@@ -20,7 +20,7 @@ type KeysStatus = { tmdb: boolean; rawg: boolean; bgg: boolean; comicvine: boole
 export function Settings() {
   const { t, locale, setLocale } = useLocale();
   const { me, refetch: refetchMe, loading } = useMe();
-  const { visibleTypes, refetch: refetchVisibleTypes } = useVisibleMediaTypes();
+  const { refetch: refetchVisibleTypes } = useVisibleMediaTypes();
   const [status, setStatus] = useState<KeysStatus | null>(null);
   const [tmdb, setTmdb] = useState("");
   const [rawg, setRawg] = useState("");

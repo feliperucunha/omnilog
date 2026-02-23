@@ -81,10 +81,10 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     }
   }
 
-  const orderBy =
+  const orderBy: { grade?: "desc"; updatedAt?: "desc" }[] | { updatedAt: "desc" } =
     sort === "grade"
-      ? ([{ grade: "desc" }, { updatedAt: "desc" }] as const)
-      : { updatedAt: "desc" as const };
+      ? [{ grade: "desc" }, { updatedAt: "desc" }]
+      : { updatedAt: "desc" };
 
   const logs = await prisma.log.findMany({
     where,
@@ -140,7 +140,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     volume,
     contentHours,
   } = parsed.data;
-  if (!validateStatus(mediaType, status)) {
+  if (!validateStatus(mediaType as MediaType, status)) {
     res.status(400).json({ error: { status: ["Invalid status for this media type"] } });
     return;
   }

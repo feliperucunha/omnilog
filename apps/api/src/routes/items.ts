@@ -1,7 +1,12 @@
 import { Router } from "express";
+import type { Prisma } from "@prisma/client";
 import { MEDIA_TYPES } from "@logeverything/shared";
 import type { MediaType } from "@logeverything/shared";
 import { prisma } from "../lib/prisma.js";
+
+type LogWithUser = Prisma.LogGetPayload<{
+  include: { user: { select: { email: true } } };
+}>;
 import { optionalAuthMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { getMovieById, getTvById } from "../services/tmdb.js";
@@ -74,13 +79,13 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     orderBy: { createdAt: "desc" },
   });
 
-  const withGrade = logs.filter((l) => l.grade != null);
+  const withGrade = logs.filter((l: LogWithUser) => l.grade != null);
   const meanGrade =
     withGrade.length > 0
-      ? withGrade.reduce((s, l) => s + (l.grade ?? 0), 0) / withGrade.length
+      ? withGrade.reduce((s: number, l: LogWithUser) => s + (l.grade ?? 0), 0) / withGrade.length
       : null;
 
-  const reviews = logs.map((l) => ({
+  const reviews = logs.map((l: LogWithUser) => ({
     id: l.id,
     userEmail: l.user.email,
     grade: l.grade,
@@ -97,7 +102,7 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     createdAt: l.createdAt.toISOString(),
   }));
 
-  const logWithImage = logs.find((l) => l.image != null && l.image !== "");
+  const logWithImage = logs.find((l: LogWithUser) => l.image != null && l.image !== "");
   const itemImage = item.image ?? logWithImage?.image ?? null;
 
   res.json({

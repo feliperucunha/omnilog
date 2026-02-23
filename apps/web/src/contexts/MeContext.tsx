@@ -6,7 +6,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { MEDIA_TYPES, type MediaType } from "@logeverything/shared";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 
