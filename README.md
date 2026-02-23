@@ -50,27 +50,10 @@ Register an account on the web app, then use Search to find media and add logs (
 | `pnpm build`   | Build all apps and packages    |
 | `pnpm lint`    | Lint all workspaces            |
 
-## Deploy
+## Deploy (Option B: frontend and API separate)
 
-### Entirely on Vercel (monorepo, one project)
-
-1. **Connect the repo** to Vercel (Import Git Repository). Use the repo root; do not set a Root Directory.
-2. **Build settings** (usually auto-detected from `vercel.json`):
-   - **Install Command**: `pnpm install`
-   - **Build Command**: `pnpm build`
-   - **Output Directory**: `apps/web/dist`
-3. **Environment variables** (Project → Settings → Environment Variables). Add:
-   - `DATABASE_URL` – Supabase connection string (Transaction pooler, port 6543).
-   - `JWT_SECRET` – Long random string (min 32 chars).
-   - `WEB_ORIGIN` – Your Vercel deployment URL (e.g. `https://your-project.vercel.app`).
-   - Optional: `TMDB_API_KEY`, `RAWG_API_KEY`, `BGG_API_TOKEN`, SMTP vars (see `apps/api/.env.example`).
-4. **Frontend API URL**: Set `VITE_API_URL` to your deployment URL + `/api` (e.g. `https://your-project.vercel.app/api`). The app uses this at build time to call the API.
-5. Deploy. The static site is served from `apps/web/dist`; all `/api/*` requests are handled by the Express app (serverless).
-
-### Frontend and API on different hosts
-
-- **Frontend** (e.g. Vercel): Set `VITE_API_URL` to your deployed API base URL (e.g. `https://your-api.up.railway.app/api`).
-- **Backend** (e.g. Railway, Render): Set `DATABASE_URL`, `JWT_SECRET`, and `WEB_ORIGIN` to your frontend URL. See `apps/api/.env.example` for all options.
+- **Frontend** (e.g. Vercel, Netlify): Set `VITE_API_URL` to your deployed API base URL (e.g. `https://your-api.up.railway.app/api`). Build uses this at compile time.
+- **Backend** (e.g. Railway, Render): Set `DATABASE_URL` (Supabase), `JWT_SECRET` (min 32 chars), and `WEB_ORIGIN` to your deployed frontend URL (e.g. `https://your-app.vercel.app`). See `apps/api/.env.example` for all options.
 
 ## Stack
 

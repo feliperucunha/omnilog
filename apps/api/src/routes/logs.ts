@@ -8,6 +8,7 @@ import {
   MEDIA_TYPES,
 } from "@logeverything/shared";
 import type { MediaType } from "@logeverything/shared";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { sanitizeReview } from "../lib/sanitize.js";
 import { authMiddleware, type AuthenticatedRequest } from "../middleware/auth.js";
@@ -81,7 +82,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     }
   }
 
-  const orderBy: { grade?: "desc"; updatedAt?: "desc" }[] | { updatedAt: "desc" } =
+  const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =
     sort === "grade"
       ? [{ grade: "desc" }, { updatedAt: "desc" }]
       : { updatedAt: "desc" };
@@ -126,7 +127,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
   }
   const userId = req.user!.userId;
   const {
-    mediaType,
+    mediaType: mediaTypeRaw,
     externalId,
     title,
     image,
@@ -140,7 +141,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     volume,
     contentHours,
   } = parsed.data;
-  if (!validateStatus(mediaType as MediaType, status)) {
+  const mediaType = mediaTypeRaw as MediaType;
+  if (!validateStatus(mediaType, status)) {
     res.status(400).json({ error: { status: ["Invalid status for this media type"] } });
     return;
   }

@@ -46,10 +46,6 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   res.status(500).json({ error: message });
 });
 
-export { app };
-
-if (process.env.VERCEL !== "1") {
-  app.listen(PORT, () => {
-    console.log(`API listening on http://localhost:${PORT}`);
-  });
-}
+app.listen(PORT, () => {
+  console.log(`API listening on http://localhost:${PORT}`);
+});
