@@ -1,0 +1,225 @@
+{
+  "app": {
+    "name": "OMNILOG",
+    "subtitle": "Log Everything"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "movies": "Movies",
+    "tv": "TV Shows",
+    "boardgames": "Board Games",
+    "games": "Games",
+    "books": "Books",
+    "anime": "Anime",
+    "manga": "Manga",
+    "comics": "Comic Books",
+    "search": "Search",
+    "settings": "Settings",
+    "logOut": "Log out",
+    "logIn": "Log in",
+    "register": "Register",
+    "theme": "Theme"
+  },
+  "theme": {
+    "dark": "Dark",
+    "light": "Light"
+  },
+  "login": {
+    "title": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "noAccount": "No account?",
+    "registerLink": "Register",
+    "forgotPassword": "Forgot password?"
+  },
+  "register": {
+    "title": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm password",
+    "register": "Register",
+    "creatingAccount": "Creating account…",
+    "haveAccount": "Already have an account?",
+    "signInLink": "Sign in",
+    "passwordsDoNotMatch": "Passwords do not match"
+  },
+  "forgotPassword": {
+    "title": "Reset password",
+    "intro": "Enter your email and we'll send you a link to reset your password.",
+    "email": "Email",
+    "submit": "Send reset link",
+    "sending": "Sending…",
+    "backToLogin": "Back to sign in",
+    "success": "If that email is registered, you will receive a reset link shortly."
+  },
+  "resetPassword": {
+    "title": "Set new password",
+    "password": "New password",
+    "confirmPassword": "Confirm new password",
+    "submit": "Set password",
+    "submitting": "Setting password…",
+    "success": "Password updated. Signing you in…",
+    "invalidToken": "Invalid or expired link. Please request a new reset link."
+  },
+  "onboarding": {
+    "title": "Set up your preferences",
+    "subtitle": "Choose your preferred theme and the types of media you want to see. You can change these later in Settings.",
+    "themeLabel": "Theme",
+    "mediaTypesLabel": "Media types",
+    "mediaTypesHint": "Select which media types appear in the sidebar and search. You can change this in Settings.",
+    "continue": "Continue",
+    "continuing": "Continuing…"
+  },
+  "settings": {
+    "title": "Settings",
+    "advanced": "Advanced",
+    "apiKeysIntro": "Add API keys to enable search for movies, TV, games, and board games. Keys are stored in your account.",
+    "language": "Language",
+    "languageLabel": "App language",
+    "keySaved": "Key saved",
+    "getApiKey": "Get your API key →",
+    "apiKeyLabel": "API key",
+    "pasteKey": "Paste your {{name}} key",
+    "enterNewKeyToReplace": "Enter a new key to replace",
+    "saveKey": "Save key",
+    "updateKey": "Update key",
+    "saving": "Saving…",
+    "visibleMediaTypesLabel": "Media types in sidebar and search",
+    "visibleMediaTypesIntro": "Choose which media types appear in the sidebar and on the search page. Uncheck to hide a type.",
+    "saveMediaTypes": "Save"
+  },
+  "common": {
+    "tryAgain": "Try again",
+    "back": "Back",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "backToSearch": "Back to Search",
+    "reviews": "Reviews",
+    "noReviews": "No reviews yet.",
+    "noImage": "No image",
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save",
+    "update": "Update",
+    "saving": "Saving…",
+    "email": "Email",
+    "password": "Password",
+    "placeholderEmail": "you@example.com",
+    "placeholderPassword": "••••••••",
+    "placeholderPasswordRegister": "At least 8 characters"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "yourStats": "Your stats",
+    "recentLogs": "Recent logs",
+    "addLog": "Add log",
+    "noLogsYet": "No logs yet.",
+    "searchAndAddFirst": "Search and add your first log",
+    "couldntLoadLogs": "Couldn't load your logs",
+    "finishedIn": "Finished in {{duration}}",
+    "statsTitle": "Time consumed",
+    "hoursConsumed": "{{hours}}h",
+    "byMonth": "By month",
+    "byYear": "By year",
+    "noStatsYet": "Complete items with runtimes to see stats here."
+  },
+  "search": {
+    "title": "Search",
+    "search": "Search",
+    "searching": "Searching…",
+    "searchPlaceholder": "Search {{type}}...",
+    "noResults": "No results.",
+    "noResultsHint": "Try another query or media type.",
+    "noResultsUntilApiKey": "No results for this search type until an API key is set."
+  },
+  "mediaLogs": {
+    "addLog": "Add log",
+    "noLogsFor": "No logs for {{label}} yet.",
+    "searchAndAddOne": "Search and add one",
+    "couldntLoadLogs": "Couldn't load logs",
+    "filterAll": "All",
+    "sortLabel": "Sort:",
+    "sortByDate": "Date",
+    "sortByGrade": "Grade"
+  },
+  "itemPage": {
+    "back": "Back",
+    "logInToReview": "Log in to leave a review or add this to your favorites or pending list.",
+    "logInLink": "Log in"
+  },
+  "itemReviewForm": {
+    "yourReview": "Your review",
+    "addReview": "Add your review",
+    "status": "Status",
+    "season": "Season",
+    "episode": "Episode",
+    "chapter": "Chapter",
+    "volume": "Volume",
+    "grade": "Grade (0–10)",
+    "rating": "Rating",
+    "reviewPlaceholder": "Your thoughts...",
+    "saveReview": "Save review",
+    "updateReview": "Update"
+  },
+  "status": {
+    "watched": "Watched",
+    "planToWatch": "Plan to watch",
+    "completed": "Completed",
+    "watching": "Watching",
+    "dropped": "Dropped",
+    "played": "Played",
+    "planToPlay": "Plan to play",
+    "playing": "Playing",
+    "read": "Read",
+    "planToRead": "Plan to read",
+    "reading": "Reading"
+  },
+  "logComplete": {
+    "logged": "Logged",
+    "viewItem": "View item",
+    "backToDashboard": "Back to dashboard"
+  },
+  "logForm": {
+    "review": "Review",
+    "reviewPlaceholder": "Your thoughts..."
+  },
+  "apiKeyPrompt": {
+    "apiKeyNeededFor": "API key needed for {{name}}",
+    "yourApiKey": "Your API key",
+    "saveToAccount": "Save to my account",
+    "logInToSave": "Log in to save your API key to your account. Until then, you can still get a key from the link above and add it after signing in."
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "message": "An unexpected error occurred.",
+    "retry": "Try again"
+  },
+  "toast": {
+    "emailPasswordRequired": "Email and password required",
+    "passwordMinLength": "Password must be at least 8 characters",
+    "welcomeBack": "Welcome back!",
+    "accountCreated": "Account created!",
+    "loginFailed": "Login failed",
+    "registrationFailed": "Registration failed",
+    "loggedOut": "Logged out",
+    "enterApiKey": "Enter your API key",
+    "apiKeySaved": "API key saved",
+    "enterKeyToSave": "Enter a key to save",
+    "keySaved": "{{name}} key saved",
+    "mediaTypesSaved": "Media types updated",
+    "failedToSave": "Failed to save",
+    "gradeInvalid": "Grade must be between 0 and 10",
+    "reviewUpdated": "Review updated",
+    "reviewSaved": "Review saved",
+    "failedToSaveReview": "Failed to save",
+    "logUpdated": "Log updated",
+    "logSaved": "Log saved",
+    "logDeleted": "Log deleted",
+    "deleteFailed": "Delete failed",
+    "searchFailed": "Search failed",
+    "trySearchingAgain": "Try searching again"
+  }
+}

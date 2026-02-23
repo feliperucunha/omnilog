@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  password             String
+  passwordResetToken   String?   // unique token for reset link
+  passwordResetExpires DateTime? // token expiry (e.g. 1h)
+  tmdbApiKey       String?
+  rawgApiKey       String?
+  bggApiToken      String?
+  comicVineApiKey  String?
+  preferredTheme      String?  // "light" | "dark"
+  preferredLocale     String?  // "en" | "pt-BR" | "es"
+  visibleMediaTypes   String?  // JSON array of media type strings; null = all
+  onboarded           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  logs          Log[]
+}
+
+model Log {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mediaType  String
+  externalId String
+  title      String
+  image      String?  // poster/cover URL saved when logging (for cards and item page fallback)
+  grade      Int?     // null when only in list without review
+  review     String?  // optional comment (sanitized before save)
+  listType   String?  // legacy "favorites" | "pending"
+  status       String?   // per-media: watched, completed, playing, etc.
+  startedAt    DateTime? // when set to in-progress (watching/reading/playing)
+  completedAt  DateTime? // when set to completed
+  contentHours Float?   // duration of content in hours (for stats)
+  season       Int?     // tv, anime
+  episode      Int?     // tv, anime
+  chapter      Int?     // anime, manga, comics
+  volume       Int?     // anime, manga, comics
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, mediaType, externalId])
+  @@index([userId])
+  @@index([userId, mediaType])
+  @@index([mediaType, externalId])
+}

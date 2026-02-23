@@ -1,0 +1,224 @@
+{
+  "app": {
+    "name": "OMNILOG",
+    "subtitle": "Registre tudo"
+  },
+  "nav": {
+    "dashboard": "Início",
+    "movies": "Filmes",
+    "tv": "Séries",
+    "boardgames": "Board Games",
+    "games": "Jogos",
+    "books": "Livros",
+    "anime": "Anime",
+    "manga": "Manga",
+    "comics": "Quadrinhos",
+    "search": "Buscar",
+    "settings": "Configurações",
+    "logOut": "Sair",
+    "logIn": "Entrar",
+    "register": "Cadastrar",
+    "theme": "Tema"
+  },
+  "theme": {
+    "dark": "Escuro",
+    "light": "Claro"
+  },
+  "login": {
+    "title": "Entrar",
+    "email": "E-mail",
+    "password": "Senha",
+    "signIn": "Entrar",
+    "signingIn": "Entrando…",
+    "noAccount": "Não tem conta?",
+    "registerLink": "Cadastre-se",
+    "forgotPassword": "Esqueceu a senha?"
+  },
+  "register": {
+    "title": "Criar conta",
+    "email": "E-mail",
+    "password": "Senha",
+    "confirmPassword": "Confirmar senha",
+    "register": "Cadastrar",
+    "creatingAccount": "Criando conta…",
+    "haveAccount": "Já tem uma conta?",
+    "signInLink": "Entrar",
+    "passwordsDoNotMatch": "As senhas não coincidem"
+  },
+  "forgotPassword": {
+    "title": "Redefinir senha",
+    "intro": "Digite seu e-mail e enviaremos um link para redefinir sua senha.",
+    "email": "E-mail",
+    "submit": "Enviar link",
+    "sending": "Enviando…",
+    "backToLogin": "Voltar ao entrar",
+    "success": "Se esse e-mail estiver cadastrado, você receberá um link em breve."
+  },
+  "resetPassword": {
+    "title": "Definir nova senha",
+    "password": "Nova senha",
+    "confirmPassword": "Confirmar nova senha",
+    "submit": "Definir senha",
+    "submitting": "Definindo senha…",
+    "success": "Senha atualizada. Entrando…",
+    "invalidToken": "Link inválido ou expirado. Solicite um novo link."
+  },
+  "onboarding": {
+    "title": "Configure suas preferências",
+    "subtitle": "Escolha o tema e os tipos de mídia que deseja ver. Você pode alterar depois em Configurações.",
+    "themeLabel": "Tema",
+    "mediaTypesLabel": "Tipos de mídia",
+    "mediaTypesHint": "Selecione quais tipos aparecem na barra e na busca. Você pode alterar em Configurações.",
+    "continue": "Continuar",
+    "continuing": "Continuando…"
+  },
+  "settings": {
+    "title": "Configurações",
+    "advanced": "Avançado",
+    "apiKeysIntro": "Adicione chaves de API para buscar filmes, séries, jogos e board games. As chaves ficam salvas na sua conta.",
+    "language": "Idioma",
+    "languageLabel": "Idioma do app",
+    "keySaved": "Chave salva",
+    "getApiKey": "Obter chave de API →",
+    "pasteKey": "Cole sua chave {{name}}",
+    "enterNewKeyToReplace": "Digite uma nova chave para substituir",
+    "saveKey": "Salvar chave",
+    "updateKey": "Atualizar chave",
+    "saving": "Salvando…",
+    "visibleMediaTypesLabel": "Tipos de mídia na barra e na busca",
+    "visibleMediaTypesIntro": "Escolha quais tipos de mídia aparecem na barra lateral e na página de busca. Desmarque para ocultar.",
+    "saveMediaTypes": "Salvar"
+  },
+  "common": {
+    "tryAgain": "Tentar novamente",
+    "back": "Voltar",
+    "showPassword": "Mostrar senha",
+    "hidePassword": "Ocultar senha",
+    "backToSearch": "Voltar à busca",
+    "reviews": "Resenhas",
+    "noReviews": "Nenhuma resenha ainda.",
+    "noImage": "Sem imagem",
+    "edit": "Editar",
+    "delete": "Excluir",
+    "cancel": "Cancelar",
+    "save": "Salvar",
+    "update": "Atualizar",
+    "saving": "Salvando…",
+    "email": "E-mail",
+    "password": "Senha",
+    "placeholderEmail": "voce@exemplo.com",
+    "placeholderPassword": "••••••••",
+    "placeholderPasswordRegister": "Mínimo 8 caracteres"
+  },
+  "dashboard": {
+    "title": "Início",
+    "finishedIn": "Finalizado em {{duration}}",
+    "statsTitle": "Tempo consumido",
+    "hoursConsumed": "{{hours}}h",
+    "byMonth": "Por mês",
+    "byYear": "Por ano",
+    "noStatsYet": "Complete itens com tempo para ver as estatísticas aqui.",
+    "yourStats": "Suas estatísticas",
+    "recentLogs": "Logs recentes",
+    "addLog": "Adicionar log",
+    "noLogsYet": "Nenhum log ainda.",
+    "searchAndAddFirst": "Busque e adicione seu primeiro log",
+    "couldntLoadLogs": "Não foi possível carregar seus logs"
+  },
+  "search": {
+    "title": "Buscar",
+    "search": "Buscar",
+    "searching": "Buscando…",
+    "searchPlaceholder": "Buscar {{type}}...",
+    "noResults": "Nenhum resultado.",
+    "noResultsHint": "Tente outra busca ou tipo de mídia.",
+    "noResultsUntilApiKey": "Nenhum resultado para este tipo até que uma chave de API seja configurada."
+  },
+  "mediaLogs": {
+    "addLog": "Adicionar log",
+    "noLogsFor": "Nenhum log de {{label}} ainda.",
+    "searchAndAddOne": "Busque e adicione um",
+    "couldntLoadLogs": "Não foi possível carregar os logs",
+    "filterAll": "Todos",
+    "sortLabel": "Ordenar:",
+    "sortByDate": "Data",
+    "sortByGrade": "Nota"
+  },
+  "itemPage": {
+    "back": "Voltar",
+    "logInToReview": "Entre para deixar uma resenha ou adicionar aos favoritos ou à lista de pendentes.",
+    "logInLink": "Entrar"
+  },
+  "itemReviewForm": {
+    "yourReview": "Sua resenha",
+    "addReview": "Adicionar sua resenha",
+    "status": "Status",
+    "season": "Temporada",
+    "episode": "Episódio",
+    "chapter": "Capítulo",
+    "volume": "Volume",
+    "grade": "Nota (0–10)",
+    "rating": "Avaliação",
+    "reviewPlaceholder": "Seus pensamentos...",
+    "saveReview": "Salvar resenha",
+    "updateReview": "Atualizar"
+  },
+  "status": {
+    "watched": "Assistido",
+    "planToWatch": "Quero assistir",
+    "completed": "Completo",
+    "watching": "Assistindo",
+    "dropped": "Abandonado",
+    "played": "Jogado",
+    "planToPlay": "Quero jogar",
+    "playing": "Jogando",
+    "read": "Lido",
+    "planToRead": "Quero ler",
+    "reading": "Lendo"
+  },
+  "logComplete": {
+    "logged": "Registrado",
+    "viewItem": "Ver item",
+    "backToDashboard": "Voltar ao início"
+  },
+  "logForm": {
+    "review": "Resenha",
+    "reviewPlaceholder": "Seus pensamentos..."
+  },
+  "apiKeyPrompt": {
+    "apiKeyNeededFor": "Chave de API necessária para {{name}}",
+    "yourApiKey": "Sua chave de API",
+    "saveToAccount": "Salvar na minha conta",
+    "logInToSave": "Entre para salvar sua chave na sua conta. Até lá, você pode obter uma chave no link acima e adicioná-la depois."
+  },
+  "errorBoundary": {
+    "title": "Algo deu errado",
+    "message": "Ocorreu um erro inesperado.",
+    "retry": "Tentar novamente"
+  },
+  "toast": {
+    "emailPasswordRequired": "E-mail e senha são obrigatórios",
+    "passwordMinLength": "A senha deve ter pelo menos 8 caracteres",
+    "welcomeBack": "Bem-vindo de volta!",
+    "accountCreated": "Conta criada!",
+    "loginFailed": "Falha ao entrar",
+    "registrationFailed": "Falha no cadastro",
+    "loggedOut": "Você saiu",
+    "enterApiKey": "Digite sua chave de API",
+    "apiKeySaved": "Chave de API salva",
+    "enterKeyToSave": "Digite uma chave para salvar",
+    "keySaved": "Chave {{name}} salva",
+    "mediaTypesSaved": "Tipos de mídia atualizados",
+    "failedToSave": "Falha ao salvar",
+    "gradeInvalid": "A nota deve ser entre 0 e 10",
+    "reviewUpdated": "Resenha atualizada",
+    "reviewSaved": "Resenha salva",
+    "failedToSaveReview": "Falha ao salvar",
+    "logUpdated": "Log atualizado",
+    "logSaved": "Log salvo",
+    "logDeleted": "Log excluído",
+    "deleteFailed": "Falha ao excluir",
+    "searchFailed": "Falha na busca",
+    "trySearchingAgain": "Tente buscar novamente"
+  }
+}

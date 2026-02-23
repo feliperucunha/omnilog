@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Typography – local fonts from src/fonts */
+:root {
+  --font-body: "Roboto Serif", Georgia, serif;
+  --font-heading: "Bodoni Moda", "Times New Roman", serif;
+  --font-display: "Hammersmith One", system-ui, sans-serif;
+}
+
+/* Light theme and defaults */
+:root {
+  --color-darkest: #0D1B2A;
+  --color-dark: #1B263B;
+  --color-mid: #415A77;
+  --color-light: #778DA9;
+  --color-lightest: #E0E1DD;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Dark theme: plain black backgrounds, neutral grays for text/borders; accent only on buttons/links */
+[data-theme="dark"],
+.dark {
+  --color-darkest: #000000;
+  --color-dark: #0a0a0a;
+  --color-mid: #333333;
+  --color-light: #737373;
+  --color-lightest: #fafafa;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.7);
+}
+
+/* Light theme: warm neutrals, sidebar and topbar share same surface for cohesion */
+[data-theme="light"] {
+  --color-darkest: #FAF9F7;
+  --color-dark: #F2F0EB;
+  --color-mid: #778DA9;
+  --color-light: #778DA9;
+  --color-lightest: #1C1917;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.06);
+  --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-darkest);
+  color: var(--color-lightest);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
