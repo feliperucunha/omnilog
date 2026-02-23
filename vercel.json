@@ -1,0 +1,6 @@
+{
+  "buildCommand": "pnpm run build --filter=@logeverything/web...",
+  "outputDirectory": "apps/web/dist",
+  "installCommand": "pnpm install",
+  "framework": null
+}
