@@ -226,40 +226,49 @@ export function Search() {
       {hasSearched && !loading && results.length > 0 && (
         <motion.div variants={staggerContainer} initial="initial" animate="animate">
           <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {results.map((item) => (
+            {results.map((item) => {
+              const status = token ? logsByExternalId.get(item.id) : undefined;
+              const isDropped = status === "dropped";
+              const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
+              const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
+              const listBorderClass =
+                status == null
+                  ? "border-[var(--color-dark)]"
+                  : isDropped
+                    ? "border-2 border-red-500"
+                    : isInProgress
+                      ? "border-2 border-amber-400"
+                      : isCompleted
+                        ? "border-2 border-emerald-600"
+                        : "border-2 border-[var(--color-mid)]";
+              const badgeClass =
+                status == null
+                  ? ""
+                  : isDropped
+                    ? "bg-red-500/95 text-white"
+                    : isInProgress
+                      ? "bg-amber-400 text-[var(--color-darkest)]"
+                      : isCompleted
+                        ? "bg-emerald-600 text-white"
+                        : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
+              return (
               <motion.div key={item.id} variants={staggerItem} className="min-h-0 sm:h-full">
                 <motion.div whileTap={tapScale} transition={tapTransition} className="h-full">
                   <button
                     type="button"
                     onClick={() => setDrawerItem({ mediaType, id: item.id })}
-                    className="h-full w-full flex flex-row sm:flex-col text-left overflow-hidden rounded-lg border border-[var(--color-dark)] bg-[var(--color-dark)] text-inherit no-underline shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 hover:border-black"
+                    className={`h-full w-full flex flex-row sm:flex-col text-left overflow-hidden rounded-lg border bg-[var(--color-dark)] text-inherit no-underline shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 ${listBorderClass} ${status == null ? "hover:border-black" : ""}`}
                   >
                     <div className="w-20 h-28 flex-shrink-0 overflow-hidden relative rounded-l-lg sm:w-full sm:h-auto sm:aspect-[2/3] sm:rounded-l-none sm:rounded-t-lg">
                       <ItemImage src={item.image} className="h-full w-full" />
-                      {token && (() => {
-                        const status = logsByExternalId.get(item.id);
-                        if (!status) return null;
-                        const label = t(`status.${STATUS_I18N_KEYS[status] ?? status}`);
-                        const isDropped = status === "dropped";
-                        const isInProgress = (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-                        const isCompleted = (COMPLETED_STATUSES as readonly string[]).includes(status);
-                        const badgeClass =
-                          isDropped
-                            ? "bg-red-500/95 text-white"
-                            : isInProgress
-                              ? "bg-amber-400 text-[var(--color-darkest)]"
-                              : isCompleted
-                                ? "bg-emerald-600 text-white"
-                                : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
-                        return (
-                          <span
-                            className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
-                            title={label}
-                          >
-                            {label}
-                          </span>
-                        );
-                      })()}
+                      {token && status && (
+                        <span
+                          className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
+                          title={t(`status.${STATUS_I18N_KEYS[status] ?? status}`)}
+                        >
+                          {t(`status.${STATUS_I18N_KEYS[status] ?? status}`)}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-1 min-w-0 flex-col justify-center gap-0.5 p-3 overflow-hidden sm:justify-start sm:gap-1 sm:h-[5.5rem] sm:min-h-[5.5rem] sm:p-4 sm:pt-3 sm:flex-shrink-0">
                       <p className="text-[10px] font-medium uppercase text-[var(--color-light)] truncate sm:text-xs">
@@ -293,7 +302,8 @@ export function Search() {
                   </button>
                 </motion.div>
               </motion.div>
-            ))}
+              );
+            })}
           </div>
         </motion.div>
       )}
