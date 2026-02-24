@@ -13,9 +13,14 @@ const app = express();
 const PORT = process.env.PORT ?? 3001;
 const WEB_ORIGIN = process.env.WEB_ORIGIN ?? "http://localhost:5173";
 
+/** CORS: allow multiple origins (e.g. production + localhost) via comma-separated CORS_ORIGINS. */
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+  : [WEB_ORIGIN];
+
 app.use(
   cors({
-    origin: WEB_ORIGIN,
+    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
     credentials: true,
   })
 );
