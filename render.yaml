@@ -1,0 +1,13 @@
+# Render Blueprint – API service (monorepo)
+# Deploy from repo root. Set env vars in Render dashboard (DATABASE_URL, JWT_SECRET, WEB_ORIGIN, etc.).
+# DATABASE_URL must include ?pgbouncer=true when using Supabase Transaction pooler (port 6543).
+services:
+  - type: web
+    name: logeverything-api
+    runtime: node
+    # Build from repo root so pnpm workspace + turbo work
+    buildCommand: pnpm install && pnpm run build --filter=@logeverything/api...
+    startCommand: node apps/api/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production

@@ -53,7 +53,7 @@ Register an account on the web app, then use Search to find media and add logs (
 ## Deploy (Option B: frontend and API separate)
 
 - **Frontend** (e.g. Vercel, Netlify): Set `VITE_API_URL` to your deployed API base URL (e.g. `https://your-api.up.railway.app/api`). Build uses this at compile time.
-- **Backend** (e.g. Railway, Render): Set `DATABASE_URL` (Supabase), `JWT_SECRET` (min 32 chars), and `WEB_ORIGIN` to your deployed frontend URL (e.g. `https://your-app.vercel.app`). See `apps/api/.env.example` for all options.
+- **Backend** (e.g. Render): Set **Root Directory** to empty (repo root). **Build Command:** `pnpm install && pnpm run build --filter=@logeverything/api...` **Start Command:** `node apps/api/dist/index.js`. Env: `DATABASE_URL` (Supabase; append `?pgbouncer=true` when using Transaction pooler port 6543), `JWT_SECRET` (min 32 chars), `WEB_ORIGIN` (deployed frontend URL). See `apps/api/.env.example`. Optional: use `render.yaml` (Blueprint) for the same config.
 
 ## Stack
 
