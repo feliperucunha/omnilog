@@ -14,6 +14,7 @@ import { apiFetch, invalidateLogsAndItemsCache } from "@/lib/api";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
+import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars, starsToGrade } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
@@ -131,15 +132,7 @@ export function LogForm(props: LogFormProps) {
       <DialogContent onClose={props.onCancel}>
         <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
           <div className="mb-4 flex gap-4">
-            {image ? (
-              <img
-                src={image}
-                alt=""
-                className="h-20 w-14 rounded object-cover"
-              />
-            ) : (
-              <div className="h-20 w-14 rounded bg-[var(--color-darkest)]" />
-            )}
+            <ItemImage src={image} className="h-20 w-14 rounded" />
             <h3 className="line-clamp-2 text-lg font-semibold text-[var(--color-lightest)]">
               {title}
             </h3>

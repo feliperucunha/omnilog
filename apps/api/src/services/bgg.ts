@@ -1,5 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import type { SearchResult, ItemDetail } from "@logeverything/shared";
+import { sortSearchResults } from "../lib/sortSearchResults.js";
 
 const BASE = "https://boardgamegeek.com/xmlapi2";
 
@@ -54,7 +55,8 @@ export type SearchBoardGamesResult =
 export async function searchBoardGames(
   q: string,
   apiToken?: string | null,
-  meta?: { link: string; tutorial: string }
+  meta?: { link: string; tutorial: string },
+  sort?: string
 ): Promise<SearchBoardGamesResult> {
   const token = apiToken ?? process.env.BGG_API_TOKEN;
   if (!token) {
@@ -94,7 +96,7 @@ export async function searchBoardGames(
   const thingItems = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
   if (thingItems.length === 0) return { results: [] };
 
-  const results = thingItems.map((item) => {
+  let results = thingItems.map((item) => {
     const names = item.name;
     let title = "Unknown";
     if (Array.isArray(names)) {
@@ -112,5 +114,6 @@ export async function searchBoardGames(
       subtitle: null,
     };
   });
-  return { results };
+  const sorted = sortSearchResults(results, sort) as typeof results;
+  return { results: sorted };
 }

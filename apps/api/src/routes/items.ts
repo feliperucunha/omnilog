@@ -2,6 +2,7 @@ import { Router } from "express";
 import { MEDIA_TYPES } from "@logeverything/shared";
 import type { MediaType } from "@logeverything/shared";
 import { prisma } from "../lib/prisma.js";
+import { sanitizeText, EXTERNAL_ID_MAX_LENGTH } from "../lib/sanitize.js";
 import { optionalAuthMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { getMovieById, getTvById } from "../services/tmdb.js";
@@ -22,13 +23,26 @@ async function getUserKeys(userId: string) {
   return user ?? undefined;
 }
 
+const DEFAULT_REVIEWS_LIMIT = 10;
+const MAX_REVIEWS_LIMIT = 50;
+
 itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res) => {
   const mediaType = req.params.mediaType as MediaType;
-  const externalId = req.params.externalId;
-  if (!MEDIA_TYPES.includes(mediaType) || !externalId) {
+  const rawExternalId = req.params.externalId;
+  if (!MEDIA_TYPES.includes(mediaType) || !rawExternalId) {
     res.status(400).json({ error: "Invalid mediaType or externalId" });
     return;
   }
+  const externalId = sanitizeText(rawExternalId, EXTERNAL_ID_MAX_LENGTH);
+  if (!externalId) {
+    res.status(400).json({ error: "Invalid externalId" });
+    return;
+  }
+  const reviewsPage = Math.max(1, parseInt(String(req.query.reviewsPage ?? 1), 10) || 1);
+  const reviewsLimit = Math.min(
+    MAX_REVIEWS_LIMIT,
+    Math.max(1, parseInt(String(req.query.reviewsLimit ?? DEFAULT_REVIEWS_LIMIT), 10) || DEFAULT_REVIEWS_LIMIT)
+  );
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
 
   let item = null;
@@ -68,16 +82,27 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     return;
   }
 
-  const logs = await prisma.log.findMany({
-    where: { mediaType, externalId },
-    include: { user: { select: { email: true } } },
-    orderBy: { createdAt: "desc" },
-  });
+  const where = { mediaType, externalId };
 
-  const withGrade = logs.filter((l) => l.grade != null);
+  const [reviewsTotal, gradeAgg, logs] = await Promise.all([
+    prisma.log.count({ where }),
+    prisma.log.aggregate({
+      where: { ...where, grade: { not: null } },
+      _avg: { grade: true },
+      _count: { grade: true },
+    }),
+    prisma.log.findMany({
+      where,
+      include: { user: { select: { email: true } } },
+      orderBy: { createdAt: "desc" },
+      skip: (reviewsPage - 1) * reviewsLimit,
+      take: reviewsLimit,
+    }),
+  ]);
+
   const meanGrade =
-    withGrade.length > 0
-      ? withGrade.reduce((s, l) => s + (l.grade ?? 0), 0) / withGrade.length
+    gradeAgg._count.grade > 0 && gradeAgg._avg.grade != null
+      ? gradeAgg._avg.grade
       : null;
 
   const reviews = logs.map((l) => ({
@@ -97,8 +122,11 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     createdAt: l.createdAt.toISOString(),
   }));
 
-  const logWithImage = logs.find((l) => l.image != null && l.image !== "");
-  const itemImage = item.image ?? logWithImage?.image ?? null;
+  const logWithImage = await prisma.log.findFirst({
+    where: { mediaType, externalId, image: { not: null } },
+    select: { image: true },
+  });
+  const itemImage = item.image ?? (logWithImage?.image as string | null) ?? null;
 
   res.json({
     item: {
@@ -108,8 +136,12 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
       year: item.year,
       subtitle: item.subtitle,
       runtimeMinutes: item.runtimeMinutes ?? null,
+      timeToBeatHours: item.timeToBeatHours ?? null,
     },
     reviews,
     meanGrade: meanGrade != null ? Math.round(meanGrade * 10) / 10 : null,
+    reviewsTotal,
+    reviewsPage,
+    reviewsLimit,
   });
 });

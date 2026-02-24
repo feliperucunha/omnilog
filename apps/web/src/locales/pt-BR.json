@@ -15,6 +15,7 @@
     "comics": "Quadrinhos",
     "search": "Buscar",
     "settings": "Configurações",
+    "about": "Sobre",
     "logOut": "Sair",
     "logIn": "Entrar",
     "register": "Cadastrar",
@@ -23,6 +24,9 @@
   "theme": {
     "dark": "Escuro",
     "light": "Claro"
+  },
+  "topbar": {
+    "preferences": "Tema e idioma"
   },
   "login": {
     "title": "Entrar",
@@ -110,11 +114,17 @@
     "placeholderPassword": "••••••••",
     "placeholderPasswordRegister": "Mínimo 8 caracteres"
   },
+  "reviews": {
+    "pageOf": "Página {{current}} de {{total}} ({{count}} resenhas)",
+    "prev": "Anterior",
+    "next": "Próxima"
+  },
   "dashboard": {
     "title": "Início",
     "finishedIn": "Finalizado em {{duration}}",
     "statsTitle": "Tempo consumido",
     "hoursConsumed": "{{hours}}h",
+    "byCategory": "Por categoria",
     "byMonth": "Por mês",
     "byYear": "Por ano",
     "noStatsYet": "Complete itens com tempo para ver as estatísticas aqui.",
@@ -130,9 +140,21 @@
     "search": "Buscar",
     "searching": "Buscando…",
     "searchPlaceholder": "Buscar {{type}}...",
+    "sortBy": "Ordenar por",
     "noResults": "Nenhum resultado.",
     "noResultsHint": "Tente outra busca ou tipo de mídia.",
     "noResultsUntilApiKey": "Nenhum resultado para este tipo até que uma chave de API seja configurada."
+  },
+  "searchSort": {
+    "relevance": "Relevância",
+    "titleAsc": "Título (A–Z)",
+    "titleDesc": "Título (Z–A)",
+    "yearNewest": "Ano (mais recente)",
+    "yearOldest": "Ano (mais antigo)",
+    "releasedNewest": "Data de lançamento (mais recente)",
+    "releasedOldest": "Data de lançamento (mais antigo)",
+    "ratingHighest": "Nota (maior)",
+    "scoreHighest": "Pontuação (maior)"
   },
   "mediaLogs": {
     "addLog": "Adicionar log",
@@ -147,7 +169,10 @@
   "itemPage": {
     "back": "Voltar",
     "logInToReview": "Entre para deixar uma resenha ou adicionar aos favoritos ou à lista de pendentes.",
-    "logInLink": "Entrar"
+    "logInLink": "Entrar",
+    "timeToBeat": "Tempo para zerar",
+    "timeToBeatHours": "{{hours}} h",
+    "timeToBeatHoursMinutes": "{{hours}} h {{minutes}} min"
   },
   "itemReviewForm": {
     "yourReview": "Sua resenha",
@@ -185,11 +210,34 @@
     "review": "Resenha",
     "reviewPlaceholder": "Seus pensamentos..."
   },
+  "customEntry": {
+    "dialogTitle": "Adicionar entrada manual",
+    "addCustomEntry": "Entrada manual",
+    "mediaType": "Tipo",
+    "entryTitle": "Título",
+    "entryTitlePlaceholder": "ex.: Nome do filme ou livro",
+    "entryTitleRequired": "Digite um título",
+    "imageUrl": "URL da imagem",
+    "invalidImageUrl": "Digite uma URL de imagem válida"
+  },
   "apiKeyPrompt": {
     "apiKeyNeededFor": "Chave de API necessária para {{name}}",
     "yourApiKey": "Sua chave de API",
     "saveToAccount": "Salvar na minha conta",
     "logInToSave": "Entre para salvar sua chave na sua conta. Até lá, você pode obter uma chave no link acima e adicioná-la depois."
+  },
+  "about": {
+    "title": "Sobre",
+    "projectTitle": "Sobre o projeto",
+    "projectBody": "OMNILOG é um app web responsivo para registrar e avaliar filmes, séries, board games, jogos, livros, anime, manga e quadrinhos. Você pode buscar por categoria, adicionar entradas manuais quando algo não está no banco de dados e manter resenhas e notas em um só lugar.\n\nO app é open source e feito com React no frontend e Node na API (monorepo Turborepo).",
+    "aboutMeTitle": "Sobre mim",
+    "aboutMeBody": "Criei o OMNILOG como projeto paralelo para acompanhar tudo que assisto, jogo e leio em um só lugar. Se for útil para você, considere apoiar o projeto pelos links abaixo.",
+    "donationTitle": "Apoie o projeto",
+    "donationIntro": "Se o OMNILOG for útil para você, pode apoiar o desenvolvimento com uma doação única ou apoio recorrente. Obrigado!",
+    "donateKofi": "Ko-fi",
+    "donateBuyMeACoffee": "Buy Me a Coffee",
+    "donateGitHub": "GitHub Sponsors",
+    "donationNotConfigured": "Links de doação não configurados. Defina VITE_DONATION_KOFI_URL, VITE_DONATION_BUYMEACOFFEE_URL e/ou VITE_DONATION_GITHUB_SPONSORS_URL no ambiente de deploy para exibi-los aqui."
   },
   "errorBoundary": {
     "title": "Algo deu errado",

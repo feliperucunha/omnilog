@@ -12,6 +12,7 @@ import {
   Search,
   LogIn,
   UserPlus,
+  Info,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -74,6 +75,7 @@ export function Nav() {
       icon: MEDIA_TYPE_NAV[type].icon,
     })),
     { to: "/search", labelKey: "nav.search", icon: <Search size={iconSize} /> },
+    { to: "/about", labelKey: "nav.about", icon: <Info size={iconSize} /> },
   ];
 
   return (
@@ -108,6 +110,7 @@ export function Nav() {
                 icon={<Search size={iconSize} />}
                 active={location.pathname === "/search"}
               />
+              <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} />
               <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} />
               <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} />
             </>
@@ -136,6 +139,7 @@ export function Nav() {
               icon={<Search size={iconSize} />}
               className="min-w-fit flex-shrink-0"
             />
+            <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} className="min-w-fit flex-shrink-0" />
             <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} className="min-w-fit flex-shrink-0" />
             <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} className="min-w-fit flex-shrink-0" />
           </>

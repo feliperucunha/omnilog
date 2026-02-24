@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
+import { ItemImage } from "@/components/ItemImage";
 import { useLocale } from "@/contexts/LocaleContext";
 import { modalContentVariants } from "@/lib/animations";
 
@@ -36,15 +37,7 @@ export function LogComplete() {
             {t("logComplete.logged")}
           </p>
           <div className="mb-4 flex justify-center">
-            {image ? (
-              <img
-                src={image}
-                alt=""
-                className="h-40 w-28 rounded-lg object-cover shadow-lg"
-              />
-            ) : (
-              <div className="h-40 w-28 rounded-lg bg-[var(--color-darkest)] shadow-lg" />
-            )}
+            <ItemImage src={image} className="h-40 w-28 rounded-lg shadow-lg" />
           </div>
           <h1 className="mb-3 text-xl font-bold text-[var(--color-lightest)] line-clamp-2">
             {title}

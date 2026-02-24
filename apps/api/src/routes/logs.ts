@@ -10,7 +10,13 @@ import {
 import type { MediaType } from "@logeverything/shared";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { sanitizeReview } from "../lib/sanitize.js";
+import {
+  sanitizeReview,
+  sanitizeText,
+  sanitizeUrl,
+  TITLE_MAX_LENGTH,
+  EXTERNAL_ID_MAX_LENGTH,
+} from "../lib/sanitize.js";
 import { authMiddleware, type AuthenticatedRequest } from "../middleware/auth.js";
 
 export const logsRouter = Router();
@@ -22,8 +28,8 @@ const optionalFloat = z.number().min(0).nullable().optional();
 
 const createLogSchema = z.object({
   mediaType: z.enum(MEDIA_TYPES as unknown as [string, ...string[]]),
-  externalId: z.string().min(1),
-  title: z.string().min(1),
+  externalId: z.string().min(1).max(EXTERNAL_ID_MAX_LENGTH),
+  title: z.string().min(1).max(TITLE_MAX_LENGTH),
   image: z.string().url().max(2048).nullable().optional(),
   grade: z.number().min(0).max(10).optional(),
   review: z.string().optional(),
@@ -72,7 +78,10 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
 
   const where = { userId } as { userId: string; mediaType?: string; externalId?: string; status?: string };
   if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
-  if (externalId) where.externalId = externalId;
+  if (externalId) {
+    const safe = sanitizeText(externalId, EXTERNAL_ID_MAX_LENGTH);
+    if (safe) where.externalId = safe;
+  }
   if (status != null && status !== "") {
     if (mediaType && MEDIA_TYPES.includes(mediaType)) {
       const allowed = LOG_STATUS_OPTIONS[mediaType];
@@ -94,26 +103,31 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   res.json(logs);
 });
 
-/** GET /logs/stats?group=month|year - hours of content completed per period */
+/** GET /logs/stats?group=category|month|year - hours of content completed per category or per period */
 logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
-  const group = (req.query.group as string) === "year" ? "year" : "month";
+  const groupParam = req.query.group as string;
+  const group = groupParam === "year" ? "year" : groupParam === "category" ? "category" : "month";
   const logs = await prisma.log.findMany({
     where: {
       userId,
       completedAt: { not: null },
       contentHours: { not: null },
     },
-    select: { completedAt: true, contentHours: true },
+    select: { completedAt: true, contentHours: true, mediaType: true },
   });
-  const byPeriod: Record<string, number> = {};
+  const byKey: Record<string, number> = {};
   for (const log of logs) {
     if (log.completedAt == null || log.contentHours == null) continue;
-    const d = log.completedAt;
-    const key = group === "year" ? `${d.getUTCFullYear()}` : `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-    byPeriod[key] = (byPeriod[key] ?? 0) + log.contentHours;
+    const key =
+      group === "category"
+        ? (log.mediaType as string)
+        : group === "year"
+          ? `${log.completedAt.getUTCFullYear()}`
+          : `${log.completedAt.getUTCFullYear()}-${String(log.completedAt.getUTCMonth() + 1).padStart(2, "0")}`;
+    byKey[key] = (byKey[key] ?? 0) + log.contentHours;
   }
-  const entries = Object.entries(byPeriod)
+  const entries = Object.entries(byKey)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([period, hours]) => ({ period, hours: Math.round(hours * 10) / 10 }));
   res.json({ group, data: entries });
@@ -146,6 +160,13 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     res.status(400).json({ error: { status: ["Invalid status for this media type"] } });
     return;
   }
+  const sanitizedTitle = sanitizeText(title, TITLE_MAX_LENGTH);
+  const sanitizedExternalId = sanitizeText(externalId, EXTERNAL_ID_MAX_LENGTH);
+  if (!sanitizedTitle || !sanitizedExternalId) {
+    res.status(400).json({ error: "Invalid title or externalId" });
+    return;
+  }
+  const sanitizedImage = image != null ? sanitizeUrl(image) : null;
   const sanitizedReview = sanitizeReview(review ?? null);
   const now = new Date();
   const createStartedAt = isInProgress(status) ? now : null;
@@ -171,7 +192,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         chapter: number | null;
         volume: number | null;
       } = {
-        title,
+        title: sanitizedTitle,
         grade: grade ?? null,
         review: sanitizedReview,
         listType: listType ?? null,
@@ -182,7 +203,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         chapter: chapter ?? null,
         volume: volume ?? null,
       };
-      if (image !== undefined) updateData.image = image ?? null;
+      if (image !== undefined) updateData.image = sanitizedImage ?? null;
       if (isInProgress(status) && existing.startedAt == null) updateData.startedAt = now;
       if (isCompleted(status)) updateData.completedAt = now;
       log = await prisma.log.update({
@@ -194,9 +215,9 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         data: {
           userId,
           mediaType,
-          externalId,
-          title,
-          image: image ?? null,
+          externalId: sanitizedExternalId,
+          title: sanitizedTitle,
+          image: sanitizedImage ?? null,
           grade: grade ?? null,
           review: sanitizedReview,
           listType: listType ?? null,
@@ -249,7 +270,7 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     chapter?: number | null;
     volume?: number | null;
   } = {};
-  if (parsed.data.image !== undefined) data.image = parsed.data.image;
+  if (parsed.data.image !== undefined) data.image = sanitizeUrl(parsed.data.image) ?? null;
   if (parsed.data.grade !== undefined) data.grade = parsed.data.grade;
   if (parsed.data.review !== undefined) data.review = sanitizeReview(parsed.data.review);
   if (parsed.data.listType !== undefined) data.listType = parsed.data.listType;

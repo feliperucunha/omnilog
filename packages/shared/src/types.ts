@@ -55,7 +55,78 @@ export interface SearchResult {
   image: string | null;
   year?: string | null;
   subtitle?: string | null;
+  /** Average time to beat in hours (games only, from RAWG playtime). */
+  timeToBeatHours?: number | null;
 }
+
+/** Sort option for search: value sent to API, labelKey for i18n (e.g. searchSort.titleAsc). */
+export interface SearchSortOption {
+  value: string;
+  labelKey: string;
+}
+
+/** Search sort options per media type (API-dependent). Default first = relevance. */
+export const SEARCH_SORT_OPTIONS: Record<MediaType, readonly SearchSortOption[]> = {
+  movies: [
+    { value: "relevance", labelKey: "searchSort.relevance" },
+    { value: "title_asc", labelKey: "searchSort.titleAsc" },
+    { value: "title_desc", labelKey: "searchSort.titleDesc" },
+    { value: "year_desc", labelKey: "searchSort.yearNewest" },
+    { value: "year_asc", labelKey: "searchSort.yearOldest" },
+  ],
+  tv: [
+    { value: "relevance", labelKey: "searchSort.relevance" },
+    { value: "title_asc", labelKey: "searchSort.titleAsc" },
+    { value: "title_desc", labelKey: "searchSort.titleDesc" },
+    { value: "year_desc", labelKey: "searchSort.yearNewest" },
+    { value: "year_asc", labelKey: "searchSort.yearOldest" },
+  ],
+  boardgames: [
+    { value: "relevance", labelKey: "searchSort.relevance" },
+    { value: "title_asc", labelKey: "searchSort.titleAsc" },
+    { value: "title_desc", labelKey: "searchSort.titleDesc" },
+    { value: "year_desc", labelKey: "searchSort.yearNewest" },
+    { value: "year_asc", labelKey: "searchSort.yearOldest" },
+  ],
+  games: [
+    { value: "relevance", labelKey: "searchSort.relevance" },
+    { value: "released_desc", labelKey: "searchSort.releasedNewest" },
+    { value: "released_asc", labelKey: "searchSort.releasedOldest" },
+    { value: "rating_desc", labelKey: "searchSort.ratingHighest" },
+    { value: "name_asc", labelKey: "searchSort.titleAsc" },
+    { value: "name_desc", labelKey: "searchSort.titleDesc" },
+  ],
+  books: [
+    { value: "relevance", labelKey: "searchSort.relevance" },
+    { value: "title_asc", labelKey: "searchSort.titleAsc" },
+    { value: "title_desc", labelKey: "searchSort.titleDesc" },
+    { value: "year_desc", labelKey: "searchSort.yearNewest" },
+    { value: "year_asc", labelKey: "searchSort.yearOldest" },
+  ],
+  anime: [
+    { value: "relevance", labelKey: "searchSort.relevance" },
+    { value: "title_asc", labelKey: "searchSort.titleAsc" },
+    { value: "title_desc", labelKey: "searchSort.titleDesc" },
+    { value: "score_desc", labelKey: "searchSort.scoreHighest" },
+    { value: "start_date_desc", labelKey: "searchSort.yearNewest" },
+    { value: "start_date_asc", labelKey: "searchSort.yearOldest" },
+  ],
+  manga: [
+    { value: "relevance", labelKey: "searchSort.relevance" },
+    { value: "title_asc", labelKey: "searchSort.titleAsc" },
+    { value: "title_desc", labelKey: "searchSort.titleDesc" },
+    { value: "score_desc", labelKey: "searchSort.scoreHighest" },
+    { value: "start_date_desc", labelKey: "searchSort.yearNewest" },
+    { value: "start_date_asc", labelKey: "searchSort.yearOldest" },
+  ],
+  comics: [
+    { value: "relevance", labelKey: "searchSort.relevance" },
+    { value: "title_asc", labelKey: "searchSort.titleAsc" },
+    { value: "title_desc", labelKey: "searchSort.titleDesc" },
+    { value: "year_desc", labelKey: "searchSort.yearNewest" },
+    { value: "year_asc", labelKey: "searchSort.yearOldest" },
+  ],
+};
 
 /** Item detail for the public item page (same shape as SearchResult, used for header) */
 export interface ItemDetail {
@@ -66,6 +137,8 @@ export interface ItemDetail {
   subtitle?: string | null;
   /** Runtime in minutes (movies, TV, etc.) for content-hours stats */
   runtimeMinutes?: number | null;
+  /** Average time to beat in hours (games only, from RAWG playtime). */
+  timeToBeatHours?: number | null;
 }
 
 /** A review shown on the item page (from any user) */
@@ -90,6 +163,12 @@ export interface ItemPageData {
   item: ItemDetail;
   reviews: ItemReview[];
   meanGrade: number | null;
+  /** Total number of reviews (for pagination). */
+  reviewsTotal?: number;
+  /** Current reviews page (1-based). */
+  reviewsPage?: number;
+  /** Reviews per page. */
+  reviewsLimit?: number;
 }
 
 export interface Log {

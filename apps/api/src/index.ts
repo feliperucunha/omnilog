@@ -1,6 +1,7 @@
 import "express-async-errors";
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import { authRouter } from "./routes/auth.js";
 import { itemsRouter } from "./routes/items.js";
@@ -13,10 +14,11 @@ const app = express();
 const PORT = process.env.PORT ?? 3001;
 const WEB_ORIGIN = process.env.WEB_ORIGIN ?? "http://localhost:5173";
 
-/** CORS: allow multiple origins (e.g. production + localhost) via comma-separated CORS_ORIGINS. */
-const corsOrigins = process.env.CORS_ORIGINS
+/** CORS: allowed request origins (frontend URLs where the browser runs), not the API URL. */
+const corsOriginsRaw = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
   : [WEB_ORIGIN];
+const corsOrigins = corsOriginsRaw.length > 0 ? corsOriginsRaw : [WEB_ORIGIN];
 
 app.use(
   cors({
@@ -24,6 +26,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(cookieParser());
 app.use(express.json());
 
 const limiter = rateLimit({

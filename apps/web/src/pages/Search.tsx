@@ -4,14 +4,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { MEDIA_TYPES, type MediaType, type SearchResult } from "@logeverything/shared";
+import { MEDIA_TYPES, SEARCH_SORT_OPTIONS, type MediaType, type SearchResult } from "@logeverything/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, STATUS_I18N_KEYS } from "@logeverything/shared";
 import { toast } from "sonner";
 import { apiFetch, apiFetchCached, invalidateApiCache } from "@/lib/api";
 import { SearchSkeleton } from "@/components/skeletons";
 import { ApiKeyPrompt, type ApiKeyProvider } from "@/components/ApiKeyPrompt";
 import { ItemPageContent } from "@/components/ItemPageContent";
+import { ItemImage } from "@/components/ItemImage";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
+import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +33,7 @@ export function Search() {
   const effectiveVisibleTypes = visibleTypes.length > 0 ? visibleTypes : [...MEDIA_TYPES];
   const defaultType = (effectiveVisibleTypes[0] ?? "movies") as MediaType;
   const [mediaType, setMediaType] = useState<MediaType>(stateMediaType ?? defaultType);
+  const [sortBy, setSortBy] = useState<string>("relevance");
   const [query, setQuery] = useState(stateQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,18 +57,25 @@ export function Search() {
   }, [effectiveVisibleTypes, mediaType]);
 
   useEffect(() => {
+    setSortBy("relevance");
+  }, [mediaType]);
+
+  useEffect(() => {
     if (stateQuery) setQuery(stateQuery);
   }, [stateQuery]);
 
-  const runSearch = useCallback(async (q: string, typeOverride?: MediaType) => {
+  const runSearch = useCallback(async (q: string, typeOverride?: MediaType, sortOverride?: string) => {
     if (!q.trim()) return;
     const searchType = typeOverride ?? mediaType;
+    const sort = sortOverride ?? sortBy;
     setLoading(true);
     setResults([]);
     setRequiresApiKey(null);
     try {
+      const params = new URLSearchParams({ type: searchType, q: q.trim() });
+      if (sort && sort !== "relevance") params.set("sort", sort);
       const data = await apiFetch<SearchResponse>(
-        `/search?type=${searchType}&q=${encodeURIComponent(q.trim())}`
+        `/search?${params.toString()}`
       );
       const list = data.results ?? [];
       setResults(list);
@@ -85,7 +95,7 @@ export function Search() {
     } finally {
       setLoading(false);
     }
-  }, [mediaType, t]);
+  }, [mediaType, sortBy, t]);
 
   const hasRunInitialSearch = useRef(false);
   const [hasSearched, setHasSearched] = useState(!!stateQuery.trim());
@@ -178,6 +188,27 @@ export function Search() {
                 </motion.div>
               ))}
             </div>
+            {hasSearched && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-[var(--color-light)]">{t("search.sortBy")}</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSortBy(v);
+                    if (query.trim()) runSearch(query, undefined, v);
+                  }}
+                  className="flex h-9 min-w-[10rem] rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
+                  aria-label={t("search.sortBy")}
+                >
+                  {SEARCH_SORT_OPTIONS[mediaType].map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {t(opt.labelKey)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </motion.div>
         </form>
       </motion.div>
@@ -194,27 +225,17 @@ export function Search() {
 
       {hasSearched && !loading && results.length > 0 && (
         <motion.div variants={staggerContainer} initial="initial" animate="animate">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
             {results.map((item) => (
-              <motion.div key={item.id} variants={staggerItem} className="h-full min-h-0">
+              <motion.div key={item.id} variants={staggerItem} className="min-h-0 sm:h-full">
                 <motion.div whileTap={tapScale} transition={tapTransition} className="h-full">
                   <button
                     type="button"
                     onClick={() => setDrawerItem({ mediaType, id: item.id })}
-                    className="h-full w-full flex flex-col text-left overflow-hidden rounded-lg border border-[var(--color-dark)] bg-[var(--color-dark)] text-inherit no-underline shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 hover:border-black"
+                    className="h-full w-full flex flex-row sm:flex-col text-left overflow-hidden rounded-lg border border-[var(--color-dark)] bg-[var(--color-dark)] text-inherit no-underline shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 hover:border-black"
                   >
-                    <div className="aspect-[2/3] w-full flex-shrink-0 overflow-hidden bg-[var(--color-darkest)] relative">
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt=""
-                          className="h-full w-full object-cover block"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-[var(--color-mid)]">
-                          {t("common.noImage")}
-                        </div>
-                      )}
+                    <div className="w-20 h-28 flex-shrink-0 overflow-hidden relative rounded-l-lg sm:w-full sm:h-auto sm:aspect-[2/3] sm:rounded-l-none sm:rounded-t-lg">
+                      <ItemImage src={item.image} className="h-full w-full" />
                       {token && (() => {
                         const status = logsByExternalId.get(item.id);
                         if (!status) return null;
@@ -232,7 +253,7 @@ export function Search() {
                                 : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
                         return (
                           <span
-                            className={`absolute bottom-1.5 right-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium ${badgeClass}`}
+                            className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
                             title={label}
                           >
                             {label}
@@ -240,15 +261,33 @@ export function Search() {
                         );
                       })()}
                     </div>
-                    <div className="flex flex-col gap-1 flex-shrink-0 h-[5.5rem] min-h-[5.5rem] p-4 pt-3 overflow-hidden">
-                      <p className="text-xs font-medium uppercase text-[var(--color-light)] truncate">
+                    <div className="flex flex-1 min-w-0 flex-col justify-center gap-0.5 p-3 overflow-hidden sm:justify-start sm:gap-1 sm:h-[5.5rem] sm:min-h-[5.5rem] sm:p-4 sm:pt-3 sm:flex-shrink-0">
+                      <p className="text-[10px] font-medium uppercase text-[var(--color-light)] truncate sm:text-xs">
                         {t(`nav.${mediaType}`)}
                       </p>
-                      <p className="line-clamp-1 text-lg font-semibold text-[var(--color-lightest)]">
+                      <p className="line-clamp-2 text-sm font-semibold text-[var(--color-lightest)] sm:line-clamp-1 sm:text-lg">
                         {item.title}
                       </p>
-                      <p className="line-clamp-2 text-sm leading-snug text-[var(--color-light)]">
-                        {[item.year, item.subtitle].filter(Boolean).join(" · ") || "—"}
+                      <p className="line-clamp-1 text-xs text-[var(--color-light)] sm:line-clamp-2 sm:text-sm sm:leading-snug">
+                        {(() => {
+                          const parts: string[] = [item.year ?? "", item.subtitle ?? ""].filter(Boolean);
+                          if (
+                            mediaType === "games" &&
+                            item.timeToBeatHours != null &&
+                            item.timeToBeatHours > 0
+                          ) {
+                            const { hours, minutes } = formatTimeToBeatHours(item.timeToBeatHours);
+                            parts.push(
+                              minutes > 0
+                                ? t("itemPage.timeToBeatHoursMinutes", {
+                                    hours: String(hours),
+                                    minutes: String(minutes),
+                                  })
+                                : t("itemPage.timeToBeatHours", { hours: String(hours) })
+                            );
+                          }
+                          return parts.join(" · ") || "—";
+                        })()}
                       </p>
                     </div>
                   </button>

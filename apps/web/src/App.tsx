@@ -13,17 +13,20 @@ import { Search } from "@/pages/Search";
 import { ItemPage } from "@/pages/ItemPage";
 import { MediaLogs } from "@/pages/MediaLogs";
 import { Settings } from "@/pages/Settings";
+import { About } from "@/pages/About";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { token } = useAuth();
+  const { token, initializing } = useAuth();
+  if (initializing) return null;
   if (!token) return <Navigate to="/login" replace />;
   return <>{children}</>;
 };
 
 const RequireOnboarded = ({ children }: { children: React.ReactNode }) => {
-  const { token, user } = useAuth();
+  const { token, user, initializing } = useAuth();
   const location = useLocation();
-    if (token && user && user.onboarded === false) {
+  if (initializing) return null;
+  if (token && user && user.onboarded === false) {
     const allowed = ["/onboarding", "/login", "/register", "/forgot-password", "/reset-password", "/log-complete"];
     if (!allowed.includes(location.pathname)) return <Navigate to="/onboarding" replace />;
   }
@@ -31,7 +34,8 @@ const RequireOnboarded = ({ children }: { children: React.ReactNode }) => {
 };
 
 const DashboardOrSearch = () => {
-  const { token } = useAuth();
+  const { token, initializing } = useAuth();
+  if (initializing) return null;
   if (token) return <Dashboard />;
   return <Navigate to="/search" replace />;
 };
@@ -50,6 +54,7 @@ export default function App() {
         <Route element={<AnimatedOutlet />}>
           <Route index element={<DashboardOrSearch />} />
           <Route path="search" element={<Search />} />
+          <Route path="about" element={<About />} />
           <Route path="item/:mediaType/:id" element={<ItemPage />} />
         <Route path="movies" element={<ProtectedRoute><MediaLogs mediaType="movies" /></ProtectedRoute>} />
           <Route path="tv" element={<ProtectedRoute><MediaLogs mediaType="tv" /></ProtectedRoute>} />

@@ -24,7 +24,7 @@ A responsive web app to log and rate movies, TV shows, board games, video games,
 
 3. **Environment and database** (API uses PostgreSQL, e.g. Supabase):
 
-   - **Backend** (`apps/api/.env`): Set `DATABASE_URL` to your Supabase connection string (Project Settings → Database → Connection string, URI; use **Transaction** pooler, port 6543, for the app).
+   - **Backend** (`apps/api/.env`): Set `DATABASE_URL` to your Supabase connection string (Project Settings → Database → Connection string, URI; use **Transaction** pooler, port 6543, for the app). When using the Transaction pooler, append `?pgbouncer=true` to the URL (or `&pgbouncer=true` if the URL already has query params) to avoid "prepared statement does not exist" errors.
    - **Frontend** (`apps/web/.env.local`): Already present; leave `VITE_API_URL` unset for local dev (Vite proxies `/api` to the API).
    - **Create tables in Supabase** (no need for Prisma to connect from your machine): open **Supabase Dashboard** → **SQL Editor** → **New query**. Paste the contents of `apps/api/prisma/supabase-init.sql`, then click **Run**. That creates the `User` and `Log` tables and records the migration so future `prisma migrate deploy` (e.g. from CI) won’t re-apply it.
    - Optional: for **movie/TV search** set `TMDB_API_KEY` in `apps/api/.env`; for **games** set `RAWG_API_KEY`; for **board games** set `BGG_API_TOKEN`. Books, Anime, and BGG work without keys (or users add their own in-app).

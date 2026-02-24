@@ -1,4 +1,5 @@
 import type { SearchResult, ItemDetail } from "@logeverything/shared";
+import { sortSearchResults } from "../lib/sortSearchResults.js";
 
 const BASE = "https://comicvine.gamespot.com/api";
 
@@ -41,7 +42,8 @@ export type SearchComicsOut =
 export async function searchComics(
   q: string,
   apiKey: string | null | undefined,
-  meta: { link: string; tutorial: string }
+  meta: { link: string; tutorial: string },
+  sort?: string
 ): Promise<SearchComicsOut> {
   if (!apiKey?.trim()) {
     return { results: [], requiresApiKey: "comicvine", link: meta.link, tutorial: meta.tutorial };
@@ -63,12 +65,13 @@ export async function searchComics(
     }>;
   };
   if (data.status_code !== 1 || !Array.isArray(data.results)) return { results: [] };
-  const results: SearchResult[] = data.results.slice(0, 20).map((item) => ({
+  const list: SearchResult[] = data.results.slice(0, 20).map((item) => ({
     id: String(item.id),
     title: item.name ?? "Unknown",
     image: item.image?.medium_url ?? item.image?.small_url ?? null,
     year: item.start_year ?? null,
     subtitle: null,
   }));
+  const results = sortSearchResults(list, sort);
   return { results };
 }

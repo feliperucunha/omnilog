@@ -1,5 +1,18 @@
 import type { SearchResult, ItemDetail } from "@logeverything/shared";
 
+/** Map our sort value to Jikan order_by and sort (asc/desc). */
+function jikanOrderParams(sort: string | undefined): { order_by?: string; sort?: string } {
+  if (!sort || sort === "relevance") return {};
+  switch (sort) {
+    case "title_asc": return { order_by: "title", sort: "asc" };
+    case "title_desc": return { order_by: "title", sort: "desc" };
+    case "score_desc": return { order_by: "score", sort: "desc" };
+    case "start_date_desc": return { order_by: "start_date", sort: "desc" };
+    case "start_date_asc": return { order_by: "start_date", sort: "asc" };
+    default: return {};
+  }
+}
+
 const BASE = "https://api.jikan.moe/v4";
 
 function toItemDetail(
@@ -33,9 +46,13 @@ export async function getAnimeById(id: string): Promise<ItemDetail | null> {
   };
 }
 
-export async function searchAnime(q: string): Promise<SearchResult[]> {
+export async function searchAnime(q: string, sort?: string): Promise<SearchResult[]> {
+  const params = new URLSearchParams({ q, limit: "20" });
+  const order = jikanOrderParams(sort);
+  if (order.order_by) params.set("order_by", order.order_by);
+  if (order.sort) params.set("sort", order.sort);
   const res = await fetch(
-    `${BASE}/anime?q=${encodeURIComponent(q)}&limit=20`
+    `${BASE}/anime?${params.toString()}`
   );
   if (!res.ok) return [];
   const data = (await res.json()) as {
@@ -67,9 +84,13 @@ export async function getMangaById(id: string): Promise<ItemDetail | null> {
   return toItemDetail(d, id);
 }
 
-export async function searchManga(q: string): Promise<SearchResult[]> {
+export async function searchManga(q: string, sort?: string): Promise<SearchResult[]> {
+  const params = new URLSearchParams({ q, limit: "20" });
+  const order = jikanOrderParams(sort);
+  if (order.order_by) params.set("order_by", order.order_by);
+  if (order.sort) params.set("sort", order.sort);
   const res = await fetch(
-    `${BASE}/manga?q=${encodeURIComponent(q)}&limit=20`
+    `${BASE}/manga?${params.toString()}`
   );
   if (!res.ok) return [];
   const data = (await res.json()) as {

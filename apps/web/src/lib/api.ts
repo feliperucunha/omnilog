@@ -10,11 +10,19 @@ const DEFAULT_TIMEOUT_MS = 15000;
 
 import { getCached, setCached, invalidateByPrefix } from "./cache.js";
 
+/** Sentinel for cookie-based sessions (no token in localStorage). */
+const COOKIE_SESSION = "cookie";
+
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem("logeverything_token");
   const headers: HeadersInit = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token && token !== COOKIE_SESSION) headers["Authorization"] = `Bearer ${token}`;
   return headers;
+}
+
+/** Dispatch so AuthContext can clear state on 401 (e.g. when using cookie session). */
+function dispatchLogout(): void {
+  window.dispatchEvent(new CustomEvent("auth:logout"));
 }
 
 function parseErrorResponse(text: string, fallback: string): string {
@@ -42,12 +50,18 @@ export function invalidateLogsAndItemsCache(): void {
   invalidateByPrefix("/items");
 }
 
+export interface ApiFetchOptions extends RequestInit {
+  timeout?: number;
+  /** When true, do not redirect to /login on 401 (e.g. for session restore or logout). */
+  skipAuthRedirect?: boolean;
+}
+
 async function fetchInternal<T>(
   path: string,
-  options?: RequestInit & { timeout?: number }
+  options?: ApiFetchOptions
 ): Promise<T> {
   const timeoutMs = options?.timeout ?? DEFAULT_TIMEOUT_MS;
-  const { timeout: _t, ...fetchOptions } = options ?? {};
+  const { timeout: _t, skipAuthRedirect, ...fetchOptions } = options ?? {};
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -55,15 +69,19 @@ async function fetchInternal<T>(
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       ...fetchOptions,
+      credentials: "include",
       signal: controller.signal,
       headers: { ...getAuthHeaders(), ...fetchOptions.headers },
     });
     clearTimeout(timeoutId);
 
     if (res.status === 401) {
-      localStorage.removeItem("logeverything_token");
-      localStorage.removeItem("logeverything_user");
-      window.location.href = "/login";
+      if (!skipAuthRedirect) {
+        localStorage.removeItem("logeverything_token");
+        localStorage.removeItem("logeverything_user");
+        dispatchLogout();
+        window.location.href = "/login";
+      }
       throw new Error("Session expired. Please sign in again.");
     }
 
@@ -94,7 +112,7 @@ async function fetchInternal<T>(
  */
 export async function apiFetch<T>(
   path: string,
-  options?: RequestInit & { timeout?: number }
+  options?: ApiFetchOptions
 ): Promise<T> {
   return fetchInternal<T>(path, options);
 }
@@ -106,7 +124,7 @@ export async function apiFetch<T>(
  */
 export async function apiFetchCached<T>(
   path: string,
-  options?: RequestInit & { timeout?: number; ttlMs?: number }
+  options?: ApiFetchOptions & { ttlMs?: number }
 ): Promise<T> {
   const method = options?.method ?? "GET";
   if (method !== "GET") {

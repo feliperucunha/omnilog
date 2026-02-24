@@ -1,13 +1,17 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import type { MediaType, Log } from "@logeverything/shared";
 import { LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache } from "@/lib/api";
 import { LogForm } from "@/components/LogForm";
+import { CustomEntryForm } from "@/components/CustomEntryForm";
+import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
@@ -32,6 +36,8 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState<"date" | "grade">("date");
+  const [showCustomEntry, setShowCustomEntry] = useState(false);
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
 
   const fetchLogs = useCallback(() => {
     setError(null);
@@ -74,6 +80,12 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
 
   const label = t(`nav.${mediaType}`);
 
+  const handleCategorySearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = categorySearchQuery.trim();
+    navigate("/search", { state: { mediaType, query: q || undefined } });
+  };
+
   if (loading && logs.length === 0) {
     return (
       <motion.div
@@ -114,22 +126,45 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="relative min-h-full pb-24 md:pb-20">
+      <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
           {label}
         </h1>
-        <motion.div whileTap={tapScale} transition={tapTransition}>
-          <Button
-            asChild
-            className="bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
-          >
-            <Link to="/search" state={{ mediaType }}>
-              {t("mediaLogs.addLog")}
-            </Link>
-          </Button>
-        </motion.div>
+        <div className="flex flex-wrap gap-2">
+          <motion.div whileTap={tapScale} transition={tapTransition}>
+            <Button
+              asChild
+              className="bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
+            >
+              <Link to="/search" state={{ mediaType }}>
+                {t("mediaLogs.addLog")}
+              </Link>
+            </Button>
+          </motion.div>
+          <motion.div whileTap={tapScale} transition={tapTransition}>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-mid)]"
+              onClick={() => setShowCustomEntry(true)}
+            >
+              {t("customEntry.addCustomEntry")}
+            </Button>
+          </motion.div>
+        </div>
       </div>
+      {showCustomEntry && (
+        <CustomEntryForm
+          mediaType={mediaType}
+          onSaved={(completion) => {
+            setShowCustomEntry(false);
+            if (completion) handleSaved(completion);
+          }}
+          onCancel={() => setShowCustomEntry(false)}
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm text-[var(--color-light)]">{t("itemReviewForm.status")}:</span>
@@ -216,12 +251,12 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
         </motion.div>
       ) : (
         <motion.div variants={staggerContainer} initial="initial" animate="animate">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {logs.map((log) => (
-              <motion.div key={log.id} variants={staggerItem} className="h-full min-h-0">
+              <motion.div key={log.id} variants={staggerItem} className="min-h-0 sm:h-full">
                 <motion.div whileTap={tapScale} transition={tapTransition} className="h-full">
                   <Card
-                    className="relative flex flex-col h-full min-h-[8.5rem] overflow-hidden border-[var(--color-dark)] bg-[var(--color-dark)]"
+                    className="relative flex flex-col min-h-0 overflow-hidden border-[var(--color-dark)] bg-[var(--color-dark)] sm:min-h-[8.5rem]"
                     style={cardShadow}
                   >
                     {deletingId === log.id && (
@@ -229,28 +264,18 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
                         <Loader2 className="h-8 w-8 animate-spin text-[var(--color-light)]" />
                       </div>
                     )}
-                    <div className="flex gap-4 p-4 flex-1 min-h-0">
-                      {log.image ? (
-                        <img
-                          src={log.image}
-                          alt=""
-                          className="h-20 w-14 flex-shrink-0 rounded-lg object-cover bg-[var(--color-darkest)]"
-                        />
-                      ) : (
-                        <div
-                          className="h-20 w-14 flex-shrink-0 rounded-lg bg-[var(--color-darkest)]"
-                        />
-                      )}
+                    <div className="flex gap-3 p-3 flex-1 min-h-0 sm:gap-4 sm:p-4">
+                      <ItemImage src={log.image} className="h-16 w-11 flex-shrink-0 rounded-lg sm:h-20 sm:w-14" />
                         <div className="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
                         <Link
                           to={`/item/${log.mediaType}/${log.externalId}`}
-                          className="line-clamp-1 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
+                          className="line-clamp-1 font-semibold text-[var(--color-lightest)] no-underline hover:underline text-sm sm:text-base"
                         >
                           {log.title}
                         </Link>
-                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                           {log.startedAt && log.completedAt && (
-                            <span className="text-xs text-[var(--color-light)]">
+                            <span className="text-[10px] sm:text-xs text-[var(--color-light)]">
                               {t("dashboard.finishedIn", { duration: formatTimeToFinish(log.startedAt, log.completedAt) })}
                             </span>
                           )}
@@ -261,7 +286,7 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
                           )}
                         </div>
                         {log.review && (
-                          <p className="line-clamp-2 text-sm text-[var(--color-light)] min-h-0">
+                          <p className="line-clamp-2 text-xs sm:text-sm text-[var(--color-light)] min-h-0">
                             {log.review}
                           </p>
                         )}
@@ -303,6 +328,30 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
           onCancel={() => setEditingLog(null)}
         />
       )}
+
+      <form
+        onSubmit={handleCategorySearchSubmit}
+        className="fixed bottom-6 left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-4 md:left-[calc(127.5px+50vw)]"
+        aria-label={t("search.search")}
+      >
+        <div className="relative flex rounded-lg border-2 border-[var(--color-mid)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">
+          <span
+            className="pointer-events-none absolute left-3 top-1/2 flex -translate-y-1/2 items-center text-[var(--color-lightest)]"
+            aria-hidden
+          >
+            <Search className="size-5" />
+          </span>
+          <Input
+            type="search"
+            placeholder={t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })}
+            value={categorySearchQuery}
+            onChange={(e) => setCategorySearchQuery(e.target.value)}
+            className="h-11 min-w-0 flex-1 border-0 bg-transparent pl-10 pr-4 text-[var(--color-lightest)] placeholder:text-[var(--color-light)] focus-visible:ring-0 focus-visible:ring-offset-0"
+            aria-label={t("search.search")}
+          />
+        </div>
+      </form>
+      </div>
     </div>
   );
 }

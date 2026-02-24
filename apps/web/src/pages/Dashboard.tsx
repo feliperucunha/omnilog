@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchCached } from "@/lib/api";
 import { DashboardSkeleton } from "@/components/skeletons";
+import { CustomEntryForm } from "@/components/CustomEntryForm";
+import { ItemImage } from "@/components/ItemImage";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
 import { MEDIA_TYPES, type Log } from "@logeverything/shared";
@@ -14,7 +16,7 @@ import { formatTimeToFinish } from "@/lib/formatDuration";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
-type StatsGroup = "month" | "year";
+type StatsGroup = "category" | "month" | "year";
 interface StatsEntry {
   period: string;
   hours: number;
@@ -22,12 +24,14 @@ interface StatsEntry {
 
 export function Dashboard() {
   const { t } = useLocale();
+  const navigate = useNavigate();
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statsGroup, setStatsGroup] = useState<StatsGroup>("month");
+  const [statsGroup, setStatsGroup] = useState<StatsGroup>("category");
   const [stats, setStats] = useState<StatsEntry[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [showCustomEntry, setShowCustomEntry] = useState(false);
 
   const fetchStats = useCallback(async (group: StatsGroup) => {
     setStatsLoading(true);
@@ -150,6 +154,14 @@ export function Dashboard() {
         </p>
         <div className="flex gap-2">
           <Button
+            variant={statsGroup === "category" ? "default" : "outline"}
+            size="sm"
+            className={statsGroup === "category" ? "bg-[var(--color-mid)] hover:bg-[var(--color-light)]" : ""}
+            onClick={() => setStatsGroup("category")}
+          >
+            {t("dashboard.byCategory")}
+          </Button>
+          <Button
             variant={statsGroup === "month" ? "default" : "outline"}
             size="sm"
             className={statsGroup === "month" ? "bg-[var(--color-mid)] hover:bg-[var(--color-light)]" : ""}
@@ -179,8 +191,18 @@ export function Dashboard() {
             <div className="flex flex-col gap-2">
               {stats.map(({ period, hours }) => (
                 <div key={period} className="flex items-center gap-3">
-                  <span className="w-20 shrink-0 text-xs text-[var(--color-light)]">
-                    {statsGroup === "year" ? period : period.slice(0, 7)}
+                  <span
+                    className={
+                      statsGroup === "category"
+                        ? "min-w-[5.5rem] max-w-[8rem] shrink-0 truncate text-xs text-[var(--color-light)]"
+                        : "w-20 shrink-0 text-xs text-[var(--color-light)]"
+                    }
+                  >
+                    {statsGroup === "category"
+                      ? t(`nav.${period}`)
+                      : statsGroup === "year"
+                        ? period
+                        : period.slice(0, 7)}
                   </span>
                   <div className="h-6 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
                     <div
@@ -199,14 +221,33 @@ export function Dashboard() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-medium uppercase text-[var(--color-light)]">
             {t("dashboard.recentLogs")}
           </p>
-          <Button asChild className="bg-[var(--color-mid)] hover:bg-[var(--color-light)]">
-            <Link to="/search">{t("dashboard.addLog")}</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild className="bg-[var(--color-mid)] hover:bg-[var(--color-light)]">
+              <Link to="/search">{t("dashboard.addLog")}</Link>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-mid)]"
+              onClick={() => setShowCustomEntry(true)}
+            >
+              {t("customEntry.addCustomEntry")}
+            </Button>
+          </div>
         </div>
+        {showCustomEntry && (
+          <CustomEntryForm
+            onSaved={(completion) => {
+              setShowCustomEntry(false);
+              if (completion) navigate("/log-complete", { state: completion });
+            }}
+            onCancel={() => setShowCustomEntry(false)}
+          />
+        )}
         {recent.length === 0 ? (
           <Card
             className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6"
@@ -238,13 +279,7 @@ export function Dashboard() {
                       className="flex gap-3 rounded-md border border-[var(--color-dark)] bg-[var(--color-dark)] p-4 text-inherit no-underline min-w-0"
                       style={paperShadow}
                     >
-                      {log.image ? (
-                        <img
-                          src={log.image}
-                          alt=""
-                          className="h-12 w-9 flex-shrink-0 rounded object-cover bg-[var(--color-darkest)]"
-                        />
-                      ) : null}
+                      <ItemImage src={log.image} className="h-12 w-9 rounded" />
                       <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                         <p className="font-medium text-[var(--color-lightest)] truncate min-w-0">
                           {log.title}

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/PasswordInput";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { COOKIE_SESSION } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import type { AuthResponse } from "@logeverything/shared";
@@ -33,7 +34,7 @@ export function Login() {
         method: "POST",
         body: JSON.stringify({ email: email.trim(), password }),
       });
-      login(data.token, { ...data.user, onboarded: data.user.onboarded ?? true });
+      login(COOKIE_SESSION, { ...data.user, onboarded: data.user.onboarded ?? true });
       toast.success(t("toast.welcomeBack"));
       navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
     } catch (err) {

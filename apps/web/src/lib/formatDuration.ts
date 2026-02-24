@@ -1,4 +1,14 @@
 /**
+ * Format time-to-beat hours for display (e.g. "12 h", "1 h 30 m").
+ * Used for games only (RAWG playtime).
+ */
+export function formatTimeToBeatHours(hours: number): { hours: number; minutes: number } {
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return { hours: h, minutes: m };
+}
+
+/**
  * Format time between two dates for display (e.g. "3 days", "2 weeks").
  */
 export function formatTimeToFinish(startedAt: string, completedAt: string): string {

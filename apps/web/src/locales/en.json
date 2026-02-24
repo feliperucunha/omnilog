@@ -15,6 +15,7 @@
     "comics": "Comic Books",
     "search": "Search",
     "settings": "Settings",
+    "about": "About",
     "logOut": "Log out",
     "logIn": "Log in",
     "register": "Register",
@@ -23,6 +24,9 @@
   "theme": {
     "dark": "Dark",
     "light": "Light"
+  },
+  "topbar": {
+    "preferences": "Theme & language"
   },
   "login": {
     "title": "Sign in",
@@ -111,6 +115,11 @@
     "placeholderPassword": "••••••••",
     "placeholderPasswordRegister": "At least 8 characters"
   },
+  "reviews": {
+    "pageOf": "Page {{current}} of {{total}} ({{count}} reviews)",
+    "prev": "Previous",
+    "next": "Next"
+  },
   "dashboard": {
     "title": "Dashboard",
     "yourStats": "Your stats",
@@ -122,6 +131,7 @@
     "finishedIn": "Finished in {{duration}}",
     "statsTitle": "Time consumed",
     "hoursConsumed": "{{hours}}h",
+    "byCategory": "By category",
     "byMonth": "By month",
     "byYear": "By year",
     "noStatsYet": "Complete items with runtimes to see stats here."
@@ -131,9 +141,21 @@
     "search": "Search",
     "searching": "Searching…",
     "searchPlaceholder": "Search {{type}}...",
+    "sortBy": "Sort by",
     "noResults": "No results.",
     "noResultsHint": "Try another query or media type.",
     "noResultsUntilApiKey": "No results for this search type until an API key is set."
+  },
+  "searchSort": {
+    "relevance": "Relevance",
+    "titleAsc": "Title (A–Z)",
+    "titleDesc": "Title (Z–A)",
+    "yearNewest": "Year (newest)",
+    "yearOldest": "Year (oldest)",
+    "releasedNewest": "Release date (newest)",
+    "releasedOldest": "Release date (oldest)",
+    "ratingHighest": "Rating (highest)",
+    "scoreHighest": "Score (highest)"
   },
   "mediaLogs": {
     "addLog": "Add log",
@@ -148,7 +170,10 @@
   "itemPage": {
     "back": "Back",
     "logInToReview": "Log in to leave a review or add this to your favorites or pending list.",
-    "logInLink": "Log in"
+    "logInLink": "Log in",
+    "timeToBeat": "Time to beat",
+    "timeToBeatHours": "{{hours}} h",
+    "timeToBeatHoursMinutes": "{{hours}} h {{minutes}} m"
   },
   "itemReviewForm": {
     "yourReview": "Your review",
@@ -186,11 +211,34 @@
     "review": "Review",
     "reviewPlaceholder": "Your thoughts..."
   },
+  "customEntry": {
+    "dialogTitle": "Add custom entry",
+    "addCustomEntry": "Custom entry",
+    "mediaType": "Type",
+    "entryTitle": "Title",
+    "entryTitlePlaceholder": "e.g. Movie or book title",
+    "entryTitleRequired": "Please enter a title",
+    "imageUrl": "Image URL",
+    "invalidImageUrl": "Please enter a valid image URL"
+  },
   "apiKeyPrompt": {
     "apiKeyNeededFor": "API key needed for {{name}}",
     "yourApiKey": "Your API key",
     "saveToAccount": "Save to my account",
     "logInToSave": "Log in to save your API key to your account. Until then, you can still get a key from the link above and add it after signing in."
+  },
+  "about": {
+    "title": "About",
+    "projectTitle": "About the project",
+    "projectBody": "OMNILOG is a responsive web app to log and rate movies, TV shows, board games, video games, books, anime, manga, and comics. You can search by category, add custom entries when something isn't in the database, and keep reviews and grades in one place.\n\nThe app is open source and built with a React frontend and Node API (Turborepo monorepo).",
+    "aboutMeTitle": "About me",
+    "aboutMeBody": "I built OMNILOG as a side project to track everything I watch, play, and read in one place. If you find it useful, consider supporting the project via the links below.",
+    "donationTitle": "Support the project",
+    "donationIntro": "If OMNILOG is useful to you, you can support its development with a one-time donation or recurring support. Thank you!",
+    "donateKofi": "Ko-fi",
+    "donateBuyMeACoffee": "Buy Me a Coffee",
+    "donateGitHub": "GitHub Sponsors",
+    "donationNotConfigured": "Donation links are not configured. Set VITE_DONATION_KOFI_URL, VITE_DONATION_BUYMEACOFFEE_URL, and/or VITE_DONATION_GITHUB_SPONSORS_URL in your deployment environment to show them here."
   },
   "errorBoundary": {
     "title": "Something went wrong",

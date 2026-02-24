@@ -1,4 +1,5 @@
 import type { SearchResult, ItemDetail } from "@logeverything/shared";
+import { sortSearchResults } from "../lib/sortSearchResults.js";
 
 const BASE = "https://api.themoviedb.org/3";
 const IMAGE_BASE = "https://image.tmdb.org/t/p/w200";
@@ -58,7 +59,8 @@ export type SearchMoviesResult =
 export async function searchMovies(
   q: string,
   apiKey?: string | null,
-  meta?: { link: string; tutorial: string }
+  meta?: { link: string; tutorial: string },
+  sort?: string
 ): Promise<SearchMoviesResult> {
   const key = getKey(apiKey);
   if (!key) {
@@ -71,14 +73,15 @@ export async function searchMovies(
   );
   if (!res.ok) return { results: [] };
   const data = (await res.json()) as { results?: Array<{ id: number; title?: string; release_date?: string; poster_path?: string }> };
-  const results = (data.results ?? []).slice(0, 20).map((item) => ({
+  let results = (data.results ?? []).slice(0, 20).map((item) => ({
     id: String(item.id),
     title: item.title ?? "Unknown",
     image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,
     year: item.release_date?.slice(0, 4) ?? null,
     subtitle: null,
   }));
-  return { results };
+  const sorted = sortSearchResults(results, sort) as typeof results;
+  return { results: sorted };
 }
 
 export type SearchTvResult =
@@ -88,7 +91,8 @@ export type SearchTvResult =
 export async function searchTv(
   q: string,
   apiKey?: string | null,
-  meta?: { link: string; tutorial: string }
+  meta?: { link: string; tutorial: string },
+  sort?: string
 ): Promise<SearchTvResult> {
   const key = getKey(apiKey);
   if (!key) {
@@ -101,12 +105,13 @@ export async function searchTv(
   );
   if (!res.ok) return { results: [] };
   const data = (await res.json()) as { results?: Array<{ id: number; name?: string; first_air_date?: string; poster_path?: string }> };
-  const results = (data.results ?? []).slice(0, 20).map((item) => ({
+  let results = (data.results ?? []).slice(0, 20).map((item) => ({
     id: String(item.id),
     title: item.name ?? "Unknown",
     image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,
     year: item.first_air_date?.slice(0, 4) ?? null,
     subtitle: null,
   }));
-  return { results };
+  const sorted = sortSearchResults(results, sort) as typeof results;
+  return { results: sorted };
 }

@@ -1,4 +1,5 @@
 import type { SearchResult, ItemDetail } from "@logeverything/shared";
+import { sortSearchResults } from "../lib/sortSearchResults.js";
 
 const BASE = "https://openlibrary.org";
 
@@ -25,7 +26,7 @@ export async function getBookById(workId: string): Promise<ItemDetail | null> {
   };
 }
 
-export async function searchBooks(q: string): Promise<SearchResult[]> {
+export async function searchBooks(q: string, sort?: string): Promise<SearchResult[]> {
   const res = await fetch(
     `${BASE}/search.json?q=${encodeURIComponent(q)}&limit=20`,
     { headers: { "User-Agent": "Logeverything/1.0 (https://github.com/logeverything)" } }
@@ -41,7 +42,7 @@ export async function searchBooks(q: string): Promise<SearchResult[]> {
     }>;
   };
   const docs = data.docs ?? [];
-  return docs.map((doc) => ({
+  let results = docs.map((doc) => ({
     id: doc.key.replace(/^\/works\//, ""),
     title: doc.title ?? "Unknown",
     image: doc.cover_i
@@ -50,4 +51,5 @@ export async function searchBooks(q: string): Promise<SearchResult[]> {
     year: doc.first_publish_year != null ? String(doc.first_publish_year) : null,
     subtitle: Array.isArray(doc.author_name) ? doc.author_name.join(", ") : null,
   }));
+  return sortSearchResults(results, sort);
 }

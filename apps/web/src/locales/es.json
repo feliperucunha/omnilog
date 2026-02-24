@@ -15,6 +15,7 @@
     "comics": "Cómics",
     "search": "Buscar",
     "settings": "Ajustes",
+    "about": "Acerca de",
     "logOut": "Cerrar sesión",
     "logIn": "Iniciar sesión",
     "register": "Registrarse",
@@ -23,6 +24,9 @@
   "theme": {
     "dark": "Oscuro",
     "light": "Claro"
+  },
+  "topbar": {
+    "preferences": "Tema e idioma"
   },
   "login": {
     "title": "Iniciar sesión",
@@ -110,6 +114,11 @@
     "placeholderPassword": "••••••••",
     "placeholderPasswordRegister": "Mínimo 8 caracteres"
   },
+  "reviews": {
+    "pageOf": "Página {{current}} de {{total}} ({{count}} reseñas)",
+    "prev": "Anterior",
+    "next": "Siguiente"
+  },
   "dashboard": {
     "title": "Inicio",
     "yourStats": "Tus estadísticas",
@@ -121,6 +130,7 @@
     "finishedIn": "Terminado en {{duration}}",
     "statsTitle": "Tiempo consumido",
     "hoursConsumed": "{{hours}}h",
+    "byCategory": "Por categoría",
     "byMonth": "Por mes",
     "byYear": "Por año",
     "noStatsYet": "Completa elementos con duración para ver estadísticas aquí."
@@ -130,9 +140,21 @@
     "search": "Buscar",
     "searching": "Buscando…",
     "searchPlaceholder": "Buscar {{type}}...",
+    "sortBy": "Ordenar por",
     "noResults": "Sin resultados.",
     "noResultsHint": "Prueba otra búsqueda o tipo de contenido.",
     "noResultsUntilApiKey": "Sin resultados para este tipo hasta que configures una clave de API."
+  },
+  "searchSort": {
+    "relevance": "Relevancia",
+    "titleAsc": "Título (A–Z)",
+    "titleDesc": "Título (Z–A)",
+    "yearNewest": "Año (más reciente)",
+    "yearOldest": "Año (más antiguo)",
+    "releasedNewest": "Fecha de lanzamiento (más reciente)",
+    "releasedOldest": "Fecha de lanzamiento (más antiguo)",
+    "ratingHighest": "Valoración (más alta)",
+    "scoreHighest": "Puntuación (más alta)"
   },
   "mediaLogs": {
     "addLog": "Añadir log",
@@ -147,7 +169,10 @@
   "itemPage": {
     "back": "Volver",
     "logInToReview": "Inicia sesión para dejar una reseña o añadir a favoritos o pendientes.",
-    "logInLink": "Iniciar sesión"
+    "logInLink": "Iniciar sesión",
+    "timeToBeat": "Tiempo para completar",
+    "timeToBeatHours": "{{hours}} h",
+    "timeToBeatHoursMinutes": "{{hours}} h {{minutes}} min"
   },
   "itemReviewForm": {
     "yourReview": "Tu reseña",
@@ -185,11 +210,34 @@
     "review": "Reseña",
     "reviewPlaceholder": "Tu opinión..."
   },
+  "customEntry": {
+    "dialogTitle": "Añadir entrada manual",
+    "addCustomEntry": "Entrada manual",
+    "mediaType": "Tipo",
+    "entryTitle": "Título",
+    "entryTitlePlaceholder": "ej. Título de película o libro",
+    "entryTitleRequired": "Introduce un título",
+    "imageUrl": "URL de imagen",
+    "invalidImageUrl": "Introduce una URL de imagen válida"
+  },
   "apiKeyPrompt": {
     "apiKeyNeededFor": "Clave de API necesaria para {{name}}",
     "yourApiKey": "Tu clave de API",
     "saveToAccount": "Guardar en mi cuenta",
     "logInToSave": "Inicia sesión para guardar tu clave en tu cuenta. Mientras tanto, puedes obtener una clave en el enlace de arriba y añadirla después."
+  },
+  "about": {
+    "title": "Acerca de",
+    "projectTitle": "Sobre el proyecto",
+    "projectBody": "OMNILOG es una app web responsive para registrar y valorar películas, series, juegos de mesa, videojuegos, libros, anime, manga y cómics. Puedes buscar por categoría, añadir entradas manuales cuando algo no está en la base de datos y tener reseñas y notas en un solo sitio.\n\nLa app es open source y está hecha con React en el frontend y Node en la API (monorepo Turborepo).",
+    "aboutMeTitle": "Sobre mí",
+    "aboutMeBody": "Creé OMNILOG como proyecto personal para seguir todo lo que veo, juego y leo en un solo lugar. Si te resulta útil, considera apoyar el proyecto con los enlaces de abajo.",
+    "donationTitle": "Apoya el proyecto",
+    "donationIntro": "Si OMNILOG te resulta útil, puedes apoyar su desarrollo con una donación puntual o apoyo recurrente. ¡Gracias!",
+    "donateKofi": "Ko-fi",
+    "donateBuyMeACoffee": "Buy Me a Coffee",
+    "donateGitHub": "GitHub Sponsors",
+    "donationNotConfigured": "Los enlaces de donación no están configurados. Define VITE_DONATION_KOFI_URL, VITE_DONATION_BUYMEACOFFEE_URL y/o VITE_DONATION_GITHUB_SPONSORS_URL en tu entorno de despliegue para mostrarlos aquí."
   },
   "errorBoundary": {
     "title": "Algo salió mal",

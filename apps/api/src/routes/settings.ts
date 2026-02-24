@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { MEDIA_TYPES } from "@logeverything/shared";
 import { prisma } from "../lib/prisma.js";
+import { sanitizeApiKey } from "../lib/sanitize.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 
@@ -15,10 +16,10 @@ export const settingsRouter = Router();
 settingsRouter.use(authMiddleware);
 
 const apiKeysSchema = z.object({
-  tmdb: z.string().min(1).optional(),
-  rawg: z.string().min(1).optional(),
-  bgg: z.string().min(1).optional(),
-  comicvine: z.string().min(1).optional(),
+  tmdb: z.string().min(1).max(512).optional(),
+  rawg: z.string().min(1).max(512).optional(),
+  bgg: z.string().min(1).max(512).optional(),
+  comicvine: z.string().min(1).max(512).optional(),
 });
 
 /** Get which API keys the user has set (no values returned). */
@@ -54,10 +55,22 @@ settingsRouter.put("/api-keys", async (req: AuthenticatedRequest, res) => {
     return;
   }
   const data: { tmdbApiKey?: string; rawgApiKey?: string; bggApiToken?: string; comicVineApiKey?: string } = {};
-  if (parsed.data.tmdb !== undefined) data.tmdbApiKey = parsed.data.tmdb;
-  if (parsed.data.rawg !== undefined) data.rawgApiKey = parsed.data.rawg;
-  if (parsed.data.bgg !== undefined) data.bggApiToken = parsed.data.bgg;
-  if (parsed.data.comicvine !== undefined) data.comicVineApiKey = parsed.data.comicvine;
+  if (parsed.data.tmdb !== undefined) {
+    const v = sanitizeApiKey(parsed.data.tmdb);
+    if (v) data.tmdbApiKey = v;
+  }
+  if (parsed.data.rawg !== undefined) {
+    const v = sanitizeApiKey(parsed.data.rawg);
+    if (v) data.rawgApiKey = v;
+  }
+  if (parsed.data.bgg !== undefined) {
+    const v = sanitizeApiKey(parsed.data.bgg);
+    if (v) data.bggApiToken = v;
+  }
+  if (parsed.data.comicvine !== undefined) {
+    const v = sanitizeApiKey(parsed.data.comicvine);
+    if (v) data.comicVineApiKey = v;
+  }
   await prisma.user.update({
     where: { id: req.user.userId },
     data,

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { Search, Settings, LogOut } from "lucide-react";
+import { Search, Settings, LogOut, SlidersHorizontal } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { LocaleSwitcherItems } from "@/components/LocaleSwitcher";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -31,8 +32,8 @@ export function Topbar() {
     else navigate("/search");
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast.success(t("toast.loggedOut"));
     navigate("/login");
   };
@@ -61,45 +62,65 @@ export function Topbar() {
         </form>
       )}
 
-      {token && user && (
-        <div className="ml-auto flex-shrink-0">
-          <DropdownMenu>
+      <div className="ml-auto flex flex-shrink-0 items-center gap-1">
+        <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-10 w-10 rounded-full border border-[var(--color-light)] bg-[var(--color-mid)]/30 p-0 text-lg font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/50"
-              aria-label={t("nav.settings")}
+              className="h-9 w-9 text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/30"
+              aria-label={t("topbar.preferences")}
             >
-              {initial}
+              <SlidersHorizontal className="size-5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-2 py-2">
-              <p className="text-xs font-medium text-[var(--color-light)]">{user.email}</p>
-            </div>
-            <DropdownMenuSeparator />
-            <div className="px-2 py-2">
               <ThemeSwitcher />
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/settings" className="flex items-center gap-2">
-                <Settings className="size-4" />
-                {t("nav.settings")}
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-red-400 focus:text-red-400 focus:bg-red-500/20"
-              onClick={handleLogout}
-            >
-              <LogOut className="size-4" />
-              {t("nav.logOut")}
-            </DropdownMenuItem>
+            <div className="px-2 py-1">
+              <p className="mb-1 px-2 text-xs font-medium text-[var(--color-light)]">
+                {t("settings.language")}
+              </p>
+              <LocaleSwitcherItems />
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
-        </div>
-      )}
+        {token && user && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full border border-[var(--color-light)] bg-[var(--color-mid)]/30 p-0 text-lg font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/50"
+                aria-label={t("nav.settings")}
+              >
+                {initial}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-2">
+                <p className="text-xs font-medium text-[var(--color-light)]">{user.email}</p>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/settings" className="flex items-center gap-2">
+                  <Settings className="size-4" />
+                  {t("nav.settings")}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-red-400 focus:text-red-400 focus:bg-red-500/20"
+                onClick={handleLogout}
+              >
+                <LogOut className="size-4" />
+                {t("nav.logOut")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
     </header>
   );
 }

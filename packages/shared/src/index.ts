@@ -3,6 +3,7 @@ export type {
   ListType,
   LogStatus,
   SearchResult,
+  SearchSortOption,
   ItemDetail,
   ItemReview,
   ItemPageData,
@@ -20,4 +21,5 @@ export {
   STATUS_I18N_KEYS,
   IN_PROGRESS_STATUSES,
   COMPLETED_STATUSES,
+  SEARCH_SORT_OPTIONS,
 } from "./types.js";
