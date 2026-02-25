@@ -250,7 +250,7 @@ export function LogForm(props: LogFormProps) {
                 >
                   <Button
                     type="submit"
-                    className="w-full bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
+                    className="w-full"
                     disabled={loading}
                   >
                     {loading ? t("common.saving") : isEdit ? t("common.update") : t("common.save")}

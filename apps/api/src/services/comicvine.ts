@@ -3,6 +3,10 @@ import { sortSearchResults } from "../lib/sortSearchResults.js";
 
 const BASE = "https://comicvine.gamespot.com/api";
 
+function getKey(apiKey?: string | null): string | null {
+  return apiKey ?? process.env.COMIC_VINE_API_KEY ?? null;
+}
+
 function buildUrl(path: string, apiKey: string, params?: Record<string, string>): string {
   const url = new URL(`${BASE}${path}`);
   url.searchParams.set("api_key", apiKey);
@@ -17,21 +21,34 @@ export async function getVolumeById(
   id: string,
   apiKey: string | null | undefined
 ): Promise<ItemDetail | null> {
-  if (!apiKey?.trim()) return null;
-  const res = await fetch(buildUrl(`/volume/4050-${id.replace(/^4050-/, "")}/`, apiKey));
+  const key = getKey(apiKey);
+  if (!key?.trim()) return null;
+  const res = await fetch(buildUrl(`/volume/4050-${id.replace(/^4050-/, "")}/`, key));
   if (!res.ok) return null;
   const data = (await res.json()) as {
     status_code?: number;
-    results?: { id?: number; name?: string; image?: { medium_url?: string }; start_year?: string };
+    results?: {
+      id?: number;
+      name?: string;
+      image?: { medium_url?: string };
+      start_year?: string;
+      description?: string;
+      count_of_issues?: number;
+      publisher?: { name?: string };
+    };
   };
   if (data.status_code !== 1 || !data.results) return null;
   const d = data.results;
+  const description = typeof d.description === "string" ? d.description.replace(/<[^>]+>/g, "").trim().slice(0, 2000) || null : null;
   return {
     id: String(d.id ?? id),
     title: d.name ?? "Unknown",
     image: d.image?.medium_url ?? null,
     year: d.start_year ?? null,
     subtitle: null,
+    description: description ?? null,
+    publisher: d.publisher?.name?.trim() || null,
+    issuesCount: (d.count_of_issues ?? 0) > 0 ? d.count_of_issues! : null,
   };
 }
 
@@ -45,10 +62,11 @@ export async function searchComics(
   meta: { link: string; tutorial: string },
   sort?: string
 ): Promise<SearchComicsOut> {
-  if (!apiKey?.trim()) {
+  const key = getKey(apiKey);
+  if (!key?.trim()) {
     return { results: [], requiresApiKey: "comicvine", link: meta.link, tutorial: meta.tutorial };
   }
-  const url = buildUrl("/search/", apiKey, {
+  const url = buildUrl("/search/", key, {
     query: q,
     resources: "volume",
     limit: "20",

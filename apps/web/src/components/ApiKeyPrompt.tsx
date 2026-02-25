@@ -98,7 +98,6 @@ export function ApiKeyPrompt({
                 />
               </div>
               <Button
-                className="bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
                 onClick={handleSave}
                 disabled={!key.trim() || saving}
               >

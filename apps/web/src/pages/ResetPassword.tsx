@@ -71,7 +71,7 @@ export function ResetPassword() {
             <CardContent className="pt-6">
               <p className="text-sm text-[var(--color-light)]">{error}</p>
               <Button
-                className="mt-4 w-full bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
+                className="mt-4 w-full"
                 onClick={() => navigate("/forgot-password", { replace: true })}
               >
                 {t("forgotPassword.title")}
@@ -127,7 +127,7 @@ export function ResetPassword() {
                 )}
                 <Button
                   type="submit"
-                  className="w-full bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
+                  className="w-full"
                   disabled={loading}
                 >
                   {loading ? t("resetPassword.submitting") : t("resetPassword.submit")}

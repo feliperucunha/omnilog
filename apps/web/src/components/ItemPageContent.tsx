@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
-import { STATUS_I18N_KEYS, type ItemPageData, type ItemReview, type MediaType } from "@logeverything/shared";
+import { STATUS_I18N_KEYS, type ItemDetail, type ItemPageData, type ItemReview, type MediaType } from "@logeverything/shared";
 import { apiFetchCached } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ItemReviewForm } from "@/components/ItemReviewForm";
@@ -17,6 +17,308 @@ import { staggerContainer, staggerItem } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
+
+function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType: MediaType; t: (key: string) => string }) {
+  const hasDescription = item.description && item.description.length > 0;
+  const hasTagline = item.tagline && item.tagline.length > 0;
+  const hasGenres = item.genres && item.genres.length > 0;
+  const hasScore = item.score != null && item.score > 0;
+  const hasContentRating = item.contentRating && item.contentRating.length > 0;
+  const hasEpisodes = item.episodesCount != null && item.episodesCount > 0;
+  const hasSeasons = item.seasonsCount != null && item.seasonsCount > 0;
+  const hasPlayers = (item.playersMin != null || item.playersMax != null);
+  const hasPlayingTime = item.playingTimeMinutes != null && item.playingTimeMinutes > 0;
+  const hasAuthors = item.authors && item.authors.length > 0;
+  const hasPublisher = item.publisher && item.publisher.length > 0;
+  const hasIssues = item.issuesCount != null && item.issuesCount > 0;
+  const hasPlatforms = item.platforms && item.platforms.length > 0;
+  const hasChapters = item.chaptersCount != null && item.chaptersCount > 0;
+  const hasVolumes = item.volumesCount != null && item.volumesCount > 0;
+  const hasRuntime = item.runtimeMinutes != null && item.runtimeMinutes > 0 && (mediaType === "movies" || mediaType === "tv");
+  const hasReleaseDate = item.releaseDate && item.releaseDate.length > 0;
+  const hasStatus = item.status && item.status.length > 0;
+  const hasProductionCountries = item.productionCountries && item.productionCountries.length > 0;
+  const hasSpokenLanguages = item.spokenLanguages && item.spokenLanguages.length > 0;
+  const hasNetworks = item.networks && item.networks.length > 0;
+  const hasDevelopers = item.developers && item.developers.length > 0;
+  const hasPublishers = item.publishers && item.publishers.length > 0;
+  const hasEsrbRating = item.esrbRating && item.esrbRating.length > 0;
+  const hasTags = item.tags && item.tags.length > 0;
+  const hasMinAge = item.minAge != null && item.minAge > 0;
+  const hasCategories = item.categories && item.categories.length > 0;
+  const hasMechanics = item.mechanics && item.mechanics.length > 0;
+  const hasStudios = item.studios && item.studios.length > 0;
+  const hasThemes = item.themes && item.themes.length > 0;
+  const hasDuration = item.duration && item.duration.length > 0;
+  const hasSerialization = item.serialization && item.serialization.length > 0;
+  const hasSubjects = item.subjects && item.subjects.length > 0;
+
+  const hasAny =
+    hasDescription ||
+    hasTagline ||
+    hasGenres ||
+    hasScore ||
+    hasContentRating ||
+    hasEpisodes ||
+    hasSeasons ||
+    hasPlayers ||
+    hasPlayingTime ||
+    hasAuthors ||
+    hasPublisher ||
+    hasIssues ||
+    hasPlatforms ||
+    hasChapters ||
+    hasVolumes ||
+    hasRuntime ||
+    hasReleaseDate ||
+    hasStatus ||
+    hasProductionCountries ||
+    hasSpokenLanguages ||
+    hasNetworks ||
+    hasDevelopers ||
+    hasPublishers ||
+    hasEsrbRating ||
+    hasTags ||
+    hasMinAge ||
+    hasCategories ||
+    hasMechanics ||
+    hasStudios ||
+    hasThemes ||
+    hasDuration ||
+    hasSerialization ||
+    hasSubjects;
+  if (!hasAny) return null;
+
+  const scoreDisplay = hasScore && item.score != null ? (item.score <= 10 ? item.score.toFixed(1) : String(Math.round(item.score))) : null;
+
+  return (
+    <Card
+      className="border-[var(--color-dark)] bg-[var(--color-dark)] p-5 sm:p-6 flex flex-col gap-5"
+      style={paperShadow}
+    >
+      {hasTagline && (
+        <p className="text-[var(--color-light)] italic text-center text-sm sm:text-base border-b border-[var(--color-mid)]/20 pb-4">
+          &ldquo;{item.tagline}&rdquo;
+        </p>
+      )}
+      {hasDescription && (
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-light)] mb-2">
+            {t("itemPage.description")}
+          </h3>
+          <p className="text-[var(--color-lightest)] text-sm sm:text-base leading-relaxed whitespace-pre-wrap">
+            {item.description}
+          </p>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {hasGenres &&
+          item.genres!.map((g) => (
+            <span
+              key={g}
+              className="rounded-full bg-[var(--color-mid)]/40 px-3 py-1 text-xs font-medium text-[var(--color-lightest)]"
+            >
+              {g}
+            </span>
+          ))}
+        {hasScore && scoreDisplay && (
+          <span className="inline-flex items-center rounded-md bg-[var(--btn-gradient-start)]/30 px-2.5 py-1 text-sm font-semibold text-[var(--color-lightest)]">
+            {scoreDisplay}/10
+          </span>
+        )}
+        {hasContentRating && (
+          <span className="rounded border border-[var(--color-mid)] px-2 py-0.5 text-xs text-[var(--color-light)]">
+            {item.contentRating}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
+        {hasReleaseDate && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.releaseDate")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{item.releaseDate}</span>
+          </div>
+        )}
+        {hasStatus && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.status")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{item.status}</span>
+          </div>
+        )}
+        {hasRuntime && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.runtime")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">
+              {item.runtimeMinutes! >= 60
+                ? `${Math.floor(item.runtimeMinutes! / 60)} h ${item.runtimeMinutes! % 60} min`
+                : `${item.runtimeMinutes} min`}
+            </span>
+          </div>
+        )}
+        {hasEpisodes && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.episodes")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{item.episodesCount}</span>
+          </div>
+        )}
+        {hasSeasons && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.seasons")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{item.seasonsCount}</span>
+          </div>
+        )}
+        {hasPlayers && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.players")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">
+              {item.playersMin != null && item.playersMax != null
+                ? `${item.playersMin}–${item.playersMax}`
+                : item.playersMin != null
+                  ? String(item.playersMin)
+                  : String(item.playersMax)}
+            </span>
+          </div>
+        )}
+        {hasPlayingTime && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.playingTime")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">
+              {item.playingTimeMinutes! >= 60
+                ? `${Math.floor(item.playingTimeMinutes! / 60)} h ${item.playingTimeMinutes! % 60} min`
+                : `${item.playingTimeMinutes} min`}
+            </span>
+          </div>
+        )}
+        {hasAuthors && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.authors")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.authors!.join(", ")}</span>
+          </div>
+        )}
+        {hasPublisher && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.publisher")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.publisher}</span>
+          </div>
+        )}
+        {hasIssues && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.issues")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{item.issuesCount}</span>
+          </div>
+        )}
+        {hasPlatforms && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.platforms")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.platforms!.join(", ")}</span>
+          </div>
+        )}
+        {hasProductionCountries && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.productionCountries")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.productionCountries!.join(", ")}</span>
+          </div>
+        )}
+        {hasSpokenLanguages && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.spokenLanguages")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.spokenLanguages!.join(", ")}</span>
+          </div>
+        )}
+        {hasNetworks && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.networks")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.networks!.join(", ")}</span>
+          </div>
+        )}
+        {hasDevelopers && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.developers")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.developers!.join(", ")}</span>
+          </div>
+        )}
+        {hasPublishers && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.publishers")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.publishers!.join(", ")}</span>
+          </div>
+        )}
+        {hasEsrbRating && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.esrbRating")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{item.esrbRating}</span>
+          </div>
+        )}
+        {hasTags && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.tags")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.tags!.join(", ")}</span>
+          </div>
+        )}
+        {hasMinAge && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.minAge")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{item.minAge}+</span>
+          </div>
+        )}
+        {hasCategories && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.categories")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.categories!.join(", ")}</span>
+          </div>
+        )}
+        {hasMechanics && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.mechanics")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.mechanics!.join(", ")}</span>
+          </div>
+        )}
+        {hasStudios && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.studios")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.studios!.join(", ")}</span>
+          </div>
+        )}
+        {hasThemes && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.themes")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.themes!.join(", ")}</span>
+          </div>
+        )}
+        {hasDuration && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.duration")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{item.duration}</span>
+          </div>
+        )}
+        {hasSerialization && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.serialization")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{item.serialization}</span>
+          </div>
+        )}
+        {hasSubjects && (
+          <div className="col-span-2 sm:col-span-3">
+            <span className="text-[var(--color-light)]">{t("itemPage.subjects")}: </span>
+            <span className="text-[var(--color-lightest)]">{item.subjects!.join(", ")}</span>
+          </div>
+        )}
+        {hasChapters && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.chapters")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{item.chaptersCount}</span>
+          </div>
+        )}
+        {hasVolumes && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.volumes")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{item.volumesCount}</span>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 export interface ItemPageContentProps {
   mediaType: MediaType;
@@ -83,7 +385,6 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             <p className="text-[var(--color-light)]">{error}</p>
             <div className="flex gap-2">
               <Button
-                className="bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
                 onClick={() => refetch(reviewsPage)}
               >
                 {t("common.tryAgain")}
@@ -168,6 +469,8 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             )}
           </div>
         </div>
+
+        <ItemDetailsBlock item={item} mediaType={mediaType} t={t} />
 
         {token && (
           <ItemReviewForm
@@ -280,7 +583,6 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-mid)]"
                       disabled={currentPage <= 1}
                       onClick={() => setReviewsPage((p) => Math.max(1, p - 1))}
                     >
@@ -290,7 +592,6 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-mid)]"
                       disabled={currentPage >= totalPages}
                       onClick={() => setReviewsPage((p) => Math.min(totalPages, p + 1))}
                     >

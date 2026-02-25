@@ -130,13 +130,8 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
 
   res.json({
     item: {
-      id: item.id,
-      title: item.title,
+      ...item,
       image: itemImage,
-      year: item.year,
-      subtitle: item.subtitle,
-      runtimeMinutes: item.runtimeMinutes ?? null,
-      timeToBeatHours: item.timeToBeatHours ?? null,
     },
     reviews,
     meanGrade: meanGrade != null ? Math.round(meanGrade * 10) / 10 : null,

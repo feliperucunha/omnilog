@@ -17,9 +17,26 @@ export async function getGameById(id: string, apiKey?: string | null): Promise<I
     released?: string;
     background_image?: string;
     playtime?: number;
+    description_raw?: string;
+    description?: string;
+    metacritic?: number;
+    genres?: Array<{ name?: string }>;
+    platforms?: Array<{ platform?: { name?: string } }>;
+    developers?: Array<{ name?: string }>;
+    publishers?: Array<{ name?: string }>;
+    esrb_rating?: { name?: string };
+    tags?: Array<{ name?: string }>;
   };
   const timeToBeatHours =
     typeof data.playtime === "number" && data.playtime > 0 ? data.playtime : null;
+  const description = (data.description_raw ?? data.description)?.trim();
+  const genres = data.genres?.map((g) => g.name).filter(Boolean) as string[] | undefined;
+  const platforms = data.platforms?.map((p) => p.platform?.name).filter(Boolean) as string[] | undefined;
+  const developers = data.developers?.map((d) => d.name).filter(Boolean) as string[] | undefined;
+  const publishers = data.publishers?.map((p) => p.name).filter(Boolean) as string[] | undefined;
+  const tags = data.tags?.map((t) => t.name).filter(Boolean) as string[] | undefined;
+  const score = typeof data.metacritic === "number" && data.metacritic > 0 ? data.metacritic / 10 : null;
+  const esrbRating = data.esrb_rating?.name?.trim() || null;
   return {
     id: String(data.id ?? id),
     title: data.name ?? "Unknown",
@@ -27,6 +44,15 @@ export async function getGameById(id: string, apiKey?: string | null): Promise<I
     year: data.released?.slice(0, 4) ?? null,
     subtitle: null,
     timeToBeatHours,
+    description: description || null,
+    genres: genres?.length ? genres : null,
+    score: score ?? null,
+    platforms: platforms?.length ? platforms : null,
+    releaseDate: data.released?.trim() || null,
+    developers: developers?.length ? developers : null,
+    publishers: publishers?.length ? publishers : null,
+    esrbRating: esrbRating ?? null,
+    tags: tags?.length ? tags : null,
   };
 }
 

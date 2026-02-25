@@ -4,6 +4,47 @@
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button:not(:disabled):active,
+  [role="button"]:not(:disabled):active {
+    opacity: 0.92;
+  }
+}
+
+@layer components {
+  .btn-gradient {
+    background: linear-gradient(135deg, var(--btn-gradient-start), var(--btn-gradient-end));
+    color: var(--btn-text);
+  }
+  @media (hover: hover) {
+    .btn-gradient:hover:not(:disabled) {
+      background: linear-gradient(135deg, var(--btn-gradient-hover-start), var(--btn-gradient-hover-end));
+    }
+  }
+  .btn-gradient-secondary {
+    background: linear-gradient(135deg, var(--btn-gradient-start), var(--btn-gradient-end));
+    color: var(--btn-text);
+    opacity: 0.85;
+  }
+  @media (hover: hover) {
+    .btn-gradient-secondary:hover:not(:disabled) {
+      opacity: 1;
+      background: linear-gradient(135deg, var(--btn-gradient-hover-start), var(--btn-gradient-hover-end));
+    }
+  }
+  .btn-gradient-destructive {
+    background: linear-gradient(135deg, var(--btn-destructive-start), var(--btn-destructive-end));
+    color: white;
+  }
+  @media (hover: hover) {
+    .btn-gradient-destructive:hover:not(:disabled) {
+      background: linear-gradient(135deg, var(--btn-destructive-hover-start), var(--btn-destructive-hover-end));
+    }
   }
 }
 
@@ -22,6 +63,17 @@
   --color-light: #778DA9;
   --color-lightest: #E0E1DD;
 
+  /* Button gradients (primary) */
+  --btn-gradient-start: #415A77;
+  --btn-gradient-end: #5c7a9e;
+  --btn-gradient-hover-start: #4a6b8a;
+  --btn-gradient-hover-end: #6b8ab0;
+  --btn-text: #ffffff;
+  --btn-destructive-start: #dc2626;
+  --btn-destructive-end: #b91c1c;
+  --btn-destructive-hover-start: #ef4444;
+  --btn-destructive-hover-end: #dc2626;
+
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -38,6 +90,16 @@
   --color-light: #737373;
   --color-lightest: #fafafa;
 
+  --btn-gradient-start: #2563eb;
+  --btn-gradient-end: #4f46e5;
+  --btn-gradient-hover-start: #3b82f6;
+  --btn-gradient-hover-end: #6366f1;
+  --btn-text: #ffffff;
+  --btn-destructive-start: #dc2626;
+  --btn-destructive-end: #b91c1c;
+  --btn-destructive-hover-start: #ef4444;
+  --btn-destructive-hover-end: #dc2626;
+
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
@@ -52,6 +114,16 @@
   --color-mid: #778DA9;
   --color-light: #778DA9;
   --color-lightest: #1C1917;
+
+  --btn-gradient-start: #415A77;
+  --btn-gradient-end: #5c7a9e;
+  --btn-gradient-hover-start: #4a6b8a;
+  --btn-gradient-hover-end: #6b8ab0;
+  --btn-text: #ffffff;
+  --btn-destructive-start: #dc2626;
+  --btn-destructive-end: #b91c1c;
+  --btn-destructive-hover-start: #ef4444;
+  --btn-destructive-hover-end: #dc2626;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);

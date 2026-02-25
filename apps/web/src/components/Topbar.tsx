@@ -1,10 +1,9 @@
-import { useState } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
-import { Search, Settings, LogOut, SlidersHorizontal } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Settings, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import { LocaleSwitcherItems } from "@/components/LocaleSwitcher";
+import { LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -13,23 +12,30 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
+
+const LOCALE_SHORT_LABELS: Record<Locale, string> = {
+  en: "EN",
+  "pt-BR": "PT",
+  es: "ES",
+};
 
 export function Topbar() {
-  const { t } = useLocale();
+  const { t, locale, setLocale } = useLocale();
   const { token, user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [searchQuery, setSearchQuery] = useState("");
-  const isSearchPage = location.pathname === "/search";
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = searchQuery.trim();
-    if (q) navigate("/search", { state: { query: q } });
-    else navigate("/search");
+  const handleLocaleChange = (newLocale: Locale) => {
+    setLocale(newLocale);
+    if (token) {
+      apiFetch("/settings/locale", {
+        method: "PUT",
+        body: JSON.stringify({ locale: newLocale }),
+      }).catch(() => {});
+    }
   };
 
   const handleLogout = async () => {
@@ -43,50 +49,33 @@ export function Topbar() {
   return (
     <header
       className={cn(
-        "flex h-14 flex-shrink-0 items-center gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-4"
+        "flex h-14 flex-shrink-0 items-center gap-3 sm:gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-3 py-2 sm:p-4"
       )}
     >
-      {!isSearchPage && (
-        <form onSubmit={handleSearchSubmit} className="relative flex flex-1 items-center max-w-md">
-          <span className="pointer-events-none absolute left-3 flex size-5 items-center justify-center text-[var(--color-lightest)]" aria-hidden>
-            <Search className="size-5" />
-          </span>
-          <Input
-            type="search"
-            placeholder={t("search.searchPlaceholder", { type: t("nav.search").toLowerCase() })}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 pl-10 pr-4 border-2 border-[var(--color-lightest)]/80 bg-[var(--color-darkest)] text-[var(--color-lightest)] placeholder:text-[var(--color-lightest)] focus-visible:border-[var(--color-lightest)] focus-visible:ring-[var(--color-lightest)]/30"
-            aria-label={t("nav.search")}
-          />
-        </form>
-      )}
-
-      <div className="ml-auto flex flex-shrink-0 items-center gap-1">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/30"
-              aria-label={t("topbar.preferences")}
-            >
-              <SlidersHorizontal className="size-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <div className="px-2 py-2">
-              <ThemeSwitcher />
-            </div>
-            <DropdownMenuSeparator />
-            <div className="px-2 py-1">
-              <p className="mb-1 px-2 text-xs font-medium text-[var(--color-light)]">
-                {t("settings.language")}
-              </p>
-              <LocaleSwitcherItems />
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="ml-auto flex flex-shrink-0 items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2">
+          <ThemeSwitcher />
+        </div>
+        <div className="flex items-center gap-1 rounded-md border border-[var(--color-mid)]/30 p-0.5">
+          <ToggleGroup
+            type="single"
+            value={locale}
+            onValueChange={(v) => v && handleLocaleChange(v as Locale)}
+            className="gap-0"
+            aria-label={t("settings.language")}
+          >
+            {LOCALE_OPTIONS.map((opt) => (
+              <ToggleGroupItem
+                key={opt.value}
+                value={opt.value}
+                className="h-8 px-2 text-xs data-[state=on]:bg-[var(--color-mid)]/50"
+                aria-label={opt.label}
+              >
+                {LOCALE_SHORT_LABELS[opt.value]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
         {token && user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

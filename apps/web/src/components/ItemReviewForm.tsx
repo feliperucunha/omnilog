@@ -257,7 +257,7 @@ export function ItemReviewForm({
             <motion.div whileTap={tapScale} transition={tapTransition}>
               <Button
                 type="submit"
-                className="w-full bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
+                className="w-full"
                 disabled={saving}
               >
                 {saving ? t("common.saving") : myLog ? t("itemReviewForm.updateReview") : t("itemReviewForm.saveReview")}

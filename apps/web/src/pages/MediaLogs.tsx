@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search } from "lucide-react";
+import { Search, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,9 @@ import { MediaLogsSkeleton } from "@/components/skeletons";
 import { toast } from "sonner";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useMe } from "@/contexts/MeContext";
+import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
+import { API_KEY_META } from "@/lib/apiKeyMeta";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
 
@@ -29,6 +32,9 @@ interface MediaLogsProps {
 export function MediaLogs({ mediaType }: MediaLogsProps) {
   const { t } = useLocale();
   const navigate = useNavigate();
+  const { me } = useMe();
+  const provider = getApiKeyProviderForMediaType(mediaType);
+  const needsKeyBanner = provider != null && me?.apiKeys && !me.apiKeys[provider];
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,10 +117,7 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
               {t("mediaLogs.couldntLoadLogs")}
             </p>
             <p className="text-sm text-[var(--color-light)]">{error}</p>
-            <Button
-              className="bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
-              onClick={fetchLogs}
-            >
+            <Button onClick={fetchLogs}>
               {t("common.tryAgain")}
             </Button>
           </div>
@@ -128,6 +131,23 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
   return (
     <div className="relative min-h-full pb-24 md:pb-20">
       <div className="flex flex-col gap-6">
+      {needsKeyBanner && (
+        <Link
+          to="/settings?open=api-keys"
+          className="flex items-center gap-3 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-left text-amber-200 no-underline transition-colors hover:bg-amber-500/20 hover:border-amber-500/70"
+        >
+          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-400" aria-hidden />
+          <p className="text-sm font-medium text-amber-100">
+            {t("apiKeyBanner.categoryMessage", {
+              category: label,
+              provider: API_KEY_META[provider!].name,
+            })}
+          </p>
+          <span className="ml-auto text-xs font-medium text-amber-300">
+            {t("apiKeyBanner.addKeyInSettings")} →
+          </span>
+        </Link>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
           {label}
@@ -135,19 +155,8 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
         <div className="flex flex-wrap gap-2">
           <motion.div whileTap={tapScale} transition={tapTransition}>
             <Button
-              asChild
-              className="bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
-            >
-              <Link to="/search" state={{ mediaType }}>
-                {t("mediaLogs.addLog")}
-              </Link>
-            </Button>
-          </motion.div>
-          <motion.div whileTap={tapScale} transition={tapTransition}>
-            <Button
               type="button"
               variant="outline"
-              className="border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-mid)]"
               onClick={() => setShowCustomEntry(true)}
             >
               {t("customEntry.addCustomEntry")}
@@ -173,11 +182,6 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
             type="button"
             variant={statusFilter === "" ? "default" : "outline"}
             size="sm"
-            className={
-              statusFilter === ""
-                ? "bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
-                : "border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-dark)]"
-            }
             onClick={() => setStatusFilter("")}
           >
             {t("mediaLogs.filterAll")}
@@ -188,11 +192,6 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
               type="button"
               variant={statusFilter === statusValue ? "default" : "outline"}
               size="sm"
-              className={
-                statusFilter === statusValue
-                  ? "bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
-                  : "border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-dark)]"
-              }
               onClick={() => setStatusFilter(statusValue)}
             >
               {t(`status.${STATUS_I18N_KEYS[statusValue] ?? statusValue}`)}
@@ -205,11 +204,6 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
             type="button"
             variant={sortBy === "date" ? "default" : "outline"}
             size="sm"
-            className={
-              sortBy === "date"
-                ? "bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
-                : "border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-dark)]"
-            }
             onClick={() => setSortBy("date")}
           >
             {t("mediaLogs.sortByDate")}
@@ -218,11 +212,6 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
             type="button"
             variant={sortBy === "grade" ? "default" : "outline"}
             size="sm"
-            className={
-              sortBy === "grade"
-                ? "bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
-                : "border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-dark)]"
-            }
             onClick={() => setSortBy("grade")}
           >
             {t("mediaLogs.sortByGrade")}

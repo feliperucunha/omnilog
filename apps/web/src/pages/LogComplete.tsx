@@ -49,7 +49,7 @@ export function LogComplete() {
           )}
           <div className="flex flex-col gap-3">
             {mediaType && id && (
-              <Button asChild className="w-full bg-[var(--color-mid)] hover:bg-[var(--color-light)]">
+              <Button asChild className="w-full">
                 <Link to={`/item/${mediaType}/${id}`}>
                   {t("logComplete.viewItem")}
                 </Link>

@@ -98,7 +98,7 @@ export function Login() {
                 <motion.div whileTap={{ scale: 0.98 }} transition={{ duration: 0.1 }}>
                   <Button
                     type="submit"
-                    className="w-full bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
+                    className="w-full"
                     disabled={loading}
                   >
                     {loading ? t("login.signingIn") : t("login.signIn")}

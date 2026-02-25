@@ -8,14 +8,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default:
-          "bg-[var(--color-mid)] text-[var(--color-lightest)] hover:bg-[var(--color-light)]",
-        destructive:
-          "bg-red-600 text-white hover:bg-red-700",
+        default: "btn-gradient border-0",
+        destructive: "btn-gradient-destructive border-0",
         outline:
-          "border border-[var(--color-mid)] bg-transparent hover:bg-[var(--color-dark)] text-[var(--color-lightest)]",
-        secondary:
-          "bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-mid)]",
+          "border-2 border-[var(--btn-gradient-start)] bg-transparent text-[var(--color-lightest)] hover:bg-[var(--btn-gradient-start)]/10 dark:hover:bg-[var(--btn-gradient-start)]/20",
+        secondary: "btn-gradient-secondary border-0",
         ghost: "hover:bg-[var(--color-dark)] text-[var(--color-lightest)]",
         link: "text-[var(--color-light)] underline-offset-4 hover:underline hover:text-[var(--color-lightest)]",
       },

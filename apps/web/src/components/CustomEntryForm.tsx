@@ -279,7 +279,7 @@ export function CustomEntryForm({
                 <motion.div whileTap={tapScale} transition={tapTransition} className="flex-1">
                   <Button
                     type="submit"
-                    className="w-full bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
+                    className="w-full"
                     disabled={loading}
                   >
                     {loading ? t("common.saving") : t("common.save")}

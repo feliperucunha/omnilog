@@ -139,6 +139,70 @@ export interface ItemDetail {
   runtimeMinutes?: number | null;
   /** Average time to beat in hours (games only, from RAWG playtime). */
   timeToBeatHours?: number | null;
+  /** Plot/synopsis/overview from API */
+  description?: string | null;
+  /** Genre names */
+  genres?: string[] | null;
+  /** Tagline (movies/TV) */
+  tagline?: string | null;
+  /** Content rating (e.g. PG-13, TV-MA) */
+  contentRating?: string | null;
+  /** Average score from API (e.g. TMDB 0–10, RAWG 0–100) */
+  score?: number | null;
+  /** TV/Anime: number of episodes */
+  episodesCount?: number | null;
+  /** TV: number of seasons */
+  seasonsCount?: number | null;
+  /** Board games: min/max players */
+  playersMin?: number | null;
+  playersMax?: number | null;
+  /** Board games: playing time in minutes */
+  playingTimeMinutes?: number | null;
+  /** Books: author names */
+  authors?: string[] | null;
+  /** Comics/Books: publisher name */
+  publisher?: string | null;
+  /** Comics: number of issues */
+  issuesCount?: number | null;
+  /** Manga: chapters / volumes */
+  chaptersCount?: number | null;
+  volumesCount?: number | null;
+  /** Games: platform names */
+  platforms?: string[] | null;
+  /** Full release/first air date (e.g. "1999-12-15") */
+  releaseDate?: string | null;
+  /** Status (e.g. Released, Ended, Returning Series) */
+  status?: string | null;
+  /** Movie: production country names */
+  productionCountries?: string[] | null;
+  /** Movie: spoken language names */
+  spokenLanguages?: string[] | null;
+  /** TV: network names */
+  networks?: string[] | null;
+  /** Games: developer names */
+  developers?: string[] | null;
+  /** Games: publisher names (can be multiple) */
+  publishers?: string[] | null;
+  /** Games: ESRB/content rating */
+  esrbRating?: string | null;
+  /** Games: tag names */
+  tags?: string[] | null;
+  /** Board games: minimum age */
+  minAge?: number | null;
+  /** Board games: category names (e.g. Card Game) */
+  categories?: string[] | null;
+  /** Board games: mechanic names */
+  mechanics?: string[] | null;
+  /** Anime: studio names */
+  studios?: string[] | null;
+  /** Anime: theme names */
+  themes?: string[] | null;
+  /** Anime: episode duration string (e.g. "24 min per ep") */
+  duration?: string | null;
+  /** Manga: serialization name (where it was published) */
+  serialization?: string | null;
+  /** Books: subject names */
+  subjects?: string[] | null;
 }
 
 /** A review shown on the item page (from any user) */

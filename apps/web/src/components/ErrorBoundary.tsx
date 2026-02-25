@@ -31,7 +31,6 @@ function ErrorFallback({ error, onRetry }: { error: Error; onRetry: () => void }
             {error.message || t("errorBoundary.message")}
           </p>
           <Button
-            className="bg-[var(--color-mid)] text-[var(--color-lightest)] hover:bg-[var(--color-light)]"
             onClick={onRetry}
           >
             {t("errorBoundary.retry")}

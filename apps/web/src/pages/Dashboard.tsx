@@ -100,7 +100,6 @@ export function Dashboard() {
             </p>
             <p className="text-sm text-[var(--color-light)]">{error}</p>
             <Button
-              className="bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
               onClick={fetchLogs}
             >
               {t("common.tryAgain")}
@@ -156,7 +155,6 @@ export function Dashboard() {
           <Button
             variant={statsGroup === "category" ? "default" : "outline"}
             size="sm"
-            className={statsGroup === "category" ? "bg-[var(--color-mid)] hover:bg-[var(--color-light)]" : ""}
             onClick={() => setStatsGroup("category")}
           >
             {t("dashboard.byCategory")}
@@ -164,7 +162,6 @@ export function Dashboard() {
           <Button
             variant={statsGroup === "month" ? "default" : "outline"}
             size="sm"
-            className={statsGroup === "month" ? "bg-[var(--color-mid)] hover:bg-[var(--color-light)]" : ""}
             onClick={() => setStatsGroup("month")}
           >
             {t("dashboard.byMonth")}
@@ -172,7 +169,6 @@ export function Dashboard() {
           <Button
             variant={statsGroup === "year" ? "default" : "outline"}
             size="sm"
-            className={statsGroup === "year" ? "bg-[var(--color-mid)] hover:bg-[var(--color-light)]" : ""}
             onClick={() => setStatsGroup("year")}
           >
             {t("dashboard.byYear")}
@@ -226,13 +222,12 @@ export function Dashboard() {
             {t("dashboard.recentLogs")}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button asChild className="bg-[var(--color-mid)] hover:bg-[var(--color-light)]">
+            <Button asChild >
               <Link to="/search">{t("dashboard.addLog")}</Link>
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-mid)]"
               onClick={() => setShowCustomEntry(true)}
             >
               {t("customEntry.addCustomEntry")}

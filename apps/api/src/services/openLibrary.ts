@@ -12,17 +12,45 @@ export async function getBookById(workId: string): Promise<ItemDetail | null> {
     title?: string;
     first_publish_date?: string;
     covers?: number[];
+    description?: string | { value?: string };
+    authors?: Array<{ key?: string }>;
+    subjects?: string[];
   };
   const year = data.first_publish_date?.slice(0, 4) ?? null;
   const image = data.covers?.[0]
     ? `https://covers.openlibrary.org/b/id/${data.covers[0]}-M.jpg`
     : null;
+  let description: string | null = null;
+  if (typeof data.description === "string") description = data.description.trim().slice(0, 2000) || null;
+  else if (data.description && typeof data.description === "object" && typeof data.description.value === "string")
+    description = data.description.value.trim().slice(0, 2000) || null;
+  let authors: string[] | null = null;
+  if (Array.isArray(data.authors) && data.authors.length > 0) {
+    const authorKeys = data.authors.slice(0, 3).map((a) => a.key).filter(Boolean) as string[];
+    if (authorKeys.length > 0) {
+      const names = await Promise.all(
+        authorKeys.map(async (key) => {
+          const authRes = await fetch(`${BASE}${key}.json`, {
+            headers: { "User-Agent": "Logeverything/1.0 (https://github.com/logeverything)" },
+          });
+          if (!authRes.ok) return null;
+          const auth = (await authRes.json()) as { name?: string };
+          return auth.name ?? null;
+        })
+      );
+      authors = names.filter((n): n is string => n != null);
+    }
+  }
+  const subjects = Array.isArray(data.subjects) ? data.subjects.filter((s): s is string => typeof s === "string").slice(0, 15) : [];
   return {
     id: workId,
     title: data.title ?? "Unknown",
     image,
     year,
-    subtitle: null,
+    subtitle: authors?.length ? authors.join(", ") : null,
+    description: description ?? null,
+    authors: authors?.length ? authors : null,
+    subjects: subjects.length > 0 ? subjects : null,
   };
 }
 

@@ -27,6 +27,12 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
         name?: { "#text": string; "@_type"?: string } | Array<{ "#text": string; "@_type"?: string }>;
         yearpublished?: { "@_value"?: string };
         image?: string;
+        description?: string;
+        minplayers?: { "@_value"?: string };
+        maxplayers?: { "@_value"?: string };
+        playingtime?: { "@_value"?: string };
+        minage?: { "@_value"?: string };
+        link?: { "@_type": string; "@_value": string } | Array<{ "@_type": string; "@_value": string }>;
       };
     };
   };
@@ -39,12 +45,34 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
     title = primary?.["#text"] ?? "Unknown";
   } else if (names?.["#text"]) title = names["#text"];
   const year = item.yearpublished?.["@_value"] ?? null;
+  const rawDesc = item.description;
+  const description =
+    typeof rawDesc === "string" ? rawDesc.replace(/<[^>]+>/g, "").trim().slice(0, 2000) || null : null;
+  const minP = item.minplayers?.["@_value"];
+  const maxP = item.maxplayers?.["@_value"];
+  const playTime = item.playingtime?.["@_value"];
+  const minVal = minP != null && minP !== "" ? parseInt(minP, 10) : null;
+  const maxVal = maxP != null && maxP !== "" ? parseInt(maxP, 10) : null;
+  const timeVal = playTime != null && playTime !== "" ? parseInt(playTime, 10) : null;
+  const minAgeVal = item.minage?.["@_value"];
+  const minAge = minAgeVal != null && minAgeVal !== "" ? parseInt(minAgeVal, 10) : null;
+  const links = item.link;
+  const linkList = Array.isArray(links) ? links : links ? [links] : [];
+  const categories = linkList.filter((l) => l["@_type"] === "boardgamecategory").map((l) => l["@_value"]).filter(Boolean) as string[];
+  const mechanics = linkList.filter((l) => l["@_type"] === "boardgamemechanic").map((l) => l["@_value"]).filter(Boolean) as string[];
   return {
     id: item["@_id"],
     title,
     image: item.image ?? null,
     year,
     subtitle: null,
+    description: description ?? null,
+    playersMin: minVal != null && !Number.isNaN(minVal) ? minVal : null,
+    playersMax: maxVal != null && !Number.isNaN(maxVal) ? maxVal : null,
+    playingTimeMinutes: timeVal != null && !Number.isNaN(timeVal) ? timeVal : null,
+    minAge: minAge != null && !Number.isNaN(minAge) ? minAge : null,
+    categories: categories.length > 0 ? categories : null,
+    mechanics: mechanics.length > 0 ? mechanics : null,
   };
 }
 

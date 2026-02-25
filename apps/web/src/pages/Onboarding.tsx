@@ -139,7 +139,7 @@ export function Onboarding() {
         </div>
 
         <Button
-          className="w-full bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
+          className="w-full"
           onClick={handleComplete}
           disabled={loading || selectedTypes.size === 0}
         >

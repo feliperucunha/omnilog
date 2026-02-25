@@ -17,7 +17,14 @@ import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMe } from "@/contexts/MeContext";
+import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
+import { API_KEY_META } from "@/lib/apiKeyMeta";
+import { Link } from "react-router-dom";
+import { AlertTriangle, X } from "lucide-react";
 import type { Log } from "@logeverything/shared";
+
+const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
 
 type SearchResponse =
   | { results: SearchResult[] }
@@ -45,6 +52,28 @@ export function Search() {
   const [drawerItem, setDrawerItem] = useState<{ mediaType: MediaType; id: string } | null>(null);
   const [logsByExternalId, setLogsByExternalId] = useState<Map<string, string>>(new Map());
   const { token } = useAuth();
+  const { me } = useMe();
+  const provider = getApiKeyProviderForMediaType(mediaType);
+  const needsKeyBanner = provider != null && me?.apiKeys && !me.apiKeys[provider];
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    if (typeof sessionStorage === "undefined") return false;
+    return sessionStorage.getItem(`${SEARCH_BANNER_DISMISSED_KEY}-${mediaType}`) === "1";
+  });
+  const showSearchKeyBanner = needsKeyBanner && !bannerDismissed;
+
+  const dismissSearchKeyBanner = () => {
+    setBannerDismissed(true);
+    try {
+      sessionStorage.setItem(`${SEARCH_BANNER_DISMISSED_KEY}-${mediaType}`, "1");
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem(`${SEARCH_BANNER_DISMISSED_KEY}-${mediaType}`) === "1";
+    setBannerDismissed(stored);
+  }, [mediaType]);
 
   useEffect(() => {
     if (stateMediaType) setMediaType(stateMediaType);
@@ -173,11 +202,6 @@ export function Search() {
                     type="button"
                     variant={mediaType === type ? "default" : "outline"}
                     size="sm"
-                    className={
-                      mediaType === type
-                        ? "bg-[var(--color-mid)] hover:bg-[var(--color-light)] hover:bg-[var(--color-dark)]"
-                        : "border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--color-lightest)] hover:bg-[var(--color-light)]"
-                    }
                     onClick={() => {
                       setMediaType(type);
                       if (query.trim()) runSearch(query, type);
@@ -357,6 +381,44 @@ export function Search() {
                 onBack={() => setDrawerItem(null)}
               />
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSearchKeyBanner && token && (
+          <motion.div
+            key="search-key-banner"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-4 right-4 z-40 flex max-w-sm items-start gap-3 rounded-lg border border-amber-500/40 bg-[var(--color-dark)] p-3 shadow-[var(--shadow-lg)] md:bottom-6 md:right-6"
+            role="status"
+          >
+          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-400 mt-0.5" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-[var(--color-lightest)]">
+              {t("apiKeyBanner.searchMessage", {
+                category: t(`nav.${mediaType}`),
+                provider: provider ? API_KEY_META[provider].name : "",
+              })}
+            </p>
+            <Link
+              to="/settings?open=api-keys"
+              className="mt-1.5 inline-block text-xs font-medium text-amber-300 underline hover:text-amber-200"
+            >
+              {t("apiKeyBanner.addKeyInSettings")}
+            </Link>
+          </div>
+          <button
+            type="button"
+            onClick={dismissSearchKeyBanner}
+            className="flex-shrink-0 rounded p-1 text-[var(--color-light)] hover:bg-[var(--color-mid)]/30 hover:text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)]"
+            aria-label={t("common.close")}
+          >
+            <X className="h-4 w-4" />
+          </button>
           </motion.div>
         )}
       </AnimatePresence>

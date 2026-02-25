@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -30,7 +31,12 @@ export function Settings() {
   const [savingLocale, setSavingLocale] = useState(false);
   const [savingMediaTypes, setSavingMediaTypes] = useState(false);
   const [selectedMediaTypes, setSelectedMediaTypes] = useState<Set<MediaType>>(new Set(MEDIA_TYPES));
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [advancedOpen, setAdvancedOpen] = useState(() => searchParams.get("open") === "api-keys");
+
+  useEffect(() => {
+    if (searchParams.get("open") === "api-keys") setAdvancedOpen(true);
+  }, [searchParams]);
 
   useEffect(() => {
     if (me?.apiKeys) {
@@ -143,29 +149,6 @@ export function Settings() {
         <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
-              {t("settings.languageLabel")}
-            </h3>
-            <div className="space-y-2">
-              <Label>{t("settings.language")}</Label>
-              <select
-                value={locale}
-                onChange={(e) => handleLocaleChange(e.target.value as Locale)}
-                disabled={savingLocale}
-                className="flex h-10 w-full max-w-xs rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] disabled:opacity-50"
-              >
-                {LOCALE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
-          <div className="flex flex-col gap-4">
-            <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
               {t("settings.visibleMediaTypesLabel")}
             </h3>
             <p className="text-sm text-[var(--color-light)]">
@@ -193,7 +176,7 @@ export function Settings() {
               ))}
             </div>
             <Button
-              className="w-fit bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
+              className="w-fit"
               onClick={handleSaveMediaTypes}
               disabled={savingMediaTypes}
             >
@@ -265,7 +248,7 @@ export function Settings() {
                           />
                         </div>
                         <Button
-                          className="w-fit bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
+                          className="w-fit"
                           onClick={() => handleSave(provider)}
                           disabled={!value.trim() || saving === provider}
                         >

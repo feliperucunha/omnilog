@@ -60,7 +60,7 @@ export function ForgotPassword() {
                 <p className="text-sm text-[var(--color-light)]">
                   {t("forgotPassword.success")}
                 </p>
-                <Button asChild className="w-full bg-[var(--color-mid)] hover:bg-[var(--color-light)]">
+                <Button asChild className="w-full">
                   <Link to="/login">{t("forgotPassword.backToLogin")}</Link>
                 </Button>
               </div>
@@ -80,7 +80,7 @@ export function ForgotPassword() {
                   </div>
                   <Button
                     type="submit"
-                    className="w-full bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
+                    className="w-full"
                     disabled={loading}
                   >
                     {loading ? t("forgotPassword.sending") : t("forgotPassword.submit")}

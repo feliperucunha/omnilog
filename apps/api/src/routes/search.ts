@@ -97,8 +97,9 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         return res.json({ results });
       }
       case "comics": {
+        const comicvineKey = keys?.comicVineApiKey ?? process.env.COMIC_VINE_API_KEY ?? null;
         const out = await searchComics(q, keys?.comicVineApiKey, { link: comicvineMeta.link, tutorial: comicvineMeta.tutorial }, sort);
-        return res.json(addPromptIfUserHasNoKey(out, "comicvine", !!keys?.comicVineApiKey));
+        return res.json(addPromptIfUserHasNoKey(out, "comicvine", !!comicvineKey));
       }
     }
   } catch (err) {
