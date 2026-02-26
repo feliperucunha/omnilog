@@ -128,7 +128,8 @@
   "apiKeyBanner": {
     "categoryMessage": "Você está usando a chave de API do app para {{category}}. Adicione sua própria chave {{provider}} para salvar na sua conta.",
     "addKeyInSettings": "Adicionar chave em Configurações",
-    "searchMessage": "Adicione uma chave {{provider}} em Configurações para salvar na sua conta (busca em {{category}})."
+    "searchMessage": "Adicione uma chave {{provider}} em Configurações para salvar na sua conta (busca em {{category}}).",
+    "searchMessageWithCount": "{{used}}/{{limit}} buscas gratuitas usadas para {{category}}. Adicione uma chave {{provider}} em Configurações para continuar."
   },
   "reviews": {
     "pageOf": "Página {{current}} de {{total}} ({{count}} resenhas)",
@@ -159,7 +160,10 @@
     "sortBy": "Ordenar por",
     "noResults": "Nenhum resultado.",
     "noResultsHint": "Tente outra busca ou tipo de mídia.",
-    "noResultsUntilApiKey": "Nenhum resultado para este tipo até que uma chave de API seja configurada."
+    "noResultsUntilApiKey": "Nenhum resultado para este tipo até que uma chave de API seja configurada.",
+    "freeSearchUsage": "{{used}}/{{limit}} buscas gratuitas usadas. Adicione sua chave de API para continuar buscando.",
+    "freeSearchLimitReached": "Busca por {{type}} desativada. {{used}}/{{limit}} buscas gratuitas usadas. Adicione sua chave de API para continuar.",
+    "categoryLimitReachedTooltip": "Busca por {{type}} desativada ({{used}}/{{limit}} buscas gratuitas usadas). Adicione sua chave de API em Configurações."
   },
   "searchSort": {
     "relevance": "Relevância",

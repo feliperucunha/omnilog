@@ -129,7 +129,8 @@
   "apiKeyBanner": {
     "categoryMessage": "You're using the app's API key for {{category}}. Add your own {{provider}} key to save it to your account.",
     "addKeyInSettings": "Add key in Settings",
-    "searchMessage": "Add a {{provider}} key in Settings to save it to your account ({{category}} search)."
+    "searchMessage": "Add a {{provider}} key in Settings to save it to your account ({{category}} search).",
+    "searchMessageWithCount": "{{used}}/{{limit}} free searches used for {{category}}. Add a {{provider}} key in Settings to keep searching."
   },
   "reviews": {
     "pageOf": "Page {{current}} of {{total}} ({{count}} reviews)",
@@ -160,7 +161,10 @@
     "sortBy": "Sort by",
     "noResults": "No results.",
     "noResultsHint": "Try another query or media type.",
-    "noResultsUntilApiKey": "No results for this search type until an API key is set."
+    "noResultsUntilApiKey": "No results for this search type until an API key is set.",
+    "freeSearchUsage": "{{used}}/{{limit}} free searches used. Add your API key to keep searching.",
+    "freeSearchLimitReached": "Search for {{type}} is disabled. {{used}}/{{limit}} free searches used. Add your API key to keep searching.",
+    "categoryLimitReachedTooltip": "{{type}} search disabled ({{used}}/{{limit}} free searches used). Add your API key in Settings."
   },
   "searchSort": {
     "relevance": "Relevance",

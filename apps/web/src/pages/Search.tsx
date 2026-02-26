@@ -31,7 +31,15 @@ const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
 
 type SearchResponse =
   | { results: SearchResult[] }
-  | { results: SearchResult[]; requiresApiKey: ApiKeyProvider; link: string; tutorial: string };
+  | {
+      results: SearchResult[];
+      requiresApiKey?: ApiKeyProvider;
+      link?: string;
+      tutorial?: string;
+      freeSearchUsed?: number;
+      freeSearchLimit?: number;
+      freeSearchLimitReached?: boolean;
+    };
 
 export function Search() {
   const { t } = useLocale();
@@ -51,7 +59,12 @@ export function Search() {
     provider: ApiKeyProvider;
     link: string;
     tutorial: string;
+    freeSearchUsed?: number;
+    freeSearchLimit?: number;
+    freeSearchLimitReached?: boolean;
   } | null>(null);
+  const [limitReachedByCategory, setLimitReachedByCategory] = useState<Partial<Record<MediaType, boolean>>>({});
+  const [usageByCategory, setUsageByCategory] = useState<Partial<Record<MediaType, { used: number; limit: number }>>>({});
   const [drawerItem, setDrawerItem] = useState<{ mediaType: MediaType; id: string } | null>(null);
   const [logsByExternalId, setLogsByExternalId] = useState<Map<string, string>>(new Map());
   const { token } = useAuth();
@@ -114,11 +127,23 @@ export function Search() {
         const data = await apiFetch<SearchResponse>(`/search?${params.toString()}`);
         const list = data.results ?? [];
         setResults(list);
+        if (data.freeSearchLimitReached) {
+          setLimitReachedByCategory((prev) => ({ ...prev, [searchType]: true }));
+        }
+        if (data.freeSearchUsed != null && data.freeSearchLimit != null) {
+          setUsageByCategory((prev) => ({
+            ...prev,
+            [searchType]: { used: data.freeSearchUsed!, limit: data.freeSearchLimit! },
+          }));
+        }
         if ("requiresApiKey" in data && data.requiresApiKey) {
           setRequiresApiKey({
             provider: data.requiresApiKey,
             link: data.link ?? "#",
             tutorial: data.tutorial ?? "",
+            freeSearchUsed: data.freeSearchUsed,
+            freeSearchLimit: data.freeSearchLimit,
+            freeSearchLimitReached: data.freeSearchLimitReached,
           });
         } else {
           setRequiresApiKey(null);
@@ -187,6 +212,8 @@ export function Search() {
 
   const handleApiKeySaved = useCallback(() => {
     setRequiresApiKey(null);
+    setLimitReachedByCategory({});
+    setUsageByCategory({});
     invalidateApiCache("/search");
     toast.success(t("toast.trySearchingAgain"));
   }, [t]);
@@ -226,21 +253,37 @@ export function Search() {
               aria-label={t("search.search")}
             />
             <div className="flex flex-wrap gap-2 mt-2 items-center justify-center">
-              {effectiveVisibleTypes.map((type) => (
-                <motion.div key={type} whileTap={tapScale} transition={tapTransition}>
-                  <Button
-                    type="button"
-                    variant={mediaType === type ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setMediaType(type);
-                      if (query.trim()) runSearch(query, type);
-                    }}
-                  >
-                    {t(`nav.${type}`)}
-                  </Button>
-                </motion.div>
-              ))}
+              {effectiveVisibleTypes.map((type) => {
+                const typeProvider = getApiKeyProviderForMediaType(type, boardGameProvider);
+                const hasKeyForType = typeProvider == null || !!me?.apiKeys?.[typeProvider];
+                const categoryLimitReached = limitReachedByCategory[type];
+                const isDisabled = !hasKeyForType && !!categoryLimitReached;
+                return (
+                  <motion.div key={type} whileTap={isDisabled ? undefined : tapScale} transition={tapTransition}>
+                    <Button
+                      type="button"
+                      variant={mediaType === type ? "default" : "outline"}
+                      size="sm"
+                      disabled={isDisabled}
+                      title={
+                        isDisabled
+                          ? t("search.categoryLimitReachedTooltip", {
+                              type: t(`nav.${type}`),
+                              used: usageByCategory[type]?.used ?? 5,
+                              limit: usageByCategory[type]?.limit ?? 5,
+                            })
+                          : undefined
+                      }
+                      onClick={() => {
+                        setMediaType(type);
+                        if (query.trim()) runSearch(query, type);
+                      }}
+                    >
+                      {t(`nav.${type}`)}
+                    </Button>
+                  </motion.div>
+                );
+              })}
             </div>
             {hasSearched && (
               <div
@@ -388,7 +431,18 @@ export function Search() {
       {hasSearched && !loading && requiresApiKey && (
         <div className="flex flex-col gap-4">
           <p className="text-sm text-[var(--color-light)]">
-            {t("search.noResultsUntilApiKey")}
+            {requiresApiKey.freeSearchLimitReached
+              ? t("search.freeSearchLimitReached", {
+                  used: requiresApiKey.freeSearchUsed ?? 5,
+                  limit: requiresApiKey.freeSearchLimit ?? 5,
+                  type: t(`nav.${mediaType}`),
+                })
+              : requiresApiKey.freeSearchUsed != null && requiresApiKey.freeSearchLimit != null
+                ? t("search.freeSearchUsage", {
+                    used: requiresApiKey.freeSearchUsed,
+                    limit: requiresApiKey.freeSearchLimit,
+                  })
+                : t("search.noResultsUntilApiKey")}
           </p>
           <ApiKeyPrompt
             provider={requiresApiKey.provider}
@@ -454,10 +508,17 @@ export function Search() {
           <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)] mt-0.5" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="text-sm text-[var(--color-lightest)]">
-              {t("apiKeyBanner.searchMessage", {
-                category: t(`nav.${mediaType}`),
-                provider: provider ? API_KEY_META[provider].name : "",
-              })}
+              {usageByCategory[mediaType]
+                ? t("apiKeyBanner.searchMessageWithCount", {
+                    category: t(`nav.${mediaType}`),
+                    provider: provider ? API_KEY_META[provider].name : "",
+                    used: usageByCategory[mediaType]!.used,
+                    limit: usageByCategory[mediaType]!.limit,
+                  })
+                : t("apiKeyBanner.searchMessage", {
+                    category: t(`nav.${mediaType}`),
+                    provider: provider ? API_KEY_META[provider].name : "",
+                  })}
             </p>
             <Link
               to="/settings?open=api-keys"
