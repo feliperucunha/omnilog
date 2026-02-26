@@ -12,6 +12,7 @@ import { searchGames } from "../services/rawg.js";
 import { searchBooks } from "../services/openLibrary.js";
 import { searchAnime, searchManga } from "../services/jikan.js";
 import { searchBoardGames } from "../services/bgg.js";
+import { searchBoardGamesLudopedia } from "../services/ludopedia.js";
 import { searchComics } from "../services/comicvine.js";
 
 export const searchRouter = Router();
@@ -21,12 +22,20 @@ const querySchema = z.object({
   type: z.enum(MEDIA_TYPES as unknown as [string, ...string[]]),
   q: z.string().min(1),
   sort: z.string().optional(),
+  boardGameProvider: z.enum(["bgg", "ludopedia"]).optional(),
 });
 
 async function getUserKeys(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { tmdbApiKey: true, rawgApiKey: true, bggApiToken: true, comicVineApiKey: true },
+    select: {
+      tmdbApiKey: true,
+      rawgApiKey: true,
+      bggApiToken: true,
+      ludopediaApiToken: true,
+      comicVineApiKey: true,
+      boardGameProvider: true,
+    },
   });
   return user ?? undefined;
 }
@@ -41,7 +50,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
     res.status(400).json({ error: "Invalid type or q" });
     return;
   }
-  const { type, q: rawQ, sort: rawSort } = parsed.data;
+  const { type, q: rawQ, sort: rawSort, boardGameProvider: queryBoardProvider } = parsed.data;
   const q = sanitizeText(rawQ, SEARCH_QUERY_MAX_LENGTH);
   if (!q) {
     res.status(400).json({ error: "Invalid or empty search query" });
@@ -50,17 +59,31 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const allowedSorts = SEARCH_SORT_OPTIONS[type as MediaType].map((o) => o.value);
   const sort = rawSort && allowedSorts.includes(rawSort) ? rawSort : undefined;
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
+  const boardProvider =
+    (type as string) === "boardgames"
+      ? queryBoardProvider ?? (keys?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg")
+      : "bgg";
   const tmdbMeta = API_KEY_META.tmdb;
   const rawgMeta = API_KEY_META.rawg;
   const bggMeta = API_KEY_META.bgg;
   const comicvineMeta = API_KEY_META.comicvine;
+  const ludopediaMeta = API_KEY_META.ludopedia;
   const addPromptIfUserHasNoKey = (
     out: { results: unknown[] },
-    provider: "tmdb" | "rawg" | "bgg" | "comicvine",
+    provider: "tmdb" | "rawg" | "bgg" | "ludopedia" | "comicvine",
     userHasKey: boolean
   ) => {
     if (req.user && !userHasKey) {
-      const meta = provider === "tmdb" ? tmdbMeta : provider === "rawg" ? rawgMeta : provider === "bgg" ? bggMeta : comicvineMeta;
+      const meta =
+        provider === "tmdb"
+          ? tmdbMeta
+          : provider === "rawg"
+            ? rawgMeta
+            : provider === "bgg"
+              ? bggMeta
+              : provider === "ludopedia"
+                ? ludopediaMeta
+                : comicvineMeta;
       return { ...out, requiresApiKey: provider, link: meta.link, tutorial: meta.tutorial };
     }
     return out;
@@ -77,6 +100,15 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         return res.json(addPromptIfUserHasNoKey(out, "tmdb", !!keys?.tmdbApiKey));
       }
       case "boardgames": {
+        if (boardProvider === "ludopedia") {
+          const out = await searchBoardGamesLudopedia(
+            q,
+            keys?.ludopediaApiToken,
+            { link: ludopediaMeta.link, tutorial: ludopediaMeta.tutorial },
+            sort
+          );
+          return res.json(addPromptIfUserHasNoKey(out, "ludopedia", !!keys?.ludopediaApiToken));
+        }
         const out = await searchBoardGames(q, keys?.bggApiToken, { link: bggMeta.link, tutorial: bggMeta.tutorial }, sort);
         return res.json(addPromptIfUserHasNoKey(out, "bgg", !!keys?.bggApiToken));
       }

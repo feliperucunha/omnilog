@@ -18,7 +18,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
-function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType: MediaType; t: (key: string) => string }) {
+function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType: MediaType; t: (key: string, params?: Record<string, string>) => string }) {
   const hasDescription = item.description && item.description.length > 0;
   const hasTagline = item.tagline && item.tagline.length > 0;
   const hasGenres = item.genres && item.genres.length > 0;
@@ -52,6 +52,7 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
   const hasDuration = item.duration && item.duration.length > 0;
   const hasSerialization = item.serialization && item.serialization.length > 0;
   const hasSubjects = item.subjects && item.subjects.length > 0;
+  const hasItemSource = mediaType === "boardgames" && (item.itemSource === "bgg" || item.itemSource === "ludopedia");
 
   const hasAny =
     hasDescription ||
@@ -86,7 +87,8 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
     hasThemes ||
     hasDuration ||
     hasSerialization ||
-    hasSubjects;
+    hasSubjects ||
+    hasItemSource;
   if (!hasAny) return null;
 
   const scoreDisplay = hasScore && item.score != null ? (item.score <= 10 ? item.score.toFixed(1) : String(Math.round(item.score))) : null;
@@ -315,6 +317,15 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
             <span className="text-[var(--color-lightest)] font-medium">{item.volumesCount}</span>
           </div>
         )}
+        {hasItemSource && (
+          <div className="col-span-2 sm:col-span-3 pt-2 mt-2 border-t border-[var(--color-mid)]/20">
+            <span className="text-xs text-[var(--color-light)]">
+              {t("itemPage.detailsFromSource", {
+                source: item.itemSource === "ludopedia" ? t("settings.boardGameProviderLudopedia") : t("settings.boardGameProviderBgg"),
+              })}
+            </span>
+          </div>
+        )}
       </div>
     </Card>
   );
@@ -532,6 +543,14 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                           <span className="text-sm font-medium text-[var(--color-lightest)]">
                             {r.userEmail}
                           </span>
+                          {r.isPro && (
+                            <span
+                              className="rounded bg-[var(--btn-gradient-start)]/20 px-1.5 py-0.5 text-xs font-semibold text-[var(--btn-gradient-start)]"
+                              title="Pro"
+                            >
+                              Pro
+                            </span>
+                          )}
                           {r.grade != null && (
                             <StarRating value={gradeToStars(r.grade)} readOnly size="sm" />
                           )}

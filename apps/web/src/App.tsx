@@ -14,6 +14,7 @@ import { ItemPage } from "@/pages/ItemPage";
 import { MediaLogs } from "@/pages/MediaLogs";
 import { Settings } from "@/pages/Settings";
 import { About } from "@/pages/About";
+import { Tiers } from "@/pages/Tiers";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { token, initializing } = useAuth();
@@ -55,6 +56,7 @@ export default function App() {
           <Route index element={<DashboardOrSearch />} />
           <Route path="search" element={<Search />} />
           <Route path="about" element={<About />} />
+          <Route path="tiers" element={<Tiers />} />
           <Route path="item/:mediaType/:id" element={<ItemPage />} />
         <Route path="movies" element={<ProtectedRoute><MediaLogs mediaType="movies" /></ProtectedRoute>} />
           <Route path="tv" element={<ProtectedRoute><MediaLogs mediaType="tv" /></ProtectedRoute>} />

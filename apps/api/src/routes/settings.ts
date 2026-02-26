@@ -19,7 +19,12 @@ const apiKeysSchema = z.object({
   tmdb: z.string().min(1).max(512).optional(),
   rawg: z.string().min(1).max(512).optional(),
   bgg: z.string().min(1).max(512).optional(),
+  ludopedia: z.string().min(1).max(512).optional(),
   comicvine: z.string().min(1).max(512).optional(),
+});
+
+const boardGameProviderSchema = z.object({
+  provider: z.enum(["bgg", "ludopedia"]),
 });
 
 /** Get which API keys the user has set (no values returned). */
@@ -31,6 +36,7 @@ settingsRouter.get("/api-keys", async (req: AuthenticatedRequest, res) => {
       tmdbApiKey: true,
       rawgApiKey: true,
       bggApiToken: true,
+      ludopediaApiToken: true,
       comicVineApiKey: true,
     },
   });
@@ -42,6 +48,7 @@ settingsRouter.get("/api-keys", async (req: AuthenticatedRequest, res) => {
     tmdb: !!user.tmdbApiKey,
     rawg: !!user.rawgApiKey,
     bgg: !!user.bggApiToken,
+    ludopedia: !!user.ludopediaApiToken,
     comicvine: !!user.comicVineApiKey,
   });
 });
@@ -54,7 +61,13 @@ settingsRouter.put("/api-keys", async (req: AuthenticatedRequest, res) => {
     res.status(400).json({ error: "Invalid body" });
     return;
   }
-  const data: { tmdbApiKey?: string; rawgApiKey?: string; bggApiToken?: string; comicVineApiKey?: string } = {};
+  const data: {
+    tmdbApiKey?: string;
+    rawgApiKey?: string;
+    bggApiToken?: string;
+    ludopediaApiToken?: string;
+    comicVineApiKey?: string;
+  } = {};
   if (parsed.data.tmdb !== undefined) {
     const v = sanitizeApiKey(parsed.data.tmdb);
     if (v) data.tmdbApiKey = v;
@@ -66,6 +79,10 @@ settingsRouter.put("/api-keys", async (req: AuthenticatedRequest, res) => {
   if (parsed.data.bgg !== undefined) {
     const v = sanitizeApiKey(parsed.data.bgg);
     if (v) data.bggApiToken = v;
+  }
+  if (parsed.data.ludopedia !== undefined) {
+    const v = sanitizeApiKey(parsed.data.ludopedia);
+    if (v) data.ludopediaApiToken = v;
   }
   if (parsed.data.comicvine !== undefined) {
     const v = sanitizeApiKey(parsed.data.comicvine);
@@ -179,6 +196,32 @@ settingsRouter.put("/visible-media-types", async (req: AuthenticatedRequest, res
     data: { visibleMediaTypes: JSON.stringify(parsed.data.types) },
   });
   res.json({ ok: true, types: parsed.data.types });
+});
+
+/** Get user's board game provider preference (bgg | ludopedia). */
+settingsRouter.get("/board-game-provider", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { boardGameProvider: true },
+  });
+  const provider = user?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
+  res.json({ provider });
+});
+
+/** Save user's board game provider preference. */
+settingsRouter.put("/board-game-provider", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const parsed = boardGameProviderSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+  await prisma.user.update({
+    where: { id: req.user.userId },
+    data: { boardGameProvider: parsed.data.provider },
+  });
+  res.json({ ok: true, provider: parsed.data.provider });
 });
 
 /** Complete onboarding: set theme, visible media types, and onboarded = true. */

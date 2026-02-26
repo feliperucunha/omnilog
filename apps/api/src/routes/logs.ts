@@ -31,8 +31,8 @@ const createLogSchema = z.object({
   externalId: z.string().min(1).max(EXTERNAL_ID_MAX_LENGTH),
   title: z.string().min(1).max(TITLE_MAX_LENGTH),
   image: z.string().url().max(2048).nullable().optional(),
-  grade: z.number().min(0).max(10).optional(),
-  review: z.string().optional(),
+  grade: z.number().min(0).max(10),
+  review: z.string().nullable().optional(),
   listType: z.enum(LIST_TYPES as unknown as [string, ...string[]]).nullable().optional(),
   status: z.string().nullable().optional(),
   season: optionalInt,
@@ -40,6 +40,7 @@ const createLogSchema = z.object({
   chapter: optionalInt,
   volume: optionalInt,
   contentHours: optionalFloat,
+  boardGameSource: z.enum(["bgg", "ludopedia"]).nullable().optional(),
 });
 
 const updateLogSchema = z.object({
@@ -68,6 +69,8 @@ function isInProgress(status: string | null | undefined): boolean {
 function isCompleted(status: string | null | undefined): boolean {
   return status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
 }
+
+const FREE_LOG_LIMIT = 500;
 
 logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
@@ -133,6 +136,55 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   res.json({ group, data: entries });
 });
 
+/** GET /logs/export - Pro only; returns all user logs as CSV */
+logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tier: true },
+  });
+  if (user?.tier !== "pro") {
+    res.status(403).json({ error: "Export is available on Pro only", code: "PRO_REQUIRED" });
+    return;
+  }
+  const logs = await prisma.log.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+  });
+  const header =
+    "mediaType,externalId,title,grade,status,season,episode,chapter,volume,startedAt,completedAt,contentHours,review,createdAt,updatedAt\n";
+  const escape = (v: string | number | null | undefined): string => {
+    if (v == null) return "";
+    const s = String(v);
+    if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const rows = logs.map(
+    (l) =>
+      [
+        escape(l.mediaType),
+        escape(l.externalId),
+        escape(l.title),
+        escape(l.grade),
+        escape(l.status),
+        escape(l.season),
+        escape(l.episode),
+        escape(l.chapter),
+        escape(l.volume),
+        escape(l.startedAt?.toISOString()),
+        escape(l.completedAt?.toISOString()),
+        escape(l.contentHours),
+        escape(l.review),
+        escape(l.createdAt?.toISOString()),
+        escape(l.updatedAt?.toISOString()),
+      ].join(",")
+  );
+  const csv = header + rows.join("\n");
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", 'attachment; filename="logs-export.csv"');
+  res.send(csv);
+});
+
 logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
   const parsed = createLogSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -154,11 +206,24 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     chapter,
     volume,
     contentHours,
+    boardGameSource: bodyBoardGameSource,
   } = parsed.data;
   const mediaType = mediaTypeRaw as MediaType;
   if (!validateStatus(mediaType, status)) {
     res.status(400).json({ error: { status: ["Invalid status for this media type"] } });
     return;
+  }
+  let boardGameSource: string | null = null;
+  if (mediaType === "boardgames") {
+    if (bodyBoardGameSource === "bgg" || bodyBoardGameSource === "ludopedia") {
+      boardGameSource = bodyBoardGameSource;
+    } else {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { boardGameProvider: true },
+      });
+      boardGameSource = user?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
+    }
   }
   const sanitizedTitle = sanitizeText(title, TITLE_MAX_LENGTH);
   const sanitizedExternalId = sanitizeText(externalId, EXTERNAL_ID_MAX_LENGTH);
@@ -173,8 +238,27 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
   const createCompletedAt = isCompleted(status) ? now : null;
   try {
     const existing = await prisma.log.findUnique({
-      where: { userId_mediaType_externalId: { userId, mediaType, externalId } },
+      where: { userId_mediaType_externalId: { userId, mediaType, externalId: sanitizedExternalId } },
     });
+    // Enforce free-tier log limit server-side (cannot be bypassed by client / modified frontend)
+    if (!existing) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { tier: true },
+      });
+      const tier = user?.tier === "pro" ? "pro" : "free";
+      if (tier === "free") {
+        const count = await prisma.log.count({ where: { userId } });
+        if (count >= FREE_LOG_LIMIT) {
+          res.status(403).json({
+            error: "Log limit reached",
+            code: "LOG_LIMIT_REACHED",
+            limit: FREE_LOG_LIMIT,
+          });
+          return;
+        }
+      }
+    }
     let log;
     if (existing) {
       const updateData: {
@@ -211,6 +295,23 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         data: updateData,
       });
     } else {
+      // Enforce free-tier limit again immediately before create (prevents race conditions / bypass)
+      const userForCreate = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { tier: true },
+      });
+      const tierForCreate = userForCreate?.tier === "pro" ? "pro" : "free";
+      if (tierForCreate === "free") {
+        const countBeforeCreate = await prisma.log.count({ where: { userId } });
+        if (countBeforeCreate >= FREE_LOG_LIMIT) {
+          res.status(403).json({
+            error: "Log limit reached",
+            code: "LOG_LIMIT_REACHED",
+            limit: FREE_LOG_LIMIT,
+          });
+          return;
+        }
+      }
       log = await prisma.log.create({
         data: {
           userId,
@@ -229,6 +330,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           episode: episode ?? null,
           chapter: chapter ?? null,
           volume: volume ?? null,
+          boardGameSource,
         },
       });
     }

@@ -58,7 +58,7 @@ authRouter.post("/register", async (req, res) => {
   const token = jwt.sign(
     { userId: user.id, email: user.email },
     JWT_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: "30d" }
   );
   const response: AuthResponse = {
     token,
@@ -91,7 +91,7 @@ authRouter.post("/login", async (req, res) => {
   const token = jwt.sign(
     { userId: user.id, email: user.email },
     JWT_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: "30d" }
   );
   const response: AuthResponse = {
     token,
@@ -172,7 +172,7 @@ authRouter.post("/reset-password", async (req, res) => {
   const jwtToken = jwt.sign(
     { userId: user.id, email: user.email },
     JWT_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: "30d" }
   );
   const response: AuthResponse = {
     token: jwtToken,

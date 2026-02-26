@@ -45,6 +45,7 @@ export function ApiKeyPrompt({
       if (provider === "tmdb") body.tmdb = trimmed;
       else if (provider === "rawg") body.rawg = trimmed;
       else if (provider === "bgg") body.bgg = trimmed;
+      else if (provider === "ludopedia") body.ludopedia = trimmed;
       else body.comicvine = trimmed;
       await apiFetch("/settings/api-keys", {
         method: "PUT",

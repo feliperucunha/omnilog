@@ -17,12 +17,15 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       id: true,
       email: true,
       onboarded: true,
+      tier: true,
       preferredTheme: true,
       preferredLocale: true,
       visibleMediaTypes: true,
+      boardGameProvider: true,
       tmdbApiKey: true,
       rawgApiKey: true,
       bggApiToken: true,
+      ludopediaApiToken: true,
       comicVineApiKey: true,
     },
   });
@@ -31,6 +34,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
+  const logCount = await prisma.log.count({ where: { userId: user.id } });
   const theme = user.preferredTheme === "light" ? "light" : "dark";
   const locale =
     user.preferredLocale && ["en", "pt-BR", "es"].includes(user.preferredLocale)
@@ -50,6 +54,9 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     }
   }
 
+  const boardGameProvider = user.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
+  const tier = user.tier === "pro" ? "pro" : "free";
+
   res.json({
     user: {
       id: user.id,
@@ -59,10 +66,14 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     theme,
     locale,
     visibleMediaTypes,
+    boardGameProvider,
+    tier,
+    logCount,
     apiKeys: {
       tmdb: !!user.tmdbApiKey,
       rawg: !!user.rawgApiKey,
       bgg: !!user.bggApiToken,
+      ludopedia: !!user.ludopediaApiToken,
       comicvine: !!user.comicVineApiKey,
     },
   });

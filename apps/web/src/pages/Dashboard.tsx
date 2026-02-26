@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchCached } from "@/lib/api";
@@ -230,7 +231,10 @@ export function Dashboard() {
               variant="outline"
               onClick={() => setShowCustomEntry(true)}
             >
-              {t("customEntry.addCustomEntry")}
+              <span className="inline-flex items-center gap-2">
+                <Plus className="size-4 shrink-0" aria-hidden />
+                {t("customEntry.addCustomEntry")}
+              </span>
             </Button>
           </div>
         </div>

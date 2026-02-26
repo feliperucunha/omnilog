@@ -1,38 +1,50 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiFetch, invalidateApiCache } from "@/lib/api";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { apiFetch, invalidateApiCache, apiFetchFile } from "@/lib/api";
 import { toast } from "sonner";
 import { API_KEY_META, type ApiKeyProvider } from "@/lib/apiKeyMeta";
 import { useLocale, LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
-import { MEDIA_TYPES, type MediaType } from "@logeverything/shared";
+import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@logeverything/shared";
 import { cn } from "@/lib/utils";
 
-type KeysStatus = { tmdb: boolean; rawg: boolean; bgg: boolean; comicvine: boolean };
+type KeysStatus = { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
+
+const LOCALE_SHORT_LABELS: Record<Locale, string> = {
+  en: "EN",
+  "pt-BR": "PT",
+  es: "ES",
+};
 
 export function Settings() {
   const { t, locale, setLocale } = useLocale();
+  const { token } = useAuth();
   const { me, refetch: refetchMe, loading } = useMe();
   const { refetch: refetchVisibleTypes } = useVisibleMediaTypes();
   const [status, setStatus] = useState<KeysStatus | null>(null);
   const [tmdb, setTmdb] = useState("");
   const [rawg, setRawg] = useState("");
   const [bgg, setBgg] = useState("");
+  const [ludopedia, setLudopedia] = useState("");
   const [comicvine, setComicvine] = useState("");
   const [saving, setSaving] = useState<ApiKeyProvider | null>(null);
-  const [savingLocale, setSavingLocale] = useState(false);
   const [savingMediaTypes, setSavingMediaTypes] = useState(false);
+  const [savingBoardGameProvider, setSavingBoardGameProvider] = useState(false);
   const [selectedMediaTypes, setSelectedMediaTypes] = useState<Set<MediaType>>(new Set(MEDIA_TYPES));
   const [searchParams] = useSearchParams();
   const [advancedOpen, setAdvancedOpen] = useState(() => searchParams.get("open") === "api-keys");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("open") === "api-keys") setAdvancedOpen(true);
@@ -44,6 +56,7 @@ export function Settings() {
         tmdb: me.apiKeys.tmdb,
         rawg: me.apiKeys.rawg,
         bgg: me.apiKeys.bgg,
+        ludopedia: me.apiKeys.ludopedia,
         comicvine: me.apiKeys.comicvine,
       });
     }
@@ -56,7 +69,16 @@ export function Settings() {
   }, [me?.visibleMediaTypes]);
 
   const handleSave = async (provider: ApiKeyProvider) => {
-    const value = provider === "tmdb" ? tmdb.trim() : provider === "rawg" ? rawg.trim() : provider === "bgg" ? bgg.trim() : comicvine.trim();
+    const value =
+      provider === "tmdb"
+        ? tmdb.trim()
+        : provider === "rawg"
+          ? rawg.trim()
+          : provider === "bgg"
+            ? bgg.trim()
+            : provider === "ludopedia"
+              ? ludopedia.trim()
+              : comicvine.trim();
     if (!value) {
       toast.error(t("toast.enterKeyToSave"));
       return;
@@ -67,20 +89,52 @@ export function Settings() {
       if (provider === "tmdb") body.tmdb = value;
       else if (provider === "rawg") body.rawg = value;
       else if (provider === "bgg") body.bgg = value;
+      else if (provider === "ludopedia") body.ludopedia = value;
       else body.comicvine = value;
       await apiFetch("/settings/api-keys", { method: "PUT", body: JSON.stringify(body) });
       invalidateApiCache("/search");
       await refetchMe();
-      setStatus((prev) => (prev ? { ...prev, [provider]: true } : { tmdb: false, rawg: false, bgg: false, comicvine: false }));
+      setStatus((prev) =>
+        prev ? { ...prev, [provider]: true } : { tmdb: false, rawg: false, bgg: false, ludopedia: false, comicvine: false }
+      );
       if (provider === "tmdb") setTmdb("");
       if (provider === "rawg") setRawg("");
       if (provider === "bgg") setBgg("");
+      if (provider === "ludopedia") setLudopedia("");
       if (provider === "comicvine") setComicvine("");
       toast.success(t("toast.keySaved", { name: API_KEY_META[provider].name }));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
     } finally {
       setSaving(null);
+    }
+  };
+
+  const handleBoardGameProviderChange = async (provider: BoardGameProvider) => {
+    if (me?.boardGameProvider === provider) return;
+    setSavingBoardGameProvider(true);
+    try {
+      await apiFetch("/settings/board-game-provider", {
+        method: "PUT",
+        body: JSON.stringify({ provider }),
+      });
+      await refetchMe();
+      invalidateApiCache("/search");
+      toast.success(t("settings.boardGameProviderSaved"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
+    } finally {
+      setSavingBoardGameProvider(false);
+    }
+  };
+
+  const handleLocaleChange = (newLocale: Locale) => {
+    setLocale(newLocale);
+    if (token) {
+      apiFetch("/settings/locale", {
+        method: "PUT",
+        body: JSON.stringify({ locale: newLocale }),
+      }).catch(() => {});
     }
   };
 
@@ -109,21 +163,6 @@ export function Settings() {
     }
   };
 
-  const handleLocaleChange = async (newLocale: Locale) => {
-    setSavingLocale(true);
-    setLocale(newLocale);
-    try {
-      await apiFetch("/settings/locale", {
-        method: "PUT",
-        body: JSON.stringify({ locale: newLocale }),
-      });
-    } catch {
-      // Locale already updated locally
-    } finally {
-      setSavingLocale(false);
-    }
-  };
-
   if (loading && !me) {
     return (
       <div className="flex flex-col gap-6">
@@ -145,6 +184,40 @@ export function Settings() {
         <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
           {t("settings.title")}
         </h1>
+
+        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+          <div className="flex flex-col gap-6">
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--color-lightest)] mb-2">
+                {t("nav.theme")}
+              </h3>
+              <ThemeSwitcher />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--color-lightest)] mb-2">
+                {t("settings.language")}
+              </h3>
+              <ToggleGroup
+                type="single"
+                value={locale}
+                onValueChange={(v) => v && handleLocaleChange(v as Locale)}
+                className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5 gap-0"
+                aria-label={t("settings.language")}
+              >
+                {LOCALE_OPTIONS.map((opt) => (
+                  <ToggleGroupItem
+                    key={opt.value}
+                    value={opt.value}
+                    className="h-8 px-3 text-sm data-[state=on]:bg-[var(--color-mid)]/50"
+                    aria-label={opt.label}
+                  >
+                    {LOCALE_SHORT_LABELS[opt.value]}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+          </div>
+        </Card>
 
         <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-4">
@@ -185,6 +258,77 @@ export function Settings() {
           </div>
         </Card>
 
+        {me?.tier === "pro" && (
+          <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+            <div className="flex flex-col gap-4">
+              <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
+                {t("tiers.exportLogs")}
+              </h3>
+              <p className="text-sm text-[var(--color-light)]">
+                {t("tiers.proExportDesc")}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-fit gap-2"
+                disabled={exporting}
+                onClick={async () => {
+                  setExporting(true);
+                  try {
+                    const { blob, filename } = await apiFetchFile("/logs/export");
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = filename;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success(t("tiers.exportSuccess"));
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : t("tiers.exportFailed"));
+                  } finally {
+                    setExporting(false);
+                  }
+                }}
+              >
+                <Download className="h-4 w-4" aria-hidden />
+                {exporting ? t("common.saving") : t("tiers.exportLogs")}
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+          <div className="flex flex-col gap-4">
+            <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
+              {t("settings.boardGameProviderLabel")}
+            </h3>
+            <p className="text-sm text-[var(--color-light)]">
+              {t("settings.boardGameProviderIntro")}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <ToggleGroup
+                type="single"
+                value={me?.boardGameProvider ?? "bgg"}
+                onValueChange={(v) => v && handleBoardGameProviderChange(v as BoardGameProvider)}
+                disabled={savingBoardGameProvider}
+                className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5"
+                aria-label={t("settings.boardGameProviderLabel")}
+              >
+                {BOARD_GAME_PROVIDERS.map((provider) => (
+                  <ToggleGroupItem
+                    key={provider}
+                    value={provider}
+                    className="h-8 px-3 text-sm"
+                    aria-label={provider === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
+                  >
+                    {provider === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+          </div>
+        </Card>
+
         <div className="rounded-md border border-[var(--color-dark)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">
           <button
             type="button"
@@ -208,8 +352,26 @@ export function Settings() {
                 {(Object.keys(API_KEY_META) as ApiKeyProvider[]).map((provider) => {
                   const meta = API_KEY_META[provider];
                   const isSet = status?.[provider];
-                  const value = provider === "tmdb" ? tmdb : provider === "rawg" ? rawg : provider === "bgg" ? bgg : comicvine;
-                  const setValue = provider === "tmdb" ? setTmdb : provider === "rawg" ? setRawg : provider === "bgg" ? setBgg : setComicvine;
+                  const value =
+                    provider === "tmdb"
+                      ? tmdb
+                      : provider === "rawg"
+                        ? rawg
+                        : provider === "bgg"
+                          ? bgg
+                          : provider === "ludopedia"
+                            ? ludopedia
+                            : comicvine;
+                  const setValue =
+                    provider === "tmdb"
+                      ? setTmdb
+                      : provider === "rawg"
+                        ? setRawg
+                        : provider === "bgg"
+                          ? setBgg
+                          : provider === "ludopedia"
+                            ? setLudopedia
+                            : setComicvine;
                   return (
                     <Card
                       key={provider}

@@ -144,6 +144,25 @@ export function About() {
           )}
         </Card>
       </div>
+
+      {/* Feedback / contact */}
+      <Card
+        className="border-[var(--color-dark)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"
+        style={paperShadow}
+      >
+        <h2 className="mb-3 text-lg font-semibold text-[var(--color-lightest)]">
+          {t("about.feedbackTitle")}
+        </h2>
+        <p className="mb-3 text-[var(--color-light)] text-sm sm:text-base">
+          {t("about.feedbackIntro")}
+        </p>
+        <a
+          href="mailto:feliperubenmv@gmail.com"
+          className="text-sm font-medium text-[var(--color-lightest)] underline hover:no-underline focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
+        >
+          feliperubenmv@gmail.com
+        </a>
+      </Card>
     </motion.div>
   );
 }

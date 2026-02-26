@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import type { MediaType, Log } from "@logeverything/shared";
-import { LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
-import { apiFetch, invalidateLogsAndItemsCache } from "@/lib/api";
+import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
+import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -51,7 +52,9 @@ export function LogForm(props: LogFormProps) {
 
   const [stars, setStars] = useState(isEdit ? gradeToStars(log!.grade ?? undefined) : 2.5);
   const [review, setReview] = useState(isEdit ? (log!.review ?? "") : "");
-  const [status, setStatus] = useState<string | null>(isEdit ? (log!.status ?? log!.listType ?? null) : null);
+  const [status, setStatus] = useState<string | null>(
+    isEdit ? (log!.status ?? log!.listType ?? null) : LOG_STATUS_OPTIONS[(props as LogFormCreateProps).mediaType][0]
+  );
   const [season, setSeason] = useState<number | "">(isEdit ? (log!.season ?? "") : "");
   const [episode, setEpisode] = useState<number | "">(isEdit ? (log!.episode ?? "") : "");
   const [chapter, setChapter] = useState<number | "">(isEdit ? (log!.chapter ?? "") : "");
@@ -121,7 +124,8 @@ export function LogForm(props: LogFormProps) {
       };
       props.onSaved(completion);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
+      const message = err instanceof Error ? err.message : t("toast.failedToSave");
+      toast.error(message === LOG_LIMIT_REACHED_CODE ? t("tiers.logLimitReached") : message);
     } finally {
       setLoading(false);
     }
@@ -145,18 +149,19 @@ export function LogForm(props: LogFormProps) {
                     <Label className="mb-2 block text-sm font-medium text-[var(--color-lightest)]">
                       {t("itemReviewForm.status")}
                     </Label>
-                    <select
+                    <Select
                       value={status ?? ""}
-                      onChange={(e) => setStatus(e.target.value || null)}
-                      className="flex h-10 w-full max-w-xs rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
-                    >
-                      <option value="">—</option>
-                      {statusOptions.map((value) => (
-                        <option key={value} value={value}>
-                          {t(`status.${STATUS_I18N_KEYS[value] ?? value}`)}
-                        </option>
-                      ))}
-                    </select>
+                      onValueChange={(v) => setStatus(v || null)}
+                      options={[
+                        { value: "", label: "—" },
+                        ...statusOptions.map((value) => ({
+                          value,
+                          label: t(`status.${STATUS_I18N_KEYS[value] ?? value}`),
+                        })),
+                      ]}
+                      placeholder="—"
+                      aria-label={t("itemReviewForm.status")}
+                    />
                   </div>
                   {showSeasonEpisode && (
                     <div className="grid grid-cols-2 gap-4">
@@ -167,7 +172,12 @@ export function LogForm(props: LogFormProps) {
                           min={0}
                           className="bg-[var(--color-darkest)]"
                           value={season === "" ? "" : season}
-                          onChange={(e) => setSeason(e.target.value === "" ? "" : Number(e.target.value))}
+                          onChange={(e) => {
+                            const next = e.target.value === "" ? "" : Number(e.target.value);
+                            setSeason(next);
+                            if (next !== "" && status != null && (COMPLETED_STATUSES as readonly string[]).includes(status))
+                              setStatus("watching");
+                          }}
                           placeholder="—"
                         />
                       </div>
@@ -178,7 +188,12 @@ export function LogForm(props: LogFormProps) {
                           min={0}
                           className="bg-[var(--color-darkest)]"
                           value={episode === "" ? "" : episode}
-                          onChange={(e) => setEpisode(e.target.value === "" ? "" : Number(e.target.value))}
+                          onChange={(e) => {
+                            const next = e.target.value === "" ? "" : Number(e.target.value);
+                            setEpisode(next);
+                            if (next !== "" && status != null && (COMPLETED_STATUSES as readonly string[]).includes(status))
+                              setStatus("watching");
+                          }}
                           placeholder="—"
                         />
                       </div>
@@ -214,12 +229,12 @@ export function LogForm(props: LogFormProps) {
               )}
               <div>
                 <Label className="mb-1 block text-sm font-medium text-[var(--color-lightest)]">
-                  {t("itemReviewForm.rating")}
+                  {t("itemReviewForm.rating")} ({t("common.required")})
                 </Label>
-                <StarRating value={stars} onChange={setStars} size="lg" />
+                <StarRating value={stars} onChange={setStars} size="lg" aria-required />
               </div>
               <div className="space-y-2">
-                <Label>{t("logForm.review")}</Label>
+                <Label>{t("logForm.review")} ({t("common.optional")})</Label>
                 <Textarea
                   placeholder={t("logForm.reviewPlaceholder")}
                   value={review ?? ""}

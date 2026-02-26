@@ -7,6 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Tier {
+  free
+  pro
+}
+
 model User {
   id                   String    @id @default(cuid())
   email                String    @unique
@@ -15,11 +20,14 @@ model User {
   passwordResetExpires DateTime? // token expiry (e.g. 1h)
   tmdbApiKey       String?
   rawgApiKey       String?
-  bggApiToken      String?
-  comicVineApiKey  String?
-  preferredTheme      String?  // "light" | "dark"
-  preferredLocale     String?  // "en" | "pt-BR" | "es"
-  visibleMediaTypes   String?  // JSON array of media type strings; null = all
+  bggApiToken        String?
+  ludopediaApiToken  String?
+  comicVineApiKey    String?
+  preferredTheme       String?  // "light" | "dark"
+  preferredLocale      String?  // "en" | "pt-BR" | "es"
+  visibleMediaTypes    String?  // JSON array of media type strings; null = all
+  boardGameProvider   String?  // "bgg" | "ludopedia"; null = bgg
+  tier                Tier     @default(free)
   onboarded           Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -45,6 +53,7 @@ model Log {
   episode      Int?     // tv, anime
   chapter      Int?     // anime, manga, comics
   volume       Int?     // anime, manga, comics
+  boardGameSource String?  // "bgg" | "ludopedia" when mediaType = boardgames; which API this externalId came from
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

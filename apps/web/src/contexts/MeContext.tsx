@@ -14,7 +14,10 @@ export interface MeResponse {
   theme: "light" | "dark";
   locale: "en" | "pt-BR" | "es";
   visibleMediaTypes: string[];
-  apiKeys: { tmdb: boolean; rawg: boolean; bgg: boolean; comicvine: boolean };
+  boardGameProvider: "bgg" | "ludopedia";
+  tier: "free" | "pro";
+  logCount: number;
+  apiKeys: { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
 }
 
 interface MeContextValue {

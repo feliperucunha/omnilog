@@ -1,7 +1,7 @@
 import type { Response } from "express";
 
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? "auth";
-const JWT_MAX_AGE_SEC = 7 * 24 * 60 * 60; // 7 days
+const JWT_MAX_AGE_SEC = 30 * 24 * 60 * 60; // 30 days (1 month)
 
 /** Production (cross-origin) needs SameSite=None; Secure. Local dev uses Lax. */
 const isProduction = process.env.NODE_ENV === "production";

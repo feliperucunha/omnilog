@@ -9,6 +9,7 @@ interface StarRatingProps {
   readOnly?: boolean;
   size?: "sm" | "md" | "lg";
   className?: string;
+  "aria-required"?: boolean;
 }
 
 const sizeClasses = {
@@ -23,6 +24,7 @@ export function StarRating({
   readOnly = false,
   size = "md",
   className,
+  "aria-required": ariaRequired,
 }: StarRatingProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoverValue, setHoverValue] = useState<number | null>(null);
@@ -53,6 +55,7 @@ export function StarRating({
       ref={containerRef}
       role={readOnly ? "img" : "slider"}
       aria-label={readOnly ? `${value} stars` : "Rating"}
+      aria-required={ariaRequired}
       aria-valuemin={readOnly ? undefined : 0}
       aria-valuemax={readOnly ? undefined : 5}
       aria-valuenow={readOnly ? undefined : value}

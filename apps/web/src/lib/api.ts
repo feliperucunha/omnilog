@@ -25,13 +25,18 @@ function dispatchLogout(): void {
   window.dispatchEvent(new CustomEvent("auth:logout"));
 }
 
+/** Error code returned by API for log limit (free tier). Check err.message === this to show tier message. */
+export const LOG_LIMIT_REACHED_CODE = "LOG_LIMIT_REACHED";
+
 function parseErrorResponse(text: string, fallback: string): string {
   try {
-    const data = JSON.parse(text) as { error?: string | Record<string, unknown> };
+    const data = JSON.parse(text) as { error?: string | Record<string, unknown>; code?: string };
+    if (data.code === LOG_LIMIT_REACHED_CODE) return LOG_LIMIT_REACHED_CODE;
     if (typeof data.error === "string") return data.error;
     if (data.error && typeof data.error === "object") {
-      const msg = (data.error as { message?: string }).message ?? JSON.stringify(data.error);
-      return msg;
+      const obj = data.error as { message?: string; code?: string };
+      if (obj.code === LOG_LIMIT_REACHED_CODE) return LOG_LIMIT_REACHED_CODE;
+      return obj.message ?? JSON.stringify(data.error);
     }
   } catch {
     if (text && text.trim().length > 0) return text.trim().slice(0, 200);
@@ -75,17 +80,18 @@ async function fetchInternal<T>(
     });
     clearTimeout(timeoutId);
 
+    const text = await res.text();
+
     if (res.status === 401) {
+      const message = parseErrorResponse(text, "Session expired. Please sign in again.");
       if (!skipAuthRedirect) {
         localStorage.removeItem("logeverything_token");
         localStorage.removeItem("logeverything_user");
         dispatchLogout();
         window.location.href = "/login";
       }
-      throw new Error("Session expired. Please sign in again.");
+      throw new Error(message);
     }
-
-    const text = await res.text();
 
     if (!res.ok) {
       const message = parseErrorResponse(
@@ -115,6 +121,39 @@ export async function apiFetch<T>(
   options?: ApiFetchOptions
 ): Promise<T> {
   return fetchInternal<T>(path, options);
+}
+
+const rawApiBase = (): string => {
+  let base = rawApiUrl ?? "/api";
+  if (import.meta.env.DEV && base.startsWith("https://localhost"))
+    base = base.replace("https://", "http://");
+  if (base.startsWith("http") && !base.endsWith("/api"))
+    base = base.replace(/\/?$/, "") + "/api";
+  return base;
+};
+
+/**
+ * Fetch a file from the API (e.g. CSV export). Returns blob and suggested filename.
+ * Uses credentials so auth is sent. Caller should trigger download (e.g. object URL + link click).
+ */
+export async function apiFetchFile(
+  path: string
+): Promise<{ blob: Blob; filename: string }> {
+  const url = `${rawApiBase()}${path}`;
+  const res = await fetch(url, {
+    credentials: "include",
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    const msg = parseErrorResponse(text, "Download failed");
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition");
+  const filename =
+    disposition?.match(/filename="([^"]+)"/)?.[1] ?? "download";
+  return { blob, filename };
 }
 
 /**

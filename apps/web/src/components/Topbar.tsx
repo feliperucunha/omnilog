@@ -1,5 +1,5 @@
-import { useNavigate, Link } from "react-router-dom";
-import { Settings, LogOut } from "lucide-react";
+import { useNavigate, Link, useLocation } from "react-router-dom";
+import { Settings, LogOut, LayoutDashboard, Search } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
@@ -27,6 +27,7 @@ export function Topbar() {
   const { t, locale, setLocale } = useLocale();
   const { token, user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLocaleChange = (newLocale: Locale) => {
     setLocale(newLocale);
@@ -52,30 +53,67 @@ export function Topbar() {
         "flex h-14 flex-shrink-0 items-center gap-3 sm:gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-3 py-2 sm:p-4"
       )}
     >
+      {/* Home and Search links: mobile only (bottom bar has categories + About) */}
+      <div className="flex items-center gap-1 md:hidden">
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "gap-2 text-sm font-medium",
+            location.pathname === "/" ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]" : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+          )}
+          asChild
+        >
+          <Link to="/">
+            <LayoutDashboard className="size-4 shrink-0" aria-hidden />
+            {t("nav.dashboard")}
+          </Link>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "h-9 w-9",
+            location.pathname === "/search" ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]" : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+          )}
+          asChild
+          aria-label={t("nav.search")}
+        >
+          <Link to="/search">
+            <Search className="size-4 shrink-0" aria-hidden />
+          </Link>
+        </Button>
+      </div>
+
       <div className="ml-auto flex flex-shrink-0 items-center gap-2 sm:gap-3">
-        <div className="flex items-center gap-2">
-          <ThemeSwitcher />
-        </div>
-        <div className="flex items-center gap-1 rounded-md border border-[var(--color-mid)]/30 p-0.5">
-          <ToggleGroup
-            type="single"
-            value={locale}
-            onValueChange={(v) => v && handleLocaleChange(v as Locale)}
-            className="gap-0"
-            aria-label={t("settings.language")}
-          >
-            {LOCALE_OPTIONS.map((opt) => (
-              <ToggleGroupItem
-                key={opt.value}
-                value={opt.value}
-                className="h-8 px-2 text-xs data-[state=on]:bg-[var(--color-mid)]/50"
-                aria-label={opt.label}
+        {/* Theme and locale: in header when logged out, inside avatar menu when logged in */}
+        {!token && (
+          <>
+            <div className="flex items-center gap-2">
+              <ThemeSwitcher />
+            </div>
+            <div className="flex items-center gap-1 rounded-md border border-[var(--color-mid)]/30 p-0.5">
+              <ToggleGroup
+                type="single"
+                value={locale}
+                onValueChange={(v) => v && handleLocaleChange(v as Locale)}
+                className="gap-0"
+                aria-label={t("settings.language")}
               >
-                {LOCALE_SHORT_LABELS[opt.value]}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </div>
+                {LOCALE_OPTIONS.map((opt) => (
+                  <ToggleGroupItem
+                    key={opt.value}
+                    value={opt.value}
+                    className="h-8 px-2 text-xs data-[state=on]:bg-[var(--color-mid)]/50"
+                    aria-label={opt.label}
+                  >
+                    {LOCALE_SHORT_LABELS[opt.value]}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+          </>
+        )}
         {token && user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -91,6 +129,34 @@ export function Topbar() {
             <DropdownMenuContent align="end" className="w-56">
               <div className="px-2 py-2">
                 <p className="text-xs font-medium text-[var(--color-light)]">{user.email}</p>
+              </div>
+              <DropdownMenuSeparator />
+              <div className="px-2 py-2 space-y-3">
+                <div>
+                  <p className="text-xs text-[var(--color-light)] mb-1.5">{t("nav.theme")}</p>
+                  <ThemeSwitcher />
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--color-light)] mb-1.5">{t("settings.language")}</p>
+                  <ToggleGroup
+                    type="single"
+                    value={locale}
+                    onValueChange={(v) => v && handleLocaleChange(v as Locale)}
+                    className="gap-0 inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5"
+                    aria-label={t("settings.language")}
+                  >
+                    {LOCALE_OPTIONS.map((opt) => (
+                      <ToggleGroupItem
+                        key={opt.value}
+                        value={opt.value}
+                        className="h-8 px-2 text-xs data-[state=on]:bg-[var(--color-mid)]/50"
+                        aria-label={opt.label}
+                      >
+                        {LOCALE_SHORT_LABELS[opt.value]}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                </div>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>

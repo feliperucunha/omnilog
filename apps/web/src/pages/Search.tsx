@@ -19,9 +19,12 @@ import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
+import { BOARD_GAME_PROVIDERS, type BoardGameProvider } from "@logeverything/shared";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Link } from "react-router-dom";
 import { AlertTriangle, X } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Select } from "@/components/ui/select";
 import type { Log } from "@logeverything/shared";
 
 const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
@@ -52,9 +55,11 @@ export function Search() {
   const [drawerItem, setDrawerItem] = useState<{ mediaType: MediaType; id: string } | null>(null);
   const [logsByExternalId, setLogsByExternalId] = useState<Map<string, string>>(new Map());
   const { token } = useAuth();
-  const { me } = useMe();
-  const provider = getApiKeyProviderForMediaType(mediaType);
+  const { me, refetch: refetchMe } = useMe();
+  const boardGameProvider = me?.boardGameProvider ?? "bgg";
+  const provider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
   const needsKeyBanner = provider != null && me?.apiKeys && !me.apiKeys[provider];
+  const [savingBoardGameProvider, setSavingBoardGameProvider] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(() => {
     if (typeof sessionStorage === "undefined") return false;
     return sessionStorage.getItem(`${SEARCH_BANNER_DISMISSED_KEY}-${mediaType}`) === "1";
@@ -93,38 +98,58 @@ export function Search() {
     if (stateQuery) setQuery(stateQuery);
   }, [stateQuery]);
 
-  const runSearch = useCallback(async (q: string, typeOverride?: MediaType, sortOverride?: string) => {
-    if (!q.trim()) return;
-    const searchType = typeOverride ?? mediaType;
-    const sort = sortOverride ?? sortBy;
-    setLoading(true);
-    setResults([]);
-    setRequiresApiKey(null);
-    try {
-      const params = new URLSearchParams({ type: searchType, q: q.trim() });
-      if (sort && sort !== "relevance") params.set("sort", sort);
-      const data = await apiFetch<SearchResponse>(
-        `/search?${params.toString()}`
-      );
-      const list = data.results ?? [];
-      setResults(list);
-      if ("requiresApiKey" in data && data.requiresApiKey) {
-        setRequiresApiKey({
-          provider: data.requiresApiKey,
-          link: data.link ?? "#",
-          tutorial: data.tutorial ?? "",
-        });
-      } else {
-        setRequiresApiKey(null);
-      }
-    } catch (err) {
+  const runSearch = useCallback(
+    async (q: string, typeOverride?: MediaType, sortOverride?: string) => {
+      if (!q.trim()) return;
+      const searchType = typeOverride ?? mediaType;
+      const sort = sortOverride ?? sortBy;
+      setLoading(true);
+      setResults([]);
+      setRequiresApiKey(null);
+      try {
+        const params = new URLSearchParams({ type: searchType, q: q.trim() });
+        if (sort && sort !== "relevance") params.set("sort", sort);
+        if (searchType === "boardgames" && (me?.boardGameProvider ?? "bgg"))
+          params.set("boardGameProvider", me?.boardGameProvider ?? "bgg");
+        const data = await apiFetch<SearchResponse>(`/search?${params.toString()}`);
+        const list = data.results ?? [];
+        setResults(list);
+        if ("requiresApiKey" in data && data.requiresApiKey) {
+          setRequiresApiKey({
+            provider: data.requiresApiKey,
+            link: data.link ?? "#",
+            tutorial: data.tutorial ?? "",
+          });
+        } else {
+          setRequiresApiKey(null);
+        }
+      } catch (err) {
       setResults([]);
       setRequiresApiKey(null);
       toast.error(err instanceof Error ? err.message : t("toast.searchFailed"));
     } finally {
       setLoading(false);
     }
-  }, [mediaType, sortBy, t]);
+  }, [mediaType, sortBy, t, me?.boardGameProvider]);
+
+  const handleBoardGameProviderChange = useCallback(
+    async (newProvider: BoardGameProvider) => {
+      if (me?.boardGameProvider === newProvider) return;
+      setSavingBoardGameProvider(true);
+      try {
+        await apiFetch("/settings/board-game-provider", {
+          method: "PUT",
+          body: JSON.stringify({ provider: newProvider }),
+        });
+        await refetchMe();
+        invalidateApiCache("/search");
+        if (query.trim()) await runSearch(query);
+      } finally {
+        setSavingBoardGameProvider(false);
+      }
+    },
+    [me?.boardGameProvider, refetchMe, query, runSearch]
+  );
 
   const hasRunInitialSearch = useRef(false);
   const [hasSearched, setHasSearched] = useState(!!stateQuery.trim());
@@ -168,8 +193,13 @@ export function Search() {
 
   return (
     <div
-      className={`flex flex-col gap-6 flex-1 min-h-0 ${hasSearched ? "w-full" : "self-center"}`}
+      className={`relative flex flex-col gap-6 flex-1 min-h-0 ${hasSearched ? "w-full" : ""}`}
     >
+      <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
+        <img src="/logo.svg" alt="" className="h-32 w-auto opacity-20 sm:h-40 md:h-48" />
+      </div>
+
+      <div className="relative z-10 flex flex-col gap-6 flex-1 min-h-0">
       <h1
         className={`text-2xl font-bold text-[var(--color-lightest)] shrink-0 ${!hasSearched ? "hidden" : ""}`}
       >
@@ -177,15 +207,15 @@ export function Search() {
       </h1>
 
       <motion.div
-        className={hasSearched ? "shrink-0 w-full" : "flex-1 flex flex-col justify-center min-h-0"}
+        className={hasSearched ? "shrink-0 w-full" : "flex-1 flex flex-col justify-end items-center min-h-0"}
         layout
         transition={{ type: "spring", stiffness: 300, damping: 35 }}
       >
-        <form onSubmit={handleSearch} className={hasSearched ? "w-full" : undefined}>
+        <form onSubmit={handleSearch} className={hasSearched ? "w-full" : "w-full max-w-xl"}>
           <motion.div
             layout
             transition={{ type: "spring", stiffness: 300, damping: 35 }}
-            className={hasSearched ? "flex flex-col gap-4 w-full" : "flex flex-col gap-4 max-w-xl"}
+            className={hasSearched ? "flex flex-col gap-4 w-full" : "flex flex-col gap-4"}
           >
             <Input
               className="w-full"
@@ -213,24 +243,47 @@ export function Search() {
               ))}
             </div>
             {hasSearched && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-[var(--color-light)]">{t("search.sortBy")}</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setSortBy(v);
-                    if (query.trim()) runSearch(query, undefined, v);
-                  }}
-                  className="flex h-9 min-w-[10rem] rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
-                  aria-label={t("search.sortBy")}
-                >
-                  {SEARCH_SORT_OPTIONS[mediaType].map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {t(opt.labelKey)}
-                    </option>
-                  ))}
-                </select>
+              <div
+                className={`flex flex-wrap items-center gap-4 ${mediaType === "boardgames" ? "w-full justify-between" : ""}`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    value={sortBy}
+                    onValueChange={(v) => {
+                      setSortBy(v);
+                      if (query.trim()) runSearch(query, undefined, v);
+                    }}
+                    options={SEARCH_SORT_OPTIONS[mediaType].map((opt) => ({
+                      value: opt.value,
+                      label: t(opt.labelKey),
+                    }))}
+                    triggerClassName="min-w-[10rem] h-9 max-w-none"
+                    aria-label={t("search.sortBy")}
+                  />
+                </div>
+                {mediaType === "boardgames" && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ToggleGroup
+                      type="single"
+                      value={boardGameProvider}
+                      onValueChange={(v) => v && handleBoardGameProviderChange(v as BoardGameProvider)}
+                      disabled={savingBoardGameProvider}
+                      className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5"
+                      aria-label={t("settings.boardGameProviderLabel")}
+                    >
+                      {BOARD_GAME_PROVIDERS.map((provider) => (
+                        <ToggleGroupItem
+                          key={provider}
+                          value={provider}
+                          className="h-8 px-3 text-sm"
+                          aria-label={provider === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
+                        >
+                          {provider === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
@@ -361,6 +414,8 @@ export function Search() {
         </motion.div>
       )}
 
+      </div>
+
       <AnimatePresence>
         {drawerItem && (
           <motion.div
@@ -389,14 +444,14 @@ export function Search() {
         {showSearchKeyBanner && token && (
           <motion.div
             key="search-key-banner"
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
+            exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-4 right-4 z-40 flex max-w-sm items-start gap-3 rounded-lg border border-amber-500/40 bg-[var(--color-dark)] p-3 shadow-[var(--shadow-lg)] md:bottom-6 md:right-6"
+            className="fixed top-4 left-4 right-4 z-40 flex max-w-sm items-start gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-dark)] p-3 shadow-[var(--shadow-lg)] md:left-auto md:right-6 md:top-6"
             role="status"
           >
-          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-400 mt-0.5" aria-hidden />
+          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)] mt-0.5" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="text-sm text-[var(--color-lightest)]">
               {t("apiKeyBanner.searchMessage", {
@@ -406,7 +461,7 @@ export function Search() {
             </p>
             <Link
               to="/settings?open=api-keys"
-              className="mt-1.5 inline-block text-xs font-medium text-amber-300 underline hover:text-amber-200"
+              className="mt-1.5 inline-block text-xs font-medium text-[var(--color-warning-text-muted)] underline hover:text-[var(--color-warning-text)]"
             >
               {t("apiKeyBanner.addKeyInSettings")}
             </Link>

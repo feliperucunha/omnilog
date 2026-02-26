@@ -10,6 +10,7 @@ import { getGameById } from "../services/rawg.js";
 import { getBookById } from "../services/openLibrary.js";
 import { getAnimeById, getMangaById } from "../services/jikan.js";
 import { getBoardGameById } from "../services/bgg.js";
+import { getBoardGameByIdLudopedia } from "../services/ludopedia.js";
 import { getVolumeById } from "../services/comicvine.js";
 
 export const itemsRouter = Router();
@@ -18,7 +19,14 @@ itemsRouter.use(optionalAuthMiddleware);
 async function getUserKeys(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { tmdbApiKey: true, rawgApiKey: true, bggApiToken: true, comicVineApiKey: true },
+    select: {
+      tmdbApiKey: true,
+      rawgApiKey: true,
+      bggApiToken: true,
+      ludopediaApiToken: true,
+      comicVineApiKey: true,
+      boardGameProvider: true,
+    },
   });
   return user ?? undefined;
 }
@@ -45,6 +53,8 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
   );
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
 
+  let boardProviderUsed: "bgg" | "ludopedia" | null = null;
+
   let item = null;
   try {
     switch (mediaType) {
@@ -54,9 +64,24 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
       case "tv":
         item = await getTvById(externalId, keys?.tmdbApiKey);
         break;
-      case "boardgames":
-        item = await getBoardGameById(externalId, keys?.bggApiToken);
+      case "boardgames": {
+        let boardProvider: "bgg" | "ludopedia" = keys?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
+        if (req.user) {
+          const logWithSource = await prisma.log.findFirst({
+            where: { userId: req.user.userId, mediaType: "boardgames", externalId },
+            select: { boardGameSource: true },
+          });
+          if (logWithSource?.boardGameSource === "bgg" || logWithSource?.boardGameSource === "ludopedia")
+            boardProvider = logWithSource.boardGameSource;
+        }
+        boardProviderUsed = boardProvider;
+        item =
+          boardProvider === "ludopedia"
+            ? await getBoardGameByIdLudopedia(externalId, keys?.ludopediaApiToken)
+            : await getBoardGameById(externalId, keys?.bggApiToken);
+        if (item) (item as { itemSource?: "bgg" | "ludopedia" }).itemSource = boardProvider;
         break;
+      }
       case "games":
         item = await getGameById(externalId, keys?.rawgApiKey);
         break;
@@ -93,7 +118,7 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     }),
     prisma.log.findMany({
       where,
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { email: true, tier: true } } },
       orderBy: { createdAt: "desc" },
       skip: (reviewsPage - 1) * reviewsLimit,
       take: reviewsLimit,
@@ -108,6 +133,7 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
   const reviews = logs.map((l) => ({
     id: l.id,
     userEmail: l.user.email,
+    isPro: l.user.tier === "pro",
     grade: l.grade,
     review: l.review,
     listType: l.listType,

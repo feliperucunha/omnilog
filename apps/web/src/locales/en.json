@@ -4,7 +4,7 @@
     "subtitle": "Log Everything"
   },
   "nav": {
-    "dashboard": "Dashboard",
+    "dashboard": "Home",
     "movies": "Movies",
     "tv": "TV Shows",
     "boardgames": "Board Games",
@@ -15,6 +15,7 @@
     "comics": "Comic Books",
     "search": "Search",
     "settings": "Settings",
+    "plans": "Plans",
     "about": "About",
     "logOut": "Log out",
     "logIn": "Log in",
@@ -93,9 +94,16 @@
     "saving": "Saving…",
     "visibleMediaTypesLabel": "Media types in sidebar and search",
     "visibleMediaTypesIntro": "Choose which media types appear in the sidebar and on the search page. Uncheck to hide a type.",
-    "saveMediaTypes": "Save"
+    "saveMediaTypes": "Save",
+    "boardGameProviderLabel": "Board game source",
+    "boardGameProviderIntro": "Choose which API to use for board game search and details. This preference is saved to your account.",
+    "boardGameProviderBgg": "Board Game Geek",
+    "boardGameProviderLudopedia": "Ludopedia",
+    "boardGameProviderSaved": "Board game source updated."
   },
   "common": {
+    "required": "required",
+    "optional": "optional",
     "tryAgain": "Try again",
     "back": "Back",
     "showPassword": "Show password",
@@ -128,7 +136,7 @@
     "next": "Next"
   },
   "dashboard": {
-    "title": "Dashboard",
+    "title": "Home",
     "yourStats": "Your stats",
     "recentLogs": "Recent logs",
     "addLog": "Add log",
@@ -166,6 +174,7 @@
   },
   "mediaLogs": {
     "addLog": "Add log",
+    "addOne": "Add one",
     "noLogsFor": "No logs for {{label}} yet.",
     "searchAndAddOne": "Search and add one",
     "couldntLoadLogs": "Couldn't load logs",
@@ -209,7 +218,8 @@
     "themes": "Themes",
     "duration": "Duration",
     "serialization": "Serialization",
-    "subjects": "Subjects"
+    "subjects": "Subjects",
+    "detailsFromSource": "Details from {{source}}. Available fields vary by source."
   },
   "itemReviewForm": {
     "yourReview": "Your review",
@@ -241,7 +251,7 @@
   "logComplete": {
     "logged": "Logged",
     "viewItem": "View item",
-    "backToDashboard": "Back to dashboard"
+    "backToDashboard": "Back to home"
   },
   "logForm": {
     "review": "Review",
@@ -276,13 +286,36 @@
     "carouselNext": "Next team member",
     "carouselGoTo": "Go to team member {{index}}",
     "projectTitle": "About the project",
-    "projectBody": "OMNILOG is like Stremio for your logs: an aggregator of APIs so you can have everything in one place. Instead of eight separate apps, use one to track movies, TV shows, board games, video games, books, anime, manga, and comics from a single dashboard. Search by category, add custom entries when something isn't in the database, and keep your reviews and grades together. No need to jump between different apps or spreadsheets—everything you watch, play, and read lives here.",
+    "projectBody": "OMNILOG is like Stremio for your logs: an aggregator of APIs so you can have everything in one place. Instead of eight separate apps, use one to track movies, TV shows, board games, video games, books, anime, manga, and comics in one place. Search by category, add custom entries when something isn't in the database, and keep your reviews and grades together. No need to jump between different apps or spreadsheets—everything you watch, play, and read lives here.",
     "donationTitle": "Support the project",
     "donationIntro": "If OMNILOG is useful to you, you can support its development with a one-time donation or recurring support. Thank you!",
     "donateKofi": "Ko-fi",
     "donateBuyMeACoffee": "Buy Me a Coffee",
     "donateGitHub": "GitHub Sponsors",
-    "donationNotConfigured": "Donation links are not configured. Set VITE_DONATION_KOFI_URL, VITE_DONATION_BUYMEACOFFEE_URL, and/or VITE_DONATION_GITHUB_SPONSORS_URL in your deployment environment to show them here."
+    "donationNotConfigured": "Donation links are not configured. Set VITE_DONATION_KOFI_URL, VITE_DONATION_BUYMEACOFFEE_URL, and/or VITE_DONATION_GITHUB_SPONSORS_URL in your deployment environment to show them here.",
+    "feedbackTitle": "Feedback",
+    "feedbackIntro": "Got feedback or suggestions? Reach out at the email below."
+  },
+  "tiers": {
+    "title": "Plans",
+    "subtitle": "Choose the plan that fits how you log.",
+    "free": "Free",
+    "freePrice": "$0",
+    "freeLogs": "Up to 500 logs",
+    "freeLogsDesc": "Log movies, shows, games, books, and more.",
+    "pro": "Pro",
+    "proPrice": "$5/month",
+    "proLogs": "Unlimited logs",
+    "proExport": "Export logs to CSV",
+    "proExportDesc": "Download all your logs as a file anytime.",
+    "currentPlan": "Current plan",
+    "usage": "{{count}} / {{limit}} logs",
+    "usageUnlimited": "{{count}} logs",
+    "upgradeToPro": "Upgrade to Pro",
+    "exportLogs": "Export logs",
+    "exportSuccess": "Export downloaded",
+    "exportFailed": "Export failed",
+    "logLimitReached": "You've reached the 500-log limit on the Free plan. Upgrade to Pro for unlimited logs."
   },
   "errorBoundary": {
     "title": "Something went wrong",

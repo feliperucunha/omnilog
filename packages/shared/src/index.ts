@@ -1,5 +1,6 @@
 export type {
   MediaType,
+  BoardGameProvider,
   ListType,
   LogStatus,
   SearchResult,
@@ -16,6 +17,7 @@ export type {
 } from "./types.js";
 export {
   MEDIA_TYPES,
+  BOARD_GAME_PROVIDERS,
   LIST_TYPES,
   LOG_STATUS_OPTIONS,
   STATUS_I18N_KEYS,

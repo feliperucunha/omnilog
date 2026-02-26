@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import type { MediaType } from "@logeverything/shared";
 import { MEDIA_TYPES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
-import { apiFetch, invalidateLogsAndItemsCache } from "@/lib/api";
+import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -106,7 +107,8 @@ export function CustomEntryForm({
       };
       onSaved(completion);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
+      const message = err instanceof Error ? err.message : t("toast.failedToSave");
+      toast.error(message === LOG_LIMIT_REACHED_CODE ? t("tiers.logLimitReached") : message);
     } finally {
       setLoading(false);
     }
@@ -126,17 +128,16 @@ export function CustomEntryForm({
                   <Label className="text-sm font-medium text-[var(--color-lightest)]">
                     {t("customEntry.mediaType")}
                   </Label>
-                  <select
+                  <Select
                     value={mediaType}
-                    onChange={(e) => setMediaType(e.target.value as MediaType)}
-                    className="flex h-10 w-full max-w-xs rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
-                  >
-                    {MEDIA_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {t(`nav.${type}`)}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={(v) => setMediaType(v as MediaType)}
+                    options={MEDIA_TYPES.map((type) => ({
+                      value: type,
+                      label: t(`nav.${type}`),
+                    }))}
+                    triggerClassName="w-full max-w-xs h-10"
+                    aria-label={t("customEntry.mediaType")}
+                  />
                 </div>
               )}
               <div className="space-y-2">
@@ -168,18 +169,20 @@ export function CustomEntryForm({
                 <Label className="text-sm font-medium text-[var(--color-lightest)]">
                   {t("itemReviewForm.status")}
                 </Label>
-                <select
+                <Select
                   value={status ?? ""}
-                  onChange={(e) => setStatus(e.target.value || null)}
-                  className="flex h-10 w-full max-w-xs rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
-                >
-                  <option value="">—</option>
-                  {statusOptions.map((value) => (
-                    <option key={value} value={value}>
-                      {t(`status.${STATUS_I18N_KEYS[value] ?? value}`)}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setStatus(v || null)}
+                  options={[
+                    { value: "", label: "—" },
+                    ...statusOptions.map((value) => ({
+                      value,
+                      label: t(`status.${STATUS_I18N_KEYS[value] ?? value}`),
+                    })),
+                  ]}
+                  placeholder="—"
+                  triggerClassName="w-full max-w-xs h-10"
+                  aria-label={t("itemReviewForm.status")}
+                />
               </div>
               {showSeasonEpisode && (
                 <div className="grid grid-cols-2 gap-4">

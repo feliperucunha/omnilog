@@ -15,6 +15,7 @@
     "comics": "Cómics",
     "search": "Buscar",
     "settings": "Ajustes",
+    "plans": "Planes",
     "about": "Acerca de",
     "logOut": "Cerrar sesión",
     "logIn": "Iniciar sesión",
@@ -92,9 +93,16 @@
     "saving": "Guardando…",
     "visibleMediaTypesLabel": "Tipos de contenido en barra y búsqueda",
     "visibleMediaTypesIntro": "Elige qué tipos de contenido se muestran en la barra lateral y en la búsqueda. Desmarca para ocultar.",
-    "saveMediaTypes": "Guardar"
+    "saveMediaTypes": "Guardar",
+    "boardGameProviderLabel": "Fuente de juegos de mesa",
+    "boardGameProviderIntro": "Elige qué API usar para buscar y ver detalles de juegos de mesa. La preferencia se guarda en tu cuenta.",
+    "boardGameProviderBgg": "Board Game Geek",
+    "boardGameProviderLudopedia": "Ludopedia",
+    "boardGameProviderSaved": "Fuente de juegos de mesa actualizada."
   },
   "common": {
+    "required": "obligatorio",
+    "optional": "opcional",
     "tryAgain": "Reintentar",
     "back": "Volver",
     "showPassword": "Mostrar contraseña",
@@ -165,6 +173,7 @@
   },
   "mediaLogs": {
     "addLog": "Añadir log",
+    "addOne": "Añadir uno",
     "noLogsFor": "Aún no hay logs de {{label}}.",
     "searchAndAddOne": "Busca y añade uno",
     "couldntLoadLogs": "No se pudieron cargar los logs",
@@ -208,7 +217,8 @@
     "themes": "Temas",
     "duration": "Duración",
     "serialization": "Serialización",
-    "subjects": "Materias"
+    "subjects": "Materias",
+    "detailsFromSource": "Detalles de {{source}}. Los campos disponibles varían según la fuente."
   },
   "itemReviewForm": {
     "yourReview": "Tu reseña",
@@ -281,7 +291,30 @@
     "donateKofi": "Ko-fi",
     "donateBuyMeACoffee": "Buy Me a Coffee",
     "donateGitHub": "GitHub Sponsors",
-    "donationNotConfigured": "Los enlaces de donación no están configurados. Define VITE_DONATION_KOFI_URL, VITE_DONATION_BUYMEACOFFEE_URL y/o VITE_DONATION_GITHUB_SPONSORS_URL en tu entorno de despliegue para mostrarlos aquí."
+    "donationNotConfigured": "Los enlaces de donación no están configurados. Define VITE_DONATION_KOFI_URL, VITE_DONATION_BUYMEACOFFEE_URL y/o VITE_DONATION_GITHUB_SPONSORS_URL en tu entorno de despliegue para mostrarlos aquí.",
+    "feedbackTitle": "Feedback",
+    "feedbackIntro": "¿Tienes sugerencias o comentarios? Escríbenos al correo de abajo."
+  },
+  "tiers": {
+    "title": "Planes",
+    "subtitle": "Elige el plan que se adapte a cómo registras.",
+    "free": "Gratis",
+    "freePrice": "0 €",
+    "freeLogs": "Hasta 500 logs",
+    "freeLogsDesc": "Registra películas, series, juegos, libros y más.",
+    "pro": "Pro",
+    "proPrice": "5 €/mes",
+    "proLogs": "Logs ilimitados",
+    "proExport": "Exportar logs a CSV",
+    "proExportDesc": "Descarga todos tus logs en un archivo cuando quieras.",
+    "currentPlan": "Plan actual",
+    "usage": "{{count}} / {{limit}} logs",
+    "usageUnlimited": "{{count}} logs",
+    "upgradeToPro": "Pasar a Pro",
+    "exportLogs": "Exportar logs",
+    "exportSuccess": "Exportación descargada",
+    "exportFailed": "Error al exportar",
+    "logLimitReached": "Has alcanzado el límite de 500 logs del plan Gratis. Pasa a Pro para logs ilimitados."
   },
   "errorBoundary": {
     "title": "Algo salió mal",

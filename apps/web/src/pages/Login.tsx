@@ -33,6 +33,7 @@ export function Login() {
       const data = await apiFetch<AuthResponse>("/auth/login", {
         method: "POST",
         body: JSON.stringify({ email: email.trim(), password }),
+        skipAuthRedirect: true,
       });
       login(COOKIE_SESSION, { ...data.user, onboarded: data.user.onboarded ?? true });
       toast.success(t("toast.welcomeBack"));

@@ -79,6 +79,15 @@
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45);
   --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.5);
+
+  /* API key / warning banner (dark theme: light amber on dark) */
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-warning-border: rgba(245, 158, 11, 0.5);
+  --color-warning-text: #fde68a;
+  --color-warning-text-muted: #fcd34d;
+  --color-warning-icon: #fbbf24;
+  --color-warning-hover-bg: rgba(245, 158, 11, 0.2);
+  --color-warning-hover-border: rgba(245, 158, 11, 0.7);
 }
 
 /* Dark theme: plain black backgrounds, neutral grays for text/borders; accent only on buttons/links */
@@ -107,29 +116,45 @@
   --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.7);
 }
 
-/* Light theme: warm neutrals, sidebar and topbar share same surface for cohesion */
+/* Light theme: WCAG AA contrast, modern slate palette; distinct surfaces for hierarchy */
 [data-theme="light"] {
-  --color-darkest: #FAF9F7;
-  --color-dark: #F2F0EB;
-  --color-mid: #778DA9;
-  --color-light: #778DA9;
-  --color-lightest: #1C1917;
+  /* Page background (lowest elevation) */
+  --color-darkest: #F1F5F9;
+  /* Cards, topbar, sidebar, modals (elevated surface) */
+  --color-dark: #FFFFFF;
+  /* Borders, focus rings, dividers – visible on white */
+  --color-mid: #94A3B8;
+  /* Secondary text, placeholders – ≥4.5:1 on white */
+  --color-light: #64748B;
+  /* Primary text – ≥7:1 on white (AAA) */
+  --color-lightest: #0F172A;
 
-  --btn-gradient-start: #415A77;
-  --btn-gradient-end: #5c7a9e;
-  --btn-gradient-hover-start: #4a6b8a;
-  --btn-gradient-hover-end: #6b8ab0;
+  /* Primary buttons: modern blue, white text (AAA) */
+  --btn-gradient-start: #2563eb;
+  --btn-gradient-end: #4f46e5;
+  --btn-gradient-hover-start: #3b82f6;
+  --btn-gradient-hover-end: #6366f1;
   --btn-text: #ffffff;
   --btn-destructive-start: #dc2626;
   --btn-destructive-end: #b91c1c;
   --btn-destructive-hover-start: #ef4444;
   --btn-destructive-hover-end: #dc2626;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.1);
-  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.06);
-  --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.12);
+  /* Subtle depth; no heavy shadows */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-modal: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
+
+  /* API key / warning banner (light theme: dark amber on light for readability) */
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #d97706;
+  --color-warning-text: #92400e;
+  --color-warning-text-muted: #b45309;
+  --color-warning-icon: #b45309;
+  --color-warning-hover-bg: #fef3c7;
+  --color-warning-hover-border: #b45309;
 }
 
 *,

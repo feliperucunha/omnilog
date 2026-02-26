@@ -10,6 +10,7 @@ import {
   BookMarked,
   Library,
   Search,
+  Settings,
   LogIn,
   UserPlus,
   Info,
@@ -67,7 +68,7 @@ function NavLinkItem({
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {showKeyWarning && (
         <AlertTriangle
-          className="h-4 w-4 flex-shrink-0 text-amber-400"
+          className="h-4 w-4 flex-shrink-0 text-[var(--color-warning-icon)]"
           aria-hidden
         />
       )}
@@ -84,19 +85,26 @@ export function Nav() {
 
   const navItems: { to: string; labelKey: string; icon: React.ReactNode; mediaType?: MediaType }[] = [
     { to: "/", labelKey: "nav.dashboard", icon: <LayoutDashboard size={iconSize} /> },
+    { to: "/search", labelKey: "nav.search", icon: <Search size={iconSize} /> },
     ...visibleTypes.map((type) => ({
       to: `/${type}`,
       labelKey: MEDIA_TYPE_NAV[type].labelKey,
       icon: MEDIA_TYPE_NAV[type].icon,
       mediaType: type,
     })),
-    { to: "/search", labelKey: "nav.search", icon: <Search size={iconSize} /> },
+    { to: "/settings", labelKey: "nav.settings", icon: <Settings size={iconSize} /> },
     { to: "/about", labelKey: "nav.about", icon: <Info size={iconSize} /> },
   ];
 
+  /** On mobile bottom bar: exclude Home and Search (they live in the top bar). */
+  const bottomBarItems = navItems.filter((item) => item.to !== "/" && item.to !== "/search");
+
   const getKeyWarning = (item: (typeof navItems)[0]) => {
     if (!token || !me?.apiKeys || !item.mediaType) return false;
-    const provider = getApiKeyProviderForMediaType(item.mediaType);
+    const provider = getApiKeyProviderForMediaType(
+      item.mediaType,
+      item.mediaType === "boardgames" ? me?.boardGameProvider : undefined
+    );
     if (!provider) return false;
     return !me.apiKeys[provider];
   };
@@ -146,7 +154,7 @@ export function Nav() {
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center gap-1 overflow-x-auto border-t border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-2 scrollbar-hide md:hidden">
         {token ? (
           <>
-            {navItems.map((item) => (
+            {bottomBarItems.map((item) => (
               <NavLinkItem
                 key={item.to}
                 to={item.to}
@@ -160,12 +168,6 @@ export function Nav() {
           </>
         ) : (
           <>
-            <NavLinkItem
-              to="/search"
-              label={t("nav.search")}
-              icon={<Search size={iconSize} />}
-              className="min-w-fit flex-shrink-0"
-            />
             <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} className="min-w-fit flex-shrink-0" />
             <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} className="min-w-fit flex-shrink-0" />
             <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} className="min-w-fit flex-shrink-0" />

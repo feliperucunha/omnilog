@@ -1,14 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, AlertTriangle } from "lucide-react";
+import { Search, AlertTriangle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import type { MediaType, Log } from "@logeverything/shared";
 import { LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
-import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache } from "@/lib/api";
+import { apiFetch, apiFetchCached, invalidateApiCache, invalidateLogsAndItemsCache } from "@/lib/api";
 import { LogForm } from "@/components/LogForm";
 import { CustomEntryForm } from "@/components/CustomEntryForm";
 import { ItemImage } from "@/components/ItemImage";
@@ -22,6 +22,8 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { BOARD_GAME_PROVIDERS, type BoardGameProvider } from "@logeverything/shared";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
 
@@ -32,9 +34,11 @@ interface MediaLogsProps {
 export function MediaLogs({ mediaType }: MediaLogsProps) {
   const { t } = useLocale();
   const navigate = useNavigate();
-  const { me } = useMe();
-  const provider = getApiKeyProviderForMediaType(mediaType);
+  const { me, refetch: refetchMe } = useMe();
+  const boardGameProvider = me?.boardGameProvider ?? "bgg";
+  const provider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
   const needsKeyBanner = provider != null && me?.apiKeys && !me.apiKeys[provider];
+  const [savingBoardGameProvider, setSavingBoardGameProvider] = useState(false);
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +48,21 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
   const [sortBy, setSortBy] = useState<"date" | "grade">("date");
   const [showCustomEntry, setShowCustomEntry] = useState(false);
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
+  const [incrementingId, setIncrementingId] = useState<string | null>(null);
+
+  const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
+  const CHAPTER_TYPES: MediaType[] = ["manga"];
+  const VOLUME_TYPES: MediaType[] = ["comics"];
+  const hasProgressButton =
+    EPISODE_TYPES.includes(mediaType) || CHAPTER_TYPES.includes(mediaType) || VOLUME_TYPES.includes(mediaType);
+
+  const getProgress = (log: Log): { field: "episode" | "chapter" | "volume"; value: number; labelKey: string } => {
+    if (EPISODE_TYPES.includes(log.mediaType))
+      return { field: "episode", value: log.episode ?? 0, labelKey: "itemReviewForm.episode" };
+    if (CHAPTER_TYPES.includes(log.mediaType))
+      return { field: "chapter", value: log.chapter ?? 0, labelKey: "itemReviewForm.chapter" };
+    return { field: "volume", value: log.volume ?? 0, labelKey: "itemReviewForm.volume" };
+  };
 
   const fetchLogs = useCallback(() => {
     setError(null);
@@ -84,12 +103,49 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
     if (completion) navigate("/log-complete", { state: completion });
   };
 
+  const handleIncrement = async (log: Log) => {
+    const { field, value } = getProgress(log);
+    const next = value + 1;
+    setIncrementingId(log.id);
+    try {
+      const updated = await apiFetch<Log>(`/logs/${log.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ [field]: next }),
+      });
+      invalidateLogsAndItemsCache();
+      setLogs((prev) => prev.map((l) => (l.id === log.id ? updated : l)));
+      toast.success(t("toast.logUpdated"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
+    } finally {
+      setIncrementingId(null);
+    }
+  };
+
   const label = t(`nav.${mediaType}`);
 
   const handleCategorySearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const q = categorySearchQuery.trim();
     navigate("/search", { state: { mediaType, query: q || undefined } });
+  };
+
+  const handleBoardGameProviderChange = async (newProvider: BoardGameProvider) => {
+    if (me?.boardGameProvider === newProvider) return;
+    setSavingBoardGameProvider(true);
+    try {
+      await apiFetch("/settings/board-game-provider", {
+        method: "PUT",
+        body: JSON.stringify({ provider: newProvider }),
+      });
+      await refetchMe();
+      invalidateApiCache("/search");
+      toast.success(t("settings.boardGameProviderSaved"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
+    } finally {
+      setSavingBoardGameProvider(false);
+    }
   };
 
   if (loading && logs.length === 0) {
@@ -130,20 +186,23 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
 
   return (
     <div className="relative min-h-full pb-24 md:pb-20">
-      <div className="flex flex-col gap-6">
+      <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
+        <img src="/logo.svg" alt="" className="h-40 w-auto opacity-20 sm:h-52 md:h-64" />
+      </div>
+      <div className="relative z-10 flex flex-col gap-6">
       {needsKeyBanner && (
         <Link
           to="/settings?open=api-keys"
-          className="flex items-center gap-3 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-left text-amber-200 no-underline transition-colors hover:bg-amber-500/20 hover:border-amber-500/70"
+          className="flex items-center gap-3 rounded-lg border px-4 py-3 text-left no-underline transition-colors border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] hover:bg-[var(--color-warning-hover-bg)] hover:border-[var(--color-warning-hover-border)]"
         >
-          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-400" aria-hidden />
-          <p className="text-sm font-medium text-amber-100">
+          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)]" aria-hidden />
+          <p className="text-sm font-medium text-[var(--color-warning-text)]">
             {t("apiKeyBanner.categoryMessage", {
               category: label,
               provider: API_KEY_META[provider!].name,
             })}
           </p>
-          <span className="ml-auto text-xs font-medium text-amber-300">
+          <span className="ml-auto text-xs font-medium text-[var(--color-warning-text-muted)]">
             {t("apiKeyBanner.addKeyInSettings")} →
           </span>
         </Link>
@@ -152,14 +211,40 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
         <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
           {label}
         </h1>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          {mediaType === "boardgames" && (
+            <div className="flex flex-wrap items-center gap-2">
+              <ToggleGroup
+                type="single"
+                value={boardGameProvider}
+                onValueChange={(v) => v && handleBoardGameProviderChange(v as BoardGameProvider)}
+                disabled={savingBoardGameProvider}
+                className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5"
+                aria-label={t("settings.boardGameProviderLabel")}
+              >
+                {BOARD_GAME_PROVIDERS.map((p) => (
+                  <ToggleGroupItem
+                    key={p}
+                    value={p}
+                    className="h-8 px-3 text-sm"
+                    aria-label={p === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
+                  >
+                    {p === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+          )}
           <motion.div whileTap={tapScale} transition={tapTransition}>
             <Button
               type="button"
               variant="outline"
               onClick={() => setShowCustomEntry(true)}
             >
-              {t("customEntry.addCustomEntry")}
+              <span className="inline-flex items-center gap-2">
+                <Plus className="size-4 shrink-0" aria-hidden />
+                {t("customEntry.addCustomEntry")}
+              </span>
             </Button>
           </motion.div>
         </div>
@@ -224,19 +309,18 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          className="flex flex-1 flex-col items-center justify-center min-h-[50vh] py-12"
         >
-          <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-sm)]">
-            <p className="text-center text-[var(--color-light)]">
-              {t("mediaLogs.noLogsFor", { label: label.toLowerCase() })}
-            </p>
-            <Link
-              to="/search"
-              state={{ mediaType }}
-              className="mt-4 inline-block text-[var(--color-lightest)] underline hover:no-underline"
-            >
-              {t("mediaLogs.searchAndAddOne")}
-            </Link>
-          </Card>
+          <p className="text-center text-[var(--color-light)]">
+            {t("mediaLogs.noLogsFor", { label: label.toLowerCase() })}
+          </p>
+          <Link
+            to="/search"
+            state={{ mediaType }}
+            className="mt-4 inline-block text-[var(--color-lightest)] underline hover:no-underline"
+          >
+            {t("mediaLogs.searchAndAddOne")}
+          </Link>
         </motion.div>
       ) : (
         <motion.div variants={staggerContainer} initial="initial" animate="animate">
@@ -251,6 +335,29 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
                     {deletingId === log.id && (
                       <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0D1B2A]/70">
                         <Loader2 className="h-8 w-8 animate-spin text-[var(--color-light)]" />
+                      </div>
+                    )}
+                    {hasProgressButton && (
+                      <div className="absolute top-2 right-2 z-[1]">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 hover:text-emerald-300 border border-emerald-500/40 transition-colors shrink-0"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleIncrement(log);
+                          }}
+                          disabled={incrementingId === log.id || deletingId === log.id}
+                          aria-label={t("mediaLogs.addOne")}
+                        >
+                          {incrementingId === log.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                          ) : (
+                            <Plus className="h-4 w-4" aria-hidden />
+                          )}
+                        </Button>
                       </div>
                     )}
                     <div className="flex gap-3 p-3 flex-1 min-h-0 sm:gap-4 sm:p-4">
@@ -274,6 +381,16 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
                             <span className="text-[var(--color-light)]">—</span>
                           )}
                         </div>
+                        {hasProgressButton && (() => {
+                          const p = getProgress(log);
+                          return (
+                            <div className="mt-1">
+                              <span className="text-xs text-[var(--color-light)]">
+                                {t(p.labelKey)}: {p.value}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         {log.review && (
                           <p className="line-clamp-2 text-xs sm:text-sm text-[var(--color-light)] min-h-0">
                             {log.review}
@@ -320,7 +437,7 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
 
       <form
         onSubmit={handleCategorySearchSubmit}
-        className="fixed bottom-6 left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-4 md:left-[calc(127.5px+50vw)]"
+        className="fixed bottom-20 left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-4 md:bottom-6 md:left-[calc(127.5px+50vw)]"
         aria-label={t("search.search")}
       >
         <div className="relative flex rounded-lg border-2 border-[var(--color-mid)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">

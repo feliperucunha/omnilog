@@ -11,6 +11,10 @@ export const MEDIA_TYPES = [
 
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
+/** Board game search/detail provider. Stored in user preference. */
+export const BOARD_GAME_PROVIDERS = ["bgg", "ludopedia"] as const;
+export type BoardGameProvider = (typeof BOARD_GAME_PROVIDERS)[number];
+
 export const LIST_TYPES = ["favorites", "pending"] as const;
 export type ListType = (typeof LIST_TYPES)[number];
 
@@ -128,13 +132,19 @@ export const SEARCH_SORT_OPTIONS: Record<MediaType, readonly SearchSortOption[]>
   ],
 };
 
-/** Item detail for the public item page (same shape as SearchResult, used for header) */
+/**
+ * Item detail for the public item page (same shape as SearchResult, used for header).
+ * For board games, which fields are present depends on the source API (BGG vs Ludopedia);
+ * the details UI only renders sections for which data exists.
+ */
 export interface ItemDetail {
   id: string;
   title: string;
   image: string | null;
   year?: string | null;
   subtitle?: string | null;
+  /** When mediaType is boardgames: which API provided this data ("bgg" | "ludopedia"). Enables UI to show "Source: …". */
+  itemSource?: "bgg" | "ludopedia" | null;
   /** Runtime in minutes (movies, TV, etc.) for content-hours stats */
   runtimeMinutes?: number | null;
   /** Average time to beat in hours (games only, from RAWG playtime). */
@@ -209,6 +219,8 @@ export interface ItemDetail {
 export interface ItemReview {
   id: string;
   userEmail: string;
+  /** True when the review author is on the Pro tier */
+  isPro?: boolean;
   grade: number | null;
   review: string | null;
   listType: string | null;
@@ -271,6 +283,8 @@ export interface CreateLogInput {
   chapter?: number | null;
   volume?: number | null;
   contentHours?: number | null;
+  /** When mediaType is boardgames: which API this id came from (bgg | ludopedia). Stored so details are fetched from the correct API. */
+  boardGameSource?: BoardGameProvider | null;
 }
 
 export interface UpdateLogInput {

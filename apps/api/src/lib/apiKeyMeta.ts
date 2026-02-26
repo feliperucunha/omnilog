@@ -30,6 +30,15 @@ export const API_KEY_META = {
 5. Once approved, open your application and create a Token.
 6. Copy the Bearer token and paste it below.`,
   },
+  ludopedia: {
+    provider: "ludopedia" as const,
+    name: "Ludopedia",
+    link: "https://ludopedia.com.br/api/documentacao.html",
+    tutorial: `1. Go to ludopedia.com.br and log in (or create an account).
+2. Open Aplicativos (https://www.ludopedia.com.br/aplicativos) and create an application.
+3. Use Ludopedia's OAuth flow to obtain an access token (see API documentation).
+4. The token is valid for 60 days; paste it below.`,
+  },
   comicvine: {
     provider: "comicvine" as const,
     name: "Comic Vine (Comic books)",

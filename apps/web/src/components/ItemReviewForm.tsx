@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import type { MediaType, Log } from "@logeverything/shared";
 import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
-import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache } from "@/lib/api";
+import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { toast } from "sonner";
 import { tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useMe } from "@/contexts/MeContext";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars, starsToGrade } from "@/lib/gradeStars";
 
@@ -46,11 +48,12 @@ export function ItemReviewForm({
   onSavedComplete,
 }: ItemReviewFormProps) {
   const { t } = useLocale();
+  const { me } = useMe();
   const [myLog, setMyLog] = useState<Log | null>(null);
   const [loadingLog, setLoadingLog] = useState(true);
   const [stars, setStars] = useState(2.5);
   const [review, setReview] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(LOG_STATUS_OPTIONS[mediaType][0]);
   const [season, setSeason] = useState<number | "">("");
   const [episode, setEpisode] = useState<number | "">("");
   const [chapter, setChapter] = useState<number | "">("");
@@ -113,15 +116,18 @@ export function ItemReviewForm({
         setMyLog(updated);
         toast.success(t("toast.reviewUpdated"));
       } else {
+        const createBody: Record<string, unknown> = {
+          mediaType,
+          externalId,
+          title,
+          image: image ?? null,
+          ...payload,
+        };
+        if (mediaType === "boardgames" && (me?.boardGameProvider === "bgg" || me?.boardGameProvider === "ludopedia"))
+          createBody.boardGameSource = me.boardGameProvider;
         const created = await apiFetch<Log>("/logs", {
           method: "POST",
-          body: JSON.stringify({
-            mediaType,
-            externalId,
-            title,
-            image: image ?? null,
-            ...payload,
-          }),
+          body: JSON.stringify(createBody),
         });
         setMyLog(created);
         toast.success(t("toast.reviewSaved"));
@@ -136,7 +142,8 @@ export function ItemReviewForm({
         id: externalId,
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.failedToSaveReview"));
+      const message = err instanceof Error ? err.message : t("toast.failedToSaveReview");
+      toast.error(message === LOG_LIMIT_REACHED_CODE ? t("tiers.logLimitReached") : message);
     } finally {
       setSaving(false);
     }
@@ -168,20 +175,21 @@ export function ItemReviewForm({
           <div className="flex flex-col gap-4">
             <div>
               <Label className="mb-2 block text-sm font-medium text-[var(--color-lightest)]">
-                {t("itemReviewForm.status")}
+                {t("itemReviewForm.status")} ({t("common.optional")})
               </Label>
-              <select
+              <Select
                 value={status ?? ""}
-                onChange={(e) => setStatus(e.target.value || null)}
-                className="flex h-10 w-full max-w-xs rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
-              >
-                <option value="">—</option>
-                {statusOptions.map((value) => (
-                  <option key={value} value={value}>
-                    {t(`status.${STATUS_I18N_KEYS[value] ?? value}`)}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(v) => setStatus(v || null)}
+                options={[
+                  { value: "", label: "—" },
+                  ...statusOptions.map((value) => ({
+                    value,
+                    label: t(`status.${STATUS_I18N_KEYS[value] ?? value}`),
+                  })),
+                ]}
+                placeholder="—"
+                aria-label={t("itemReviewForm.status")}
+              />
             </div>
 
             {showSeasonEpisode && (
@@ -193,7 +201,12 @@ export function ItemReviewForm({
                     min={0}
                     className="bg-[var(--color-darkest)]"
                     value={season === "" ? "" : season}
-                    onChange={(e) => setSeason(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => {
+                      const next = e.target.value === "" ? "" : Number(e.target.value);
+                      setSeason(next);
+                      if (next !== "" && status != null && (COMPLETED_STATUSES as readonly string[]).includes(status))
+                        setStatus("watching");
+                    }}
                     placeholder="—"
                   />
                 </div>
@@ -204,7 +217,12 @@ export function ItemReviewForm({
                     min={0}
                     className="bg-[var(--color-darkest)]"
                     value={episode === "" ? "" : episode}
-                    onChange={(e) => setEpisode(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => {
+                      const next = e.target.value === "" ? "" : Number(e.target.value);
+                      setEpisode(next);
+                      if (next !== "" && status != null && (COMPLETED_STATUSES as readonly string[]).includes(status))
+                        setStatus("watching");
+                    }}
                     placeholder="—"
                   />
                 </div>
@@ -240,12 +258,12 @@ export function ItemReviewForm({
 
             <div>
               <Label className="mb-2 block text-sm font-medium text-[var(--color-lightest)]">
-                {t("itemReviewForm.rating")}
+                {t("itemReviewForm.rating")} ({t("common.required")})
               </Label>
-              <StarRating value={stars} onChange={setStars} size="lg" />
+              <StarRating value={stars} onChange={setStars} size="lg" aria-required />
             </div>
             <div className="space-y-2">
-              <Label>{t("logForm.review")}</Label>
+              <Label>{t("logForm.review")} ({t("common.optional")})</Label>
               <Textarea
                 placeholder={t("itemReviewForm.reviewPlaceholder")}
                 value={review}
