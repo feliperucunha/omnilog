@@ -29,17 +29,15 @@ import type { Log } from "@logeverything/shared";
 
 const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
 
-type SearchResponse =
-  | { results: SearchResult[] }
-  | {
-      results: SearchResult[];
-      requiresApiKey?: ApiKeyProvider;
-      link?: string;
-      tutorial?: string;
-      freeSearchUsed?: number;
-      freeSearchLimit?: number;
-      freeSearchLimitReached?: boolean;
-    };
+interface SearchResponse {
+  results: SearchResult[];
+  requiresApiKey?: ApiKeyProvider;
+  link?: string;
+  tutorial?: string;
+  freeSearchUsed?: number;
+  freeSearchLimit?: number;
+  freeSearchLimitReached?: boolean;
+}
 
 export function Search() {
   const { t } = useLocale();
@@ -269,8 +267,8 @@ export function Search() {
                         isDisabled
                           ? t("search.categoryLimitReachedTooltip", {
                               type: t(`nav.${type}`),
-                              used: usageByCategory[type]?.used ?? 5,
-                              limit: usageByCategory[type]?.limit ?? 5,
+                              used: String(usageByCategory[type]?.used ?? 5),
+                              limit: String(usageByCategory[type]?.limit ?? 5),
                             })
                           : undefined
                       }
@@ -433,14 +431,14 @@ export function Search() {
           <p className="text-sm text-[var(--color-light)]">
             {requiresApiKey.freeSearchLimitReached
               ? t("search.freeSearchLimitReached", {
-                  used: requiresApiKey.freeSearchUsed ?? 5,
-                  limit: requiresApiKey.freeSearchLimit ?? 5,
+                  used: String(requiresApiKey.freeSearchUsed ?? 5),
+                  limit: String(requiresApiKey.freeSearchLimit ?? 5),
                   type: t(`nav.${mediaType}`),
                 })
               : requiresApiKey.freeSearchUsed != null && requiresApiKey.freeSearchLimit != null
                 ? t("search.freeSearchUsage", {
-                    used: requiresApiKey.freeSearchUsed,
-                    limit: requiresApiKey.freeSearchLimit,
+                    used: String(requiresApiKey.freeSearchUsed),
+                    limit: String(requiresApiKey.freeSearchLimit),
                   })
                 : t("search.noResultsUntilApiKey")}
           </p>
@@ -512,8 +510,8 @@ export function Search() {
                 ? t("apiKeyBanner.searchMessageWithCount", {
                     category: t(`nav.${mediaType}`),
                     provider: provider ? API_KEY_META[provider].name : "",
-                    used: usageByCategory[mediaType]!.used,
-                    limit: usageByCategory[mediaType]!.limit,
+                    used: String(usageByCategory[mediaType]!.used),
+                    limit: String(usageByCategory[mediaType]!.limit),
                   })
                 : t("apiKeyBanner.searchMessage", {
                     category: t(`nav.${mediaType}`),
