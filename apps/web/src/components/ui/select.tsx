@@ -115,22 +115,24 @@ export function Select({
   "aria-label": ariaLabel,
 }: SelectProps) {
   return (
-    <SelectRoot
-      value={value === "" || value == null ? "__empty" : value}
-      onValueChange={(v) => onValueChange(v === "__empty" ? "" : v)}
-      disabled={disabled}
-    >
-      <SelectTrigger className={cn("max-w-xs", triggerClassName)} aria-label={ariaLabel}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((opt) => (
-          <SelectItem key={opt.value === "" ? "__empty" : opt.value} value={opt.value === "" ? "__empty" : opt.value}>
-            {opt.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </SelectRoot>
+    <div className={className}>
+      <SelectRoot
+        value={value === "" || value == null ? "__empty" : value}
+        onValueChange={(v) => onValueChange(v === "__empty" ? "" : v)}
+        disabled={disabled}
+      >
+        <SelectTrigger className={cn("max-w-xs", triggerClassName)} aria-label={ariaLabel}>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((opt) => (
+            <SelectItem key={opt.value === "" ? "__empty" : opt.value} value={opt.value === "" ? "__empty" : opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </SelectRoot>
+    </div>
   );
 }
 

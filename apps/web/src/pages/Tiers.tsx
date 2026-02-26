@@ -70,8 +70,8 @@ export function Tiers() {
           </p>
           <p className="mt-1 text-sm text-[var(--color-light)]">
             {isPro
-              ? t("tiers.usageUnlimited", { count: logCount })
-              : t("tiers.usage", { count: logCount, limit: FREE_LOG_LIMIT })}
+              ? t("tiers.usageUnlimited", { count: String(logCount) })
+              : t("tiers.usage", { count: String(logCount), limit: String(FREE_LOG_LIMIT) })}
           </p>
           {isPro && (
             <Button
@@ -112,7 +112,7 @@ export function Tiers() {
           </ul>
           {token && !isPro && (
             <p className="mt-4 text-xs text-[var(--color-light)]">
-              {t("tiers.usage", { count: logCount, limit: FREE_LOG_LIMIT })}
+              {t("tiers.usage", { count: String(logCount), limit: String(FREE_LOG_LIMIT) })}
             </p>
           )}
         </Card>
