@@ -1,5 +1,5 @@
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Settings, LogOut, LayoutDashboard, Search } from "lucide-react";
+import { Settings, LogOut, Search } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
@@ -53,22 +53,15 @@ export function Topbar() {
         "flex h-14 flex-shrink-0 items-center gap-3 sm:gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-3 py-2 sm:p-4"
       )}
     >
-      {/* Home and Search links: mobile only (bottom bar has categories + About) */}
-      <div className="flex items-center gap-1 md:hidden">
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "gap-2 text-sm font-medium",
-            location.pathname === "/" ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]" : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-          )}
-          asChild
+      {/* Logo (→ dashboard) and Search: mobile only (bottom bar has categories + About) */}
+      <div className="flex items-center gap-2 md:hidden">
+        <Link
+          to="/"
+          className="flex items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
+          aria-label={t("nav.dashboard")}
         >
-          <Link to="/">
-            <LayoutDashboard className="size-4 shrink-0" aria-hidden />
-            {t("nav.dashboard")}
-          </Link>
-        </Button>
+          <img src="/logo.svg" alt="" className="h-8 w-auto flex-shrink-0" />
+        </Link>
         <Button
           variant="ghost"
           size="icon"

@@ -115,20 +115,31 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     where: {
       userId,
       completedAt: { not: null },
-      contentHours: { not: null },
     },
-    select: { completedAt: true, contentHours: true, mediaType: true },
+    select: { completedAt: true, contentHours: true, startedAt: true, mediaType: true },
   });
   const byKey: Record<string, number> = {};
+  const MS_PER_HOUR = 60 * 60 * 1000;
+  const FALLBACK_MAX_HOURS = 24; // cap derived hours (start→finish) so multi-day completions don't inflate stats
   for (const log of logs) {
-    if (log.completedAt == null || log.contentHours == null) continue;
+    if (log.completedAt == null) continue;
+    let hours: number;
+    if (log.contentHours != null && log.contentHours > 0) {
+      hours = log.contentHours;
+    } else if (log.startedAt != null) {
+      const elapsedMs = log.completedAt.getTime() - log.startedAt.getTime();
+      hours = Math.min(elapsedMs / MS_PER_HOUR, FALLBACK_MAX_HOURS);
+      if (hours <= 0) continue;
+    } else {
+      continue;
+    }
     const key =
       group === "category"
         ? (log.mediaType as string)
         : group === "year"
           ? `${log.completedAt.getUTCFullYear()}`
           : `${log.completedAt.getUTCFullYear()}-${String(log.completedAt.getUTCMonth() + 1).padStart(2, "0")}`;
-    byKey[key] = (byKey[key] ?? 0) + log.contentHours;
+    byKey[key] = (byKey[key] ?? 0) + hours;
   }
   const entries = Object.entries(byKey)
     .sort(([a], [b]) => a.localeCompare(b))

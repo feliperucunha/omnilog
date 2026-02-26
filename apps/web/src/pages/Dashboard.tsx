@@ -10,7 +10,8 @@ import { CustomEntryForm } from "@/components/CustomEntryForm";
 import { ItemImage } from "@/components/ItemImage";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
-import { MEDIA_TYPES, type Log } from "@logeverything/shared";
+import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
+import { MEDIA_TYPES, type Log, type MediaType } from "@logeverything/shared";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
@@ -25,6 +26,7 @@ interface StatsEntry {
 
 export function Dashboard() {
   const { t } = useLocale();
+  const { visibleTypes } = useVisibleMediaTypes();
   const navigate = useNavigate();
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +69,11 @@ export function Dashboard() {
   }, [fetchLogs]);
 
   const recent = logs.slice(0, 10);
-  const maxHours = stats.length > 0 ? Math.max(...stats.map((s) => s.hours), 1) : 1;
+  const displayedStats =
+    statsGroup === "category"
+      ? stats.filter((s) => visibleTypes.includes(s.period as MediaType))
+      : stats;
+  const maxHours = displayedStats.length > 0 ? Math.max(...displayedStats.map((s) => s.hours), 1) : 1;
   const byType = Object.fromEntries(
     MEDIA_TYPES.map((type) => [
       type,
@@ -123,7 +129,7 @@ export function Dashboard() {
         </p>
         <motion.div variants={staggerContainer} initial="initial" animate="animate">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-6">
-            {MEDIA_TYPES.map((type) => (
+            {visibleTypes.map((type) => (
               <motion.div key={type} variants={staggerItem} className="h-full">
                 <motion.div
                   whileTap={tapScale}
@@ -186,7 +192,7 @@ export function Dashboard() {
         ) : (
           <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-4" style={paperShadow}>
             <div className="flex flex-col gap-2">
-              {stats.map(({ period, hours }) => (
+              {displayedStats.map(({ period, hours }) => (
                 <div key={period} className="flex items-center gap-3">
                   <span
                     className={
