@@ -186,7 +186,8 @@
     "filterAll": "All",
     "sortLabel": "Sort:",
     "sortByDate": "Date",
-    "sortByGrade": "Grade"
+    "sortByGrade": "Grade",
+    "dataLanguageDependsOnApi": "The language of the data shown here depends on the API used for this category."
   },
   "itemPage": {
     "back": "Back",

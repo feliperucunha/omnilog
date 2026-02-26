@@ -67,6 +67,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
     type: req.query.type,
     q: req.query.q,
     sort: req.query.sort,
+    boardGameProvider: req.query.boardGameProvider,
   });
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid type or q" });

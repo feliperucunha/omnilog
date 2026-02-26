@@ -207,6 +207,9 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
           </span>
         </Link>
       )}
+      <p className="text-xs text-[var(--color-light)]" role="note">
+        {t("mediaLogs.dataLanguageDependsOnApi")}
+      </p>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
           {label}

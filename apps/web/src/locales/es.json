@@ -185,7 +185,8 @@
     "filterAll": "Todos",
     "sortLabel": "Ordenar:",
     "sortByDate": "Fecha",
-    "sortByGrade": "Nota"
+    "sortByGrade": "Nota",
+    "dataLanguageDependsOnApi": "El idioma de los datos mostrados aquí depende de la API usada para esta categoría."
   },
   "itemPage": {
     "back": "Volver",
