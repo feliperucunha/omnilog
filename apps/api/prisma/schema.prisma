@@ -2,6 +2,9 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// When using a transaction-mode pooler (e.g. Supabase pooler :6543, PgBouncer),
+// add ?pgbouncer=true to DATABASE_URL (or &pgbouncer=true if URL has other params).
+// Otherwise you get: "prepared statement \"s20\" does not exist" in production.
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

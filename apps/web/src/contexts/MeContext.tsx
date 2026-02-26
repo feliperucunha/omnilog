@@ -41,10 +41,12 @@ export function MeProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true);
     try {
-      const data = await apiFetch<MeResponse>("/me");
+      const data = await apiFetch<MeResponse>("/me", { skipAuthRedirect: true });
       setMe(data);
     } catch {
       setMe(null);
+      // 401 on /me (e.g. cookie not sent cross-origin) — clear auth so ProtectedRoute redirects to login
+      window.dispatchEvent(new CustomEvent("auth:logout"));
     } finally {
       setLoading(false);
     }
