@@ -28,21 +28,10 @@ const DONATION_LINKS = [
 ] as const;
 
 const TEAM_MEMBERS = [
-  { roleKey: "about.teamRoleCEO", nameKey: "about.teamNameCEO" },
-  { roleKey: "about.teamRoleDeveloper", nameKey: "about.teamNameDeveloper" },
-  { roleKey: "about.teamRoleDesigner", nameKey: "about.teamNameDesigner" },
+  { roleKey: "about.teamRoleCEO", nameKey: "about.teamNameCEO", image: "/ceo.jpeg" },
+  { roleKey: "about.teamRoleDeveloper", nameKey: "about.teamNameDeveloper", image: "/dev.jpeg" },
+  { roleKey: "about.teamRoleDesigner", nameKey: "about.teamNameDesigner", image: "/designer.jpeg" },
 ] as const;
-
-function TeamCardPlaceholder() {
-  return (
-    <div
-      className="w-full aspect-square bg-[var(--color-mid)] rounded-t-lg flex items-center justify-center text-[var(--color-dark)] text-4xl"
-      aria-hidden
-    >
-      ?
-    </div>
-  );
-}
 
 export function About() {
   const { t } = useLocale();
@@ -78,7 +67,11 @@ export function About() {
               className="overflow-hidden border-[var(--color-dark)] bg-[var(--color-dark)] p-0 flex flex-col"
               style={paperShadow}
             >
-              <TeamCardPlaceholder />
+              <img
+                src={member.image}
+                alt={t(member.nameKey)}
+                className="w-full aspect-square object-cover rounded-t-lg"
+              />
               <div className="p-4 text-center sm:p-5">
                 <p className="font-semibold text-[var(--color-lightest)] text-base sm:text-lg">
                   {t(member.nameKey)}
