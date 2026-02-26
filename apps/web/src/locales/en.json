@@ -82,6 +82,7 @@
     "title": "Settings",
     "advanced": "Advanced",
     "apiKeysIntro": "Add API keys to enable search for movies, TV, games, and board games. Keys are stored in your account.",
+    "apiKeysSupport": "Contact support",
     "language": "Language",
     "languageLabel": "App language",
     "keySaved": "Key saved",

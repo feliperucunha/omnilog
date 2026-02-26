@@ -82,6 +82,7 @@
     "title": "Configurações",
     "advanced": "Avançado",
     "apiKeysIntro": "Adicione chaves de API para buscar filmes, séries, jogos e board games. As chaves ficam salvas na sua conta.",
+    "apiKeysSupport": "Falar com o suporte",
     "language": "Idioma",
     "languageLabel": "Idioma do app",
     "keySaved": "Chave salva",

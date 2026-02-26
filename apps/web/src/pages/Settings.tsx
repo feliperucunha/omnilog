@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, HelpCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -345,9 +345,19 @@ export function Settings() {
           </button>
           {advancedOpen && (
             <div className="border-t border-[var(--color-dark)] px-4 pb-4 pt-2">
-              <p className="mb-4 text-sm text-[var(--color-light)]">
-                {t("settings.apiKeysIntro")}
-              </p>
+              <div className="mb-4 flex items-start gap-2">
+                <p className="flex-1 text-sm text-[var(--color-light)]">
+                  {t("settings.apiKeysIntro")}
+                </p>
+                <a
+                  href="mailto:feliperubenmv@gmail.com"
+                  className="shrink-0 rounded p-1 text-[var(--color-light)] transition-colors hover:text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
+                  aria-label={t("settings.apiKeysSupport")}
+                  title={t("settings.apiKeysSupport")}
+                >
+                  <HelpCircle className="h-5 w-5" aria-hidden />
+                </a>
+              </div>
               <div className="flex flex-col gap-4">
                 {(Object.keys(API_KEY_META) as ApiKeyProvider[]).map((provider) => {
                   const meta = API_KEY_META[provider];
