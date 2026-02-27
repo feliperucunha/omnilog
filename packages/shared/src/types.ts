@@ -11,6 +11,11 @@ export const MEDIA_TYPES = [
 
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
+/** Narrow a string to MediaType; returns "movies" if not a valid media type. */
+export function toMediaType(s: string): MediaType {
+  return MEDIA_TYPES.includes(s as MediaType) ? (s as MediaType) : "movies";
+}
+
 /** Board game search/detail provider. Stored in user preference. */
 export const BOARD_GAME_PROVIDERS = ["bgg", "ludopedia"] as const;
 export type BoardGameProvider = (typeof BOARD_GAME_PROVIDERS)[number];

@@ -4,8 +4,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { NumberCombobox } from "@/components/ui/number-combobox";
 import type { MediaType, Log } from "@logeverything/shared";
 import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
@@ -17,7 +17,7 @@ import { StarRating } from "@/components/StarRating";
 import { gradeToStars, starsToGrade } from "@/lib/gradeStars";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
-const HAS_CHAPTER_VOLUME: MediaType[] = ["comics"];
+const HAS_CHAPTER_VOLUME: MediaType[] = ["comics", "manga"];
 
 export interface LogCompleteState {
   image: string | null;
@@ -64,9 +64,31 @@ export function ItemReviewForm({
   const [volume, setVolume] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
 
+  type ProgressOptions = {
+    seasons?: number[];
+    episodesBySeason?: Record<string, number[]>;
+    episodes?: number[];
+    chapters?: number[];
+    volumes?: number[];
+  };
+  const [progressOptions, setProgressOptions] = useState<ProgressOptions | null>(null);
+  const [progressOptionsLoading, setProgressOptionsLoading] = useState(false);
+
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
+
+  useEffect(() => {
+    if (!showSeasonEpisode && !showChapterVolume) return;
+    setProgressOptionsLoading(true);
+    apiFetchCached<ProgressOptions>(
+      `/items/${mediaType}/${encodeURIComponent(externalId)}/progress-options`,
+      { ttlMs: 5 * 60 * 1000 }
+    )
+      .then(setProgressOptions)
+      .catch(() => setProgressOptions(null))
+      .finally(() => setProgressOptionsLoading(false));
+  }, [mediaType, externalId, showSeasonEpisode, showChapterVolume]);
 
   useEffect(() => {
     apiFetchCached<Log[]>(
@@ -237,34 +259,36 @@ export function ItemReviewForm({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.season")}</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    className="bg-[var(--color-darkest)]"
-                    value={season === "" ? "" : season}
-                    onChange={(e) => {
-                      const next = e.target.value === "" ? "" : Number(e.target.value);
+                  <NumberCombobox
+                    value={season}
+                    onChange={(next) => {
                       setSeason(next);
                       if (next !== "" && status != null && (COMPLETED_STATUSES as readonly string[]).includes(status))
                         setStatus("watching");
                     }}
+                    options={progressOptions?.seasons ?? []}
                     placeholder="—"
+                    aria-label={t("itemReviewForm.season")}
+                    optionsLoading={progressOptionsLoading}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.episode")}</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    className="bg-[var(--color-darkest)]"
-                    value={episode === "" ? "" : episode}
-                    onChange={(e) => {
-                      const next = e.target.value === "" ? "" : Number(e.target.value);
+                  <NumberCombobox
+                    value={episode}
+                    onChange={(next) => {
                       setEpisode(next);
                       if (next !== "" && status != null && (COMPLETED_STATUSES as readonly string[]).includes(status))
                         setStatus("watching");
                     }}
+                    options={
+                      mediaType === "tv" && season !== ""
+                        ? (progressOptions?.episodesBySeason?.[String(season)] ?? [])
+                        : (progressOptions?.episodes ?? [])
+                    }
                     placeholder="—"
+                    aria-label={t("itemReviewForm.episode")}
+                    optionsLoading={progressOptionsLoading}
                   />
                 </div>
               </div>
@@ -274,24 +298,24 @@ export function ItemReviewForm({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.chapter")}</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    className="bg-[var(--color-darkest)]"
-                    value={chapter === "" ? "" : chapter}
-                    onChange={(e) => setChapter(e.target.value === "" ? "" : Number(e.target.value))}
+                  <NumberCombobox
+                    value={chapter}
+                    onChange={setChapter}
+                    options={progressOptions?.chapters ?? []}
                     placeholder="—"
+                    aria-label={t("itemReviewForm.chapter")}
+                    optionsLoading={progressOptionsLoading}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.volume")}</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    className="bg-[var(--color-darkest)]"
-                    value={volume === "" ? "" : volume}
-                    onChange={(e) => setVolume(e.target.value === "" ? "" : Number(e.target.value))}
+                  <NumberCombobox
+                    value={volume}
+                    onChange={setVolume}
+                    options={progressOptions?.volumes ?? []}
                     placeholder="—"
+                    aria-label={t("itemReviewForm.volume")}
+                    optionsLoading={progressOptionsLoading}
                   />
                 </div>
               </div>

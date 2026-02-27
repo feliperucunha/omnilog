@@ -140,25 +140,23 @@ export function Settings() {
     }
   };
 
-  const handleToggleMediaType = (type: MediaType) => {
-    setSelectedMediaTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
-      return next;
-    });
-  };
-
-  const handleSaveMediaTypes = async () => {
+  const handleToggleMediaType = async (type: MediaType) => {
+    const next = new Set(selectedMediaTypes);
+    if (next.has(type)) next.delete(type);
+    else next.add(type);
+    const typesArray = Array.from(next);
+    if (typesArray.length === 0) return;
+    setSelectedMediaTypes(next);
     setSavingMediaTypes(true);
     try {
       await apiFetch("/settings/visible-media-types", {
         method: "PUT",
-        body: JSON.stringify({ types: Array.from(selectedMediaTypes) }),
+        body: JSON.stringify({ types: typesArray }),
       });
       await refetchVisibleTypes();
       toast.success(t("toast.mediaTypesSaved"));
     } catch (err) {
+      setSelectedMediaTypes(selectedMediaTypes);
       toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
     } finally {
       setSavingMediaTypes(false);
@@ -269,6 +267,7 @@ export function Settings() {
                     type="checkbox"
                     checked={selectedMediaTypes.has(type)}
                     onChange={() => handleToggleMediaType(type)}
+                    disabled={savingMediaTypes}
                     className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
                   />
                   <span className="text-sm text-[var(--color-lightest)]">
@@ -277,13 +276,6 @@ export function Settings() {
                 </label>
               ))}
             </div>
-            <Button
-              className="w-fit"
-              onClick={handleSaveMediaTypes}
-              disabled={savingMediaTypes}
-            >
-              {savingMediaTypes ? t("settings.saving") : t("settings.saveMediaTypes")}
-            </Button>
           </div>
         </Card>
 
@@ -370,7 +362,7 @@ export function Settings() {
             ) : (
               <ChevronRight className="h-5 w-5 shrink-0 text-[var(--color-light)]" aria-hidden />
             )}
-            <span className="font-semibold">{t("settings.advanced")}</span>
+            <span className="font-semibold">{t("settings.apiKeys")}</span>
           </button>
           {advancedOpen && (
             <div className="border-t border-[var(--color-dark)] px-4 pb-4 pt-2">

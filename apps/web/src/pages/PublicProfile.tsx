@@ -8,11 +8,12 @@ import { DashboardSkeleton } from "@/components/skeletons";
 import { ItemImage } from "@/components/ItemImage";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
-import { MEDIA_TYPES, type Log, type MediaType } from "@logeverything/shared";
+import { MEDIA_TYPES, type Log, type MediaType, toMediaType } from "@logeverything/shared";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Select } from "@/components/ui/select";
 import { MediaLogs } from "@/pages/MediaLogs";
 
 const RESERVED_PATHS = new Set([
@@ -66,9 +67,9 @@ export function PublicProfile() {
   const [statsLoading, setStatsLoading] = useState(true);
 
   const visibleTypes = profile?.visibleMediaTypes ?? [];
-  const defaultCategory = visibleTypes.length > 0 ? visibleTypes[0] : ("movies" as MediaType);
+  const defaultCategory: MediaType = visibleTypes.length > 0 ? toMediaType(visibleTypes[0]) : "movies";
   const [selectedCategory, setSelectedCategory] = useState<MediaType>(() => {
-    if (categoryParam && MEDIA_TYPES.includes(categoryParam)) return categoryParam as MediaType;
+    if (categoryParam && MEDIA_TYPES.includes(categoryParam as MediaType)) return toMediaType(categoryParam);
     return defaultCategory;
   });
 
@@ -84,7 +85,7 @@ export function PublicProfile() {
         setProfile(p);
         setLogs(allLogs);
         if (p.visibleMediaTypes.length > 0) {
-          setSelectedCategory(p.visibleMediaTypes[0] as MediaType);
+          setSelectedCategory(toMediaType(p.visibleMediaTypes[0]));
         }
       })
       .catch((err) => {
@@ -96,8 +97,8 @@ export function PublicProfile() {
   }, [userId]);
 
   useEffect(() => {
-    if (categoryParam && MEDIA_TYPES.includes(categoryParam)) setSelectedCategory(categoryParam as MediaType);
-    else if (!categoryParam && visibleTypes.length > 0) setSelectedCategory(visibleTypes[0] as MediaType);
+    if (categoryParam && MEDIA_TYPES.includes(categoryParam as MediaType)) setSelectedCategory(toMediaType(categoryParam));
+    else if (!categoryParam && visibleTypes.length > 0) setSelectedCategory(toMediaType(visibleTypes[0]));
   }, [categoryParam, visibleTypes]);
 
   const setCategory = useCallback(
@@ -211,7 +212,23 @@ export function PublicProfile() {
 
       <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
         <p className="text-sm font-medium uppercase text-[var(--color-light)]">{t("dashboard.statsTitle")}</p>
-        <div className="flex flex-wrap gap-2">
+        {/* Mobile: dropdown for time consumed filter */}
+        <div className="md:hidden w-full min-w-0">
+          <Select
+            value={statsGroup}
+            onValueChange={(v) => setStatsGroup(v as StatsGroup)}
+            options={[
+              { value: "category", label: t("dashboard.byCategory") },
+              { value: "month", label: t("dashboard.byMonth") },
+              { value: "year", label: t("dashboard.byYear") },
+            ]}
+            aria-label={t("dashboard.statsTitle")}
+            className="min-w-0 w-full"
+            triggerClassName="w-full max-w-none min-w-0"
+          />
+        </div>
+        {/* Desktop: button group */}
+        <div className="hidden md:flex flex-wrap gap-2">
           <Button
             variant={statsGroup === "category" ? "default" : "outline"}
             size="sm"

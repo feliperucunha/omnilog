@@ -11,6 +11,7 @@ import { LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
 import { apiFetch, apiFetchCached, apiFetchPublic, invalidateApiCache, invalidateLogsAndItemsCache } from "@/lib/api";
 import { LogForm } from "@/components/LogForm";
 import { CustomEntryForm } from "@/components/CustomEntryForm";
+import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
@@ -24,6 +25,7 @@ import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Select } from "@/components/ui/select";
 import { BOARD_GAME_PROVIDERS, type BoardGameProvider } from "@logeverything/shared";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
@@ -125,7 +127,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
     }
   };
 
-  const handleSaved = (completion?: { image: string | null; title: string; grade: number | null; mediaType?: string; id?: string }) => {
+  const handleSaved = (completion?: LogCompleteState) => {
     setEditingLog(null);
     fetchLogs();
     if (completion) showLogComplete(completion);
@@ -294,6 +296,36 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
 
       {!readOnly && (
       <div className="flex min-w-0 flex-wrap items-center gap-3 overflow-hidden">
+        {/* Mobile (< md): custom dropdowns, no labels */}
+        <div className="grid w-full grid-cols-2 gap-2 md:hidden">
+          <Select
+            value={statusFilter}
+            onValueChange={setStatusFilter}
+            options={[
+              { value: "", label: t("mediaLogs.filterAll") },
+              ...statusOptions.map((s) => ({
+                value: s,
+                label: t(`status.${STATUS_I18N_KEYS[s] ?? s}`),
+              })),
+            ]}
+            aria-label={t("itemReviewForm.status")}
+            className="min-w-0 w-full"
+            triggerClassName="w-full max-w-none min-w-0"
+          />
+          <Select
+            value={sortBy}
+            onValueChange={(v) => setSortBy(v as "date" | "grade")}
+            options={[
+              { value: "date", label: t("mediaLogs.sortByDate") },
+              { value: "grade", label: t("mediaLogs.sortByGrade") },
+            ]}
+            aria-label={t("mediaLogs.sortLabel")}
+            className="min-w-0 w-full"
+            triggerClassName="w-full max-w-none min-w-0"
+          />
+        </div>
+        {/* Desktop (md+): buttons with labels */}
+        <div className="hidden md:flex min-w-0 flex-wrap items-center gap-3">
         <span className="shrink-0 text-sm text-[var(--color-light)]">{t("itemReviewForm.status")}:</span>
         <div className="flex min-w-0 flex-wrap gap-2">
           <Button
@@ -334,6 +366,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
           >
             {t("mediaLogs.sortByGrade")}
           </Button>
+        </div>
         </div>
       </div>
       )}

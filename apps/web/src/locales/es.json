@@ -86,6 +86,7 @@
   "settings": {
     "title": "Ajustes",
     "advanced": "Avanzado",
+    "apiKeys": "Claves de API",
     "apiKeysIntro": "Añade claves de API para buscar películas, series, juegos y juegos de mesa. Las claves se guardan en tu cuenta.",
     "apiKeysSupport": "Contactar con soporte",
     "language": "Idioma",
@@ -303,7 +304,7 @@
     "teamRoleDesigner": "Diseñador",
     "teamNameCEO": "Felipe Cunha",
     "teamNameDeveloper": "Fe Costa",
-    "teamNameDesigner": "F' Cunha",
+    "teamNameDesigner": "Lipe Cunha",
     "carouselPrev": "Miembro anterior",
     "carouselNext": "Siguiente miembro",
     "carouselGoTo": "Ir al miembro {{index}}",

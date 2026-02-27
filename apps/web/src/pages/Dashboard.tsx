@@ -1,29 +1,40 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Share2, AlertTriangle } from "lucide-react";
+import { Share2, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchCached } from "@/lib/api";
 import { DashboardSkeleton } from "@/components/skeletons";
-import { CustomEntryForm } from "@/components/CustomEntryForm";
 import { ItemImage } from "@/components/ItemImage";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
-import { useLogComplete } from "@/contexts/LogCompleteContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
-import { MEDIA_TYPES, type Log, type MediaType } from "@logeverything/shared";
+import { MEDIA_TYPES, type Log, type MediaType, toMediaType } from "@logeverything/shared";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Select } from "@/components/ui/select";
 import { MediaLogs } from "@/pages/MediaLogs";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
+
+const STORAGE_KEY_STATS = "logeverything.dashboard.statsCollapsed";
+const STORAGE_KEY_RECENT = "logeverything.dashboard.recentLogsCollapsed";
+
+function getStoredCollapsed(key: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(key) === "true";
+  } catch {
+    return false;
+  }
+}
 
 type StatsGroup = "category" | "month" | "year";
 interface StatsEntry {
@@ -34,13 +45,12 @@ interface StatsEntry {
 export function Dashboard() {
   const { t } = useLocale();
   const { me } = useMe();
-  const { showLogComplete } = useLogComplete();
   const { visibleTypes } = useVisibleMediaTypes();
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryParam = searchParams.get("category");
-  const defaultCategory = visibleTypes.length > 0 ? visibleTypes[0] : ("movies" as MediaType);
+  const defaultCategory: MediaType = visibleTypes.length > 0 ? toMediaType(visibleTypes[0]) : "movies";
   const [selectedCategory, setSelectedCategory] = useState<MediaType>(() => {
-    if (categoryParam && MEDIA_TYPES.includes(categoryParam)) return categoryParam as MediaType;
+    if (categoryParam && MEDIA_TYPES.includes(categoryParam as MediaType)) return toMediaType(categoryParam);
     return defaultCategory;
   });
   const [logs, setLogs] = useState<Log[]>([]);
@@ -49,17 +59,38 @@ export function Dashboard() {
   const [statsGroup, setStatsGroup] = useState<StatsGroup>("category");
   const [stats, setStats] = useState<StatsEntry[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [showCustomEntry, setShowCustomEntry] = useState(false);
+
+  const [statsCollapsed, setStatsCollapsedState] = useState(() => getStoredCollapsed(STORAGE_KEY_STATS));
+  const [recentLogsCollapsed, setRecentLogsCollapsedState] = useState(() => getStoredCollapsed(STORAGE_KEY_RECENT));
+
+  const setStatsCollapsed = useCallback((value: boolean) => {
+    setStatsCollapsedState(value);
+    try {
+      localStorage.setItem(STORAGE_KEY_STATS, String(value));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const setRecentLogsCollapsed = useCallback((value: boolean) => {
+    setRecentLogsCollapsedState(value);
+    try {
+      localStorage.setItem(STORAGE_KEY_RECENT, String(value));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
-    if (categoryParam && MEDIA_TYPES.includes(categoryParam)) setSelectedCategory(categoryParam as MediaType);
-    else if (!categoryParam && visibleTypes.length > 0) setSelectedCategory(visibleTypes[0] as MediaType);
+    if (categoryParam && MEDIA_TYPES.includes(categoryParam as MediaType)) setSelectedCategory(toMediaType(categoryParam));
+    else if (!categoryParam && visibleTypes.length > 0) setSelectedCategory(toMediaType(visibleTypes[0]));
   }, [categoryParam, visibleTypes]);
 
   useEffect(() => {
     if (visibleTypes.length > 0 && !visibleTypes.includes(selectedCategory)) {
-      setSelectedCategory(visibleTypes[0] as MediaType);
-      setSearchParams({ category: visibleTypes[0] }, { replace: true });
+      const fallback = toMediaType(visibleTypes[0]);
+      setSelectedCategory(fallback);
+      setSearchParams({ category: fallback }, { replace: true });
     }
   }, [visibleTypes, selectedCategory, setSearchParams]);
 
@@ -201,18 +232,43 @@ export function Dashboard() {
 
       {visibleTypes.length > 0 && (
         <div className="flex min-w-0 justify-center overflow-hidden">
+          {/* Mobile: swipeable tab strip */}
+          <div
+            className="flex md:hidden min-w-0 overflow-x-auto overflow-y-hidden gap-2 py-2 -mx-4 px-4 scroll-smooth touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            role="tablist"
+            aria-label={t("dashboard.category")}
+          >
+            {visibleTypes.map((type) => (
+              <button
+                key={type}
+                type="button"
+                role="tab"
+                aria-selected={selectedCategory === type}
+                aria-label={`${t(`nav.${type}`)} (${byType[type] ?? 0})`}
+                onClick={() => setCategory(type as MediaType)}
+                className={
+                  selectedCategory === type
+                    ? "btn-gradient flex-shrink-0 rounded-full px-4 py-2.5 text-sm font-medium text-[var(--btn-text)] transition-colors whitespace-nowrap"
+                    : "flex-shrink-0 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4 py-2.5 text-sm font-medium text-[var(--color-light)] transition-colors whitespace-nowrap"
+                }
+              >
+                {t(`nav.${type}`)} ({byType[type] ?? 0})
+              </button>
+            ))}
+          </div>
+          {/* Desktop: toggle group */}
           <ToggleGroup
             type="single"
             value={selectedCategory}
             onValueChange={(v) => v && setCategory(v as MediaType)}
-            className="inline-flex flex-wrap justify-center gap-2 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-2 w-full md:w-fit md:gap-1 md:p-1"
+            className="hidden md:inline-flex flex-wrap justify-center gap-2 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-2 w-full max-w-2xl md:w-fit md:gap-1 md:p-1"
             aria-label={t("dashboard.category")}
           >
             {visibleTypes.map((type) => (
               <ToggleGroupItem
                 key={type}
                 value={type}
-                className="rounded-md px-4 py-3 text-sm data-[state=on]:bg-[var(--color-mid)]/50 md:px-3 md:py-2"
+                className="rounded-md px-4 py-3 text-sm data-[state=on]:bg-gradient-to-br data-[state=on]:from-[var(--btn-gradient-start)] data-[state=on]:to-[var(--btn-gradient-end)] data-[state=on]:text-[var(--btn-text)] md:px-3 md:py-2"
                 aria-label={`${t(`nav.${type}`)} (${byType[type] ?? 0})`}
               >
                 {t(`nav.${type}`)} ({byType[type] ?? 0})
@@ -228,11 +284,40 @@ export function Dashboard() {
         </section>
       )}
 
+      <div className="grid min-w-0 grid-cols-1 gap-8 overflow-hidden md:grid-cols-2">
       <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-        <p className="text-sm font-medium uppercase text-[var(--color-light)]">
-          {t("dashboard.statsTitle")}
-        </p>
-        <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setStatsCollapsed(!statsCollapsed)}
+          className="flex w-full items-center gap-2 rounded-lg text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)]"
+          aria-expanded={!statsCollapsed}
+        >
+          {statsCollapsed ? (
+            <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+          )}
+          <span>{t("dashboard.statsTitle")}</span>
+        </button>
+        {!statsCollapsed && (
+          <>
+        {/* Mobile: dropdown for time consumed filter */}
+        <div className="md:hidden w-full min-w-0">
+          <Select
+            value={statsGroup}
+            onValueChange={(v) => setStatsGroup(v as StatsGroup)}
+            options={[
+              { value: "category", label: t("dashboard.byCategory") },
+              { value: "month", label: t("dashboard.byMonth") },
+              { value: "year", label: t("dashboard.byYear") },
+            ]}
+            aria-label={t("dashboard.statsTitle")}
+            className="min-w-0 w-full"
+            triggerClassName="w-full max-w-none min-w-0"
+          />
+        </div>
+        {/* Desktop: button group */}
+        <div className="hidden md:flex flex-wrap gap-2">
           <Button
             variant={statsGroup === "category" ? "default" : "outline"}
             size="sm"
@@ -295,35 +380,28 @@ export function Dashboard() {
             </div>
           </Card>
         )}
+          </>
+        )}
       </div>
 
       <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-medium uppercase text-[var(--color-light)]">
-            {t("dashboard.recentLogs")}
-          </p>
-          <div className="flex min-w-0 flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowCustomEntry(true)}
-            >
-              <span className="inline-flex items-center gap-2">
-                <Plus className="size-4 shrink-0" aria-hidden />
-                {t("customEntry.addCustomEntry")}
-              </span>
-            </Button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setRecentLogsCollapsed(!recentLogsCollapsed)}
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)]"
+            aria-expanded={!recentLogsCollapsed}
+          >
+            {recentLogsCollapsed ? (
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            ) : (
+              <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+            )}
+            <span>{t("dashboard.recentLogs")}</span>
+          </button>
         </div>
-        {showCustomEntry && (
-          <CustomEntryForm
-            onSaved={(completion) => {
-              setShowCustomEntry(false);
-              if (completion) showLogComplete(completion);
-            }}
-            onCancel={() => setShowCustomEntry(false)}
-          />
-        )}
+        {!recentLogsCollapsed && (
+        <>
         {recent.length === 0 ? (
           <Card
             className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6"
@@ -380,6 +458,9 @@ export function Dashboard() {
             </div>
           </motion.ul>
         )}
+        </>
+        )}
+      </div>
       </div>
     </div>
   );

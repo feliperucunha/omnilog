@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { NumberCombobox } from "@/components/ui/number-combobox";
 import { Select } from "@/components/ui/select";
 import type { MediaType } from "@logeverything/shared";
 import { MEDIA_TYPES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
@@ -20,7 +21,7 @@ import { starsToGrade } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
-const HAS_CHAPTER_VOLUME: MediaType[] = ["comics"];
+const HAS_CHAPTER_VOLUME: MediaType[] = ["comics", "manga"];
 
 function isValidUrl(s: string): boolean {
   if (!s.trim()) return true;
@@ -191,30 +192,24 @@ export function CustomEntryForm({
                     <Label className="text-sm text-[var(--color-lightest)]">
                       {t("itemReviewForm.season")}
                     </Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      className="bg-[var(--color-darkest)]"
-                      value={season === "" ? "" : season}
-                      onChange={(e) =>
-                        setSeason(e.target.value === "" ? "" : Number(e.target.value))
-                      }
+                    <NumberCombobox
+                      value={season}
+                      onChange={setSeason}
+                      options={[]}
                       placeholder="—"
+                      aria-label={t("itemReviewForm.season")}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm text-[var(--color-lightest)]">
                       {t("itemReviewForm.episode")}
                     </Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      className="bg-[var(--color-darkest)]"
-                      value={episode === "" ? "" : episode}
-                      onChange={(e) =>
-                        setEpisode(e.target.value === "" ? "" : Number(e.target.value))
-                      }
+                    <NumberCombobox
+                      value={episode}
+                      onChange={setEpisode}
+                      options={[]}
                       placeholder="—"
+                      aria-label={t("itemReviewForm.episode")}
                     />
                   </div>
                 </div>
@@ -225,30 +220,24 @@ export function CustomEntryForm({
                     <Label className="text-sm text-[var(--color-lightest)]">
                       {t("itemReviewForm.chapter")}
                     </Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      className="bg-[var(--color-darkest)]"
-                      value={chapter === "" ? "" : chapter}
-                      onChange={(e) =>
-                        setChapter(e.target.value === "" ? "" : Number(e.target.value))
-                      }
+                    <NumberCombobox
+                      value={chapter}
+                      onChange={setChapter}
+                      options={[]}
                       placeholder="—"
+                      aria-label={t("itemReviewForm.chapter")}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm text-[var(--color-lightest)]">
                       {t("itemReviewForm.volume")}
                     </Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      className="bg-[var(--color-darkest)]"
-                      value={volume === "" ? "" : volume}
-                      onChange={(e) =>
-                        setVolume(e.target.value === "" ? "" : Number(e.target.value))
-                      }
+                    <NumberCombobox
+                      value={volume}
+                      onChange={setVolume}
+                      options={[]}
                       placeholder="—"
+                      aria-label={t("itemReviewForm.volume")}
                     />
                   </div>
                 </div>

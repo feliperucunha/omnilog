@@ -17,6 +17,7 @@ export type {
 } from "./types.js";
 export {
   MEDIA_TYPES,
+  toMediaType,
   BOARD_GAME_PROVIDERS,
   LIST_TYPES,
   LOG_STATUS_OPTIONS,

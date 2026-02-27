@@ -5,7 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { sanitizeText, EXTERNAL_ID_MAX_LENGTH } from "../lib/sanitize.js";
 import { optionalAuthMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
-import { getMovieById, getTvById } from "../services/tmdb.js";
+import { getMovieById, getTvById, getTvSeasonEpisodeNumbers } from "../services/tmdb.js";
 import { getGameById } from "../services/rawg.js";
 import { getBookById } from "../services/openLibrary.js";
 import { getAnimeById, getMangaById } from "../services/jikan.js";
@@ -33,6 +33,81 @@ async function getUserKeys(userId: string) {
 
 const DEFAULT_REVIEWS_LIMIT = 10;
 const MAX_REVIEWS_LIMIT = 50;
+
+/** GET /items/:mediaType/:externalId/progress-options - options for season/episode/chapter/volume dropdowns. */
+itemsRouter.get("/:mediaType/:externalId/progress-options", async (req: AuthenticatedRequest, res) => {
+  const mediaType = req.params.mediaType as MediaType;
+  const rawExternalId = req.params.externalId;
+  if (!MEDIA_TYPES.includes(mediaType) || !rawExternalId) {
+    res.status(400).json({ error: "Invalid mediaType or externalId" });
+    return;
+  }
+  const externalId = sanitizeText(rawExternalId, EXTERNAL_ID_MAX_LENGTH);
+  if (!externalId) {
+    res.status(400).json({ error: "Invalid externalId" });
+    return;
+  }
+  const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
+
+  try {
+    if (mediaType === "tv") {
+      const item = await getTvById(externalId, keys?.tmdbApiKey);
+      if (!item || !item.seasonsCount) {
+        res.json({ seasons: [], episodesBySeason: {} });
+        return;
+      }
+      const seasons = Array.from({ length: item.seasonsCount }, (_, i) => i + 1);
+      const episodesBySeason: Record<string, number[]> = {};
+      for (const sn of seasons) {
+        const eps = await getTvSeasonEpisodeNumbers(externalId, sn, keys?.tmdbApiKey);
+        episodesBySeason[String(sn)] = eps.length > 0 ? eps : Array.from({ length: 24 }, (_, i) => i + 1);
+      }
+      res.json({ seasons, episodesBySeason });
+      return;
+    }
+    if (mediaType === "anime") {
+      const item = await getAnimeById(externalId);
+      if (!item || !item.episodesCount) {
+        res.json({ episodes: [] });
+        return;
+      }
+      const episodes = Array.from({ length: item.episodesCount }, (_, i) => i + 1);
+      res.json({ episodes });
+      return;
+    }
+    if (mediaType === "manga") {
+      const item = await getMangaById(externalId);
+      if (!item) {
+        res.json({ chapters: [], volumes: [] });
+        return;
+      }
+      const chapters =
+        (item.chaptersCount ?? 0) > 0
+          ? Array.from({ length: item.chaptersCount! }, (_, i) => i + 1)
+          : [];
+      const volumes =
+        (item.volumesCount ?? 0) > 0
+          ? Array.from({ length: item.volumesCount! }, (_, i) => i + 1)
+          : [];
+      res.json({ chapters, volumes });
+      return;
+    }
+    if (mediaType === "comics") {
+      const item = await getVolumeById(externalId, keys?.comicVineApiKey);
+      if (!item || !item.issuesCount) {
+        res.json({ volumes: [] });
+        return;
+      }
+      const volumes = Array.from({ length: item.issuesCount }, (_, i) => i + 1);
+      res.json({ volumes });
+      return;
+    }
+    res.json({});
+  } catch (err) {
+    console.error("Progress options error:", err);
+    res.status(500).json({ error: "Failed to load options" });
+  }
+});
 
 /** GET /items/:mediaType/:externalId/reviews - reviews only (for async loading after details). */
 itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequest, res) => {

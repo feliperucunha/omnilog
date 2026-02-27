@@ -3,8 +3,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function ItemPageSkeleton() {
   return (
     <div className="flex flex-col gap-8">
+      <Skeleton className="h-9 w-24 rounded-md" />
       <div className="flex flex-wrap items-start gap-6">
-        <Skeleton className="h-64 w-44 rounded-xl" />
+        <Skeleton className="h-64 w-44 flex-shrink-0 rounded-xl" />
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <Skeleton className="h-3.5 w-14 rounded" />
           <Skeleton className="h-8 w-4/5 rounded-md" />

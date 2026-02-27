@@ -94,6 +94,28 @@ export async function getTvById(id: string, apiKey?: string | null): Promise<Ite
   };
 }
 
+/** Get episode numbers for a TV season (for progress dropdowns). */
+export async function getTvSeasonEpisodeNumbers(
+  seriesId: string,
+  seasonNumber: number,
+  apiKey?: string | null
+): Promise<number[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const res = await fetch(
+    `${BASE}/tv/${seriesId}/season/${seasonNumber}?api_key=${key}`
+  );
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    episodes?: Array<{ episode_number?: number }>;
+  };
+  const episodes = data.episodes ?? [];
+  const numbers = episodes
+    .map((ep) => ep.episode_number)
+    .filter((n): n is number => typeof n === "number" && n >= 0);
+  return numbers.length > 0 ? numbers.sort((a, b) => a - b) : [];
+}
+
 export type SearchMoviesResult =
   | { results: SearchResult[] }
   | { results: []; requiresApiKey: "tmdb"; link: string; tutorial: string };
