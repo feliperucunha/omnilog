@@ -35,6 +35,7 @@
     "email": "Email",
     "emailOrUsername": "Email or username",
     "password": "Password",
+    "rememberMe": "Remember me",
     "signIn": "Sign in",
     "signingIn": "Signing in…",
     "noAccount": "No account?",

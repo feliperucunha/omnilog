@@ -35,6 +35,7 @@
     "email": "Correo",
     "emailOrUsername": "Correo o nombre de usuario",
     "password": "Contraseña",
+    "rememberMe": "Recordarme",
     "signIn": "Iniciar sesión",
     "signingIn": "Iniciando sesión…",
     "noAccount": "¿No tienes cuenta?",

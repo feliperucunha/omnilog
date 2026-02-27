@@ -7,17 +7,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/PasswordInput";
 import { useLocale } from "@/contexts/LocaleContext";
-import { useAuth } from "@/contexts/AuthContext";
-import { COOKIE_SESSION } from "@/contexts/AuthContext";
+import { COOKIE_SESSION, useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { AuthResponse } from "@logeverything/shared";
 import { modalContentVariants } from "@/lib/animations";
 
+const REMEMBER_LOGIN_KEY = "logeverything-remember-login";
+
+function getStoredRememberLogin(): { email: string; rememberMe: boolean } {
+  if (typeof window === "undefined") return { email: "", rememberMe: false };
+  try {
+    const raw = localStorage.getItem(REMEMBER_LOGIN_KEY);
+    if (!raw) return { email: "", rememberMe: false };
+    const data = JSON.parse(raw) as { email?: string } | null;
+    return {
+      email: typeof data?.email === "string" ? data.email : "",
+      rememberMe: !!data?.email,
+    };
+  } catch {
+    return { email: "", rememberMe: false };
+  }
+}
+
 export function Login() {
   const { t } = useLocale();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => getStoredRememberLogin().email);
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(() => getStoredRememberLogin().rememberMe);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -35,6 +53,22 @@ export function Login() {
         body: JSON.stringify({ email: email.trim(), password }),
         skipAuthRedirect: true,
       });
+      if (rememberMe) {
+        try {
+          localStorage.setItem(
+            REMEMBER_LOGIN_KEY,
+            JSON.stringify({ email: email.trim() })
+          );
+        } catch {
+          // ignore
+        }
+      } else {
+        try {
+          localStorage.removeItem(REMEMBER_LOGIN_KEY);
+        } catch {
+          // ignore
+        }
+      }
       login(COOKIE_SESSION, { ...data.user, onboarded: data.user.onboarded ?? true });
       toast.success(t("toast.welcomeBack"));
       navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
@@ -56,8 +90,9 @@ export function Login() {
         className="w-full max-w-[400px]"
       >
         <Card className="w-full border-[var(--color-dark)] bg-[var(--color-dark)] shadow-[var(--shadow-modal)]">
-          <CardHeader className="text-center">
-            <h1 className="flex flex-col gap-0.5 text-2xl font-bold text-[var(--color-lightest)]">
+          <CardHeader className="flex flex-col items-center gap-4 text-center">
+            <img src="/logo.png" alt="" className="h-24! w-auto sm:h-16" />
+            <h1 className="flex flex-col gap-0.5 text-2xl -mt-6 font-bold text-[var(--color-lightest)]">
               <span>{t("app.name")}</span>
               <span className="text-lg font-normal text-[var(--color-light)]">
                 {t("app.subtitle")}
@@ -88,6 +123,22 @@ export function Login() {
                     required
                   />
                 </div>
+                <label
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 py-1",
+                    "focus-within:ring-2 focus-within:ring-[var(--color-mid)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--color-dark)] focus-within:outline-none rounded"
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 shrink-0 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                  />
+                  <span className="text-sm text-[var(--color-light)]">
+                    {t("login.rememberMe")}
+                  </span>
+                </label>
                 <p className="text-right text-sm">
                   <Link
                     to="/forgot-password"
