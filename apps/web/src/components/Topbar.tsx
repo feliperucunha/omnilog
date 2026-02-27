@@ -1,5 +1,5 @@
-import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Settings, LogOut, Search } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Settings, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
@@ -27,7 +27,6 @@ export function Topbar() {
   const { t, locale, setLocale } = useLocale();
   const { token, user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleLocaleChange = (newLocale: Locale) => {
     setLocale(newLocale);
@@ -53,8 +52,8 @@ export function Topbar() {
         "flex h-14 flex-shrink-0 items-center gap-3 sm:gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-3 py-2 sm:p-4"
       )}
     >
-      {/* Logo (→ dashboard) and Search: mobile only (bottom bar has categories + About) */}
-      <div className="flex items-center gap-2 md:hidden">
+      {/* Mobile: logo only (Home + Search are in the bottom bar) */}
+      <div className="flex items-center md:hidden">
         <Link
           to="/"
           className="flex items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
@@ -62,20 +61,6 @@ export function Topbar() {
         >
           <img src="/logo.svg" alt="" className="h-8 w-auto flex-shrink-0" />
         </Link>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "h-9 w-9",
-            location.pathname === "/search" ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]" : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-          )}
-          asChild
-          aria-label={t("nav.search")}
-        >
-          <Link to="/search">
-            <Search className="size-4 shrink-0" aria-hidden />
-          </Link>
-        </Button>
       </div>
 
       <div className="ml-auto flex flex-shrink-0 items-center gap-2 sm:gap-3">

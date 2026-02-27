@@ -14,13 +14,29 @@ const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-in-production";
 const WEB_ORIGIN = process.env.WEB_ORIGIN ?? "http://localhost:5173";
 const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
+/** Password: at least 8 characters, at least one letter and one number. */
+const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .refine((p) => /[a-zA-Z]/.test(p), "Password must contain at least one letter")
+  .refine((p) => /\d/.test(p), "Password must contain at least one number");
+
+const usernameSchema = z
+  .string()
+  .min(2, "Username must be at least 2 characters")
+  .max(32, "Username must be at most 32 characters")
+  .regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscore and hyphen")
+  .trim();
+
 const registerSchema = z.object({
+  username: usernameSchema,
   email: z.string().email().max(255).trim(),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: passwordSchema,
 });
 
 const loginSchema = z.object({
-  email: z.string().email().max(255).trim(),
+  /** Email or username; validated as non-empty string, lookup by either field. */
+  email: z.string().min(1, "Email or username required").max(255).trim(),
   password: z.string().min(1),
 });
 
@@ -30,7 +46,7 @@ const forgotPasswordSchema = z.object({
 
 const resetPasswordSchema = z.object({
   token: z.string().min(1).max(512),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: passwordSchema,
 });
 
 authRouter.post("/register", async (req, res) => {
@@ -44,16 +60,22 @@ authRouter.post("/register", async (req, res) => {
     res.status(400).json({ error: "Invalid email" });
     return;
   }
+  const username = sanitizeText(parsed.data.username, 32) ?? parsed.data.username.trim().slice(0, 32);
   const { password } = parsed.data;
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
+  const existingByEmail = await prisma.user.findUnique({ where: { email } });
+  if (existingByEmail) {
     res.status(409).json({ error: "Email already registered" });
+    return;
+  }
+  const existingByUsername = await prisma.user.findUnique({ where: { username } });
+  if (existingByUsername) {
+    res.status(409).json({ error: "Username already taken" });
     return;
   }
   const hashed = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({
-    data: { email, password: hashed },
-    select: { id: true, email: true, onboarded: true },
+    data: { username, email, password: hashed },
+    select: { id: true, username: true, email: true, onboarded: true },
   });
   const token = jwt.sign(
     { userId: user.id, email: user.email },
@@ -62,7 +84,7 @@ authRouter.post("/register", async (req, res) => {
   );
   const response: AuthResponse = {
     token,
-    user: { id: user.id, email: user.email, onboarded: user.onboarded },
+    user: { id: user.id, username: user.username ?? undefined, email: user.email, onboarded: user.onboarded },
   };
   setAuthCookie(res, token);
   res.status(201).json(response);
@@ -74,18 +96,20 @@ authRouter.post("/login", async (req, res) => {
     res.status(400).json({ error: parsed.error.flatten().fieldErrors });
     return;
   }
-  const email = sanitizeEmail(parsed.data.email);
-  if (!email) {
-    res.status(400).json({ error: "Invalid email" });
+  const loginInput = sanitizeEmail(parsed.data.email) ?? parsed.data.email.trim();
+  if (!loginInput) {
+    res.status(400).json({ error: "Email or username required" });
     return;
   }
   const { password } = parsed.data;
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, email: true, password: true, onboarded: true },
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [{ email: loginInput }, { username: loginInput }],
+    },
+    select: { id: true, username: true, email: true, password: true, onboarded: true },
   });
   if (!user || !(await bcrypt.compare(password, user.password))) {
-    res.status(401).json({ error: "Invalid email or password" });
+    res.status(401).json({ error: "Invalid email/username or password" });
     return;
   }
   const token = jwt.sign(
@@ -95,7 +119,7 @@ authRouter.post("/login", async (req, res) => {
   );
   const response: AuthResponse = {
     token,
-    user: { id: user.id, email: user.email, onboarded: user.onboarded },
+    user: { id: user.id, username: user.username ?? undefined, email: user.email, onboarded: user.onboarded },
   };
   setAuthCookie(res, token);
   res.json(response);
@@ -169,14 +193,22 @@ authRouter.post("/reset-password", async (req, res) => {
       passwordResetExpires: null,
     },
   });
+  const u = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { id: true, username: true, email: true, onboarded: true },
+  });
+  if (!u) {
+    res.status(500).json({ error: "User not found" });
+    return;
+  }
   const jwtToken = jwt.sign(
-    { userId: user.id, email: user.email },
+    { userId: u.id, email: u.email },
     JWT_SECRET,
     { expiresIn: "30d" }
   );
   const response: AuthResponse = {
     token: jwtToken,
-    user: { id: user.id, email: user.email, onboarded: user.onboarded },
+    user: { id: u.id, username: u.username ?? undefined, email: u.email, onboarded: u.onboarded },
   };
   setAuthCookie(res, jwtToken);
   res.json(response);

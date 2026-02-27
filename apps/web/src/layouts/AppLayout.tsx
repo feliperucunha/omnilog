@@ -7,10 +7,10 @@ export function AppLayout() {
     <div className="flex min-h-screen">
       <Nav />
       <main
-        className="flex min-h-screen flex-1 flex-col pb-20 md:pb-6 md:pl-[255px]"
+        className="flex min-h-screen min-w-0 flex-1 flex-col pb-20 md:pb-6 md:pl-[255px]"
       >
         <Topbar />
-        <div className="flex flex-1 flex-col min-h-0 overflow-auto p-4 md:p-6">
+        <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-4 md:p-6">
           <Outlet />
         </div>
       </main>

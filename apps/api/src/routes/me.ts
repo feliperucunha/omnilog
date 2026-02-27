@@ -15,6 +15,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     where: { id: req.user.userId },
     select: {
       id: true,
+      username: true,
       email: true,
       onboarded: true,
       tier: true,
@@ -60,6 +61,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
   res.json({
     user: {
       id: user.id,
+      username: user.username ?? undefined,
       email: user.email,
       onboarded: user.onboarded,
     },

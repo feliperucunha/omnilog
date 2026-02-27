@@ -36,6 +36,8 @@ interface LogFormCreateProps {
 interface LogFormEditProps {
   mode: "edit";
   log: Log;
+  /** TV/Anime: total episodes (set episode to this when user selects completed status). */
+  episodesCount?: number | null;
   onSaved: (completion?: LogCompleteState) => void;
   onCancel: () => void;
 }
@@ -78,7 +80,7 @@ export function LogForm(props: LogFormProps) {
   }, [isEdit, log?.id]);
 
   const title = isEdit ? log!.title : props.title;
-  const image = isEdit ? null : (props as LogFormCreateProps).image;
+  const image = isEdit ? (log!.image ?? null) : (props as LogFormCreateProps).image;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,20 +88,55 @@ export function LogForm(props: LogFormProps) {
     setLoading(true);
     try {
       if (isEdit) {
+        const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
+        const episodesCount = "episodesCount" in props ? props.episodesCount : undefined;
+        const episodeForPayload =
+          isCompleted && showSeasonEpisode && episodesCount != null && episodesCount > 0
+            ? episodesCount
+            : toNum(episode);
         const payload = {
           grade,
           review: review.trim() || null,
           status: status || null,
           season: toNum(season),
-          episode: toNum(episode),
+          episode: episodeForPayload,
           chapter: toNum(chapter),
           volume: toNum(volume),
         };
+        const currentStatus = props.log.status ?? props.log.listType ?? null;
+        const statusChanged = (status ?? null) !== currentStatus;
+        const noChange =
+          grade === (props.log.grade ?? null) &&
+          (review.trim() || null) === (props.log.review ?? null) &&
+          (status ?? null) === currentStatus &&
+          toNum(season) === (props.log.season ?? null) &&
+          episodeForPayload === (props.log.episode ?? null) &&
+          toNum(chapter) === (props.log.chapter ?? null) &&
+          toNum(volume) === (props.log.volume ?? null);
+        if (noChange) {
+          setLoading(false);
+          props.onCancel();
+          return;
+        }
         await apiFetch(`/logs/${props.log.id}`, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
         toast.success(t("toast.logUpdated"));
+        invalidateLogsAndItemsCache();
+        if (statusChanged) {
+          const completion: LogCompleteState = {
+            image,
+            title,
+            grade,
+            status: status ?? undefined,
+            mediaType: props.log.mediaType as MediaType,
+            id: props.log.externalId,
+          };
+          props.onSaved(completion);
+        } else {
+          props.onSaved();
+        }
       } else {
         await apiFetch("/logs", {
           method: "POST",
@@ -110,19 +147,21 @@ export function LogForm(props: LogFormProps) {
             image: image ?? null,
             grade,
             review,
+            status: status ?? null,
           }),
         });
         toast.success(t("toast.logSaved"));
+        invalidateLogsAndItemsCache();
+        const completion: LogCompleteState = {
+          image,
+          title,
+          grade,
+          status: status ?? undefined,
+          mediaType: props.mediaType,
+          id: props.externalId,
+        };
+        props.onSaved(completion);
       }
-      invalidateLogsAndItemsCache();
-      const completion: LogCompleteState = {
-        image,
-        title,
-        grade,
-        mediaType: isEdit ? (props.log.mediaType as MediaType) : props.mediaType,
-        id: isEdit ? props.log.externalId : props.externalId,
-      };
-      props.onSaved(completion);
     } catch (err) {
       const message = err instanceof Error ? err.message : t("toast.failedToSave");
       toast.error(message === LOG_LIMIT_REACHED_CODE ? t("tiers.logLimitReached") : message);
@@ -151,7 +190,13 @@ export function LogForm(props: LogFormProps) {
                     </Label>
                     <Select
                       value={status ?? ""}
-                      onValueChange={(v) => setStatus(v || null)}
+                      onValueChange={(v) => {
+                        const next = v || null;
+                        setStatus(next);
+                        if (isEdit && next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && "episodesCount" in props && props.episodesCount != null && props.episodesCount > 0) {
+                          setEpisode(props.episodesCount);
+                        }
+                      }}
                       options={[
                         { value: "", label: "—" },
                         ...statusOptions.map((value) => ({

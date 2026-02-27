@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { STATUS_I18N_KEYS, type ItemDetail, type ItemPageData, type ItemReview, type MediaType } from "@logeverything/shared";
 import { apiFetchCached } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLogComplete } from "@/contexts/LogCompleteContext";
 import { ItemReviewForm } from "@/components/ItemReviewForm";
 import { ItemPageSkeleton } from "@/components/skeletons";
 import { ItemImage } from "@/components/ItemImage";
@@ -53,6 +54,7 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
   const hasSerialization = item.serialization && item.serialization.length > 0;
   const hasSubjects = item.subjects && item.subjects.length > 0;
   const hasItemSource = mediaType === "boardgames" && (item.itemSource === "bgg" || item.itemSource === "ludopedia");
+  const hasDataLanguageNote = true;
 
   const hasAny =
     hasDescription ||
@@ -88,7 +90,8 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
     hasDuration ||
     hasSerialization ||
     hasSubjects ||
-    hasItemSource;
+    hasItemSource ||
+    hasDataLanguageNote;
   if (!hasAny) return null;
 
   const scoreDisplay = hasScore && item.score != null ? (item.score <= 10 ? item.score.toFixed(1) : String(Math.round(item.score))) : null;
@@ -317,15 +320,18 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
             <span className="text-[var(--color-lightest)] font-medium">{item.volumesCount}</span>
           </div>
         )}
-        {hasItemSource && (
-          <div className="col-span-2 sm:col-span-3 pt-2 mt-2 border-t border-[var(--color-mid)]/20">
-            <span className="text-xs text-[var(--color-light)]">
+        <div className="col-span-2 sm:col-span-3 pt-2 mt-2 border-t border-[var(--color-mid)]/20 space-y-1">
+          {hasItemSource && (
+            <span className="block text-xs text-[var(--color-light)]">
               {t("itemPage.detailsFromSource", {
                 source: item.itemSource === "ludopedia" ? t("settings.boardGameProviderLudopedia") : t("settings.boardGameProviderBgg"),
               })}
             </span>
-          </div>
-        )}
+          )}
+          <span className="block text-xs text-[var(--color-light)]" role="note">
+            {t("itemPage.dataLanguageDependsOnApi")}
+          </span>
+        </div>
       </div>
     </Card>
   );
@@ -339,21 +345,30 @@ export interface ItemPageContentProps {
 
 const REVIEWS_PAGE_SIZE = 10;
 
+interface ReviewsResponse {
+  reviews: ItemReview[];
+  meanGrade: number | null;
+  reviewsTotal: number;
+  reviewsPage: number;
+  reviewsLimit: number;
+}
+
 export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps) {
   const { t } = useLocale();
-  const navigate = useNavigate();
+  const { showLogComplete } = useLogComplete();
   const [data, setData] = useState<ItemPageData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reviewsPage, setReviewsPage] = useState(1);
   const { token } = useAuth();
 
-  const refetch = useCallback((page = 1) => {
+  const fetchItem = useCallback(() => {
     setError(null);
     setLoading(true);
     const params = new URLSearchParams({
-      reviewsPage: String(page),
-      reviewsLimit: String(REVIEWS_PAGE_SIZE),
+      reviewsPage: "1",
+      reviewsLimit: "0",
     });
     apiFetchCached<ItemPageData>(
       `/items/${mediaType}/${id}?${params.toString()}`,
@@ -364,13 +379,49 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
       .finally(() => setLoading(false));
   }, [mediaType, id, t]);
 
+  const fetchReviews = useCallback(
+    (page: number) => {
+      setReviewsLoading(true);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(REVIEWS_PAGE_SIZE),
+      });
+      apiFetchCached<ReviewsResponse>(
+        `/items/${mediaType}/${id}/reviews?${params.toString()}`,
+        { ttlMs: 2 * 60 * 1000 }
+      )
+        .then((res) => {
+          setData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  reviews: res.reviews,
+                  meanGrade: res.meanGrade,
+                  reviewsTotal: res.reviewsTotal,
+                  reviewsPage: res.reviewsPage,
+                  reviewsLimit: res.reviewsLimit,
+                }
+              : prev
+          );
+        })
+        .catch(() => {})
+        .finally(() => setReviewsLoading(false));
+    },
+    [mediaType, id]
+  );
+
   useEffect(() => {
     setReviewsPage(1);
   }, [mediaType, id]);
 
   useEffect(() => {
-    refetch(reviewsPage);
-  }, [refetch, reviewsPage]);
+    fetchItem();
+  }, [fetchItem]);
+
+  useEffect(() => {
+    if (!data?.item) return;
+    fetchReviews(reviewsPage);
+  }, [data?.item, reviewsPage, fetchReviews]);
 
   if (loading && !data) {
     return (
@@ -396,7 +447,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             <p className="text-[var(--color-light)]">{error}</p>
             <div className="flex gap-2">
               <Button
-                onClick={() => refetch(reviewsPage)}
+                onClick={() => fetchItem()}
               >
                 {t("common.tryAgain")}
               </Button>
@@ -490,8 +541,9 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             title={item.title}
             image={item.image}
             runtimeMinutes={item.runtimeMinutes ?? null}
+            episodesCount={item.episodesCount ?? null}
             onSaved={() => setReviewsPage(1)}
-            onSavedComplete={(state) => navigate("/log-complete", { state })}
+            onSavedComplete={(state) => showLogComplete(state)}
           />
         )}
 
@@ -516,7 +568,16 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
           <h2 className="text-xl font-semibold text-[var(--color-lightest)]">
             {t("common.reviews")}
           </h2>
-            {reviews.length === 0 ? (
+          {reviewsLoading ? (
+            <Card
+              className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6"
+              style={paperShadow}
+            >
+              <p className="text-center text-[var(--color-light)]">
+                {t("search.searching")}
+              </p>
+            </Card>
+          ) : reviews.length === 0 ? (
             <Card
               className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6"
               style={paperShadow}
@@ -602,7 +663,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={currentPage <= 1}
+                      disabled={reviewsLoading || currentPage <= 1}
                       onClick={() => setReviewsPage((p) => Math.max(1, p - 1))}
                     >
                       {t("reviews.prev")}
@@ -611,7 +672,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={currentPage >= totalPages}
+                      disabled={reviewsLoading || currentPage >= totalPages}
                       onClick={() => setReviewsPage((p) => Math.min(totalPages, p + 1))}
                     >
                       {t("reviews.next")}

@@ -9,6 +9,7 @@ import { logsRouter } from "./routes/logs.js";
 import { meRouter } from "./routes/me.js";
 import { searchRouter } from "./routes/search.js";
 import { settingsRouter } from "./routes/settings.js";
+import { usersRouter } from "./routes/users.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -42,6 +43,7 @@ app.use("/api/items", itemsRouter);
 app.use("/api/logs", logsRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/settings", settingsRouter);
+app.use("/api/users", usersRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });

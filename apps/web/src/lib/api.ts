@@ -114,6 +114,38 @@ async function fetchInternal<T>(
 }
 
 /**
+ * Fetch public API (no auth). Use for read-only public endpoints (e.g. /users/:id).
+ * Does not send credentials or redirect on 401.
+ */
+export async function apiFetchPublic<T>(path: string, options?: RequestInit): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      credentials: "omit",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", ...options?.headers },
+    });
+    clearTimeout(timeoutId);
+    const text = await res.text();
+    if (!res.ok) {
+      const message = parseErrorResponse(text, res.status === 404 ? "Not found" : "Request failed");
+      throw new Error(message);
+    }
+    if (!text) return undefined as T;
+    return JSON.parse(text) as T;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error) {
+      if (err.name === "AbortError") throw new Error("Request took too long. Please try again.");
+      throw err;
+    }
+    throw new Error("Network error. Check your connection and try again.");
+  }
+}
+
+/**
  * Fetch from API. Use for mutations and when you don't want cache.
  */
 export async function apiFetch<T>(

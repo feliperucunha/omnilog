@@ -33,6 +33,7 @@
   "login": {
     "title": "Iniciar sesión",
     "email": "Correo",
+    "emailOrUsername": "Correo o nombre de usuario",
     "password": "Contraseña",
     "signIn": "Iniciar sesión",
     "signingIn": "Iniciando sesión…",
@@ -42,6 +43,7 @@
   },
   "register": {
     "title": "Crear cuenta",
+    "username": "Nombre de usuario",
     "email": "Correo",
     "password": "Contraseña",
     "confirmPassword": "Confirmar contraseña",
@@ -50,6 +52,9 @@
     "haveAccount": "¿Ya tienes cuenta?",
     "signInLink": "Iniciar sesión",
     "passwordsDoNotMatch": "Las contraseñas no coinciden"
+  },
+  "validation": {
+    "passwordLettersAndNumbers": "La contraseña debe tener al menos 8 caracteres e incluir letras y números"
   },
   "forgotPassword": {
     "title": "Restablecer contraseña",
@@ -99,7 +104,10 @@
     "boardGameProviderIntro": "Elige qué API usar para buscar y ver detalles de juegos de mesa. La preferencia se guarda en tu cuenta.",
     "boardGameProviderBgg": "Board Game Geek",
     "boardGameProviderLudopedia": "Ludopedia",
-    "boardGameProviderSaved": "Fuente de juegos de mesa actualizada."
+    "boardGameProviderSaved": "Fuente de juegos de mesa actualizada.",
+    "showCompleteModal": "Mostrar modal de confirmación al registrar",
+    "showCompleteModalEnabled": "Activado",
+    "showCompleteModalIntro": "Si está activado, aparece un modal de confirmación después de añadir o actualizar un registro. Se guarda solo en este dispositivo."
   },
   "common": {
     "required": "obligatorio",
@@ -122,11 +130,12 @@
     "password": "Contraseña",
     "placeholderEmail": "tu@ejemplo.com",
     "placeholderPassword": "••••••••",
-    "placeholderPasswordRegister": "Mínimo 8 caracteres",
+    "placeholderPasswordRegister": "Mínimo 8 caracteres, letras y números",
+    "placeholderUsername": "Letras, números, guión bajo, guión",
     "close": "Cerrar"
   },
   "apiKeyBanner": {
-    "categoryMessage": "Estás usando la clave de API de la app para {{category}}. Añade tu propia clave {{provider}} para guardarla en tu cuenta.",
+    "categoryMessage": "Clave de {{category}} faltante",
     "addKeyInSettings": "Añadir clave en Ajustes",
     "searchMessage": "Añade una clave {{provider}} en Ajustes para guardarla en tu cuenta (búsqueda en {{category}}).",
     "searchMessageWithCount": "{{used}}/{{limit}} búsquedas gratuitas usadas para {{category}}. Añade una clave {{provider}} en Ajustes para seguir buscando."
@@ -136,9 +145,17 @@
     "prev": "Anterior",
     "next": "Siguiente"
   },
+  "publicProfile": {
+    "title": "Perfil público",
+    "titleWithName": "Log de {{name}}",
+    "backToApp": "Volver al app"
+  },
   "dashboard": {
     "title": "Inicio",
+    "share": "Compartir perfil",
+    "linkCopied": "Enlace del perfil copiado",
     "yourStats": "Tus estadísticas",
+    "category": "Categoría",
     "recentLogs": "Logs recientes",
     "addLog": "Añadir log",
     "noLogsYet": "Aún no hay logs.",
@@ -185,8 +202,7 @@
     "filterAll": "Todos",
     "sortLabel": "Ordenar:",
     "sortByDate": "Fecha",
-    "sortByGrade": "Nota",
-    "dataLanguageDependsOnApi": "El idioma de los datos mostrados aquí depende de la API usada para esta categoría."
+    "sortByGrade": "Nota"
   },
   "itemPage": {
     "back": "Volver",
@@ -224,7 +240,8 @@
     "duration": "Duración",
     "serialization": "Serialización",
     "subjects": "Materias",
-    "detailsFromSource": "Detalles de {{source}}. Los campos disponibles varían según la fuente."
+    "detailsFromSource": "Detalles de {{source}}. Los campos disponibles varían según la fuente.",
+    "dataLanguageDependsOnApi": "El idioma de los datos mostrados aquí depende de la API usada para esta categoría."
   },
   "itemReviewForm": {
     "yourReview": "Tu reseña",

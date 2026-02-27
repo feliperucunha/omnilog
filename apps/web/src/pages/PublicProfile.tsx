@@ -1,21 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Share2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
-import { apiFetch, apiFetchCached } from "@/lib/api";
+import { apiFetchPublic } from "@/lib/api";
 import { DashboardSkeleton } from "@/components/skeletons";
-import { CustomEntryForm } from "@/components/CustomEntryForm";
 import { ItemImage } from "@/components/ItemImage";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
-import { useLogComplete } from "@/contexts/LogCompleteContext";
-import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
-import { useMe } from "@/contexts/MeContext";
-import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
-import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { MEDIA_TYPES, type Log, type MediaType } from "@logeverything/shared";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
@@ -23,7 +15,27 @@ import { formatTimeToFinish } from "@/lib/formatDuration";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { MediaLogs } from "@/pages/MediaLogs";
 
-const paperShadow = { boxShadow: "var(--shadow-sm)" };
+const RESERVED_PATHS = new Set([
+  "login",
+  "register",
+  "forgot-password",
+  "reset-password",
+  "onboarding",
+  "search",
+  "about",
+  "tiers",
+  "settings",
+  "item",
+  "movies",
+  "tv",
+  "boardgames",
+  "games",
+  "books",
+  "anime",
+  "manga",
+  "comics",
+  "api",
+]);
 
 type StatsGroup = "category" | "month" | "year";
 interface StatsEntry {
@@ -31,37 +43,62 @@ interface StatsEntry {
   hours: number;
 }
 
-export function Dashboard() {
+interface PublicProfileResponse {
+  id: string;
+  username: string | null;
+  visibleMediaTypes: string[];
+  logCount: number;
+}
+
+const paperShadow = { boxShadow: "var(--shadow-sm)" };
+
+export function PublicProfile() {
+  const { userId } = useParams<{ userId: string }>();
   const { t } = useLocale();
-  const { me } = useMe();
-  const { showLogComplete } = useLogComplete();
-  const { visibleTypes } = useVisibleMediaTypes();
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryParam = searchParams.get("category");
-  const defaultCategory = visibleTypes.length > 0 ? visibleTypes[0] : ("movies" as MediaType);
-  const [selectedCategory, setSelectedCategory] = useState<MediaType>(() => {
-    if (categoryParam && MEDIA_TYPES.includes(categoryParam)) return categoryParam as MediaType;
-    return defaultCategory;
-  });
+  const [profile, setProfile] = useState<PublicProfileResponse | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statsGroup, setStatsGroup] = useState<StatsGroup>("category");
   const [stats, setStats] = useState<StatsEntry[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [showCustomEntry, setShowCustomEntry] = useState(false);
+
+  const visibleTypes = profile?.visibleMediaTypes ?? [];
+  const defaultCategory = visibleTypes.length > 0 ? visibleTypes[0] : ("movies" as MediaType);
+  const [selectedCategory, setSelectedCategory] = useState<MediaType>(() => {
+    if (categoryParam && MEDIA_TYPES.includes(categoryParam)) return categoryParam as MediaType;
+    return defaultCategory;
+  });
+
+  useEffect(() => {
+    if (!userId || RESERVED_PATHS.has(userId)) return;
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      apiFetchPublic<PublicProfileResponse>(`/users/${userId}`),
+      apiFetchPublic<Log[]>(`/users/${userId}/logs`),
+    ])
+      .then(([p, allLogs]) => {
+        setProfile(p);
+        setLogs(allLogs);
+        if (p.visibleMediaTypes.length > 0) {
+          setSelectedCategory(p.visibleMediaTypes[0] as MediaType);
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Could not load profile");
+        setProfile(null);
+        setLogs([]);
+      })
+      .finally(() => setLoading(false));
+  }, [userId]);
 
   useEffect(() => {
     if (categoryParam && MEDIA_TYPES.includes(categoryParam)) setSelectedCategory(categoryParam as MediaType);
     else if (!categoryParam && visibleTypes.length > 0) setSelectedCategory(visibleTypes[0] as MediaType);
   }, [categoryParam, visibleTypes]);
-
-  useEffect(() => {
-    if (visibleTypes.length > 0 && !visibleTypes.includes(selectedCategory)) {
-      setSelectedCategory(visibleTypes[0] as MediaType);
-      setSearchParams({ category: visibleTypes[0] }, { replace: true });
-    }
-  }, [visibleTypes, selectedCategory, setSearchParams]);
 
   const setCategory = useCallback(
     (type: MediaType) => {
@@ -71,48 +108,25 @@ export function Dashboard() {
     [setSearchParams]
   );
 
-  const fetchStats = useCallback(async (group: StatsGroup) => {
-    setStatsLoading(true);
-    try {
-      const res = await apiFetch<{ data: StatsEntry[] }>(`/logs/stats?group=${group}`);
-      setStats(res.data ?? []);
-    } catch {
-      setStats([]);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
+  const fetchStats = useCallback(
+    async (group: StatsGroup) => {
+      if (!userId) return;
+      setStatsLoading(true);
+      try {
+        const res = await apiFetchPublic<{ data: StatsEntry[] }>(`/users/${userId}/logs/stats?group=${group}`);
+        setStats(res.data ?? []);
+      } catch {
+        setStats([]);
+      } finally {
+        setStatsLoading(false);
+      }
+    },
+    [userId]
+  );
 
   useEffect(() => {
-    fetchStats(statsGroup);
-  }, [statsGroup, fetchStats]);
-
-  const fetchLogs = useCallback(() => {
-    setError(null);
-    setLoading(true);
-    apiFetchCached<Log[]>("/logs", { ttlMs: 2 * 60 * 1000 })
-      .then(setLogs)
-      .catch((err) => {
-        setLogs([]);
-        setError(err instanceof Error ? err.message : t("dashboard.couldntLoadLogs"));
-      })
-      .finally(() => setLoading(false));
-  }, [t]);
-
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
-
-  const handleShare = useCallback(async () => {
-    if (!me?.user?.id) return;
-    const url = `${window.location.origin}/${me.user.id}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success(t("dashboard.linkCopied"));
-    } catch {
-      toast.error(t("common.tryAgain"));
-    }
-  }, [me?.user?.id, t]);
+    if (userId) fetchStats(statsGroup);
+  }, [statsGroup, fetchStats, userId]);
 
   const recent = logs.slice(0, 10);
   const displayedStats =
@@ -121,30 +135,22 @@ export function Dashboard() {
       : stats;
   const maxHours = displayedStats.length > 0 ? Math.max(...displayedStats.map((s) => s.hours), 1) : 1;
   const byType = Object.fromEntries(
-    MEDIA_TYPES.map((type) => [
-      type,
-      logs.filter((l) => l.mediaType === type).length,
-    ])
+    MEDIA_TYPES.map((type) => [type, logs.filter((l) => l.mediaType === type).length])
   );
 
-  const boardGameProvider = me?.boardGameProvider ?? "bgg";
-  const apiKeyProvider = getApiKeyProviderForMediaType(selectedCategory, boardGameProvider);
-  const needsApiKeyBanner =
-    apiKeyProvider != null && me?.apiKeys && !me.apiKeys[apiKeyProvider];
+  if (!userId || RESERVED_PATHS.has(userId)) {
+    return <Navigate to="/" replace />;
+  }
 
-  if (loading && logs.length === 0) {
+  if (loading && !profile) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.2 }}
-      >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
         <DashboardSkeleton />
       </motion.div>
     );
   }
 
-  if (error && logs.length === 0) {
+  if (error && !profile) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -152,51 +158,26 @@ export function Dashboard() {
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
       >
         <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
-          <div className="flex flex-col gap-4">
-            <p className="font-medium text-[var(--color-lightest)]">
-              {t("dashboard.couldntLoadLogs")}
-            </p>
-            <p className="text-sm text-[var(--color-light)]">{error}</p>
-            <Button
-              onClick={fetchLogs}
-            >
-              {t("common.tryAgain")}
-            </Button>
-          </div>
+          <p className="font-medium text-[var(--color-lightest)]">{error}</p>
+          <Link to="/" className="mt-4 inline-block text-sm text-[var(--color-light)] underline hover:no-underline">
+            {t("nav.dashboard")}
+          </Link>
         </Card>
       </motion.div>
     );
   }
 
+  const title = profile?.username
+    ? t("publicProfile.titleWithName", { name: profile.username })
+    : t("publicProfile.title");
+
   return (
     <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden">
-      {needsApiKeyBanner && (
-        <Link
-          to="/settings?open=api-keys"
-          className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-3 text-left no-underline transition-colors text-[var(--color-warning-text)] hover:border-[var(--color-warning-hover-border)] hover:bg-[var(--color-warning-hover-bg)]"
-        >
-          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)]" aria-hidden />
-          <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--color-warning-text)]">
-            {t("apiKeyBanner.categoryMessage", {
-              category: t(`nav.${selectedCategory}`),
-              provider: API_KEY_META[apiKeyProvider].name,
-            })}
-          </p>
-          <span className="shrink-0 text-xs font-medium text-[var(--color-warning-text-muted)]">
-            {t("apiKeyBanner.addKeyInSettings")} →
-          </span>
-        </Link>
-      )}
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
-          {t("dashboard.title")}
-        </h1>
-        {me?.user?.id && (
-          <Button type="button" variant="outline" size="sm" onClick={handleShare} aria-label={t("dashboard.share")}>
-            <Share2 className="size-4 shrink-0" aria-hidden />
-            <span className="hidden sm:inline">{t("dashboard.share")}</span>
-          </Button>
-        )}
+        <h1 className="text-2xl font-bold text-[var(--color-lightest)]">{title}</h1>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/">{t("publicProfile.backToApp")}</Link>
+        </Button>
       </div>
 
       {visibleTypes.length > 0 && (
@@ -224,14 +205,12 @@ export function Dashboard() {
 
       {visibleTypes.length > 0 && (
         <section aria-label={t(`nav.${selectedCategory}`)} className="min-w-0 overflow-hidden">
-          <MediaLogs mediaType={selectedCategory} embedded />
+          <MediaLogs mediaType={selectedCategory} embedded publicUserId={userId} />
         </section>
       )}
 
       <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-        <p className="text-sm font-medium uppercase text-[var(--color-light)]">
-          {t("dashboard.statsTitle")}
-        </p>
+        <p className="text-sm font-medium uppercase text-[var(--color-light)]">{t("dashboard.statsTitle")}</p>
         <div className="flex flex-wrap gap-2">
           <Button
             variant={statsGroup === "category" ? "default" : "outline"}
@@ -259,9 +238,7 @@ export function Dashboard() {
           <div className="h-48 animate-pulse rounded-md bg-[var(--color-dark)]" />
         ) : stats.length === 0 ? (
           <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6" style={paperShadow}>
-            <p className="text-center text-sm text-[var(--color-light)]">
-              {t("dashboard.noStatsYet")}
-            </p>
+            <p className="text-center text-sm text-[var(--color-light)]">{t("dashboard.noStatsYet")}</p>
           </Card>
         ) : (
           <Card className="min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-4" style={paperShadow}>
@@ -298,46 +275,10 @@ export function Dashboard() {
       </div>
 
       <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-medium uppercase text-[var(--color-light)]">
-            {t("dashboard.recentLogs")}
-          </p>
-          <div className="flex min-w-0 flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowCustomEntry(true)}
-            >
-              <span className="inline-flex items-center gap-2">
-                <Plus className="size-4 shrink-0" aria-hidden />
-                {t("customEntry.addCustomEntry")}
-              </span>
-            </Button>
-          </div>
-        </div>
-        {showCustomEntry && (
-          <CustomEntryForm
-            onSaved={(completion) => {
-              setShowCustomEntry(false);
-              if (completion) showLogComplete(completion);
-            }}
-            onCancel={() => setShowCustomEntry(false)}
-          />
-        )}
+        <p className="text-sm font-medium uppercase text-[var(--color-light)]">{t("dashboard.recentLogs")}</p>
         {recent.length === 0 ? (
-          <Card
-            className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6"
-            style={paperShadow}
-          >
-            <p className="text-center text-[var(--color-light)]">
-              {t("dashboard.noLogsYet")}{" "}
-              <Link
-                to="/search"
-                className="text-[var(--color-lightest)] underline hover:no-underline"
-              >
-                {t("dashboard.searchAndAddFirst")}
-              </Link>
-            </p>
+          <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6" style={paperShadow}>
+            <p className="text-center text-[var(--color-light)]">{t("dashboard.noLogsYet")}</p>
           </Card>
         ) : (
           <motion.ul
@@ -357,13 +298,13 @@ export function Dashboard() {
                     >
                       <ItemImage src={log.image} className="h-12 w-9 shrink-0 rounded" />
                       <div className="flex min-w-0 flex-1 items-center justify-between gap-2 overflow-hidden">
-                        <p className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
-                          {log.title}
-                        </p>
+                        <p className="min-w-0 truncate font-medium text-[var(--color-lightest)]">{log.title}</p>
                         <div className="flex shrink-0 items-center gap-2">
                           {log.startedAt && log.completedAt && (
                             <span className="whitespace-nowrap text-xs text-[var(--color-light)]">
-                              {t("dashboard.finishedIn", { duration: formatTimeToFinish(log.startedAt, log.completedAt) })}
+                              {t("dashboard.finishedIn", {
+                                duration: formatTimeToFinish(log.startedAt, log.completedAt),
+                              })}
                             </span>
                           )}
                           {log.grade != null ? (

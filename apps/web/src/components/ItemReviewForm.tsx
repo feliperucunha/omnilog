@@ -23,6 +23,7 @@ export interface LogCompleteState {
   image: string | null;
   title: string;
   grade: number | null;
+  status?: string | null;
   mediaType?: MediaType;
   id?: string;
 }
@@ -34,6 +35,8 @@ interface ItemReviewFormProps {
   image: string | null;
   /** Runtime in minutes (for content-hours when marking completed) */
   runtimeMinutes?: number | null;
+  /** TV/Anime: total episodes (used to set episode when user selects completed status) */
+  episodesCount?: number | null;
   onSaved: () => void;
   onSavedComplete?: (data: LogCompleteState) => void;
 }
@@ -44,6 +47,7 @@ export function ItemReviewForm({
   title,
   image,
   runtimeMinutes,
+  episodesCount,
   onSaved,
   onSavedComplete,
 }: ItemReviewFormProps) {
@@ -98,23 +102,53 @@ export function ItemReviewForm({
         isCompleted && runtimeMinutes != null && runtimeMinutes > 0
           ? Math.round((runtimeMinutes / 60) * 10) / 10
           : null;
+      const episodeForPayload =
+        isCompleted && showSeasonEpisode && episodesCount != null && episodesCount > 0
+          ? episodesCount
+          : toNum(episode);
       const payload = {
         grade: gradeNum,
         review: review.trim() || null,
         status: status || null,
         season: toNum(season),
-        episode: toNum(episode),
+        episode: episodeForPayload,
         chapter: toNum(chapter),
         volume: toNum(volume),
         contentHours,
       };
       if (myLog) {
+        const currentStatus = myLog.status ?? myLog.listType ?? null;
+        const statusChanged = (status ?? null) !== currentStatus;
+        const noChange =
+          gradeNum === (myLog.grade ?? null) &&
+          (review.trim() || null) === (myLog.review ?? null) &&
+          (status ?? null) === currentStatus &&
+          toNum(season) === (myLog.season ?? null) &&
+          episodeForPayload === (myLog.episode ?? null) &&
+          toNum(chapter) === (myLog.chapter ?? null) &&
+          toNum(volume) === (myLog.volume ?? null);
+        if (noChange) {
+          setSaving(false);
+          return;
+        }
         const updated = await apiFetch<Log>(`/logs/${myLog.id}`, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
         setMyLog(updated);
         toast.success(t("toast.reviewUpdated"));
+        invalidateLogsAndItemsCache();
+        onSaved();
+        if (statusChanged) {
+          onSavedComplete?.({
+            image,
+            title,
+            grade: gradeNum,
+            status: status ?? undefined,
+            mediaType,
+            id: externalId,
+          });
+        }
       } else {
         const createBody: Record<string, unknown> = {
           mediaType,
@@ -131,16 +165,17 @@ export function ItemReviewForm({
         });
         setMyLog(created);
         toast.success(t("toast.reviewSaved"));
+        invalidateLogsAndItemsCache();
+        onSaved();
+        onSavedComplete?.({
+          image,
+          title,
+          grade: gradeNum,
+          status: status ?? undefined,
+          mediaType,
+          id: externalId,
+        });
       }
-      invalidateLogsAndItemsCache();
-      onSaved();
-      onSavedComplete?.({
-        image,
-        title,
-        grade: gradeNum,
-        mediaType,
-        id: externalId,
-      });
     } catch (err) {
       const message = err instanceof Error ? err.message : t("toast.failedToSaveReview");
       toast.error(message === LOG_LIMIT_REACHED_CODE ? t("tiers.logLimitReached") : message);
@@ -179,7 +214,13 @@ export function ItemReviewForm({
               </Label>
               <Select
                 value={status ?? ""}
-                onValueChange={(v) => setStatus(v || null)}
+                onValueChange={(v) => {
+                  const next = v || null;
+                  setStatus(next);
+                  if (next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && episodesCount != null && episodesCount > 0) {
+                    setEpisode(episodesCount);
+                  }
+                }}
                 options={[
                   { value: "", label: "—" },
                   ...statusOptions.map((value) => ({

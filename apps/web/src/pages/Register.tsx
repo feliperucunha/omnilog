@@ -14,8 +14,13 @@ import { apiFetch } from "@/lib/api";
 import type { AuthResponse } from "@logeverything/shared";
 import { modalContentVariants } from "@/lib/animations";
 
+function isValidPassword(p: string): boolean {
+  return p.length >= 8 && /[a-zA-Z]/.test(p) && /\d/.test(p);
+}
+
 export function Register() {
   const { t } = useLocale();
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -25,12 +30,20 @@ export function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
+    if (!username.trim() || !email.trim() || !password) {
       toast.error(t("toast.emailPasswordRequired"));
       return;
     }
-    if (password.length < 8) {
-      toast.error(t("toast.passwordMinLength"));
+    if (username.trim().length < 2) {
+      toast.error(t("register.username") + ": " + "At least 2 characters");
+      return;
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(username.trim())) {
+      toast.error(t("register.username") + ": " + "Only letters, numbers, underscore and hyphen");
+      return;
+    }
+    if (!isValidPassword(password)) {
+      toast.error(t("validation.passwordLettersAndNumbers"));
       return;
     }
     if (password !== confirmPassword) {
@@ -41,7 +54,7 @@ export function Register() {
     try {
       const data = await apiFetch<AuthResponse>("/auth/register", {
         method: "POST",
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ username: username.trim(), email: email.trim(), password }),
       });
       login(COOKIE_SESSION, { ...data.user, onboarded: data.user.onboarded ?? false });
       toast.success(t("toast.accountCreated"));
@@ -72,6 +85,19 @@ export function Register() {
           <CardContent className="pt-0">
             <form onSubmit={handleSubmit}>
               <div className="flex flex-col gap-4">
+                <div className="space-y-2">
+                  <Label>{t("register.username")}</Label>
+                  <Input
+                    type="text"
+                    autoComplete="username"
+                    placeholder={t("common.placeholderUsername")}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                    minLength={2}
+                    maxLength={32}
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label>{t("register.email")}</Label>
                   <Input

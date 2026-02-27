@@ -34,6 +34,74 @@ async function getUserKeys(userId: string) {
 const DEFAULT_REVIEWS_LIMIT = 10;
 const MAX_REVIEWS_LIMIT = 50;
 
+/** GET /items/:mediaType/:externalId/reviews - reviews only (for async loading after details). */
+itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequest, res) => {
+  const mediaType = req.params.mediaType as MediaType;
+  const rawExternalId = req.params.externalId;
+  if (!MEDIA_TYPES.includes(mediaType) || !rawExternalId) {
+    res.status(400).json({ error: "Invalid mediaType or externalId" });
+    return;
+  }
+  const externalId = sanitizeText(rawExternalId, EXTERNAL_ID_MAX_LENGTH);
+  if (!externalId) {
+    res.status(400).json({ error: "Invalid externalId" });
+    return;
+  }
+  const reviewsPage = Math.max(1, parseInt(String(req.query.page ?? req.query.reviewsPage ?? 1), 10) || 1);
+  const reviewsLimit = Math.min(
+    MAX_REVIEWS_LIMIT,
+    Math.max(1, parseInt(String(req.query.limit ?? req.query.reviewsLimit ?? DEFAULT_REVIEWS_LIMIT), 10) || DEFAULT_REVIEWS_LIMIT)
+  );
+  const where = { mediaType, externalId };
+
+  const [reviewsTotal, gradeAgg, logs] = await Promise.all([
+    prisma.log.count({ where }),
+    prisma.log.aggregate({
+      where: { ...where, grade: { not: null } },
+      _avg: { grade: true },
+      _count: { grade: true },
+    }),
+    prisma.log.findMany({
+      where,
+      include: { user: { select: { email: true, tier: true } } },
+      orderBy: { createdAt: "desc" },
+      skip: (reviewsPage - 1) * reviewsLimit,
+      take: reviewsLimit,
+    }),
+  ]);
+
+  const meanGrade =
+    gradeAgg._count.grade > 0 && gradeAgg._avg.grade != null
+      ? gradeAgg._avg.grade
+      : null;
+
+  const reviews = logs.map((l) => ({
+    id: l.id,
+    userEmail: l.user.email,
+    isPro: l.user.tier === "pro",
+    grade: l.grade,
+    review: l.review,
+    listType: l.listType,
+    status: l.status,
+    season: l.season,
+    episode: l.episode,
+    chapter: l.chapter,
+    volume: l.volume,
+    startedAt: l.startedAt?.toISOString() ?? null,
+    completedAt: l.completedAt?.toISOString() ?? null,
+    contentHours: l.contentHours,
+    createdAt: l.createdAt.toISOString(),
+  }));
+
+  res.json({
+    reviews,
+    meanGrade: meanGrade != null ? Math.round(meanGrade * 10) / 10 : null,
+    reviewsTotal,
+    reviewsPage,
+    reviewsLimit,
+  });
+});
+
 itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res) => {
   const mediaType = req.params.mediaType as MediaType;
   const rawExternalId = req.params.externalId;
@@ -47,10 +115,11 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     return;
   }
   const reviewsPage = Math.max(1, parseInt(String(req.query.reviewsPage ?? 1), 10) || 1);
-  const reviewsLimit = Math.min(
-    MAX_REVIEWS_LIMIT,
-    Math.max(1, parseInt(String(req.query.reviewsLimit ?? DEFAULT_REVIEWS_LIMIT), 10) || DEFAULT_REVIEWS_LIMIT)
-  );
+  const requestedLimit = parseInt(String(req.query.reviewsLimit ?? DEFAULT_REVIEWS_LIMIT), 10);
+  const reviewsLimit =
+    requestedLimit === 0
+      ? 0
+      : Math.min(MAX_REVIEWS_LIMIT, Math.max(1, requestedLimit || DEFAULT_REVIEWS_LIMIT));
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
 
   let boardProviderUsed: "bgg" | "ludopedia" | null = null;
@@ -116,13 +185,15 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
       _avg: { grade: true },
       _count: { grade: true },
     }),
-    prisma.log.findMany({
-      where,
-      include: { user: { select: { email: true, tier: true } } },
-      orderBy: { createdAt: "desc" },
-      skip: (reviewsPage - 1) * reviewsLimit,
-      take: reviewsLimit,
-    }),
+    reviewsLimit === 0
+      ? Promise.resolve([])
+      : prisma.log.findMany({
+          where,
+          include: { user: { select: { email: true, tier: true } } },
+          orderBy: { createdAt: "desc" },
+          skip: (reviewsPage - 1) * reviewsLimit,
+          take: reviewsLimit,
+        }),
   ]);
 
   const meanGrade =
@@ -163,6 +234,6 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     meanGrade: meanGrade != null ? Math.round(meanGrade * 10) / 10 : null,
     reviewsTotal,
     reviewsPage,
-    reviewsLimit,
+    reviewsLimit: reviewsLimit === 0 ? DEFAULT_REVIEWS_LIMIT : reviewsLimit,
   });
 });

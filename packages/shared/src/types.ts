@@ -312,5 +312,5 @@ export interface AuthLoginInput {
 
 export interface AuthResponse {
   token: string;
-  user: { id: string; email: string; onboarded: boolean };
+  user: { id: string; username?: string; email: string; onboarded: boolean };
 }

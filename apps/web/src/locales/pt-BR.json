@@ -33,6 +33,7 @@
   "login": {
     "title": "Entrar",
     "email": "E-mail",
+    "emailOrUsername": "E-mail ou nome de usuário",
     "password": "Senha",
     "signIn": "Entrar",
     "signingIn": "Entrando…",
@@ -42,6 +43,7 @@
   },
   "register": {
     "title": "Criar conta",
+    "username": "Nome de usuário",
     "email": "E-mail",
     "password": "Senha",
     "confirmPassword": "Confirmar senha",
@@ -50,6 +52,9 @@
     "haveAccount": "Já tem uma conta?",
     "signInLink": "Entrar",
     "passwordsDoNotMatch": "As senhas não coincidem"
+  },
+  "validation": {
+    "passwordLettersAndNumbers": "A senha deve ter pelo menos 8 caracteres e incluir letras e números"
   },
   "forgotPassword": {
     "title": "Redefinir senha",
@@ -99,7 +104,10 @@
     "boardGameProviderIntro": "Escolha qual API usar para busca e detalhes de jogos de tabuleiro. A preferência é salva na sua conta.",
     "boardGameProviderBgg": "Board Game Geek",
     "boardGameProviderLudopedia": "Ludopedia",
-    "boardGameProviderSaved": "Fonte de jogos de tabuleiro atualizada."
+    "boardGameProviderSaved": "Fonte de jogos de tabuleiro atualizada.",
+    "showCompleteModal": "Mostrar modal de conclusão ao registrar",
+    "showCompleteModalEnabled": "Ativado",
+    "showCompleteModalIntro": "Quando ativo, um modal de confirmação aparece após adicionar ou atualizar um registro. Salvo apenas neste dispositivo."
   },
   "common": {
     "required": "obrigatório",
@@ -122,11 +130,12 @@
     "password": "Senha",
     "placeholderEmail": "voce@exemplo.com",
     "placeholderPassword": "••••••••",
-    "placeholderPasswordRegister": "Mínimo 8 caracteres",
+    "placeholderPasswordRegister": "Mínimo 8 caracteres, letras e números",
+    "placeholderUsername": "Letras, números, underscore, hífen",
     "close": "Fechar"
   },
   "apiKeyBanner": {
-    "categoryMessage": "Você está usando a chave de API do app para {{category}}. Adicione sua própria chave {{provider}} para salvar na sua conta.",
+    "categoryMessage": "Chave de {{category}} ausente",
     "addKeyInSettings": "Adicionar chave em Configurações",
     "searchMessage": "Adicione uma chave {{provider}} em Configurações para salvar na sua conta (busca em {{category}}).",
     "searchMessageWithCount": "{{used}}/{{limit}} buscas gratuitas usadas para {{category}}. Adicione uma chave {{provider}} em Configurações para continuar."
@@ -136,8 +145,15 @@
     "prev": "Anterior",
     "next": "Próxima"
   },
+  "publicProfile": {
+    "title": "Perfil público",
+    "titleWithName": "Log de {{name}}",
+    "backToApp": "Voltar ao app"
+  },
   "dashboard": {
     "title": "Início",
+    "share": "Compartilhar perfil",
+    "linkCopied": "Link do perfil copiado",
     "finishedIn": "Finalizado em {{duration}}",
     "statsTitle": "Tempo consumido",
     "hoursConsumed": "{{hours}}h",
@@ -146,6 +162,7 @@
     "byYear": "Por ano",
     "noStatsYet": "Complete itens com tempo para ver as estatísticas aqui.",
     "yourStats": "Suas estatísticas",
+    "category": "Categoria",
     "recentLogs": "Logs recentes",
     "addLog": "Adicionar log",
     "noLogsYet": "Nenhum log ainda.",
@@ -185,8 +202,7 @@
     "filterAll": "Todos",
     "sortLabel": "Ordenar:",
     "sortByDate": "Data",
-    "sortByGrade": "Nota",
-    "dataLanguageDependsOnApi": "O idioma dos dados exibidos aqui depende da API usada para esta categoria."
+    "sortByGrade": "Nota"
   },
   "itemPage": {
     "back": "Voltar",
@@ -224,7 +240,8 @@
     "duration": "Duração",
     "serialization": "Serialização",
     "subjects": "Assuntos",
-    "detailsFromSource": "Detalhes de {{source}}. Os campos disponíveis variam conforme a fonte."
+    "detailsFromSource": "Detalhes de {{source}}. Os campos disponíveis variam conforme a fonte.",
+    "dataLanguageDependsOnApi": "O idioma dos dados exibidos aqui depende da API usada para esta categoria."
   },
   "itemReviewForm": {
     "yourReview": "Sua resenha",

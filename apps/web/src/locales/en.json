@@ -33,6 +33,7 @@
   "login": {
     "title": "Sign in",
     "email": "Email",
+    "emailOrUsername": "Email or username",
     "password": "Password",
     "signIn": "Sign in",
     "signingIn": "Signing in…",
@@ -42,6 +43,7 @@
   },
   "register": {
     "title": "Create account",
+    "username": "Username",
     "email": "Email",
     "password": "Password",
     "confirmPassword": "Confirm password",
@@ -50,6 +52,9 @@
     "haveAccount": "Already have an account?",
     "signInLink": "Sign in",
     "passwordsDoNotMatch": "Passwords do not match"
+  },
+  "validation": {
+    "passwordLettersAndNumbers": "Password must be at least 8 characters and include both letters and numbers"
   },
   "forgotPassword": {
     "title": "Reset password",
@@ -100,7 +105,10 @@
     "boardGameProviderIntro": "Choose which API to use for board game search and details. This preference is saved to your account.",
     "boardGameProviderBgg": "Board Game Geek",
     "boardGameProviderLudopedia": "Ludopedia",
-    "boardGameProviderSaved": "Board game source updated."
+    "boardGameProviderSaved": "Board game source updated.",
+    "showCompleteModal": "Show completion modal after logging",
+    "showCompleteModalEnabled": "Enabled",
+    "showCompleteModalIntro": "When on, a confirmation modal appears after you add or update a log. Stored on this device only."
   },
   "common": {
     "required": "required",
@@ -123,11 +131,12 @@
     "password": "Password",
     "placeholderEmail": "you@example.com",
     "placeholderPassword": "••••••••",
-    "placeholderPasswordRegister": "At least 8 characters",
+    "placeholderPasswordRegister": "At least 8 characters, letters and numbers",
+    "placeholderUsername": "Letters, numbers, underscore, hyphen",
     "close": "Close"
   },
   "apiKeyBanner": {
-    "categoryMessage": "You're using the app's API key for {{category}}. Add your own {{provider}} key to save it to your account.",
+    "categoryMessage": "{{category}} key missing",
     "addKeyInSettings": "Add key in Settings",
     "searchMessage": "Add a {{provider}} key in Settings to save it to your account ({{category}} search).",
     "searchMessageWithCount": "{{used}}/{{limit}} free searches used for {{category}}. Add a {{provider}} key in Settings to keep searching."
@@ -137,9 +146,17 @@
     "prev": "Previous",
     "next": "Next"
   },
+  "publicProfile": {
+    "title": "Public profile",
+    "titleWithName": "{{name}}'s log",
+    "backToApp": "Back to app"
+  },
   "dashboard": {
     "title": "Home",
+    "share": "Share profile",
+    "linkCopied": "Profile link copied to clipboard",
     "yourStats": "Your stats",
+    "category": "Category",
     "recentLogs": "Recent logs",
     "addLog": "Add log",
     "noLogsYet": "No logs yet.",
@@ -186,8 +203,7 @@
     "filterAll": "All",
     "sortLabel": "Sort:",
     "sortByDate": "Date",
-    "sortByGrade": "Grade",
-    "dataLanguageDependsOnApi": "The language of the data shown here depends on the API used for this category."
+    "sortByGrade": "Grade"
   },
   "itemPage": {
     "back": "Back",
@@ -225,7 +241,8 @@
     "duration": "Duration",
     "serialization": "Serialization",
     "subjects": "Subjects",
-    "detailsFromSource": "Details from {{source}}. Available fields vary by source."
+    "detailsFromSource": "Details from {{source}}. Available fields vary by source.",
+    "dataLanguageDependsOnApi": "The language of the data shown here depends on the API used for this category."
   },
   "itemReviewForm": {
     "yourReview": "Your review",

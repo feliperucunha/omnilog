@@ -1,77 +1,46 @@
 import { NavLink, Link, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Film,
-  Tv,
-  Dice5,
-  Gamepad2,
-  BookOpen,
-  Flower2,
-  BookMarked,
-  Library,
+  Home,
   Search,
   Settings,
   LogIn,
   UserPlus,
   Info,
-  AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
-import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
-import { useMe } from "@/contexts/MeContext";
-import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
-import type { MediaType } from "@logeverything/shared";
 import { cn } from "@/lib/utils";
 
 const iconSize = 18;
-
-const MEDIA_TYPE_NAV: Record<MediaType, { labelKey: string; icon: React.ReactNode }> = {
-  movies: { labelKey: "nav.movies", icon: <Film size={iconSize} /> },
-  tv: { labelKey: "nav.tv", icon: <Tv size={iconSize} /> },
-  boardgames: { labelKey: "nav.boardgames", icon: <Dice5 size={iconSize} /> },
-  games: { labelKey: "nav.games", icon: <Gamepad2 size={iconSize} /> },
-  books: { labelKey: "nav.books", icon: <BookOpen size={iconSize} /> },
-  anime: { labelKey: "nav.anime", icon: <Flower2 size={iconSize} /> },
-  manga: { labelKey: "nav.manga", icon: <Library size={iconSize} /> },
-  comics: { labelKey: "nav.comics", icon: <BookMarked size={iconSize} /> },
-};
 
 function NavLinkItem({
   to,
   label,
   icon,
   active,
+  iconOnly,
   className,
-  showKeyWarning,
-  ariaLabelWarning,
 }: {
   to: string;
   label: string;
   icon: React.ReactNode;
   active?: boolean;
+  iconOnly?: boolean;
   className?: string;
-  showKeyWarning?: boolean;
-  ariaLabelWarning?: string;
 }) {
   return (
     <NavLink
       to={to}
       className={cn(
-        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/50",
+        "flex items-center rounded-lg text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/50",
+        iconOnly ? "flex-1 justify-center py-3" : "gap-2 px-3 py-2 text-sm font-medium",
         active && "bg-[var(--color-mid)]/50",
         className
       )}
-      aria-label={ariaLabelWarning ? `${label} (${ariaLabelWarning})` : undefined}
+      aria-label={label}
     >
       {icon}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {showKeyWarning && (
-        <AlertTriangle
-          className="h-4 w-4 flex-shrink-0 text-[var(--color-warning-icon)]"
-          aria-hidden
-        />
-      )}
+      {!iconOnly && <span className="min-w-0 flex-1 truncate">{label}</span>}
     </NavLink>
   );
 }
@@ -79,35 +48,17 @@ function NavLinkItem({
 export function Nav() {
   const { t } = useLocale();
   const { token } = useAuth();
-  const { me } = useMe();
   const location = useLocation();
-  const { visibleTypes } = useVisibleMediaTypes();
 
-  const navItems: { to: string; labelKey: string; icon: React.ReactNode; mediaType?: MediaType }[] = [
-    { to: "/", labelKey: "nav.dashboard", icon: <LayoutDashboard size={iconSize} /> },
+  const navItems: { to: string; labelKey: string; icon: React.ReactNode }[] = [
+    { to: "/", labelKey: "nav.dashboard", icon: <Home size={iconSize} /> },
     { to: "/search", labelKey: "nav.search", icon: <Search size={iconSize} /> },
-    ...visibleTypes.map((type) => ({
-      to: `/${type}`,
-      labelKey: MEDIA_TYPE_NAV[type].labelKey,
-      icon: MEDIA_TYPE_NAV[type].icon,
-      mediaType: type,
-    })),
     { to: "/settings", labelKey: "nav.settings", icon: <Settings size={iconSize} /> },
     { to: "/about", labelKey: "nav.about", icon: <Info size={iconSize} /> },
   ];
 
-  /** On mobile bottom bar: exclude Home and Search (they live in the top bar). */
-  const bottomBarItems = navItems.filter((item) => item.to !== "/" && item.to !== "/search");
-
-  const getKeyWarning = (item: (typeof navItems)[0]) => {
-    if (!token || !me?.apiKeys || !item.mediaType) return false;
-    const provider = getApiKeyProviderForMediaType(
-      item.mediaType,
-      item.mediaType === "boardgames" ? me?.boardGameProvider : undefined
-    );
-    if (!provider) return false;
-    return !me.apiKeys[provider];
-  };
+  /** On mobile bottom bar: Home and Search first, then Settings and About. Icon-only, fill space. */
+  const bottomBarItems = navItems;
 
   return (
     <>
@@ -130,8 +81,6 @@ export function Nav() {
                   label={t(item.labelKey)}
                   icon={item.icon}
                   active={location.pathname === item.to}
-                  showKeyWarning={getKeyWarning(item)}
-                  ariaLabelWarning={getKeyWarning(item) ? t("nav.apiKeyWarning") : undefined}
                 />
               ))}
             </>
@@ -151,26 +100,27 @@ export function Nav() {
         </div>
       </aside>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center gap-1 overflow-x-auto border-t border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-2 scrollbar-hide md:hidden">
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 flex flex-1 items-stretch border-t border-[var(--color-mid)]/30 bg-[var(--color-dark)] md:hidden"
+        aria-label="Main navigation"
+      >
         {token ? (
-          <>
-            {bottomBarItems.map((item) => (
-              <NavLinkItem
-                key={item.to}
-                to={item.to}
-                label={t(item.labelKey)}
-                icon={item.icon}
-                className="min-w-fit flex-shrink-0"
-                showKeyWarning={getKeyWarning(item)}
-                ariaLabelWarning={getKeyWarning(item) ? t("nav.apiKeyWarning") : undefined}
-              />
-            ))}
-          </>
+          bottomBarItems.map((item) => (
+            <NavLinkItem
+              key={item.to}
+              to={item.to}
+              label={t(item.labelKey)}
+              icon={item.icon}
+              active={location.pathname === item.to}
+              iconOnly
+            />
+          ))
         ) : (
           <>
-            <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} className="min-w-fit flex-shrink-0" />
-            <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} className="min-w-fit flex-shrink-0" />
-            <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} className="min-w-fit flex-shrink-0" />
+            <NavLinkItem to="/search" label={t("nav.search")} icon={<Search size={iconSize} />} active={location.pathname === "/search"} iconOnly />
+            <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} active={location.pathname === "/about"} iconOnly />
+            <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} active={location.pathname === "/login"} iconOnly />
+            <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} active={location.pathname === "/register"} iconOnly />
           </>
         )}
       </nav>

@@ -15,6 +15,7 @@ import { API_KEY_META, type ApiKeyProvider } from "@/lib/apiKeyMeta";
 import { useLocale, LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
+import { getShowCompleteModal, SHOW_COMPLETE_MODAL_STORAGE_KEY } from "@/contexts/LogCompleteContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@logeverything/shared";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,7 @@ export function Settings() {
   const [searchParams] = useSearchParams();
   const [advancedOpen, setAdvancedOpen] = useState(() => searchParams.get("open") === "api-keys");
   const [exporting, setExporting] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(() => getShowCompleteModal());
 
   useEffect(() => {
     if (searchParams.get("open") === "api-keys") setAdvancedOpen(true);
@@ -192,6 +194,33 @@ export function Settings() {
                 {t("nav.theme")}
               </h3>
               <ThemeSwitcher />
+            </div>
+            <div>
+              <label
+                className={cn(
+                  "flex cursor-pointer items-center items-start gap-3 rounded-md py-2 transition-colors hover:bg-[var(--color-darkest)]/50",
+                  "focus-within:ring-2 focus-within:ring-[var(--color-mid)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--color-dark)]"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={showCompleteModal}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setShowCompleteModal(checked);
+                    localStorage.setItem(SHOW_COMPLETE_MODAL_STORAGE_KEY, checked ? "true" : "false");
+                  }}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                />
+                <span className="flex flex-col gap-1 text-left">
+                  <span className="text-lg font-semibold text-[var(--color-lightest)]">
+                    {t("settings.showCompleteModal")}
+                  </span>
+                  <span className="text-sm text-[var(--color-light)]">
+                    {t("settings.showCompleteModalIntro")}
+                  </span>
+                </span>
+              </label>
             </div>
             <div>
               <h3 className="text-lg font-semibold text-[var(--color-lightest)] mb-2">

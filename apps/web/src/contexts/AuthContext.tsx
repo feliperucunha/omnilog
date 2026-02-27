@@ -16,6 +16,7 @@ export const COOKIE_SESSION = "cookie";
 
 interface User {
   id: string;
+  username?: string;
   email: string;
   onboarded?: boolean;
 }

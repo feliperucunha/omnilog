@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import type { MediaType, Log } from "@logeverything/shared";
 import { LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
-import { apiFetch, apiFetchCached, invalidateApiCache, invalidateLogsAndItemsCache } from "@/lib/api";
+import { apiFetch, apiFetchCached, apiFetchPublic, invalidateApiCache, invalidateLogsAndItemsCache } from "@/lib/api";
 import { LogForm } from "@/components/LogForm";
 import { CustomEntryForm } from "@/components/CustomEntryForm";
 import { ItemImage } from "@/components/ItemImage";
@@ -19,6 +19,7 @@ import { MediaLogsSkeleton } from "@/components/skeletons";
 import { toast } from "sonner";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useLogComplete } from "@/contexts/LogCompleteContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
@@ -29,20 +30,27 @@ const cardShadow = { boxShadow: "var(--shadow-card)" };
 
 interface MediaLogsProps {
   mediaType: MediaType;
+  /** When true, rendered inside Dashboard: no watermark background. */
+  embedded?: boolean;
+  /** When set, read-only public profile: fetch from /users/:id/logs, hide all write UI. */
+  publicUserId?: string;
 }
 
-export function MediaLogs({ mediaType }: MediaLogsProps) {
+export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLogsProps) {
   const { t } = useLocale();
   const navigate = useNavigate();
+  const { showLogComplete } = useLogComplete();
   const { me, refetch: refetchMe } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
   const provider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
-  const needsKeyBanner = provider != null && me?.apiKeys && !me.apiKeys[provider];
+  const needsKeyBanner = !publicUserId && provider != null && me?.apiKeys && !me.apiKeys[provider];
+  const readOnly = !!publicUserId;
   const [savingBoardGameProvider, setSavingBoardGameProvider] = useState(false);
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingLog, setEditingLog] = useState<Log | null>(null);
+  const [editingLogEpisodesCount, setEditingLogEpisodesCount] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState<"date" | "grade">("date");
@@ -69,18 +77,38 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
     setLoading(true);
     const params = new URLSearchParams({ mediaType, sort: sortBy });
     if (statusFilter) params.set("status", statusFilter);
-    apiFetchCached<Log[]>(`/logs?${params.toString()}`, { ttlMs: 2 * 60 * 1000 })
+    const path = publicUserId
+      ? `/users/${publicUserId}/logs?${params.toString()}`
+      : `/logs?${params.toString()}`;
+    const fetcher = publicUserId
+      ? () => apiFetchPublic<Log[]>(path)
+      : () => apiFetchCached<Log[]>(path, { ttlMs: 2 * 60 * 1000 });
+    fetcher()
       .then(setLogs)
       .catch((err) => {
         setLogs([]);
         setError(err instanceof Error ? err.message : t("mediaLogs.couldntLoadLogs"));
       })
       .finally(() => setLoading(false));
-  }, [mediaType, statusFilter, sortBy, t]);
+  }, [mediaType, statusFilter, sortBy, t, publicUserId]);
 
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
+
+  useEffect(() => {
+    if (!editingLog) {
+      setEditingLogEpisodesCount(null);
+      return;
+    }
+    if (editingLog.mediaType !== "tv" && editingLog.mediaType !== "anime") return;
+    apiFetchCached<{ episodesCount?: number | null }>(
+      `/items/${editingLog.mediaType}/${encodeURIComponent(editingLog.externalId)}`,
+      { ttlMs: 5 * 60 * 1000 }
+    )
+      .then((item) => setEditingLogEpisodesCount(item.episodesCount ?? null))
+      .catch(() => setEditingLogEpisodesCount(null));
+  }, [editingLog]);
 
   const handleDelete = async (id: string) => {
     setDeletingId(id);
@@ -100,7 +128,7 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
   const handleSaved = (completion?: { image: string | null; title: string; grade: number | null; mediaType?: string; id?: string }) => {
     setEditingLog(null);
     fetchLogs();
-    if (completion) navigate("/log-complete", { state: completion });
+    if (completion) showLogComplete(completion);
   };
 
   const handleIncrement = async (log: Log) => {
@@ -185,74 +213,75 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
 
   return (
-    <div className="relative min-h-full pb-24 md:pb-20">
-      <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
-        <img src="/logo.svg" alt="" className="h-40 w-auto opacity-20 sm:h-52 md:h-64" />
-      </div>
-      <div className="relative z-10 flex flex-col gap-6">
-      {needsKeyBanner && (
+    <div className={`relative min-h-full min-w-0 overflow-hidden pb-24 md:pb-20 ${embedded ? "" : ""}`}>
+      {!embedded && (
+        <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
+          <img src="/logo.svg" alt="" className="h-40 w-auto opacity-20 sm:h-52 md:h-64" />
+        </div>
+      )}
+      <div className="relative z-10 flex min-w-0 flex-col gap-6 overflow-hidden">
+      {needsKeyBanner && !embedded && (
         <Link
           to="/settings?open=api-keys"
-          className="flex items-center gap-3 rounded-lg border px-4 py-3 text-left no-underline transition-colors border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] hover:bg-[var(--color-warning-hover-bg)] hover:border-[var(--color-warning-hover-border)]"
+          className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-3 text-left no-underline transition-colors text-[var(--color-warning-text)] hover:border-[var(--color-warning-hover-border)] hover:bg-[var(--color-warning-hover-bg)]"
         >
           <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)]" aria-hidden />
-          <p className="text-sm font-medium text-[var(--color-warning-text)]">
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--color-warning-text)]">
             {t("apiKeyBanner.categoryMessage", {
               category: label,
               provider: API_KEY_META[provider!].name,
             })}
           </p>
-          <span className="ml-auto text-xs font-medium text-[var(--color-warning-text-muted)]">
+          <span className="shrink-0 text-xs font-medium text-[var(--color-warning-text-muted)]">
             {t("apiKeyBanner.addKeyInSettings")} →
           </span>
         </Link>
       )}
-      <p className="text-xs text-[var(--color-light)]" role="note">
-        {t("mediaLogs.dataLanguageDependsOnApi")}
-      </p>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 overflow-hidden">
+        <h1 className="min-w-0 truncate text-2xl font-bold text-[var(--color-lightest)]">
           {label}
         </h1>
-        <div className="flex flex-wrap items-center gap-3">
-          {mediaType === "boardgames" && (
-            <div className="flex flex-wrap items-center gap-2">
-              <ToggleGroup
-                type="single"
-                value={boardGameProvider}
-                onValueChange={(v) => v && handleBoardGameProviderChange(v as BoardGameProvider)}
-                disabled={savingBoardGameProvider}
-                className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5"
-                aria-label={t("settings.boardGameProviderLabel")}
+        {!readOnly && (
+          <div className="flex min-w-0 flex-shrink-0 flex-wrap items-center gap-3">
+            {mediaType === "boardgames" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <ToggleGroup
+                  type="single"
+                  value={boardGameProvider}
+                  onValueChange={(v) => v && handleBoardGameProviderChange(v as BoardGameProvider)}
+                  disabled={savingBoardGameProvider}
+                  className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5"
+                  aria-label={t("settings.boardGameProviderLabel")}
+                >
+                  {BOARD_GAME_PROVIDERS.map((p) => (
+                    <ToggleGroupItem
+                      key={p}
+                      value={p}
+                      className="h-8 px-3 text-sm"
+                      aria-label={p === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
+                    >
+                      {p === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </div>
+            )}
+            <motion.div whileTap={tapScale} transition={tapTransition}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCustomEntry(true)}
               >
-                {BOARD_GAME_PROVIDERS.map((p) => (
-                  <ToggleGroupItem
-                    key={p}
-                    value={p}
-                    className="h-8 px-3 text-sm"
-                    aria-label={p === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
-                  >
-                    {p === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
-          )}
-          <motion.div whileTap={tapScale} transition={tapTransition}>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowCustomEntry(true)}
-            >
-              <span className="inline-flex items-center gap-2">
-                <Plus className="size-4 shrink-0" aria-hidden />
-                {t("customEntry.addCustomEntry")}
-              </span>
-            </Button>
-          </motion.div>
-        </div>
+                <span className="inline-flex items-center gap-2">
+                  <Plus className="size-4 shrink-0" aria-hidden />
+                  {t("customEntry.addCustomEntry")}
+                </span>
+              </Button>
+            </motion.div>
+          </div>
+        )}
       </div>
-      {showCustomEntry && (
+      {!readOnly && showCustomEntry && (
         <CustomEntryForm
           mediaType={mediaType}
           onSaved={(completion) => {
@@ -263,9 +292,10 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm text-[var(--color-light)]">{t("itemReviewForm.status")}:</span>
-        <div className="flex flex-wrap gap-2">
+      {!readOnly && (
+      <div className="flex min-w-0 flex-wrap items-center gap-3 overflow-hidden">
+        <span className="shrink-0 text-sm text-[var(--color-light)]">{t("itemReviewForm.status")}:</span>
+        <div className="flex min-w-0 flex-wrap gap-2">
           <Button
             type="button"
             variant={statusFilter === "" ? "default" : "outline"}
@@ -286,8 +316,8 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
             </Button>
           ))}
         </div>
-        <span className="text-sm text-[var(--color-light)] ml-2 md:ml-4">{t("mediaLogs.sortLabel")}</span>
-        <div className="flex flex-wrap gap-2">
+        <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
+        <div className="flex min-w-0 flex-wrap gap-2">
           <Button
             type="button"
             variant={sortBy === "date" ? "default" : "outline"}
@@ -306,6 +336,7 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
           </Button>
         </div>
       </div>
+      )}
 
       {logs.length === 0 ? (
         <motion.div
@@ -317,17 +348,19 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
           <p className="text-center text-[var(--color-light)]">
             {t("mediaLogs.noLogsFor", { label: label.toLowerCase() })}
           </p>
-          <Link
-            to="/search"
-            state={{ mediaType }}
-            className="mt-4 inline-block text-[var(--color-lightest)] underline hover:no-underline"
-          >
-            {t("mediaLogs.searchAndAddOne")}
-          </Link>
+          {!readOnly && (
+            <Link
+              to="/search"
+              state={{ mediaType }}
+              className="mt-4 inline-block text-[var(--color-lightest)] underline hover:no-underline"
+            >
+              {t("mediaLogs.searchAndAddOne")}
+            </Link>
+          )}
         </motion.div>
       ) : (
-        <motion.div variants={staggerContainer} initial="initial" animate="animate">
-          <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+        <motion.div variants={staggerContainer} initial="initial" animate="animate" className="min-w-0 overflow-hidden">
+          <div className="flex min-w-0 flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {logs.map((log) => (
               <motion.div key={log.id} variants={staggerItem} className="min-h-0 sm:h-full">
                 <motion.div whileTap={tapScale} transition={tapTransition} className="h-full">
@@ -335,12 +368,12 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
                     className="relative flex flex-col min-h-0 overflow-hidden border-[var(--color-dark)] bg-[var(--color-dark)] sm:min-h-[8.5rem]"
                     style={cardShadow}
                   >
-                    {deletingId === log.id && (
+                    {!readOnly && deletingId === log.id && (
                       <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0D1B2A]/70">
                         <Loader2 className="h-8 w-8 animate-spin text-[var(--color-light)]" />
                       </div>
                     )}
-                    {hasProgressButton && (
+                    {!readOnly && hasProgressButton && (
                       <div className="absolute top-2 right-2 z-[1]">
                         <Button
                           type="button"
@@ -401,26 +434,28 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
                         )}
                       </div>
                     </div>
-                    <div className="flex border-t border-[var(--color-darkest)]">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="flex-1 hover:bg-[var(--color-mid)]/30"
-                        onClick={() => setEditingLog(log)}
-                        disabled={deletingId === log.id}
-                      >
-                        {t("common.edit")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="flex-1 text-red-400 hover:bg-red-500/20 hover:text-red-400"
-                        onClick={() => handleDelete(log.id)}
-                        disabled={deletingId === log.id}
-                      >
-                        {t("common.delete")}
-                      </Button>
-                    </div>
+                    {!readOnly && (
+                      <div className="flex border-t border-[var(--color-darkest)]">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex-1 hover:bg-[var(--color-mid)]/30"
+                          onClick={() => setEditingLog(log)}
+                          disabled={deletingId === log.id}
+                        >
+                          {t("common.edit")}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex-1 text-red-400 hover:bg-red-500/20 hover:text-red-400"
+                          onClick={() => handleDelete(log.id)}
+                          disabled={deletingId === log.id}
+                        >
+                          {t("common.delete")}
+                        </Button>
+                      </div>
+                    )}
                   </Card>
                 </motion.div>
               </motion.div>
@@ -429,15 +464,17 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
         </motion.div>
       )}
 
-      {editingLog && (
+      {!readOnly && editingLog && (
         <LogForm
           mode="edit"
           log={editingLog}
+          episodesCount={editingLogEpisodesCount}
           onSaved={handleSaved}
           onCancel={() => setEditingLog(null)}
         />
       )}
 
+      {!readOnly && !embedded && (
       <form
         onSubmit={handleCategorySearchSubmit}
         className="fixed bottom-20 left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-4 md:bottom-6 md:left-[calc(127.5px+50vw)]"
@@ -460,6 +497,7 @@ export function MediaLogs({ mediaType }: MediaLogsProps) {
           />
         </div>
       </form>
+      )}
       </div>
     </div>
   );

@@ -6,15 +6,16 @@ import { Login } from "@/pages/Login";
 import { Register } from "@/pages/Register";
 import { ForgotPassword } from "@/pages/ForgotPassword";
 import { ResetPassword } from "@/pages/ResetPassword";
-import { LogComplete } from "@/pages/LogComplete";
+import { LogCompleteProvider } from "@/contexts/LogCompleteContext";
 import { Onboarding } from "@/pages/Onboarding";
 import { Dashboard } from "@/pages/Dashboard";
 import { Search } from "@/pages/Search";
 import { ItemPage } from "@/pages/ItemPage";
-import { MediaLogs } from "@/pages/MediaLogs";
 import { Settings } from "@/pages/Settings";
 import { About } from "@/pages/About";
 import { Tiers } from "@/pages/Tiers";
+import { PublicProfile } from "@/pages/PublicProfile";
+import { PublicProfileLayout } from "@/layouts/PublicProfileLayout";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { token, initializing } = useAuth();
@@ -28,7 +29,7 @@ const RequireOnboarded = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   if (initializing) return null;
   if (token && user && user.onboarded === false) {
-    const allowed = ["/onboarding", "/login", "/register", "/forgot-password", "/reset-password", "/log-complete"];
+    const allowed = ["/onboarding", "/login", "/register", "/forgot-password", "/reset-password"];
     if (!allowed.includes(location.pathname)) return <Navigate to="/onboarding" replace />;
   }
   return <>{children}</>;
@@ -43,34 +44,38 @@ const DashboardOrSearch = () => {
 
 export default function App() {
   return (
-    <RequireOnboarded>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/log-complete" element={<LogComplete />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/" element={<AppLayout />}>
-        <Route element={<AnimatedOutlet />}>
-          <Route index element={<DashboardOrSearch />} />
-          <Route path="search" element={<Search />} />
-          <Route path="about" element={<About />} />
-          <Route path="tiers" element={<Tiers />} />
-          <Route path="item/:mediaType/:id" element={<ItemPage />} />
-        <Route path="movies" element={<ProtectedRoute><MediaLogs mediaType="movies" /></ProtectedRoute>} />
-          <Route path="tv" element={<ProtectedRoute><MediaLogs mediaType="tv" /></ProtectedRoute>} />
-          <Route path="boardgames" element={<ProtectedRoute><MediaLogs mediaType="boardgames" /></ProtectedRoute>} />
-          <Route path="games" element={<ProtectedRoute><MediaLogs mediaType="games" /></ProtectedRoute>} />
-          <Route path="books" element={<ProtectedRoute><MediaLogs mediaType="books" /></ProtectedRoute>} />
-          <Route path="anime" element={<ProtectedRoute><MediaLogs mediaType="anime" /></ProtectedRoute>} />
-          <Route path="manga" element={<ProtectedRoute><MediaLogs mediaType="manga" /></ProtectedRoute>} />
-          <Route path="comics" element={<ProtectedRoute><MediaLogs mediaType="comics" /></ProtectedRoute>} />
-          <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        </Route>
-      </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </RequireOnboarded>
+    <LogCompleteProvider>
+      <RequireOnboarded>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/" element={<AppLayout />}>
+            <Route element={<AnimatedOutlet />}>
+              <Route index element={<DashboardOrSearch />} />
+              <Route path="search" element={<Search />} />
+              <Route path="about" element={<About />} />
+              <Route path="tiers" element={<Tiers />} />
+              <Route path="item/:mediaType/:id" element={<ItemPage />} />
+              <Route path="movies" element={<ProtectedRoute><Navigate to="/?category=movies" replace /></ProtectedRoute>} />
+              <Route path="tv" element={<ProtectedRoute><Navigate to="/?category=tv" replace /></ProtectedRoute>} />
+              <Route path="boardgames" element={<ProtectedRoute><Navigate to="/?category=boardgames" replace /></ProtectedRoute>} />
+              <Route path="games" element={<ProtectedRoute><Navigate to="/?category=games" replace /></ProtectedRoute>} />
+              <Route path="books" element={<ProtectedRoute><Navigate to="/?category=books" replace /></ProtectedRoute>} />
+              <Route path="anime" element={<ProtectedRoute><Navigate to="/?category=anime" replace /></ProtectedRoute>} />
+              <Route path="manga" element={<ProtectedRoute><Navigate to="/?category=manga" replace /></ProtectedRoute>} />
+              <Route path="comics" element={<ProtectedRoute><Navigate to="/?category=comics" replace /></ProtectedRoute>} />
+              <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            </Route>
+          </Route>
+          <Route path="/:userId" element={<PublicProfileLayout />}>
+            <Route index element={<PublicProfile />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </RequireOnboarded>
+    </LogCompleteProvider>
   );
 }

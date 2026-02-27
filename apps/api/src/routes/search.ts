@@ -19,7 +19,7 @@ export const searchRouter = Router();
 searchRouter.use(optionalAuthMiddleware);
 
 /** Free searches per category when user has no API key. Key: userId|ip + type (+ boardProvider for boardgames). */
-const FREE_SEARCH_LIMIT_PER_CATEGORY = 5;
+const FREE_SEARCH_LIMIT_PER_CATEGORY = 10;
 const freeSearchCounts = new Map<string, number>();
 
 function getFreeSearchKey(req: { user?: { userId: string }; ip?: string }, type: string, boardProvider: string): string {
@@ -28,14 +28,26 @@ function getFreeSearchKey(req: { user?: { userId: string }; ip?: string }, type:
   return `${id}-${type}${suffix}`;
 }
 
-function getFreeSearchUsage(key: string): { used: number; limit: number } {
-  const used = freeSearchCounts.get(key) ?? 0;
+/** Client may send X-Free-Search-Used (from localStorage) so usage persists across server restarts. */
+function getClientUsedFromRequest(req: { headers: Record<string, string | string[] | undefined> }): number | undefined {
+  const raw = req.headers["x-free-search-used"];
+  const s = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : undefined;
+  if (s == null) return undefined;
+  const n = parseInt(s, 10);
+  if (Number.isNaN(n) || n < 0) return undefined;
+  return Math.min(n, FREE_SEARCH_LIMIT_PER_CATEGORY);
+}
+
+function getFreeSearchUsage(key: string, clientUsed?: number): { used: number; limit: number } {
+  const serverUsed = freeSearchCounts.get(key) ?? 0;
+  const used = Math.max(serverUsed, clientUsed ?? 0);
   return { used, limit: FREE_SEARCH_LIMIT_PER_CATEGORY };
 }
 
-function incrementFreeSearch(key: string): number {
-  const prev = freeSearchCounts.get(key) ?? 0;
-  const next = prev + 1;
+function incrementFreeSearch(key: string, clientUsed?: number): number {
+  const serverUsed = freeSearchCounts.get(key) ?? 0;
+  const used = Math.max(serverUsed, clientUsed ?? 0);
+  const next = used + 1;
   freeSearchCounts.set(key, next);
   return next;
 }
@@ -81,6 +93,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
   }
   const allowedSorts = SEARCH_SORT_OPTIONS[type as MediaType].map((o) => o.value);
   const sort = rawSort && allowedSorts.includes(rawSort) ? rawSort : undefined;
+  const clientUsed = getClientUsedFromRequest(req);
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
   const boardProvider =
     (type as string) === "boardgames"
@@ -133,7 +146,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         const userHasKey = !!keys?.tmdbApiKey;
         if (!userHasKey) {
           const key = getFreeSearchKey(req, type, boardProvider);
-          const { used } = getFreeSearchUsage(key);
+          const { used } = getFreeSearchUsage(key, clientUsed);
           if (used >= FREE_SEARCH_LIMIT_PER_CATEGORY) {
             return res.json(
               addPromptIfUserHasNoKey(
@@ -146,11 +159,11 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
               )
             );
           }
-          incrementFreeSearch(key);
+          incrementFreeSearch(key, clientUsed);
         }
         const out = await searchMovies(q, keys?.tmdbApiKey, { link: tmdbMeta.link, tutorial: tmdbMeta.tutorial }, sort);
         const key = !keys?.tmdbApiKey ? getFreeSearchKey(req, type, boardProvider) : "";
-        const usage = key ? getFreeSearchUsage(key) : null;
+        const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
         return res.json(
           addPromptIfUserHasNoKey(
             out,
@@ -166,7 +179,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         const userHasKey = !!keys?.tmdbApiKey;
         if (!userHasKey) {
           const key = getFreeSearchKey(req, type, boardProvider);
-          const { used } = getFreeSearchUsage(key);
+          const { used } = getFreeSearchUsage(key, clientUsed);
           if (used >= FREE_SEARCH_LIMIT_PER_CATEGORY) {
             return res.json(
               addPromptIfUserHasNoKey(
@@ -179,11 +192,11 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
               )
             );
           }
-          incrementFreeSearch(key);
+          incrementFreeSearch(key, clientUsed);
         }
         const out = await searchTv(q, keys?.tmdbApiKey, { link: tmdbMeta.link, tutorial: tmdbMeta.tutorial }, sort);
         const key = !keys?.tmdbApiKey ? getFreeSearchKey(req, type, boardProvider) : "";
-        const usage = key ? getFreeSearchUsage(key) : null;
+        const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
         return res.json(
           addPromptIfUserHasNoKey(
             out,
@@ -200,7 +213,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         const userHasKey = boardProvider === "ludopedia" ? !!keys?.ludopediaApiToken : !!keys?.bggApiToken;
         if (!userHasKey) {
           const key = getFreeSearchKey(req, type, boardProvider);
-          const { used } = getFreeSearchUsage(key);
+          const { used } = getFreeSearchUsage(key, clientUsed);
           if (used >= FREE_SEARCH_LIMIT_PER_CATEGORY) {
             const meta = provider === "ludopedia" ? ludopediaMeta : bggMeta;
             return res.json({
@@ -213,7 +226,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
               freeSearchLimitReached: true,
             });
           }
-          incrementFreeSearch(key);
+          incrementFreeSearch(key, clientUsed);
         }
         if (boardProvider === "ludopedia") {
           const out = await searchBoardGamesLudopedia(
@@ -223,7 +236,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
             sort
           );
           const key = !keys?.ludopediaApiToken ? getFreeSearchKey(req, type, boardProvider) : "";
-          const usage = key ? getFreeSearchUsage(key) : null;
+          const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
           return res.json(
             addPromptIfUserHasNoKey(
               out,
@@ -237,7 +250,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         }
         const out = await searchBoardGames(q, keys?.bggApiToken, { link: bggMeta.link, tutorial: bggMeta.tutorial }, sort);
         const key = !keys?.bggApiToken ? getFreeSearchKey(req, type, boardProvider) : "";
-        const usage = key ? getFreeSearchUsage(key) : null;
+        const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
         return res.json(
           addPromptIfUserHasNoKey(
             out,
@@ -253,7 +266,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         const userHasKey = !!keys?.rawgApiKey;
         if (!userHasKey) {
           const key = getFreeSearchKey(req, type, boardProvider);
-          const { used } = getFreeSearchUsage(key);
+          const { used } = getFreeSearchUsage(key, clientUsed);
           if (used >= FREE_SEARCH_LIMIT_PER_CATEGORY) {
             return res.json(
               addPromptIfUserHasNoKey(
@@ -266,11 +279,11 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
               )
             );
           }
-          incrementFreeSearch(key);
+          incrementFreeSearch(key, clientUsed);
         }
         const out = await searchGames(q, keys?.rawgApiKey, { link: rawgMeta.link, tutorial: rawgMeta.tutorial }, sort);
         const key = !keys?.rawgApiKey ? getFreeSearchKey(req, type, boardProvider) : "";
-        const usage = key ? getFreeSearchUsage(key) : null;
+        const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
         return res.json(
           addPromptIfUserHasNoKey(
             out,
@@ -299,7 +312,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         const userHasKey = !!comicvineKey;
         if (!userHasKey) {
           const key = getFreeSearchKey(req, type, boardProvider);
-          const { used } = getFreeSearchUsage(key);
+          const { used } = getFreeSearchUsage(key, clientUsed);
           if (used >= FREE_SEARCH_LIMIT_PER_CATEGORY) {
             return res.json(
               addPromptIfUserHasNoKey(
@@ -312,11 +325,11 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
               )
             );
           }
-          incrementFreeSearch(key);
+          incrementFreeSearch(key, clientUsed);
         }
         const out = await searchComics(q, keys?.comicVineApiKey, { link: comicvineMeta.link, tutorial: comicvineMeta.tutorial }, sort);
         const key = !comicvineKey ? getFreeSearchKey(req, type, boardProvider) : "";
-        const usage = key ? getFreeSearchUsage(key) : null;
+        const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
         return res.json(
           addPromptIfUserHasNoKey(
             out,

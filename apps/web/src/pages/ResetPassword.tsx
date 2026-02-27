@@ -32,8 +32,10 @@ export function ResetPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (password.length < 8) {
-      toast.error(t("toast.passwordMinLength"));
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    if (password.length < 8 || !hasLetter || !hasNumber) {
+      toast.error(t("validation.passwordLettersAndNumbers"));
       return;
     }
     if (password !== confirmPassword) {

@@ -102,6 +102,7 @@ export function CustomEntryForm({
         image,
         title: trimmedTitle,
         grade,
+        status: status ?? undefined,
         mediaType,
         id: externalId,
       };

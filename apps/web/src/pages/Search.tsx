@@ -28,6 +28,35 @@ import { Select } from "@/components/ui/select";
 import type { Log } from "@logeverything/shared";
 
 const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
+const FREE_SEARCH_USAGE_STORAGE_KEY = "logeverything_free_search_usage";
+
+function getFreeSearchUsageKey(type: MediaType, boardProvider: BoardGameProvider): string {
+  return type === "boardgames" ? `boardgames-${boardProvider}` : type;
+}
+
+function loadFreeSearchUsageFromStorage(): Record<string, { used: number; limit: number }> {
+  try {
+    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(FREE_SEARCH_USAGE_STORAGE_KEY) : null;
+    if (!raw) return {};
+    const data = JSON.parse(raw) as Record<string, { used?: number; limit?: number }>;
+    const out: Record<string, { used: number; limit: number }> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (v && typeof v.used === "number" && typeof v.limit === "number") out[k] = { used: v.used, limit: v.limit };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function saveFreeSearchUsageToStorage(usageKey: string, value: { used: number; limit: number }) {
+  try {
+    const prev = loadFreeSearchUsageFromStorage();
+    localStorage.setItem(FREE_SEARCH_USAGE_STORAGE_KEY, JSON.stringify({ ...prev, [usageKey]: value }));
+  } catch {
+    // ignore
+  }
+}
 
 interface SearchResponse {
   results: SearchResult[];
@@ -62,7 +91,15 @@ export function Search() {
     freeSearchLimitReached?: boolean;
   } | null>(null);
   const [limitReachedByCategory, setLimitReachedByCategory] = useState<Partial<Record<MediaType, boolean>>>({});
-  const [usageByCategory, setUsageByCategory] = useState<Partial<Record<MediaType, { used: number; limit: number }>>>({});
+  const [usageByCategory, setUsageByCategory] = useState<Partial<Record<MediaType, { used: number; limit: number }>>>(() => {
+    const stored = loadFreeSearchUsageFromStorage();
+    const out: Partial<Record<MediaType, { used: number; limit: number }>> = {};
+    for (const type of MEDIA_TYPES) {
+      const key = getFreeSearchUsageKey(type as MediaType, type === "boardgames" ? "bgg" : "bgg");
+      if (stored[key]) out[type as MediaType] = stored[key];
+    }
+    return out;
+  });
   const [drawerItem, setDrawerItem] = useState<{ mediaType: MediaType; id: string } | null>(null);
   const [logsByExternalId, setLogsByExternalId] = useState<Map<string, string>>(new Map());
   const { token } = useAuth();
@@ -109,30 +146,56 @@ export function Search() {
     if (stateQuery) setQuery(stateQuery);
   }, [stateQuery]);
 
+  useEffect(() => {
+    const stored = loadFreeSearchUsageFromStorage();
+    const boardProvider = me?.boardGameProvider ?? "bgg";
+    setUsageByCategory((prev) => {
+      const next = { ...prev };
+      for (const type of MEDIA_TYPES) {
+        const key = getFreeSearchUsageKey(type as MediaType, type === "boardgames" ? boardProvider : "bgg");
+        if (stored[key]) next[type as MediaType] = stored[key];
+      }
+      return next;
+    });
+    setLimitReachedByCategory((prev) => {
+      const next = { ...prev };
+      for (const type of MEDIA_TYPES) {
+        const key = getFreeSearchUsageKey(type as MediaType, type === "boardgames" ? boardProvider : "bgg");
+        const u = stored[key];
+        next[type as MediaType] = !!(u && u.used >= u.limit);
+      }
+      return next;
+    });
+  }, [me?.boardGameProvider]);
+
   const runSearch = useCallback(
     async (q: string, typeOverride?: MediaType, sortOverride?: string) => {
       if (!q.trim()) return;
       const searchType = typeOverride ?? mediaType;
       const sort = sortOverride ?? sortBy;
+      const boardProvider = me?.boardGameProvider ?? "bgg";
+      const usageKey = getFreeSearchUsageKey(searchType, searchType === "boardgames" ? boardProvider : "bgg");
+      const stored = loadFreeSearchUsageFromStorage();
+      const clientUsed = stored[usageKey]?.used ?? 0;
       setLoading(true);
       setResults([]);
       setRequiresApiKey(null);
       try {
         const params = new URLSearchParams({ type: searchType, q: q.trim() });
         if (sort && sort !== "relevance") params.set("sort", sort);
-        if (searchType === "boardgames" && (me?.boardGameProvider ?? "bgg"))
-          params.set("boardGameProvider", me?.boardGameProvider ?? "bgg");
-        const data = await apiFetch<SearchResponse>(`/search?${params.toString()}`);
+        if (searchType === "boardgames" && boardProvider) params.set("boardGameProvider", boardProvider);
+        const data = await apiFetch<SearchResponse>(`/search?${params.toString()}`, {
+          headers: { "X-Free-Search-Used": String(clientUsed) },
+        });
         const list = data.results ?? [];
         setResults(list);
         if (data.freeSearchLimitReached) {
           setLimitReachedByCategory((prev) => ({ ...prev, [searchType]: true }));
         }
         if (data.freeSearchUsed != null && data.freeSearchLimit != null) {
-          setUsageByCategory((prev) => ({
-            ...prev,
-            [searchType]: { used: data.freeSearchUsed!, limit: data.freeSearchLimit! },
-          }));
+          const usage = { used: data.freeSearchUsed, limit: data.freeSearchLimit };
+          saveFreeSearchUsageToStorage(usageKey, usage);
+          setUsageByCategory((prev) => ({ ...prev, [searchType]: usage }));
         }
         if ("requiresApiKey" in data && data.requiresApiKey) {
           setRequiresApiKey({
@@ -267,8 +330,8 @@ export function Search() {
                         isDisabled
                           ? t("search.categoryLimitReachedTooltip", {
                               type: t(`nav.${type}`),
-                              used: String(usageByCategory[type]?.used ?? 5),
-                              limit: String(usageByCategory[type]?.limit ?? 5),
+                              used: String(usageByCategory[type]?.used ?? 10),
+                              limit: String(usageByCategory[type]?.limit ?? 10),
                             })
                           : undefined
                       }
@@ -431,8 +494,8 @@ export function Search() {
           <p className="text-sm text-[var(--color-light)]">
             {requiresApiKey.freeSearchLimitReached
               ? t("search.freeSearchLimitReached", {
-                  used: String(requiresApiKey.freeSearchUsed ?? 5),
-                  limit: String(requiresApiKey.freeSearchLimit ?? 5),
+                  used: String(requiresApiKey.freeSearchUsed ?? 10),
+                  limit: String(requiresApiKey.freeSearchLimit ?? 10),
                   type: t(`nav.${mediaType}`),
                 })
               : requiresApiKey.freeSearchUsed != null && requiresApiKey.freeSearchLimit != null

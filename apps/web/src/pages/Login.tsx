@@ -68,11 +68,11 @@ export function Login() {
             <form onSubmit={handleSubmit}>
               <div className="flex flex-col gap-4">
                 <div className="space-y-2">
-                  <Label>{t("login.email")}</Label>
+                  <Label>{t("login.emailOrUsername")}</Label>
                   <Input
-                    type="email"
-                    autoComplete="email"
-                    placeholder={t("common.placeholderEmail")}
+                    type="text"
+                    autoComplete="username"
+                    placeholder={t("login.emailOrUsername")}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
