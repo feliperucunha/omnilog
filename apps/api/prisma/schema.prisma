@@ -32,6 +32,8 @@ model User {
   visibleMediaTypes    String?  // JSON array of media type strings; null = all
   boardGameProvider   String?  // "bgg" | "ludopedia"; null = bgg
   tier                Tier     @default(free)
+  stripeCustomerId    String?  @unique // Stripe customer ID for subscriptions
+  country             String?  // ISO 3166-1 alpha-2 e.g. BR for pricing
   onboarded           Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt      DateTime @updatedAt

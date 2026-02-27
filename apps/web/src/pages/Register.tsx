@@ -24,6 +24,7 @@ export function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [country, setCountry] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -54,7 +55,12 @@ export function Register() {
     try {
       const data = await apiFetch<AuthResponse>("/auth/register", {
         method: "POST",
-        body: JSON.stringify({ username: username.trim(), email: email.trim(), password }),
+        body: JSON.stringify({
+          username: username.trim(),
+          email: email.trim(),
+          password,
+          ...(country.trim().length === 2 && { country: country.trim().toUpperCase() }),
+        }),
       });
       login(COOKIE_SESSION, { ...data.user, onboarded: data.user.onboarded ?? false });
       toast.success(t("toast.accountCreated"));
@@ -108,6 +114,18 @@ export function Register() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("register.country")}</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] ring-offset-[var(--color-darkest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)]"
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    aria-label={t("register.country")}
+                  >
+                    <option value="">{t("register.countryRestOfWorld")}</option>
+                    <option value="BR">{t("register.countryBrazil")}</option>
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <Label>{t("register.password")}</Label>

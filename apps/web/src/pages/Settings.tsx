@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronDown, ChevronRight, Download, HelpCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -249,38 +249,56 @@ export function Settings() {
         <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
-              {t("settings.visibleMediaTypesLabel")}
+              {t("settings.publicProfileCustomization")}
             </h3>
-            <p className="text-sm text-[var(--color-light)]">
-              {t("settings.visibleMediaTypesIntro")}
-            </p>
-            <div className="flex flex-wrap gap-4">
-              {MEDIA_TYPES.map((type) => (
-                <label
-                  key={type}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 transition-colors hover:bg-[var(--color-darkest)]/50",
-                    "focus-within:ring-2 focus-within:ring-[var(--color-mid)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--color-dark)]"
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedMediaTypes.has(type)}
-                    onChange={() => handleToggleMediaType(type)}
-                    disabled={savingMediaTypes}
-                    className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
-                  />
-                  <span className="text-sm text-[var(--color-lightest)]">
-                    {t(`nav.${type}`)}
-                  </span>
-                </label>
-              ))}
-            </div>
+            {me?.tier === "pro" ? (
+              <>
+                <p className="text-sm text-[var(--color-light)]">
+                  {t("settings.visibleMediaTypesIntro")}
+                </p>
+                <div className="flex flex-wrap gap-4">
+                  {MEDIA_TYPES.map((type) => (
+                    <label
+                      key={type}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 transition-colors hover:bg-[var(--color-darkest)]/50",
+                        "focus-within:ring-2 focus-within:ring-[var(--color-mid)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--color-dark)]"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedMediaTypes.has(type)}
+                        onChange={() => handleToggleMediaType(type)}
+                        disabled={savingMediaTypes}
+                        className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                      />
+                      <span className="text-sm text-[var(--color-lightest)]">
+                        {t(`nav.${type}`)}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-[var(--color-light)]">
+                  {t("settings.publicProfileProOnlyIntro")}
+                </p>
+                <Button variant="outline" className="w-fit" asChild>
+                  <Link to="/tiers">{t("settings.publicProfileUpgrade")}</Link>
+                </Button>
+              </>
+            )}
           </div>
         </Card>
 
-        {me?.tier === "pro" && (
-          <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        {me && (
+          <Card
+            className={cn(
+              "border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]",
+              me.tier !== "pro" && "opacity-75"
+            )}
+          >
             <div className="flex flex-col gap-4">
               <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
                 {t("tiers.exportLogs")}
@@ -288,32 +306,45 @@ export function Settings() {
               <p className="text-sm text-[var(--color-light)]">
                 {t("tiers.proExportDesc")}
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-fit gap-2"
-                disabled={exporting}
-                onClick={async () => {
-                  setExporting(true);
-                  try {
-                    const { blob, filename } = await apiFetchFile("/logs/export");
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = filename;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    toast.success(t("tiers.exportSuccess"));
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : t("tiers.exportFailed"));
-                  } finally {
-                    setExporting(false);
-                  }
-                }}
-              >
-                <Download className="h-4 w-4" aria-hidden />
-                {exporting ? t("common.saving") : t("tiers.exportLogs")}
-              </Button>
+              {me.tier === "pro" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-fit gap-2"
+                  disabled={exporting}
+                  onClick={async () => {
+                    setExporting(true);
+                    try {
+                      const { blob, filename } = await apiFetchFile("/logs/export");
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = filename;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast.success(t("tiers.exportSuccess"));
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : t("tiers.exportFailed"));
+                    } finally {
+                      setExporting(false);
+                    }
+                  }}
+                >
+                  <Download className="h-4 w-4" aria-hidden />
+                  {exporting ? t("common.saving") : t("tiers.exportLogs")}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-fit gap-2 opacity-70"
+                  asChild
+                >
+                  <Link to="/tiers">
+                    <Download className="h-4 w-4" aria-hidden />
+                    {t("tiers.exportLogs")}
+                  </Link>
+                </Button>
+              )}
             </div>
           </Card>
         )}

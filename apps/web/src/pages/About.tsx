@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
+const DEFAULT_BUYMEACOFFEE_URL = "https://www.buymeacoffee.com/felipecunha";
+
 const DONATION_LINKS = [
   {
     key: "kofi",
@@ -37,12 +39,22 @@ export function About() {
   const { t } = useLocale();
 
   const donationButtons = DONATION_LINKS.filter((link) => {
-    const url = import.meta.env[link.envKey] as string | undefined;
-    return url != null && String(url).trim() !== "";
-  }).map((link) => ({
-    ...link,
-    url: String(import.meta.env[link.envKey]).trim(),
-  }));
+    const envUrl = import.meta.env[link.envKey] as string | undefined;
+    const url =
+      link.key === "buymeacoffee"
+        ? (envUrl != null && String(envUrl).trim() !== "" ? String(envUrl).trim() : DEFAULT_BUYMEACOFFEE_URL)
+        : envUrl != null && String(envUrl).trim() !== ""
+          ? String(envUrl).trim()
+          : null;
+    return url != null;
+  }).map((link) => {
+    const envUrl = import.meta.env[link.envKey] as string | undefined;
+    const url =
+      link.key === "buymeacoffee"
+        ? (envUrl != null && String(envUrl).trim() !== "" ? String(envUrl).trim() : DEFAULT_BUYMEACOFFEE_URL)
+        : String(import.meta.env[link.envKey]).trim();
+    return { ...link, url };
+  });
 
   return (
     <motion.div
@@ -135,6 +147,23 @@ export function About() {
               {t("about.donationNotConfigured")}
             </p>
           )}
+          <div className="mt-6 pt-4 border-t border-[var(--color-mid)]/20">
+            <h3 className="mb-2 text-sm font-semibold text-[var(--color-lightest)]">
+              {t("about.donatePixTitle")}
+            </h3>
+            <p className="mb-3 text-sm text-[var(--color-light)]">
+              {t("about.donatePixIntro")}
+            </p>
+            <img
+              src="/qrcode.png"
+              alt={t("about.donatePixAlt")}
+              className="h-48 w-48 rounded-lg border border-[var(--color-mid)]/30 object-contain bg-[var(--color-darkest)]"
+            />
+            <p className="mt-3 text-sm text-[var(--color-light)]">
+              {t("about.donatePixKeyLabel")}{" "}
+              <span className="font-mono text-[var(--color-lightest)]">felipecunha04@icloud.com</span>
+            </p>
+          </div>
         </Card>
       </div>
 

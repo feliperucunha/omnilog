@@ -6,6 +6,7 @@ import {
   LogIn,
   UserPlus,
   Info,
+  CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -54,6 +55,7 @@ export function Nav() {
     { to: "/", labelKey: "nav.dashboard", icon: <Home size={iconSize} /> },
     { to: "/search", labelKey: "nav.search", icon: <Search size={iconSize} /> },
     { to: "/settings", labelKey: "nav.settings", icon: <Settings size={iconSize} /> },
+    { to: "/tiers", labelKey: "nav.plans", icon: <CreditCard size={iconSize} /> },
     { to: "/about", labelKey: "nav.about", icon: <Info size={iconSize} /> },
   ];
 
@@ -94,6 +96,7 @@ export function Nav() {
                 active={location.pathname === "/search"}
               />
               <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} />
+              <NavLinkItem to="/tiers" label={t("nav.plans")} icon={<CreditCard size={iconSize} />} active={location.pathname === "/tiers"} />
               <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} />
               <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} />
             </>
@@ -119,6 +122,7 @@ export function Nav() {
         ) : (
           <>
             <NavLinkItem to="/search" label={t("nav.search")} icon={<Search size={iconSize} />} active={location.pathname === "/search"} iconOnly />
+            <NavLinkItem to="/tiers" label={t("nav.plans")} icon={<CreditCard size={iconSize} />} active={location.pathname === "/tiers"} iconOnly />
             <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} active={location.pathname === "/about"} iconOnly />
             <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} active={location.pathname === "/login"} iconOnly />
             <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} active={location.pathname === "/register"} iconOnly />

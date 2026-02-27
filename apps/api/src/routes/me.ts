@@ -23,6 +23,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       preferredLocale: true,
       visibleMediaTypes: true,
       boardGameProvider: true,
+      country: true,
       tmdbApiKey: true,
       rawgApiKey: true,
       bggApiToken: true,
@@ -70,6 +71,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     visibleMediaTypes,
     boardGameProvider,
     tier,
+    country: user.country ?? undefined,
     logCount,
     apiKeys: {
       tmdb: !!user.tmdbApiKey,

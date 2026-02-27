@@ -1,14 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, AlertTriangle, Plus } from "lucide-react";
+import { Search, AlertTriangle, Plus, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import type { MediaType, Log } from "@logeverything/shared";
 import { LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
-import { apiFetch, apiFetchCached, apiFetchPublic, invalidateApiCache, invalidateLogsAndItemsCache } from "@/lib/api";
+import { apiFetch, apiFetchCached, apiFetchPublic, invalidateApiCache, invalidateLogsAndItemsCache, apiFetchFile } from "@/lib/api";
 import { LogForm } from "@/components/LogForm";
 import { CustomEntryForm } from "@/components/CustomEntryForm";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
@@ -27,6 +27,7 @@ import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select } from "@/components/ui/select";
 import { BOARD_GAME_PROVIDERS, type BoardGameProvider } from "@logeverything/shared";
+import { cn } from "@/lib/utils";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
 
@@ -59,6 +60,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
   const [showCustomEntry, setShowCustomEntry] = useState(false);
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const [incrementingId, setIncrementingId] = useState<string | null>(null);
+  const [exportingCategory, setExportingCategory] = useState(false);
 
   const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
   const CHAPTER_TYPES: MediaType[] = ["manga"];
@@ -158,6 +160,29 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
     e.preventDefault();
     const q = categorySearchQuery.trim();
     navigate("/search", { state: { mediaType, query: q || undefined } });
+  };
+
+  const isPro = me?.tier === "pro";
+  const handleExportCategory = async () => {
+    if (!isPro) {
+      navigate("/tiers");
+      return;
+    }
+    setExportingCategory(true);
+    try {
+      const { blob, filename } = await apiFetchFile(`/logs/export?mediaType=${encodeURIComponent(mediaType)}`);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(t("mediaLogs.exportCategorySuccess"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("tiers.exportFailed"));
+    } finally {
+      setExportingCategory(false);
+    }
   };
 
   const handleBoardGameProviderChange = async (newProvider: BoardGameProvider) => {
@@ -280,6 +305,25 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
                 </span>
               </Button>
             </motion.div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className={cn(
+                "shrink-0",
+                !isPro && "opacity-60 cursor-pointer"
+              )}
+              onClick={handleExportCategory}
+              disabled={exportingCategory}
+              title={t("mediaLogs.exportCategory")}
+              aria-label={t("mediaLogs.exportCategory")}
+            >
+              {exportingCategory ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Download className="size-4" aria-hidden />
+              )}
+            </Button>
           </div>
         )}
       </div>

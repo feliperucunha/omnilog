@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { Nav } from "@/components/Nav";
 import { Topbar } from "@/components/Topbar";
+import { AdBanner } from "@/components/AdBanner";
 
 export function AppLayout() {
   return (
@@ -12,6 +13,7 @@ export function AppLayout() {
         <Topbar />
         <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-4 md:p-6">
           <Outlet />
+          <AdBanner />
         </div>
       </main>
     </div>

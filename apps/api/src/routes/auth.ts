@@ -32,6 +32,7 @@ const registerSchema = z.object({
   username: usernameSchema,
   email: z.string().email().max(255).trim(),
   password: passwordSchema,
+  country: z.string().max(2).optional(), // ISO 3166-1 alpha-2 e.g. BR; empty or omit = rest of world
 });
 
 const loginSchema = z.object({
@@ -73,8 +74,11 @@ authRouter.post("/register", async (req, res) => {
     return;
   }
   const hashed = await bcrypt.hash(password, 10);
+  const country = parsed.data.country && parsed.data.country.trim().length === 2
+    ? String(parsed.data.country).toUpperCase().slice(0, 2)
+    : null;
   const user = await prisma.user.create({
-    data: { username, email, password: hashed },
+    data: { username, email, password: hashed, ...(country && { country }) },
     select: { id: true, username: true, email: true, onboarded: true },
   });
   const token = jwt.sign(

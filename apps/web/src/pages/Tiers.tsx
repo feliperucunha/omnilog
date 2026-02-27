@@ -1,41 +1,82 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Download, Sparkles } from "lucide-react";
+import { Check, Loader2, Sparkles } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetchFile } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
+import { TiersSkeleton } from "@/components/skeletons";
 
 const FREE_LOG_LIMIT = 500;
 
 export function Tiers() {
   const { t } = useLocale();
   const { token } = useAuth();
-  const { me } = useMe();
-  const [exporting, setExporting] = useState(false);
+  const { me, refetch, loading } = useMe();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  useEffect(() => {
+    const sessionId = searchParams.get("session_id");
+    const canceled = searchParams.get("canceled");
+    if (sessionId) {
+      toast.success(t("tiers.upgradeSuccess"));
+      refetch();
+      setSearchParams({}, { replace: true });
+    } else if (canceled === "1") {
+      toast.info(t("tiers.upgradeCanceled"));
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, refetch, t]);
 
   const tier = me?.tier ?? "free";
   const logCount = me?.logCount ?? 0;
   const isPro = tier === "pro";
+  const isBrazil = me?.country === "BR";
+  const proPriceLabel = isBrazil ? t("tiers.proPriceBr") : t("tiers.proPrice");
 
-  const handleExport = async () => {
-    setExporting(true);
+  if (token && loading) return <TiersSkeleton />;
+
+  const handleUpgradeToPro = async () => {
+    setCheckoutLoading(true);
     try {
-      const { blob, filename } = await apiFetchFile("/logs/export");
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success(t("tiers.exportSuccess"));
+      const data = await apiFetch<{ url: string }>("/stripe/create-checkout-session", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+      throw new Error("No checkout URL returned");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("tiers.exportFailed"));
-    } finally {
-      setExporting(false);
+      setCheckoutLoading(false);
+      const message = err instanceof Error ? err.message : t("tiers.upgradeError");
+      toast.error(message);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    setPortalLoading(true);
+    try {
+      const data = await apiFetch<{ url: string }>("/stripe/create-portal-session", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+      throw new Error("No portal URL returned");
+    } catch (err) {
+      setPortalLoading(false);
+      const message = err instanceof Error ? err.message : t("tiers.manageSubscriptionError");
+      toast.error(message);
     }
   };
 
@@ -73,17 +114,15 @@ export function Tiers() {
               ? t("tiers.usageUnlimited", { count: String(logCount) })
               : t("tiers.usage", { count: String(logCount), limit: String(FREE_LOG_LIMIT) })}
           </p>
-          {isPro && (
+          {token && isPro && (
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="mt-3 gap-2"
-              onClick={handleExport}
-              disabled={exporting}
+              className="mt-3 border-[var(--color-mid)] text-[var(--color-light)] hover:bg-[var(--color-mid)]/30"
+              disabled={portalLoading}
+              onClick={handleManageSubscription}
             >
-              <Download className="h-4 w-4" aria-hidden />
-              {exporting ? t("common.saving") : t("tiers.exportLogs")}
+              {portalLoading ? t("tiers.redirecting") : t("tiers.manageSubscription")}
             </Button>
           )}
         </Card>
@@ -129,7 +168,7 @@ export function Tiers() {
             {t("tiers.pro")}
           </h2>
           <p className="mt-1 text-2xl font-bold text-[var(--color-lightest)]">
-            {t("tiers.proPrice")}
+            {proPriceLabel}
           </p>
           <ul className="mt-4 flex flex-1 flex-col gap-2 text-sm text-[var(--color-light)]">
             <li className="flex items-center gap-2">
@@ -144,30 +183,26 @@ export function Tiers() {
               <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
               {t("tiers.proExportDesc")}
             </li>
+            <li className="flex items-center gap-2">
+              <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+              {t("tiers.proNoAds")}
+            </li>
           </ul>
           {token && !isPro && (
             <Button
               type="button"
               className="btn-gradient mt-4 w-full"
-              onClick={() => {
-                toast.info(
-                  "Payment integration coming soon. For now, contact support to upgrade to Pro."
-                );
-              }}
+              disabled={checkoutLoading}
+              onClick={handleUpgradeToPro}
             >
-              {t("tiers.upgradeToPro")}
-            </Button>
-          )}
-          {token && isPro && (
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-4 w-full gap-2"
-              onClick={handleExport}
-              disabled={exporting}
-            >
-              <Download className="h-4 w-4" aria-hidden />
-              {exporting ? t("common.saving") : t("tiers.exportLogs")}
+              {checkoutLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  {t("tiers.redirecting")}
+                </>
+              ) : (
+                t("tiers.upgradeToPro")
+              )}
             </Button>
           )}
         </Card>

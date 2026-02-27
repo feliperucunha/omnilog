@@ -147,7 +147,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   res.json({ group, data: entries });
 });
 
-/** GET /logs/export - Pro only; returns all user logs as CSV */
+/** GET /logs/export - Pro only; returns user logs as CSV. Optional ?mediaType= for single category. */
 logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const user = await prisma.user.findUnique({
@@ -158,8 +158,17 @@ logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
     res.status(403).json({ error: "Export is available on Pro only", code: "PRO_REQUIRED" });
     return;
   }
+  const mediaTypeParam = req.query.mediaType as string | undefined;
+  const mediaTypeFilter =
+    mediaTypeParam && MEDIA_TYPES.includes(mediaTypeParam as (typeof MEDIA_TYPES)[number])
+      ? (mediaTypeParam as (typeof MEDIA_TYPES)[number])
+      : null;
+
+  const where = { userId } as { userId: string; mediaType?: string };
+  if (mediaTypeFilter) where.mediaType = mediaTypeFilter;
+
   const logs = await prisma.log.findMany({
-    where: { userId },
+    where,
     orderBy: { updatedAt: "desc" },
   });
   const header =
@@ -191,8 +200,9 @@ logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
       ].join(",")
   );
   const csv = header + rows.join("\n");
+  const filename = mediaTypeFilter ? `logs-${mediaTypeFilter}.csv` : "logs-export.csv";
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", 'attachment; filename="logs-export.csv"');
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.send(csv);
 });
 
