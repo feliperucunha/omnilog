@@ -24,7 +24,7 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
     items?: {
       item?: {
         "@_id": string;
-        name?: { "#text": string; "@_type"?: string } | Array<{ "#text": string; "@_type"?: string }>;
+        name?: { "#text"?: string; "@_value"?: string; "@_type"?: string } | Array<{ "#text"?: string; "@_value"?: string; "@_type"?: string }>;
         yearpublished?: { "@_value"?: string };
         image?: string;
         description?: string;
@@ -39,11 +39,15 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
   const item = parsed.items?.item;
   if (!item || Array.isArray(item)) return null;
   const names = item.name;
+  const getTitle = (n: { "#text"?: string; "@_value"?: string } | undefined): string =>
+    (n?.["@_value"] ?? n?.["#text"] ?? "Unknown").trim() || "Unknown";
   let title = "Unknown";
   if (Array.isArray(names)) {
     const primary = names.find((n) => n["@_type"] === "primary") ?? names[0];
-    title = primary?.["#text"] ?? "Unknown";
-  } else if (names?.["#text"]) title = names["#text"];
+    title = getTitle(primary);
+  } else if (names) {
+    title = getTitle(names);
+  }
   const year = item.yearpublished?.["@_value"] ?? null;
   const rawDesc = item.description;
   const description =
@@ -114,7 +118,7 @@ export async function searchBoardGames(
     items?: {
       item?: Array<{
         "@_id": string;
-        name?: { "#text": string; "@_type"?: string } | Array<{ "#text": string; "@_type"?: string }>;
+        name?: { "#text"?: string; "@_value"?: string; "@_type"?: string } | Array<{ "#text"?: string; "@_value"?: string; "@_type"?: string }>;
         yearpublished?: { "@_value"?: string };
         image?: string;
       }>;
@@ -124,14 +128,16 @@ export async function searchBoardGames(
   const thingItems = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
   if (thingItems.length === 0) return { results: [] };
 
+  const getTitle = (n: { "#text"?: string; "@_value"?: string } | undefined): string =>
+    (n?.["@_value"] ?? n?.["#text"] ?? "Unknown").trim() || "Unknown";
   let results = thingItems.map((item) => {
     const names = item.name;
     let title = "Unknown";
     if (Array.isArray(names)) {
       const primary = names.find((n) => n["@_type"] === "primary") ?? names[0];
-      title = primary?.["#text"] ?? "Unknown";
-    } else if (names?.["#text"]) {
-      title = names["#text"];
+      title = getTitle(primary);
+    } else if (names) {
+      title = getTitle(names);
     }
     const year = (item as { yearpublished?: { "@_value"?: string } }).yearpublished?.["@_value"] ?? null;
     return {

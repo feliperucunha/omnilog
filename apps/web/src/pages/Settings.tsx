@@ -198,7 +198,7 @@ export function Settings() {
             <div>
               <label
                 className={cn(
-                  "flex cursor-pointer items-center items-start gap-3 rounded-md py-2 transition-colors hover:bg-[var(--color-darkest)]/50",
+                  "flex cursor-pointer items-center  gap-3 rounded-md py-2 transition-colors hover:bg-[var(--color-darkest)]/50",
                   "focus-within:ring-2 focus-within:ring-[var(--color-mid)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--color-dark)]"
                 )}
               >

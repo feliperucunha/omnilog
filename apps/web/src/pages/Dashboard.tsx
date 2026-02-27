@@ -205,7 +205,7 @@ export function Dashboard() {
             type="single"
             value={selectedCategory}
             onValueChange={(v) => v && setCategory(v as MediaType)}
-            className="inline-flex flex-wrap justify-center gap-2 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-2 w-full max-w-2xl md:w-fit md:gap-1 md:p-1"
+            className="inline-flex flex-wrap justify-center gap-2 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-2 w-full md:w-fit md:gap-1 md:p-1"
             aria-label={t("dashboard.category")}
           >
             {visibleTypes.map((type) => (
