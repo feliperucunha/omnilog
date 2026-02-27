@@ -14,7 +14,7 @@ declare global {
 export function AdBanner() {
   const { me } = useMe();
   const { t } = useLocale();
-  const insRef = useRef<HTMLElement>(null);
+  const insRef = useRef<HTMLModElement>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
 
   const clientId = (import.meta.env.VITE_ADSENSE_CLIENT_ID as string)?.trim();
@@ -70,7 +70,7 @@ export function AdBanner() {
       </div>
       <div className="min-h-[90px] w-full overflow-hidden rounded-md bg-[var(--color-darkest)]/50 [&_.adsbygoogle]:min-h-[90px]">
         <ins
-          ref={insRef as React.RefObject<HTMLElement>}
+          ref={insRef}
           className="adsbygoogle block"
           data-ad-client={clientId}
           {...(slotId ? { "data-ad-slot": slotId } : {})}
