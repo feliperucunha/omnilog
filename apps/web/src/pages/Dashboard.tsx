@@ -219,9 +219,9 @@ export function Dashboard() {
         </Link>
       )}
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
+        <h2 className="text-xl font-bold text-[var(--color-lightest)] sm:text-2xl">
           {t("dashboard.title")}
-        </h1>
+        </h2>
         {me?.user?.id && (
           <Button type="button" variant="outline" size="sm" onClick={handleShare} aria-label={t("dashboard.share")}>
             <Share2 className="size-4 shrink-0" aria-hidden />

@@ -283,16 +283,24 @@ export function Search() {
     <div
       className={`relative flex flex-col gap-6 flex-1 min-h-0 ${hasSearched ? "w-full" : ""}`}
     >
-      <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
-        <img src="/logo.svg" alt="" className="h-32 w-auto opacity-20 sm:h-40 md:h-48" />
+      <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center gap-2" aria-hidden>
+        <img src="/logo.png" alt="" className="h-32 w-auto opacity-20 sm:h-40 md:h-48 md:pr-4 pr-2" />
+        <div className="-mt-8 flex flex-col items-center">
+          <span className="text-xl font-bold text-[var(--color-lightest)] opacity-80 sm:text-2xl">
+            {t("app.name")}
+          </span>
+          <span className="text-sm text-[var(--color-light)] opacity-80">
+            {t("app.subtitle")}
+          </span>
+        </div>
       </div>
 
       <div className="relative z-10 flex flex-col gap-6 flex-1 min-h-0">
-      <h1
+      <h2
         className={`text-2xl font-bold text-[var(--color-lightest)] shrink-0 ${!hasSearched ? "hidden" : ""}`}
       >
         {t("search.title")}
-      </h1>
+      </h2>
 
       <motion.div
         className={hasSearched ? "shrink-0 w-full" : "flex-1 flex flex-col justify-end items-center min-h-0"}

@@ -218,7 +218,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
     <div className={`relative min-h-full min-w-0 overflow-hidden pb-24 md:pb-20 ${embedded ? "" : ""}`}>
       {!embedded && (
         <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
-          <img src="/logo.svg" alt="" className="h-40 w-auto opacity-20 sm:h-52 md:h-64" />
+          <img src="/logo.png" alt="" className="h-40 w-auto opacity-20 sm:h-52 md:h-64" />
         </div>
       )}
       <div className="relative z-10 flex min-w-0 flex-col gap-6 overflow-hidden">

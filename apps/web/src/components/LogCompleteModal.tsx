@@ -66,7 +66,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
         {/* Mobile: container wraps image (same size); desktop: fixed size */}
         <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center md:flex-initial md:justify-start md:pb-10 md:pt-0">
           <div className="flex flex-col items-center justify-center md:mb-5">
-            <img src="/logo.svg" alt="" className="mb-4 h-9 w-auto opacity-90 md:h-10" aria-hidden />
+            <img src="/logo.png" alt="" className="mb-4 h-9 w-auto opacity-90 md:h-10" aria-hidden />
             <ItemImage
               src={image}
               className="max-w-full rounded-xl shadow-lg md:max-w-none md:h-40 md:w-28 md:flex-none"

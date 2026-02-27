@@ -59,7 +59,8 @@ export function Topbar() {
           className="flex items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
           aria-label={t("nav.dashboard")}
         >
-          <img src="/logo.svg" alt="" className="h-8 w-auto flex-shrink-0" />
+          <img src="/logo.png" alt="" className="h-14 -ml-2 w-auto flex-shrink-0" />
+          <span className="-ml-4 font-bold text-2xl text-(--btn-gradient-end) dark:text-(--btn-gradient-start)">OMNILOG</span>
         </Link>
       </div>
 

@@ -67,9 +67,10 @@ export function Nav() {
       >
         <Link
           to="/"
-          className="flex h-14 items-center gap-3 border-b border-[var(--color-mid)]/30 pl-4 text-[var(--color-lightest)] no-underline"
+          className="flex h-14 items-center border-b border-[var(--color-mid)]/30 -ml-2 text-[var(--color-lightest)] no-underline"
         >
-          <img src="/logo.svg" alt="OMNILOG" className="h-16 w-auto flex-shrink-0" />
+          <img src="/logo.png" alt="OMNILOG" className="h-16 w-auto flex-shrink-0" />
+          <span className="-ml-4 font-bold text-2xl text-(--btn-gradient-end) dark:text-(--btn-gradient-start)">OMNILOG</span>
         </Link>
         <div className="flex flex-1 flex-col gap-1 overflow-y-auto p-2 min-h-0">
           {token ? (
