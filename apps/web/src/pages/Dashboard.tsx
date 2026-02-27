@@ -231,55 +231,56 @@ export function Dashboard() {
       </div>
 
       {visibleTypes.length > 0 && (
-        <div className="flex min-w-0 justify-center overflow-hidden">
-          {/* Mobile: swipeable tab strip */}
-          <div
-            className="flex md:hidden min-w-0 overflow-x-auto overflow-y-hidden gap-2 py-2 -mx-4 px-4 scroll-smooth touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            role="tablist"
-            aria-label={t("dashboard.category")}
-          >
-            {visibleTypes.map((type) => (
-              <button
-                key={type}
-                type="button"
-                role="tab"
-                aria-selected={selectedCategory === type}
-                aria-label={`${t(`nav.${type}`)} (${byType[type] ?? 0})`}
-                onClick={() => setCategory(type as MediaType)}
-                className={
-                  selectedCategory === type
-                    ? "btn-gradient flex-shrink-0 rounded-full px-4 py-2.5 text-sm font-medium text-[var(--btn-text)] transition-colors whitespace-nowrap"
-                    : "flex-shrink-0 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4 py-2.5 text-sm font-medium text-[var(--color-light)] transition-colors whitespace-nowrap"
-                }
-              >
-                {t(`nav.${type}`)} ({byType[type] ?? 0})
-              </button>
-            ))}
+        <section
+          aria-label={t("dashboard.category")}
+          className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
+        >
+          {/* Category selector: mobile swipeable tabs, desktop toggle group */}
+          <div className="flex min-w-0 w-full shrink-0 justify-center overflow-hidden">
+            {/* Mobile: swipeable tab strip */}
+            <div
+              className="flex md:hidden min-w-0 flex-1 overflow-x-auto overflow-y-hidden gap-2 py-1 scroll-smooth touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              role="tablist"
+              aria-label={t("dashboard.category")}
+            >
+              {visibleTypes.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  role="tab"
+                  aria-selected={selectedCategory === type}
+                  aria-label={`${t(`nav.${type}`)} (${byType[type] ?? 0})`}
+                  onClick={() => setCategory(type as MediaType)}
+                  className={
+                    selectedCategory === type
+                      ? "btn-gradient flex-shrink-0 rounded-full px-4 py-2.5 text-sm font-medium text-[var(--btn-text)] transition-colors whitespace-nowrap"
+                      : "flex-shrink-0 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4 py-2.5 text-sm font-medium text-[var(--color-light)] transition-colors whitespace-nowrap"
+                  }
+                >
+                  {t(`nav.${type}`)} ({byType[type] ?? 0})
+                </button>
+              ))}
+            </div>
+            {/* Desktop: toggle group */}
+            <ToggleGroup
+              type="single"
+              value={selectedCategory}
+              onValueChange={(v) => v && setCategory(v as MediaType)}
+              className="hidden md:inline-flex flex-wrap justify-center gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-2 md:w-fit"
+              aria-label={t("dashboard.category")}
+            >
+              {visibleTypes.map((type) => (
+                <ToggleGroupItem
+                  key={type}
+                  value={type}
+                  className="rounded-md px-4 py-3 text-sm data-[state=on]:bg-gradient-to-br data-[state=on]:from-[var(--btn-gradient-start)] data-[state=on]:to-[var(--btn-gradient-end)] data-[state=on]:text-[var(--btn-text)] md:px-3 md:py-2"
+                  aria-label={`${t(`nav.${type}`)} (${byType[type] ?? 0})`}
+                >
+                  {t(`nav.${type}`)} ({byType[type] ?? 0})
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </div>
-          {/* Desktop: toggle group */}
-          <ToggleGroup
-            type="single"
-            value={selectedCategory}
-            onValueChange={(v) => v && setCategory(v as MediaType)}
-            className="hidden md:inline-flex flex-wrap justify-center gap-2 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-2 w-full max-w-2xl md:w-fit md:gap-1 md:p-1"
-            aria-label={t("dashboard.category")}
-          >
-            {visibleTypes.map((type) => (
-              <ToggleGroupItem
-                key={type}
-                value={type}
-                className="rounded-md px-4 py-3 text-sm data-[state=on]:bg-gradient-to-br data-[state=on]:from-[var(--btn-gradient-start)] data-[state=on]:to-[var(--btn-gradient-end)] data-[state=on]:text-[var(--btn-text)] md:px-3 md:py-2"
-                aria-label={`${t(`nav.${type}`)} (${byType[type] ?? 0})`}
-              >
-                {t(`nav.${type}`)} ({byType[type] ?? 0})
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </div>
-      )}
-
-      {visibleTypes.length > 0 && (
-        <section aria-label={t(`nav.${selectedCategory}`)} className="min-w-0 overflow-hidden">
           <MediaLogs mediaType={selectedCategory} embedded />
         </section>
       )}
@@ -301,85 +302,85 @@ export function Dashboard() {
         </button>
         {!statsCollapsed && (
           <>
-        {/* Mobile: dropdown for time consumed filter */}
-        <div className="md:hidden w-full min-w-0">
-          <Select
-            value={statsGroup}
-            onValueChange={(v) => setStatsGroup(v as StatsGroup)}
-            options={[
-              { value: "category", label: t("dashboard.byCategory") },
-              { value: "month", label: t("dashboard.byMonth") },
-              { value: "year", label: t("dashboard.byYear") },
-            ]}
-            aria-label={t("dashboard.statsTitle")}
-            className="min-w-0 w-full"
-            triggerClassName="w-full max-w-none min-w-0"
-          />
-        </div>
-        {/* Desktop: button group */}
-        <div className="hidden md:flex flex-wrap gap-2">
-          <Button
-            variant={statsGroup === "category" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatsGroup("category")}
-          >
-            {t("dashboard.byCategory")}
-          </Button>
-          <Button
-            variant={statsGroup === "month" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatsGroup("month")}
-          >
-            {t("dashboard.byMonth")}
-          </Button>
-          <Button
-            variant={statsGroup === "year" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatsGroup("year")}
-          >
-            {t("dashboard.byYear")}
-          </Button>
-        </div>
-        {statsLoading ? (
-          <div className="h-48 animate-pulse rounded-md bg-[var(--color-dark)]" />
-        ) : stats.length === 0 ? (
-          <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6" style={paperShadow}>
-            <p className="text-center text-sm text-[var(--color-light)]">
-              {t("dashboard.noStatsYet")}
-            </p>
-          </Card>
-        ) : (
-          <Card className="min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-4" style={paperShadow}>
-            <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-              {displayedStats.map(({ period, hours }) => (
-                <div key={period} className="flex min-w-0 items-center gap-3">
-                  <span
-                    className={
-                      statsGroup === "category"
-                        ? "min-w-0 max-w-[5.5rem] shrink-0 truncate text-xs text-[var(--color-light)] sm:min-w-[5.5rem] sm:max-w-[8rem]"
-                        : "w-14 shrink-0 truncate text-xs text-[var(--color-light)] sm:w-20"
-                    }
-                  >
-                    {statsGroup === "category"
-                      ? t(`nav.${period}`)
-                      : statsGroup === "year"
-                        ? period
-                        : period.slice(0, 7)}
-                  </span>
-                  <div className="h-6 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
-                    <div
-                      className="h-full rounded bg-[var(--color-mid)]"
-                      style={{ width: `${Math.max(5, (hours / maxHours) * 100)}%` }}
-                    />
-                  </div>
-                  <span className="w-12 shrink-0 text-right text-xs text-[var(--color-lightest)]">
-                    {t("dashboard.hoursConsumed", { hours: hours.toFixed(1) })}
-                  </span>
-                </div>
-              ))}
+        <Card className="min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-4" style={paperShadow}>
+          <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
+            {/* Mobile: dropdown for time consumed filter */}
+            <div className="md:hidden w-full min-w-0">
+              <Select
+                value={statsGroup}
+                onValueChange={(v) => setStatsGroup(v as StatsGroup)}
+                options={[
+                  { value: "category", label: t("dashboard.byCategory") },
+                  { value: "month", label: t("dashboard.byMonth") },
+                  { value: "year", label: t("dashboard.byYear") },
+                ]}
+                aria-label={t("dashboard.statsTitle")}
+                className="min-w-0 w-full"
+                triggerClassName="w-full max-w-none min-w-0"
+              />
             </div>
-          </Card>
-        )}
+            {/* Desktop: button group */}
+            <div className="hidden md:flex flex-wrap gap-2">
+              <Button
+                variant={statsGroup === "category" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatsGroup("category")}
+              >
+                {t("dashboard.byCategory")}
+              </Button>
+              <Button
+                variant={statsGroup === "month" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatsGroup("month")}
+              >
+                {t("dashboard.byMonth")}
+              </Button>
+              <Button
+                variant={statsGroup === "year" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatsGroup("year")}
+              >
+                {t("dashboard.byYear")}
+              </Button>
+            </div>
+            {statsLoading ? (
+              <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
+            ) : stats.length === 0 ? (
+              <p className="text-center text-sm text-[var(--color-light)]">
+                {t("dashboard.noStatsYet")}
+              </p>
+            ) : (
+              <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+                {displayedStats.map(({ period, hours }) => (
+                  <div key={period} className="flex min-w-0 items-center gap-3">
+                    <span
+                      className={
+                        statsGroup === "category"
+                          ? "min-w-0 max-w-[5.5rem] shrink-0 truncate text-xs text-[var(--color-light)] sm:min-w-[5.5rem] sm:max-w-[8rem]"
+                          : "w-14 shrink-0 truncate text-xs text-[var(--color-light)] sm:w-20"
+                      }
+                    >
+                      {statsGroup === "category"
+                        ? t(`nav.${period}`)
+                        : statsGroup === "year"
+                          ? period
+                          : period.slice(0, 7)}
+                    </span>
+                    <div className="h-6 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
+                      <div
+                        className="h-full rounded bg-[var(--color-mid)]"
+                        style={{ width: `${Math.max(5, (hours / maxHours) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="w-12 shrink-0 text-right text-xs text-[var(--color-lightest)]">
+                      {t("dashboard.hoursConsumed", { hours: hours.toFixed(1) })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
           </>
         )}
       </div>

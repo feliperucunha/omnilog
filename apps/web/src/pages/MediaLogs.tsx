@@ -407,12 +407,12 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
                       </div>
                     )}
                     {!readOnly && hasProgressButton && (
-                      <div className="absolute top-2 right-2 z-[1]">
+                      <div className="absolute top-15 md:top-16 right-2 z-[1]">
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 rounded-full bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 hover:text-emerald-300 border border-emerald-500/40 transition-colors shrink-0"
+                          className="h-8 w-8 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 hover:text-emerald-300 border border-emerald-500/40 transition-colors shrink-0"
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
