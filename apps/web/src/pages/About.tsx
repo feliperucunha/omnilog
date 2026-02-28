@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
-import { Heart, Coffee, Github } from "lucide-react";
+import { Heart, Github } from "lucide-react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
-const DEFAULT_BUYMEACOFFEE_URL = "https://www.buymeacoffee.com/felipecunha";
+const DEFAULT_KOFI_URL = "https://ko-fi.com/felipecunha23777";
 
 const DONATION_LINKS = [
   {
@@ -14,12 +14,6 @@ const DONATION_LINKS = [
     envKey: "VITE_DONATION_KOFI_URL",
     icon: Heart,
     labelKey: "about.donateKofi",
-  },
-  {
-    key: "buymeacoffee",
-    envKey: "VITE_DONATION_BUYMEACOFFEE_URL",
-    icon: Coffee,
-    labelKey: "about.donateBuyMeACoffee",
   },
   {
     key: "github",
@@ -41,8 +35,8 @@ export function About() {
   const donationButtons = DONATION_LINKS.filter((link) => {
     const envUrl = import.meta.env[link.envKey] as string | undefined;
     const url =
-      link.key === "buymeacoffee"
-        ? (envUrl != null && String(envUrl).trim() !== "" ? String(envUrl).trim() : DEFAULT_BUYMEACOFFEE_URL)
+      link.key === "kofi"
+        ? (envUrl != null && String(envUrl).trim() !== "" ? String(envUrl).trim() : DEFAULT_KOFI_URL)
         : envUrl != null && String(envUrl).trim() !== ""
           ? String(envUrl).trim()
           : null;
@@ -50,8 +44,8 @@ export function About() {
   }).map((link) => {
     const envUrl = import.meta.env[link.envKey] as string | undefined;
     const url =
-      link.key === "buymeacoffee"
-        ? (envUrl != null && String(envUrl).trim() !== "" ? String(envUrl).trim() : DEFAULT_BUYMEACOFFEE_URL)
+      link.key === "kofi"
+        ? (envUrl != null && String(envUrl).trim() !== "" ? String(envUrl).trim() : DEFAULT_KOFI_URL)
         : String(import.meta.env[link.envKey]).trim();
     return { ...link, url };
   });
