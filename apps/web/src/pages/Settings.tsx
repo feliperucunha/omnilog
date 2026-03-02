@@ -187,6 +187,36 @@ export function Settings() {
 
         <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-6">
+            {me && (
+              <div>
+                <h3 className="text-lg font-semibold text-[var(--color-lightest)] mb-2">
+                  {t("settings.subscription")}
+                </h3>
+                <p className="text-sm text-[var(--color-light)]">
+                  {me.tier === "pro" ? (
+                    me.daysRemaining != null ? (
+                      <>
+                        {me.daysRemaining === 1
+                          ? t("settings.subscriptionDaysLeftOne")
+                          : t("settings.subscriptionDaysLeft", { count: String(me.daysRemaining) })}
+                        {" · "}
+                        <Link to="/tiers" className="underline hover:no-underline">
+                          {t("tiers.manageSubscription")}
+                        </Link>
+                      </>
+                    ) : (
+                      <Link to="/tiers" className="underline hover:no-underline">
+                        {t("tiers.manageSubscription")}
+                      </Link>
+                    )
+                  ) : (
+                    <Link to="/tiers" className="underline hover:no-underline">
+                      {t("settings.viewPlans")}
+                    </Link>
+                  )}
+                </p>
+              </div>
+            )}
             <div>
               <h3 className="text-lg font-semibold text-[var(--color-lightest)] mb-2">
                 {t("nav.theme")}

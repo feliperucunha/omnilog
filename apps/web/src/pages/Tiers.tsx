@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,18 +14,25 @@ import { TiersSkeleton } from "@/components/skeletons";
 
 const FREE_LOG_LIMIT = 500;
 
+/** Numeric prices for savings calculation (must match locale strings). */
+const PRO_PRICES = {
+  default: { monthly: 5, yearly: 50 },
+  BR: { monthly: 20, yearly: 200 },
+} as const;
+
 export function Tiers() {
   const { t } = useLocale();
   const { token } = useAuth();
   const { me, refetch, loading } = useMe();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [interval, setInterval] = useState<"monthly" | "yearly">("monthly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
-    const sessionId = searchParams.get("session_id");
+    const approved = searchParams.get("approved");
     const canceled = searchParams.get("canceled");
-    if (sessionId) {
+    if (approved === "1") {
       toast.success(t("tiers.upgradeSuccess"));
       refetch();
       setSearchParams({}, { replace: true });
@@ -36,18 +44,23 @@ export function Tiers() {
 
   const tier = me?.tier ?? "free";
   const logCount = me?.logCount ?? 0;
+  const daysRemaining = me?.daysRemaining ?? null;
   const isPro = tier === "pro";
   const isBrazil = me?.country === "BR";
-  const proPriceLabel = isBrazil ? t("tiers.proPriceBr") : t("tiers.proPrice");
+  const proPriceMonthlyLabel = isBrazil ? t("tiers.proPriceBrMonthly") : t("tiers.proPriceMonthly");
+  const proPriceYearlyLabel = isBrazil ? t("tiers.proPriceBrYearly") : t("tiers.proPriceBrYearly");
+  const prices = isBrazil ? PRO_PRICES.BR : PRO_PRICES.default;
+  const yearlySavePercent =
+    Math.round((1 - prices.yearly / (prices.monthly * 12)) * 100) || 0;
 
   if (token && loading) return <TiersSkeleton />;
 
   const handleUpgradeToPro = async () => {
     setCheckoutLoading(true);
     try {
-      const data = await apiFetch<{ url: string }>("/stripe/create-checkout-session", {
+      const data = await apiFetch<{ url: string }>("/paypal/create-subscription", {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify({ interval }),
       });
       if (data?.url) {
         window.location.href = data.url;
@@ -64,7 +77,7 @@ export function Tiers() {
   const handleManageSubscription = async () => {
     setPortalLoading(true);
     try {
-      const data = await apiFetch<{ url: string }>("/stripe/create-portal-session", {
+      const data = await apiFetch<{ url: string }>("/paypal/create-portal-session", {
         method: "POST",
         body: JSON.stringify({}),
       });
@@ -114,6 +127,13 @@ export function Tiers() {
               ? t("tiers.usageUnlimited", { count: String(logCount) })
               : t("tiers.usage", { count: String(logCount), limit: String(FREE_LOG_LIMIT) })}
           </p>
+          {token && isPro && daysRemaining != null && (
+            <p className="mt-1 text-sm text-[var(--color-light)]">
+              {daysRemaining === 1
+                ? t("tiers.daysLeftOne")
+                : t("tiers.daysLeft", { count: String(daysRemaining) })}
+            </p>
+          )}
           {token && isPro && (
             <Button
               type="button"
@@ -160,16 +180,72 @@ export function Tiers() {
           className="relative flex flex-col border-[var(--color-mid)]/50 bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]"
           style={{ boxShadow: "var(--shadow-md)" }}
         >
-          <div className="absolute -top-2 right-4 flex items-center gap-1 rounded-full bg-[var(--btn-gradient-start)]/20 px-2 py-0.5 text-xs font-medium text-[var(--btn-gradient-start)]">
-            <Sparkles className="h-3 w-3" aria-hidden />
-            {t("tiers.pro")}
+          <div className="absolute -top-2 right-4 flex items-center gap-1 rounded-full bg-[var(--btn-gradient-start)] px-2 py-0.5 text-xs font-medium text-[var(--btn-gradient-start)]">
+            <span className="text-white">
+              {t("tiers.pro")}
+            </span>
           </div>
           <h2 className="text-lg font-semibold text-[var(--color-lightest)]">
             {t("tiers.pro")}
           </h2>
-          <p className="mt-1 text-2xl font-bold text-[var(--color-lightest)]">
-            {proPriceLabel}
-          </p>
+          {token && !isPro && (
+            <div className="mt-2 flex flex-col gap-2">
+              <p className="text-xs text-[var(--color-light)]">{t("tiers.billingInterval")}</p>
+              <ToggleGroup
+                type="single"
+                value={interval}
+                onValueChange={(v) => v && setInterval(v as "monthly" | "yearly")}
+                className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5 gap-0"
+                aria-label={t("tiers.billingInterval")}
+              >
+                <ToggleGroupItem
+                  value="monthly"
+                  className="flex-1 px-4 py-2 text-sm data-[state=on]:bg-[var(--color-mid)]/50 data-[state=on]:text-[var(--color-lightest)]"
+                  aria-label={t("tiers.monthly")}
+                >
+                  {t("tiers.monthly")}
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="yearly"
+                  className="flex-1 px-4 py-2 text-sm data-[state=on]:bg-[var(--color-mid)]/50 data-[state=on]:text-[var(--color-lightest)]"
+                  aria-label={t("tiers.yearly")}
+                >
+                  {t("tiers.yearly")}
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <div className="flex flex-wrap items-center gap-2">
+                {interval === "yearly" && yearlySavePercent > 0 ? (
+                  <>
+                    <span className="text-lg font-bold text-[var(--color-light)] line-through">
+                      {isBrazil
+                        ? `R$ ${prices.monthly * 12}`
+                        : `$${prices.monthly * 12}`}
+                    </span>
+                    <span className="text-lg font-bold text-[var(--color-lightest)]">
+                      {proPriceYearlyLabel}
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-500">
+                      {t("tiers.yearlySavePercent", { percent: String(yearlySavePercent) })}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-lg font-bold text-[var(--color-lightest)]">
+                    {proPriceMonthlyLabel}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          {token && isPro && (
+            <p className="mt-2 text-lg font-bold text-[var(--color-lightest)]">
+              {proPriceMonthlyLabel}
+            </p>
+          )}
+          {!token && (
+            <p className="mt-2 text-lg font-bold text-[var(--color-lightest)]">
+              {proPriceMonthlyLabel}
+            </p>
+          )}
           <ul className="mt-4 flex flex-1 flex-col gap-2 text-sm text-[var(--color-light)]">
             <li className="flex items-center gap-2">
               <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />

@@ -9,7 +9,8 @@ import { logsRouter } from "./routes/logs.js";
 import { meRouter } from "./routes/me.js";
 import { searchRouter } from "./routes/search.js";
 import { settingsRouter } from "./routes/settings.js";
-import { stripeRouter, handleStripeWebhook } from "./routes/stripe.js";
+import { paypalRouter, handlePayPalWebhook } from "./routes/paypal.js";
+import { cronRouter, runSubscriptionExpiry } from "./routes/cron.js";
 import { usersRouter } from "./routes/users.js";
 
 const app = express();
@@ -30,11 +31,11 @@ app.use(
 );
 app.use(cookieParser());
 
-// Stripe webhook needs raw body for signature verification – register before express.json()
+// PayPal webhook needs raw body for signature verification – register before express.json()
 app.post(
-  "/api/stripe/webhook",
+  "/api/paypal/webhook",
   express.raw({ type: "application/json" }),
-  (req, res) => void handleStripeWebhook(req, res)
+  (req, res) => void handlePayPalWebhook(req, res)
 );
 
 app.use(express.json());
@@ -52,7 +53,8 @@ app.use("/api/items", itemsRouter);
 app.use("/api/logs", logsRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/settings", settingsRouter);
-app.use("/api/stripe", stripeRouter);
+app.use("/api/paypal", paypalRouter);
+app.use("/api/cron", cronRouter);
 app.use("/api/users", usersRouter);
 
 app.get("/api/health", (_req, res) => {
@@ -66,6 +68,18 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   res.status(500).json({ error: message });
 });
 
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
+
+  // Run subscription expiry in-process: on startup and every 24h (no external cron needed)
+  void runSubscriptionExpiry().then((n) => {
+    if (n > 0) console.log(`Subscription expiry: ${n} user(s) downgraded to free`);
+  });
+  setInterval(() => {
+    void runSubscriptionExpiry().then((n) => {
+      if (n > 0) console.log(`Subscription expiry: ${n} user(s) downgraded to free`);
+    });
+  }, TWENTY_FOUR_HOURS_MS);
 });

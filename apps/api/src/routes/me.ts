@@ -19,6 +19,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       email: true,
       onboarded: true,
       tier: true,
+      subscriptionEndsAt: true,
       preferredTheme: true,
       preferredLocale: true,
       visibleMediaTypes: true,
@@ -58,6 +59,16 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
 
   const boardGameProvider = user.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
   const tier = user.tier === "pro" ? "pro" : "free";
+  const subscriptionEndsAt = user.subscriptionEndsAt?.toISOString() ?? null;
+  const daysRemaining =
+    subscriptionEndsAt && tier === "pro"
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(subscriptionEndsAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+          )
+        )
+      : null;
 
   res.json({
     user: {
@@ -71,6 +82,8 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     visibleMediaTypes,
     boardGameProvider,
     tier,
+    subscriptionEndsAt,
+    daysRemaining,
     country: user.country ?? undefined,
     logCount,
     apiKeys: {

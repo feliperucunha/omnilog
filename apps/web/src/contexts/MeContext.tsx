@@ -16,6 +16,8 @@ export interface MeResponse {
   visibleMediaTypes: string[];
   boardGameProvider: "bgg" | "ludopedia";
   tier: "free" | "pro";
+  subscriptionEndsAt: string | null;
+  daysRemaining: number | null; // Pro subscription days left (null if not pro or no end date)
   country?: string; // ISO 3166-1 alpha-2 e.g. BR for pricing
   logCount: number;
   apiKeys: { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
