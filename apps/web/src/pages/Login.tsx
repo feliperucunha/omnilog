@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/PasswordInput";
 import { useLocale } from "@/contexts/LocaleContext";
 import { COOKIE_SESSION, useAuth } from "@/contexts/AuthContext";
+import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -91,7 +92,7 @@ export function Login() {
       >
         <Card className="w-full border-[var(--color-dark)] bg-[var(--color-dark)] shadow-[var(--shadow-modal)]">
           <CardHeader className="flex flex-col items-center gap-4 text-center">
-            <img src="/logo.png" alt="" className="h-24! w-auto sm:h-16" />
+            <Logo alt="" className="h-24! w-auto sm:h-16" />
             <h1 className="flex flex-col gap-0.5 text-2xl -mt-6 font-bold text-[var(--color-lightest)]">
               <span>{t("app.name")}</span>
               <span className="text-lg font-normal text-[var(--color-light)]">

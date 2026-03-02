@@ -27,6 +27,7 @@ const TEAM_MEMBERS = [
   { roleKey: "about.teamRoleCEO", nameKey: "about.teamNameCEO", image: "/ceo.jpeg" },
   { roleKey: "about.teamRoleDeveloper", nameKey: "about.teamNameDeveloper", image: "/dev.jpeg" },
   { roleKey: "about.teamRoleDesigner", nameKey: "about.teamNameDesigner", image: "/designer.jpeg" },
+  { roleKey: "about.teamRoleQA", nameKey: "about.teamNameQA", image: "/qa.jpeg" },
 ] as const;
 
 export function About() {
@@ -66,7 +67,7 @@ export function About() {
         <h2 className="mb-3 sm:mb-4 text-base font-semibold text-[var(--color-lightest)] sm:text-lg">
           {t("about.teamTitle")}
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {TEAM_MEMBERS.map((member) => (
             <Card
               key={member.roleKey}

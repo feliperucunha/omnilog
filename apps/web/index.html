@@ -4,12 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OMNILOG — Log Everything in One Place</title>
-    <link rel="icon" href="/logo.png" type="image/svg+xml" />
+    <link rel="icon" href="/logo-dark.png" type="image/png" />
     <script>
       (function() {
         var t = localStorage.getItem('logeverything-theme');
-        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
-        else document.documentElement.setAttribute('data-theme', 'dark');
+        if (t !== 'light' && t !== 'dark') t = 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+        var link = document.querySelector('link[rel="icon"]');
+        if (link) link.href = t === 'dark' ? '/logo-dark.png' : '/logo.png';
       })();
     </script>
   </head>

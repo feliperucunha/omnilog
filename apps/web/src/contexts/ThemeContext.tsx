@@ -35,6 +35,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute("data-theme", colorScheme);
     document.documentElement.classList.toggle("dark", colorScheme === "dark");
     localStorage.setItem(STORAGE_KEY, colorScheme);
+    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (link) link.href = colorScheme === "dark" ? "/logo-dark.png" : "/logo.png";
   }, [colorScheme]);
 
   const setColorScheme = useCallback((scheme: ColorScheme) => {

@@ -9,6 +9,7 @@ import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, STATUS_I18N_KEYS } from "@log
 import { toast } from "sonner";
 import { apiFetch, apiFetchCached, invalidateApiCache } from "@/lib/api";
 import { SearchSkeleton } from "@/components/skeletons";
+import { Logo } from "@/components/Logo";
 import { ApiKeyPrompt, type ApiKeyProvider } from "@/components/ApiKeyPrompt";
 import { ItemPageContent } from "@/components/ItemPageContent";
 import { ItemImage } from "@/components/ItemImage";
@@ -284,7 +285,7 @@ export function Search() {
       className={`relative flex flex-col gap-6 flex-1 min-h-0 ${hasSearched ? "w-full" : ""}`}
     >
       <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center gap-2" aria-hidden>
-        <img src="/logo.png" alt="" className="h-32 w-auto opacity-20 sm:h-40 md:h-48 md:pr-4 pr-2" />
+        <Logo alt="" className="h-32 w-auto opacity-20 sm:h-40 md:h-48 md:pr-4 pr-2" />
         <div className="-mt-8 flex flex-col items-center">
           <span className="text-xl font-bold text-[var(--color-lightest)] opacity-80 sm:text-2xl">
             {t("app.name")}
