@@ -100,9 +100,9 @@ paypalRouter.post(
     const country = normalizeCountry(user.country);
     let planId: string | null = null;
     if (country === "BR") {
-      planId = interval === "yearly" ? (PAYPAL_PLAN_ID_BR_YEARLY ?? PAYPAL_PLAN_ID_BR) : PAYPAL_PLAN_ID_BR;
+      planId = (interval === "yearly" ? (PAYPAL_PLAN_ID_BR_YEARLY ?? PAYPAL_PLAN_ID_BR) : PAYPAL_PLAN_ID_BR) ?? null;
     } else {
-      planId = interval === "yearly" ? (PAYPAL_PLAN_ID_YEARLY ?? PAYPAL_PLAN_ID) : PAYPAL_PLAN_ID;
+      planId = (interval === "yearly" ? (PAYPAL_PLAN_ID_YEARLY ?? PAYPAL_PLAN_ID) : PAYPAL_PLAN_ID) ?? null;
     }
     if (!planId) {
       if (country === "BR") {
@@ -158,7 +158,7 @@ paypalRouter.post(
       res.status(500).json({ error: "Failed to create checkout session" });
       return;
     }
-    res.json({ url: approveLink.href });
+    res.json({ url: approveLink.href, subscriptionId: sub.id ?? undefined });
   }
 );
 
@@ -167,18 +167,53 @@ paypalRouter.post(
   authMiddleware,
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user) return;
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: { paypalSubscriptionId: true },
-    });
-    if (!user?.paypalSubscriptionId) {
-      res.status(400).json({ error: "No subscription to manage" });
-      return;
-    }
     const manageUrl = PAYPAL_SANDBOX
       ? "https://www.sandbox.paypal.com/myaccount/autopay/"
       : "https://www.paypal.com/myaccount/autopay/";
     res.json({ url: manageUrl });
+  }
+);
+
+paypalRouter.post(
+  "/cancel-subscription",
+  authMiddleware,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) return;
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { paypalSubscriptionId: true },
+    });
+    const token = await getPayPalAccessToken();
+    if (!user?.paypalSubscriptionId || !token) {
+      res.status(400).json({ error: "No subscription to cancel" });
+      return;
+    }
+    const periodEnd = await getSubscriptionPeriodEnd(token, user.paypalSubscriptionId);
+    const cancelRes = await fetch(
+      `${PAYPAL_BASE}/v1/billing/subscriptions/${user.paypalSubscriptionId}/cancel`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason: "User requested cancellation" }),
+      }
+    );
+    if (!cancelRes.ok) {
+      const errText = await cancelRes.text();
+      console.error("PayPal cancel subscription error:", cancelRes.status, errText);
+      res.status(502).json({ error: "Could not cancel subscription with PayPal" });
+      return;
+    }
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: {
+        paypalSubscriptionId: null,
+        subscriptionEndsAt: periodEnd ?? new Date(),
+      },
+    });
+    res.json({ ok: true, subscriptionEndsAt: periodEnd?.toISOString() ?? null });
   }
 );
 

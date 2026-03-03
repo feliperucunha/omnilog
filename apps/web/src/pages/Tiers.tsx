@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
-import { Check, Loader2, Sparkles } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -11,6 +12,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { TiersSkeleton } from "@/components/skeletons";
+import { getPayPalHostedButton } from "@/config/paypal-hosted-buttons";
+import { PayPalHostedButtonForm } from "@/components/PayPalHostedButtonForm";
+
+const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined;
 
 const FREE_LOG_LIMIT = 500;
 
@@ -26,8 +31,8 @@ export function Tiers() {
   const { me, refetch, loading } = useMe();
   const [searchParams, setSearchParams] = useSearchParams();
   const [interval, setInterval] = useState<"monthly" | "yearly">("monthly");
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   useEffect(() => {
     const approved = searchParams.get("approved");
@@ -48,31 +53,14 @@ export function Tiers() {
   const isPro = tier === "pro";
   const isBrazil = me?.country === "BR";
   const proPriceMonthlyLabel = isBrazil ? t("tiers.proPriceBrMonthly") : t("tiers.proPriceMonthly");
-  const proPriceYearlyLabel = isBrazil ? t("tiers.proPriceBrYearly") : t("tiers.proPriceBrYearly");
+  const proPriceYearlyLabel = isBrazil ? t("tiers.proPriceBrYearly") : t("tiers.proPriceYearly");
   const prices = isBrazil ? PRO_PRICES.BR : PRO_PRICES.default;
   const yearlySavePercent =
     Math.round((1 - prices.yearly / (prices.monthly * 12)) * 100) || 0;
 
-  if (token && loading) return <TiersSkeleton />;
+  const hostedButton = getPayPalHostedButton(me?.country, interval);
 
-  const handleUpgradeToPro = async () => {
-    setCheckoutLoading(true);
-    try {
-      const data = await apiFetch<{ url: string }>("/paypal/create-subscription", {
-        method: "POST",
-        body: JSON.stringify({ interval }),
-      });
-      if (data?.url) {
-        window.location.href = data.url;
-        return;
-      }
-      throw new Error("No checkout URL returned");
-    } catch (err) {
-      setCheckoutLoading(false);
-      const message = err instanceof Error ? err.message : t("tiers.upgradeError");
-      toast.error(message);
-    }
-  };
+  if (token && loading) return <TiersSkeleton />;
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
@@ -90,6 +78,31 @@ export function Tiers() {
       setPortalLoading(false);
       const message = err instanceof Error ? err.message : t("tiers.manageSubscriptionError");
       toast.error(message);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    setCancelLoading(true);
+    try {
+      await apiFetch<{ ok: boolean }>("/paypal/cancel-subscription", { method: "POST" });
+      toast.success(t("tiers.cancelSubscriptionSuccess"));
+      refetch();
+    } catch {
+      try {
+        const data = await apiFetch<{ url: string }>("/paypal/create-portal-session", {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+        if (data?.url) {
+          window.location.href = data.url;
+          return;
+        }
+      } catch {
+        // fall through
+      }
+      toast.error(t("tiers.cancelSubscriptionError"));
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -135,15 +148,26 @@ export function Tiers() {
             </p>
           )}
           {token && isPro && (
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-3 border-[var(--color-mid)] text-[var(--color-light)] hover:bg-[var(--color-mid)]/30"
-              disabled={portalLoading}
-              onClick={handleManageSubscription}
-            >
-              {portalLoading ? t("tiers.redirecting") : t("tiers.manageSubscription")}
-            </Button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-[var(--color-mid)] text-[var(--color-light)] hover:bg-[var(--color-mid)]/30"
+                disabled={portalLoading || cancelLoading}
+                onClick={handleManageSubscription}
+              >
+                {portalLoading ? t("tiers.redirecting") : t("tiers.manageSubscription")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="border-red-500/50 text-red-400 hover:bg-red-500/20"
+                disabled={portalLoading || cancelLoading}
+                onClick={handleCancelSubscription}
+              >
+                {cancelLoading ? t("tiers.canceling") : t("tiers.cancelSubscription")}
+              </Button>
+            </div>
           )}
         </Card>
       )}
@@ -264,22 +288,45 @@ export function Tiers() {
               {t("tiers.proNoAds")}
             </li>
           </ul>
-          {token && !isPro && (
-            <Button
-              type="button"
-              className="btn-gradient mt-4 w-full"
-              disabled={checkoutLoading}
-              onClick={handleUpgradeToPro}
-            >
-              {checkoutLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  {t("tiers.redirecting")}
-                </>
-              ) : (
-                t("tiers.upgradeToPro")
-              )}
-            </Button>
+          {token && !isPro && hostedButton && (
+            <div className="mt-4 w-full" key={`${me?.country ?? "default"}-${interval}`}>
+              <PayPalHostedButtonForm
+                config={hostedButton}
+                submitAlt={t("tiers.subscribeWithPayPal")}
+                className="w-full"
+              />
+            </div>
+          )}
+          {token && !isPro && !hostedButton && paypalClientId && (
+            <div className="mt-4 w-full [&_.paypal-buttons]:!min-h-[42px]" key={interval}>
+              <PayPalScriptProvider
+                options={{
+                  clientId: paypalClientId,
+                  vault: true,
+                  intent: "subscription",
+                }}
+              >
+                <PayPalButtons
+                  style={{ layout: "vertical", shape: "rect" }}
+                  createSubscription={async () => {
+                    const data = await apiFetch<{
+                      url: string;
+                      subscriptionId?: string;
+                    }>("/paypal/create-subscription", {
+                      method: "POST",
+                      body: JSON.stringify({ interval }),
+                    });
+                    if (!data?.subscriptionId) throw new Error("No subscription ID");
+                    return data.subscriptionId;
+                  }}
+                />
+              </PayPalScriptProvider>
+            </div>
+          )}
+          {token && !isPro && !hostedButton && !paypalClientId && (
+            <p className="mt-4 text-sm text-[var(--color-light)]">
+              {t("tiers.hostedButtonNotAvailable")}
+            </p>
           )}
         </Card>
       </div>
