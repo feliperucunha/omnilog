@@ -336,7 +336,16 @@
     "donatePixAlt": "Pix donation QR code",
     "donatePixKeyLabel": "Pix key (e-mail):",
     "feedbackTitle": "Feedback",
-    "feedbackIntro": "Got feedback or suggestions? Reach out at the email below."
+    "feedbackIntro": "Rate the website and leave a comment. Click to expand.",
+    "feedbackLoginRequired": "Sign in to send feedback.",
+    "feedbackRatingLabel": "Rate the website (1–10)",
+    "feedbackCommentsPlaceholder": "Comments (optional)",
+    "feedbackSend": "Send feedback",
+    "feedbackSending": "Sending…",
+    "feedbackSuccess": "Thank you for your feedback!",
+    "feedbackCooldown": "You can send feedback again in {{time}}.",
+    "feedbackCooldownShort": "Next feedback in {{time}}",
+    "feedbackError": "Could not send feedback. Try again later."
   },
   "ad": {
     "bannerLabel": "Advertisement",

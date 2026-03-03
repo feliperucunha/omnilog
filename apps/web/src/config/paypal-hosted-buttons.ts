@@ -32,7 +32,10 @@ const HOSTED_BUTTONS: Record<string, PayPalHostedButton> = {
   // "BR|yearly": { hostedButtonId: "...", currencyCode: "BRL" },
 };
 
-const PAYPAL_WEBSCR = "https://www.paypal.com/cgi-bin/webscr";
+const PAYPAL_SANDBOX = import.meta.env.VITE_PAYPAL_SANDBOX === "true";
+const PAYPAL_WEBSCR = PAYPAL_SANDBOX
+  ? "https://www.sandbox.paypal.com/cgi-bin/webscr"
+  : "https://www.paypal.com/cgi-bin/webscr";
 
 function configKey(country: string | undefined, interval: BillingInterval): string {
   const region = country === "BR" ? "BR" : "default";

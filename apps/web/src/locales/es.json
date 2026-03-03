@@ -335,7 +335,16 @@
     "donatePixAlt": "Código QR para donación por Pix",
     "donatePixKeyLabel": "Clave Pix (correo):",
     "feedbackTitle": "Feedback",
-    "feedbackIntro": "¿Tienes sugerencias o comentarios? Escríbenos al correo de abajo."
+    "feedbackIntro": "Valora el sitio y deja un comentario. Haz clic para expandir.",
+    "feedbackLoginRequired": "Inicia sesión para enviar feedback.",
+    "feedbackRatingLabel": "Valora el sitio (1–10)",
+    "feedbackCommentsPlaceholder": "Comentarios (opcional)",
+    "feedbackSend": "Enviar feedback",
+    "feedbackSending": "Enviando…",
+    "feedbackSuccess": "¡Gracias por tu feedback!",
+    "feedbackCooldown": "Podrás enviar feedback de nuevo en {{time}}.",
+    "feedbackCooldownShort": "Próximo feedback en {{time}}",
+    "feedbackError": "No se pudo enviar el feedback. Inténtalo más tarde."
   },
   "ad": {
     "bannerLabel": "Publicidad",

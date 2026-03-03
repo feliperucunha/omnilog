@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { PayPalHostedButton } from "@/config/paypal-hosted-buttons";
 import { PAYPAL_HOSTED_FORM_ACTION } from "@/config/paypal-hosted-buttons";
 
@@ -21,6 +22,11 @@ export function PayPalHostedButtonForm({
   submitAlt = "Subscribe with PayPal",
   className,
 }: PayPalHostedButtonFormProps) {
+  const [origin, setOrigin] = useState<string>("");
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
   return (
     <div className={className}>
       <form
@@ -32,6 +38,12 @@ export function PayPalHostedButtonForm({
         <input type="hidden" name="cmd" value="_s-xclick" />
         <input type="hidden" name="hosted_button_id" value={config.hostedButtonId} />
         <input type="hidden" name="currency_code" value={config.currencyCode} />
+        {origin && (
+          <>
+            <input type="hidden" name="return" value={`${origin}/tiers?approved=1`} />
+            <input type="hidden" name="cancel_return" value={`${origin}/tiers?canceled=1`} />
+          </>
+        )}
         <input
           type="image"
           src={config.imageUrl ?? SUBSCRIBE_IMAGE_DEFAULT}

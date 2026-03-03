@@ -12,6 +12,7 @@ import { settingsRouter } from "./routes/settings.js";
 import { paypalRouter, handlePayPalWebhook } from "./routes/paypal.js";
 import { cronRouter, runSubscriptionExpiry } from "./routes/cron.js";
 import { usersRouter } from "./routes/users.js";
+import { feedbackRouter } from "./routes/feedback.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -56,6 +57,7 @@ app.use("/api/settings", settingsRouter);
 app.use("/api/paypal", paypalRouter);
 app.use("/api/cron", cronRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/feedback", feedbackRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
