@@ -72,12 +72,33 @@ function isCompleted(status: string | null | undefined): boolean {
 
 const FREE_LOG_LIMIT = 500;
 
+const PAGINATION_LIMIT_DEFAULT = 25;
+const PAGINATION_LIMIT_MAX = 100;
+
+/** GET /logs/counts - Per-category log counts for tab labels. Returns { data: { [mediaType]: number } }. */
+logsRouter.get("/counts", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const counts = await prisma.log.groupBy({
+    by: ["mediaType"],
+    where: { userId },
+    _count: { id: true },
+  });
+  const data = Object.fromEntries(
+    MEDIA_TYPES.map((t) => [t, counts.find((c) => c.mediaType === t)?._count.id ?? 0])
+  ) as Record<MediaType, number>;
+  res.json({ data });
+});
+
 logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const mediaType = req.query.mediaType as MediaType | undefined;
   const externalId = req.query.externalId as string | undefined;
   const status = req.query.status as string | undefined;
   const sort = (req.query.sort as string) === "grade" ? "grade" : "date";
+  const limitParam = req.query.limit != null ? parseInt(String(req.query.limit), 10) : NaN;
+  const usePagination = Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= PAGINATION_LIMIT_MAX;
+  const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
+  const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
   const where = { userId } as { userId: string; mediaType?: string; externalId?: string; status?: string };
   if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
@@ -99,11 +120,67 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       ? [{ grade: "desc" }, { updatedAt: "desc" }]
       : { updatedAt: "desc" };
 
+  if (usePagination && takeSize != null) {
+    const take = takeSize + 1;
+    const logs = await prisma.log.findMany({
+      where,
+      orderBy,
+      take,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+    });
+    const hasMore = logs.length > takeSize;
+    const data = hasMore ? logs.slice(0, takeSize) : logs;
+    const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null;
+    res.json({ data, nextCursor });
+    return;
+  }
+
   const logs = await prisma.log.findMany({
     where,
     orderBy,
   });
   res.json(logs);
+});
+
+/** GET /logs/feed - Up to 5 recent logs from followed users, ordered by startedAt desc (for Social section). */
+logsRouter.get("/feed", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const followings = await prisma.follow.findMany({
+    where: { followerId: userId },
+    select: { followingId: true },
+  });
+  const followingIds = followings.map((f) => f.followingId);
+  if (followingIds.length === 0) {
+    res.json({ data: [] });
+    return;
+  }
+  const rows = await prisma.log.findMany({
+    where: { userId: { in: followingIds } },
+    orderBy: [{ startedAt: "desc" }, { updatedAt: "desc" }],
+    take: 5,
+    include: {
+      user: {
+        select: { id: true, username: true },
+      },
+    },
+  });
+  const data = rows.map((row) => {
+    const { user, ...log } = row;
+    return {
+      log: {
+        ...log,
+        startedAt: log.startedAt?.toISOString() ?? null,
+        completedAt: log.completedAt?.toISOString() ?? null,
+        createdAt: log.createdAt.toISOString(),
+        updatedAt: log.updatedAt.toISOString(),
+      },
+      user: {
+        id: user.id,
+        username: user.username ?? null,
+      },
+    };
+  });
+  res.json({ data });
 });
 
 /** GET /logs/stats?group=category|month|year - hours of content completed per category or per period */
@@ -145,6 +222,51 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([period, hours]) => ({ period, hours: Math.round(hours * 10) / 10 }));
   res.json({ group, data: entries });
+});
+
+/** GET /logs/calendar?year=YYYY&month=M - Start and end dates per day for a month. Pro only; free accounts get no data. */
+logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tier: true },
+  });
+  if (user?.tier !== "pro") {
+    const year = typeof req.query.year === "string" ? parseInt(req.query.year, 10) : new Date().getFullYear();
+    const month = typeof req.query.month === "string" ? parseInt(req.query.month, 10) : new Date().getMonth() + 1;
+    res.json({ year: Number.isFinite(year) ? year : new Date().getFullYear(), month: Number.isFinite(month) ? month : new Date().getMonth() + 1, dates: {} });
+    return;
+  }
+  const yearParam = typeof req.query.year === "string" ? parseInt(req.query.year, 10) : new Date().getFullYear();
+  const monthParam = typeof req.query.month === "string" ? parseInt(req.query.month, 10) : new Date().getMonth() + 1;
+  const year = Number.isFinite(yearParam) ? yearParam : new Date().getFullYear();
+  const month = Number.isFinite(monthParam) ? Math.max(1, Math.min(12, monthParam)) : new Date().getMonth() + 1;
+  const start = new Date(Date.UTC(year, month - 1, 1));
+  const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+  const logs = await prisma.log.findMany({
+    where: {
+      userId,
+      OR: [
+        { startedAt: { gte: start, lte: end } },
+        { completedAt: { gte: start, lte: end } },
+      ],
+    },
+    select: { startedAt: true, completedAt: true },
+  });
+  const dates: Record<string, number> = {};
+  const toKey = (d: Date) =>
+    `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  for (const log of logs) {
+    if (log.startedAt && log.startedAt >= start && log.startedAt <= end) {
+      const key = toKey(log.startedAt);
+      dates[key] = (dates[key] ?? 0) + 1;
+    }
+    if (log.completedAt && log.completedAt >= start && log.completedAt <= end) {
+      const key = toKey(log.completedAt);
+      dates[key] = (dates[key] ?? 0) + 1;
+    }
+  }
+  res.json({ year, month, dates });
 });
 
 /** GET /logs/export - Pro only; returns user logs as CSV. Optional ?mediaType= for single category. */

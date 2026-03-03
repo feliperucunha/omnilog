@@ -141,8 +141,8 @@
   /* Primary buttons: modern blue, white text (AAA) */
   --btn-gradient-start: #378C61;
   --btn-gradient-end: #174A31;
-  --btn-gradient-hover-start: #3b82f6;
-  --btn-gradient-hover-end: #6366f1;
+  --btn-gradient-hover-start: #378C62;
+  --btn-gradient-hover-end: #174A30;
   --btn-text: #ffffff;
   --btn-destructive-start: #dc2626;
   --btn-destructive-end: #b91c1c;

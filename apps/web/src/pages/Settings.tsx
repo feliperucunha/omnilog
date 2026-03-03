@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SettingsSkeleton } from "@/components/skeletons";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { apiFetch, invalidateApiCache, apiFetchFile } from "@/lib/api";
 import { toast } from "sonner";
@@ -164,14 +164,7 @@ export function Settings() {
   };
 
   if (loading && !me) {
-    return (
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-9 w-32 rounded-md" />
-        <Skeleton className="h-[200px] rounded-md" />
-        <Skeleton className="h-[200px] rounded-md" />
-        <Skeleton className="h-[200px] rounded-md" />
-      </div>
-    );
+    return <SettingsSkeleton />;
   }
 
   return (

@@ -9,6 +9,7 @@ import { ResetPassword } from "@/pages/ResetPassword";
 import { LogCompleteProvider } from "@/contexts/LogCompleteContext";
 import { Onboarding } from "@/pages/Onboarding";
 import { Dashboard } from "@/pages/Dashboard";
+import { Statistics } from "@/pages/Statistics";
 import { Search } from "@/pages/Search";
 import { ItemPage } from "@/pages/ItemPage";
 import { Settings } from "@/pages/Settings";
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="/" element={<AppLayout />}>
             <Route element={<AnimatedOutlet />}>
               <Route index element={<DashboardOrSearch />} />
+              <Route path="statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
               <Route path="search" element={<Search />} />
               <Route path="about" element={<About />} />
               <Route path="tiers" element={<Tiers />} />

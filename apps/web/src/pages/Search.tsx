@@ -59,6 +59,9 @@ function saveFreeSearchUsageToStorage(usageKey: string, value: { used: number; l
   }
 }
 
+const USERS_SEARCH_TYPE = "users" as const;
+type SearchFilter = MediaType | typeof USERS_SEARCH_TYPE;
+
 interface SearchResponse {
   results: SearchResult[];
   requiresApiKey?: ApiKeyProvider;
@@ -67,6 +70,11 @@ interface SearchResponse {
   freeSearchUsed?: number;
   freeSearchLimit?: number;
   freeSearchLimitReached?: boolean;
+}
+
+interface UserSearchResult {
+  id: string;
+  username?: string;
 }
 
 export function Search() {
@@ -78,10 +86,12 @@ export function Search() {
   const stateQuery = state?.query ?? "";
   const effectiveVisibleTypes = visibleTypes.length > 0 ? visibleTypes : [...MEDIA_TYPES];
   const defaultType = (effectiveVisibleTypes[0] ?? "movies") as MediaType;
-  const [mediaType, setMediaType] = useState<MediaType>(stateMediaType ?? defaultType);
+  const [searchFilter, setSearchFilter] = useState<SearchFilter>(stateMediaType ?? defaultType);
+  const mediaType = searchFilter === USERS_SEARCH_TYPE ? defaultType : searchFilter;
   const [sortBy, setSortBy] = useState<string>("relevance");
   const [query, setQuery] = useState(stateQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [requiresApiKey, setRequiresApiKey] = useState<{
     provider: ApiKeyProvider;
@@ -130,14 +140,17 @@ export function Search() {
   }, [mediaType]);
 
   useEffect(() => {
-    if (stateMediaType) setMediaType(stateMediaType);
+    if (stateMediaType) setSearchFilter(stateMediaType);
   }, [stateMediaType]);
 
   useEffect(() => {
-    if (!effectiveVisibleTypes.includes(mediaType)) {
-      setMediaType(effectiveVisibleTypes[0] ?? "movies");
+    if (
+      searchFilter !== USERS_SEARCH_TYPE &&
+      !effectiveVisibleTypes.includes(searchFilter)
+    ) {
+      setSearchFilter((effectiveVisibleTypes[0] ?? "movies") as MediaType);
     }
-  }, [effectiveVisibleTypes, mediaType]);
+  }, [effectiveVisibleTypes, searchFilter]);
 
   useEffect(() => {
     setSortBy("relevance");
@@ -170,9 +183,27 @@ export function Search() {
   }, [me?.boardGameProvider]);
 
   const runSearch = useCallback(
-    async (q: string, typeOverride?: MediaType, sortOverride?: string) => {
+    async (q: string, typeOverride?: SearchFilter, sortOverride?: string) => {
       if (!q.trim()) return;
-      const searchType = typeOverride ?? mediaType;
+      const filter = typeOverride ?? searchFilter;
+      if (filter === USERS_SEARCH_TYPE) {
+        setLoading(true);
+        setResults([]);
+        setUserResults([]);
+        setRequiresApiKey(null);
+        try {
+          const params = new URLSearchParams({ q: q.trim() });
+          const data = await apiFetch<{ users: UserSearchResult[] }>(`/search/users?${params.toString()}`);
+          setUserResults(data.users ?? []);
+        } catch {
+          setUserResults([]);
+          toast.error(t("toast.searchFailed"));
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+      const searchType = filter as MediaType;
       const sort = sortOverride ?? sortBy;
       const boardProvider = me?.boardGameProvider ?? "bgg";
       const usageKey = getFreeSearchUsageKey(searchType, searchType === "boardgames" ? boardProvider : "bgg");
@@ -180,6 +211,7 @@ export function Search() {
       const clientUsed = stored[usageKey]?.used ?? 0;
       setLoading(true);
       setResults([]);
+      setUserResults([]);
       setRequiresApiKey(null);
       try {
         const params = new URLSearchParams({ type: searchType, q: q.trim() });
@@ -211,13 +243,15 @@ export function Search() {
           setRequiresApiKey(null);
         }
       } catch (err) {
-      setResults([]);
-      setRequiresApiKey(null);
-      toast.error(err instanceof Error ? err.message : t("toast.searchFailed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [mediaType, sortBy, t, me?.boardGameProvider]);
+        setResults([]);
+        setRequiresApiKey(null);
+        toast.error(err instanceof Error ? err.message : t("toast.searchFailed"));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [searchFilter, sortBy, t, me?.boardGameProvider]
+  );
 
   const handleBoardGameProviderChange = useCallback(
     async (newProvider: BoardGameProvider) => {
@@ -249,7 +283,7 @@ export function Search() {
   }, [stateQuery, runSearch]);
 
   useEffect(() => {
-    if (!token || !hasSearched || results.length === 0) {
+    if (!token || !hasSearched || searchFilter === USERS_SEARCH_TYPE || results.length === 0) {
       setLogsByExternalId(new Map());
       return;
     }
@@ -263,7 +297,7 @@ export function Search() {
         setLogsByExternalId(map);
       })
       .catch(() => setLogsByExternalId(new Map()));
-  }, [token, mediaType, hasSearched, results.length]);
+  }, [token, mediaType, hasSearched, results.length, searchFilter]);
 
   const handleSearch = async (e: React.FormEvent) => {
     setHasSearched(true);
@@ -316,14 +350,36 @@ export function Search() {
           >
             <Input
               className="w-full"
-              placeholder={t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })}
+              placeholder={
+                searchFilter === USERS_SEARCH_TYPE
+                  ? t("search.usersPlaceholder")
+                  : t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })
+              }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus={!hasSearched}
               aria-label={t("search.search")}
             />
             <div className="flex flex-wrap gap-2 mt-2 items-center justify-center">
-              {effectiveVisibleTypes.map((type) => {
+              {[...effectiveVisibleTypes, USERS_SEARCH_TYPE].map((filter) => {
+                if (filter === USERS_SEARCH_TYPE) {
+                  return (
+                    <motion.div key={USERS_SEARCH_TYPE} whileTap={tapScale} transition={tapTransition}>
+                      <Button
+                        type="button"
+                        variant={searchFilter === USERS_SEARCH_TYPE ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setSearchFilter(USERS_SEARCH_TYPE);
+                          if (query.trim()) runSearch(query, USERS_SEARCH_TYPE);
+                        }}
+                      >
+                        {t("search.usersFilter")}
+                      </Button>
+                    </motion.div>
+                  );
+                }
+                const type = filter as MediaType;
                 const typeProvider = getApiKeyProviderForMediaType(type, boardGameProvider);
                 const hasKeyForType = typeProvider == null || !!me?.apiKeys?.[typeProvider];
                 const categoryLimitReached = limitReachedByCategory[type];
@@ -332,7 +388,7 @@ export function Search() {
                   <motion.div key={type} whileTap={isDisabled ? undefined : tapScale} transition={tapTransition}>
                     <Button
                       type="button"
-                      variant={mediaType === type ? "default" : "outline"}
+                      variant={searchFilter === type ? "default" : "outline"}
                       size="sm"
                       disabled={isDisabled}
                       title={
@@ -345,7 +401,7 @@ export function Search() {
                           : undefined
                       }
                       onClick={() => {
-                        setMediaType(type);
+                        setSearchFilter(type);
                         if (query.trim()) runSearch(query, type);
                       }}
                     >
@@ -355,7 +411,7 @@ export function Search() {
                 );
               })}
             </div>
-            {hasSearched && (
+            {hasSearched && searchFilter !== USERS_SEARCH_TYPE && (
               <div
                 className={`flex flex-wrap items-center gap-4 ${mediaType === "boardgames" ? "w-full justify-between" : ""}`}
               >
@@ -413,7 +469,43 @@ export function Search() {
         </motion.div>
       )}
 
-      {hasSearched && !loading && results.length > 0 && (
+      {hasSearched && !loading && searchFilter === USERS_SEARCH_TYPE && userResults.length > 0 && (
+        <motion.div variants={staggerContainer} initial="initial" animate="animate">
+          <div className="flex flex-col gap-2">
+            {userResults.map((user) => (
+              <motion.div key={user.id} variants={staggerItem}>
+                <Link
+                  to={`/${user.username ?? user.id}`}
+                  className="flex min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-[var(--color-dark)] bg-[var(--color-dark)] p-4 text-inherit no-underline shadow-[var(--shadow-sm)] transition-opacity hover:opacity-95"
+                >
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-mid)]/30 text-lg font-semibold text-[var(--color-lightest)]">
+                    {(user.username ?? user.id).slice(0, 1).toUpperCase()}
+                  </div>
+                  <span className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
+                    {user.username ?? user.id}
+                  </span>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {hasSearched && !loading && searchFilter === USERS_SEARCH_TYPE && query && userResults.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        >
+          <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-sm)]">
+            <p className="text-center text-[var(--color-light)]">
+              {t("search.noUsersFound")}
+            </p>
+          </Card>
+        </motion.div>
+      )}
+
+      {hasSearched && !loading && searchFilter !== USERS_SEARCH_TYPE && results.length > 0 && (
         <motion.div variants={staggerContainer} initial="initial" animate="animate">
           <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
             {results.map((item) => {
@@ -524,7 +616,7 @@ export function Search() {
         </div>
       )}
 
-      {hasSearched && !loading && query && results.length === 0 && !requiresApiKey && (
+      {hasSearched && !loading && searchFilter !== USERS_SEARCH_TYPE && query && results.length === 0 && !requiresApiKey && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}

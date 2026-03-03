@@ -32,7 +32,8 @@ model User {
   visibleMediaTypes    String?  // JSON array of media type strings; null = all
   boardGameProvider   String?  // "bgg" | "ludopedia"; null = bgg
   tier                Tier     @default(free)
-  paypalSubscriptionId  String?  @unique // PayPal subscription ID for Pro
+  stripeSubscriptionId  String?  @unique // Stripe subscription ID for Pro
+  stripeCustomerId     String?  // Stripe customer ID (for billing portal)
   subscriptionEndsAt   DateTime?       // Pro access until this date; cron clears tier when past; null = endless (e.g. testing)
   country             String?  // ISO 3166-1 alpha-2 e.g. BR for pricing
   onboarded           Boolean  @default(false)
@@ -40,6 +41,21 @@ model User {
   updatedAt      DateTime @updatedAt
   logs          Log[]
   feedbacks      Feedback[]
+  followsFollowing  Follow[] @relation("FollowFollowing")
+  followsFollowers  Follow[] @relation("FollowFollower")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("FollowFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("FollowFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }
 
 model Feedback {

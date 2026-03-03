@@ -347,3 +347,26 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
     res.status(502).json({ error: "Search failed" });
   }
 });
+
+const USER_SEARCH_MAX = 20;
+
+/** GET /search/users?q= - Search users by username (for Social / Follow). Returns { users: Array<{ id, username }> }. */
+searchRouter.get("/users", async (req: AuthenticatedRequest, res) => {
+  const rawQ = typeof req.query.q === "string" ? req.query.q : "";
+  const q = sanitizeText(rawQ.trim(), 100);
+  if (!q || q.length < 1) {
+    res.json({ users: [] });
+    return;
+  }
+  const users = await prisma.user.findMany({
+    where: {
+      username: { not: null, contains: q, mode: "insensitive" },
+    },
+    select: { id: true, username: true },
+    take: USER_SEARCH_MAX,
+    orderBy: { username: "asc" },
+  });
+  res.json({
+    users: users.map((u) => ({ id: u.id, username: u.username ?? undefined })),
+  });
+});

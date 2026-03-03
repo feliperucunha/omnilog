@@ -177,6 +177,9 @@ export function About() {
           <p className="whitespace-pre-wrap text-[var(--color-light)] flex-1 text-sm sm:text-base">
             {t("about.projectBody")}
           </p>
+          <p className="mt-3 text-sm text-[var(--color-mid)]">
+            {t("about.projectHostingNote")}
+          </p>
         </Card>
         <Card
           className="border-[var(--color-dark)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"

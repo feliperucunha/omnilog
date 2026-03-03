@@ -1,8 +1,7 @@
 import { motion } from "framer-motion";
-import { Check, Sparkles } from "lucide-react";
+import { Check, Sparkles, Loader2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -12,10 +11,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { TiersSkeleton } from "@/components/skeletons";
-import { getPayPalHostedButton } from "@/config/paypal-hosted-buttons";
-import { PayPalHostedButtonForm } from "@/components/PayPalHostedButtonForm";
-
-const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined;
 
 const FREE_LOG_LIMIT = 500;
 
@@ -31,6 +26,7 @@ export function Tiers() {
   const { me, refetch, loading } = useMe();
   const [searchParams, setSearchParams] = useSearchParams();
   const [interval, setInterval] = useState<"monthly" | "yearly">("monthly");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
 
@@ -58,14 +54,31 @@ export function Tiers() {
   const yearlySavePercent =
     Math.round((1 - prices.yearly / (prices.monthly * 12)) * 100) || 0;
 
-  const hostedButton = getPayPalHostedButton(me?.country, interval);
-
   if (token && loading) return <TiersSkeleton />;
+
+  const handleSubscribe = async () => {
+    setCheckoutLoading(true);
+    try {
+      const data = await apiFetch<{ url: string }>("/stripe/create-checkout-session", {
+        method: "POST",
+        body: JSON.stringify({ interval }),
+      });
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+      throw new Error("No checkout URL returned");
+    } catch (err) {
+      setCheckoutLoading(false);
+      const message = err instanceof Error ? err.message : t("tiers.checkoutError");
+      toast.error(message);
+    }
+  };
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
     try {
-      const data = await apiFetch<{ url: string }>("/paypal/create-portal-session", {
+      const data = await apiFetch<{ url: string }>("/stripe/create-portal-session", {
         method: "POST",
         body: JSON.stringify({}),
       });
@@ -84,12 +97,12 @@ export function Tiers() {
   const handleCancelSubscription = async () => {
     setCancelLoading(true);
     try {
-      await apiFetch<{ ok: boolean }>("/paypal/cancel-subscription", { method: "POST" });
+      await apiFetch<{ ok: boolean }>("/stripe/cancel-subscription", { method: "POST" });
       toast.success(t("tiers.cancelSubscriptionSuccess"));
       refetch();
     } catch {
       try {
-        const data = await apiFetch<{ url: string }>("/paypal/create-portal-session", {
+        const data = await apiFetch<{ url: string }>("/stripe/create-portal-session", {
           method: "POST",
           body: JSON.stringify({}),
         });
@@ -201,8 +214,11 @@ export function Tiers() {
         </Card>
 
         <Card
-          className="relative flex flex-col border-[var(--color-mid)]/50 bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]"
-          style={{ boxShadow: "var(--shadow-md)" }}
+          className="relative flex flex-col border-[var(--color-mid)]/50 bg-[var(--color-dark)] p-6"
+          style={{
+            boxShadow:
+              "0 1px 3px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(65, 90, 119, 0.15)",
+          }}
         >
           <div className="absolute -top-2 right-4 flex items-center gap-1 rounded-full bg-[var(--btn-gradient-start)] px-2 py-0.5 text-xs font-medium text-[var(--btn-gradient-start)]">
             <span className="text-white">
@@ -285,48 +301,33 @@ export function Tiers() {
             </li>
             <li className="flex items-center gap-2">
               <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+              <span>{t("tiers.proStatistics")}: {t("tiers.proStatisticsDesc")}</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+              <span>{t("tiers.proProfileCustomization")}: {t("tiers.proProfileCustomizationDesc")}</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
               {t("tiers.proNoAds")}
             </li>
           </ul>
-          {token && !isPro && hostedButton && (
-            <div className="mt-4 w-full" key={`${me?.country ?? "default"}-${interval}`}>
-              <PayPalHostedButtonForm
-                config={hostedButton}
-                submitAlt={t("tiers.subscribeWithPayPal")}
-                className="w-full"
-              />
-            </div>
-          )}
-          {token && !isPro && !hostedButton && paypalClientId && (
-            <div className="mt-4 w-full [&_.paypal-buttons]:!min-h-[42px]" key={interval}>
-              <PayPalScriptProvider
-                options={{
-                  clientId: paypalClientId,
-                  vault: true,
-                  intent: "subscription",
-                }}
-              >
-                <PayPalButtons
-                  style={{ layout: "vertical", shape: "rect" }}
-                  createSubscription={async () => {
-                    const data = await apiFetch<{
-                      url: string;
-                      subscriptionId?: string;
-                    }>("/paypal/create-subscription", {
-                      method: "POST",
-                      body: JSON.stringify({ interval }),
-                    });
-                    if (!data?.subscriptionId) throw new Error("No subscription ID");
-                    return data.subscriptionId;
-                  }}
-                />
-              </PayPalScriptProvider>
-            </div>
-          )}
-          {token && !isPro && !hostedButton && !paypalClientId && (
-            <p className="mt-4 text-sm text-[var(--color-light)]">
-              {t("tiers.hostedButtonNotAvailable")}
-            </p>
+          {token && !isPro && (
+            <Button
+              type="button"
+              className="btn-gradient mt-4 w-full"
+              disabled={checkoutLoading}
+              onClick={handleSubscribe}
+            >
+              {checkoutLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+                  {t("tiers.redirecting")}
+                </>
+              ) : (
+                t("tiers.subscribeWithStripe")
+              )}
+            </Button>
           )}
         </Card>
       </div>

@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom";
-import { Settings, LogOut } from "lucide-react";
+import { Settings, Info, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
@@ -143,6 +143,12 @@ export function Topbar() {
                 <Link to="/settings" className="flex items-center gap-2">
                   <Settings className="size-4" />
                   {t("nav.settings")}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/about" className="flex items-center gap-2">
+                  <Info className="size-4" />
+                  {t("nav.about")}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem

@@ -13,17 +13,19 @@ function looksLikeCuid(id: string): boolean {
   return id.length >= 20 && id.length <= 30 && /^[a-z0-9]+$/i.test(id);
 }
 
-/** GET /users/:userId - Public profile (username, visibleMediaTypes, logCount). No email or secrets. */
-usersRouter.get("/:userId", async (req: Request<{ userId: string }>, res: Response) => {
-  const { userId } = req.params;
-  if (!userId || !looksLikeCuid(userId)) {
-    res.status(400).json({ error: "Invalid user" });
-    return;
+/** Resolve identifier (username or id) to user. Returns null if not found. */
+async function getUserByIdentifier(identifier: string) {
+  if (!identifier || identifier.length > 100) return null;
+  if (looksLikeCuid(identifier)) {
+    return prisma.user.findUnique({ where: { id: identifier }, select: { id: true, username: true, visibleMediaTypes: true } });
   }
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, username: true, visibleMediaTypes: true },
-  });
+  return prisma.user.findUnique({ where: { username: identifier }, select: { id: true, username: true, visibleMediaTypes: true } });
+}
+
+/** GET /users/:identifier - Public profile by username or id. No email or secrets. */
+usersRouter.get("/:identifier", async (req: Request<{ identifier: string }>, res: Response) => {
+  const { identifier } = req.params;
+  const user = await getUserByIdentifier(identifier);
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
@@ -49,15 +51,11 @@ usersRouter.get("/:userId", async (req: Request<{ userId: string }>, res: Respon
   });
 });
 
-/** GET /users/:userId/logs/stats?group=category|month|year - Public stats. No auth. */
-usersRouter.get("/:userId/logs/stats", async (req: Request<{ userId: string }>, res: Response) => {
-  const { userId } = req.params;
-  if (!userId || !looksLikeCuid(userId)) {
-    res.status(400).json({ error: "Invalid user" });
-    return;
-  }
-  const exists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-  if (!exists) {
+/** GET /users/:identifier/logs/stats?group=category|month|year - Public stats. No auth. */
+usersRouter.get("/:identifier/logs/stats", async (req: Request<{ identifier: string }>, res: Response) => {
+  const { identifier } = req.params;
+  const user = await getUserByIdentifier(identifier);
+  if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
   }
@@ -65,7 +63,7 @@ usersRouter.get("/:userId/logs/stats", async (req: Request<{ userId: string }>, 
   const group = groupParam === "year" ? "year" : groupParam === "category" ? "category" : "month";
   const logs = await prisma.log.findMany({
     where: {
-      userId,
+      userId: user.id,
       completedAt: { not: null },
     },
     select: { completedAt: true, contentHours: true, startedAt: true, mediaType: true },
@@ -99,23 +97,44 @@ usersRouter.get("/:userId/logs/stats", async (req: Request<{ userId: string }>, 
   res.json({ group, data: entries });
 });
 
-/** GET /users/:userId/logs - Public list of logs (same shape as GET /logs). No auth. */
-usersRouter.get("/:userId/logs", async (req: Request<{ userId: string }>, res: Response) => {
-  const { userId } = req.params;
-  if (!userId || !looksLikeCuid(userId)) {
-    res.status(400).json({ error: "Invalid user" });
+const PAGINATION_LIMIT_MAX = 100;
+
+/** GET /users/:identifier/logs/counts - Public per-category counts. Returns { data: { [mediaType]: number } }. */
+usersRouter.get("/:identifier/logs/counts", async (req: Request<{ identifier: string }>, res: Response) => {
+  const { identifier } = req.params;
+  const user = await getUserByIdentifier(identifier);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
     return;
   }
-  const exists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-  if (!exists) {
+  const counts = await prisma.log.groupBy({
+    by: ["mediaType"],
+    where: { userId: user.id },
+    _count: { id: true },
+  });
+  const data = Object.fromEntries(
+    MEDIA_TYPES.map((t) => [t, counts.find((c) => c.mediaType === t)?._count.id ?? 0])
+  ) as Record<MediaType, number>;
+  res.json({ data });
+});
+
+/** GET /users/:identifier/logs - Public list of logs (same shape as GET /logs). Supports ?limit=&cursor= for pagination. No auth. */
+usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>, res: Response) => {
+  const { identifier } = req.params;
+  const user = await getUserByIdentifier(identifier);
+  if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
   }
   const mediaType = req.query.mediaType as MediaType | undefined;
   const status = req.query.status as string | undefined;
   const sort = (req.query.sort as string) === "grade" ? "grade" : "date";
+  const limitParam = req.query.limit != null ? parseInt(String(req.query.limit), 10) : NaN;
+  const usePagination = Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= PAGINATION_LIMIT_MAX;
+  const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
+  const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
-  const where = { userId } as { userId: string; mediaType?: string; status?: string };
+  const where = { userId: user.id } as { userId: string; mediaType?: string; status?: string };
   if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
   if (status != null && status !== "") {
     if (mediaType && MEDIA_TYPES.includes(mediaType)) {
@@ -130,6 +149,21 @@ usersRouter.get("/:userId/logs", async (req: Request<{ userId: string }>, res: R
     sort === "grade"
       ? [{ grade: "desc" }, { updatedAt: "desc" }]
       : { updatedAt: "desc" };
+
+  if (usePagination && takeSize != null) {
+    const take = takeSize + 1;
+    const logs = await prisma.log.findMany({
+      where,
+      orderBy,
+      take,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+    });
+    const hasMore = logs.length > takeSize;
+    const data = hasMore ? logs.slice(0, takeSize) : logs;
+    const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null;
+    res.json({ data, nextCursor });
+    return;
+  }
 
   const logs = await prisma.log.findMany({
     where,

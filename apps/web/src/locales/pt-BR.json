@@ -5,6 +5,7 @@
   },
   "nav": {
     "dashboard": "Início",
+    "statistics": "Estatísticas",
     "movies": "Filmes",
     "tv": "Séries",
     "boardgames": "Board Games",
@@ -160,7 +161,16 @@
   "publicProfile": {
     "title": "Perfil público",
     "titleWithName": "Log de {{name}}",
-    "backToApp": "Voltar ao app"
+    "backToApp": "Ir para o app"
+  },
+  "social": {
+    "follow": "Seguir",
+    "following": "Seguindo",
+    "followSuccess": "Seguindo!",
+    "sectionTitle": "Social",
+    "emptyFeed": "Comece a seguir seus amigos para ver os logs deles.",
+    "findUsers": "Encontrar usuários",
+    "userWithoutUsername": "Usuário"
   },
   "dashboard": {
     "title": "Início",
@@ -173,6 +183,18 @@
     "byMonth": "Por mês",
     "byYear": "Por ano",
     "noStatsYet": "Complete itens com tempo para ver as estatísticas aqui.",
+    "calendarTitle": "Calendário",
+    "calendarProOnly": "Veja quando você completou itens. Assine o Pro para o calendário.",
+    "calendarPrevMonth": "Mês anterior",
+    "calendarNextMonth": "Próximo mês",
+    "calendarMon": "Seg",
+    "calendarTue": "Ter",
+    "calendarWed": "Qua",
+    "calendarThu": "Qui",
+    "calendarFri": "Sex",
+    "calendarSat": "Sáb",
+    "calendarSun": "Dom",
+    "calendarCompletions": "{{count}} conclusão(ões) em {{date}}",
     "yourStats": "Suas estatísticas",
     "category": "Categoria",
     "recentLogs": "Logs recentes",
@@ -180,6 +202,10 @@
     "noLogsYet": "Nenhum log ainda.",
     "searchAndAddFirst": "Busque e adicione seu primeiro log",
     "couldntLoadLogs": "Não foi possível carregar seus logs"
+  },
+  "statistics": {
+    "proOnlyTitle": "Estatísticas é um recurso Pro",
+    "proOnlyMessage": "Assine o plano Pro para acessar estatísticas e exportação."
   },
   "search": {
     "title": "Buscar",
@@ -192,7 +218,10 @@
     "noResultsUntilApiKey": "Nenhum resultado para este tipo até que uma chave de API seja configurada.",
     "freeSearchUsage": "{{used}}/{{limit}} buscas gratuitas usadas. Adicione sua chave de API para continuar buscando.",
     "freeSearchLimitReached": "Busca por {{type}} desativada. {{used}}/{{limit}} buscas gratuitas usadas. Adicione sua chave de API para continuar.",
-    "categoryLimitReachedTooltip": "Busca por {{type}} desativada ({{used}}/{{limit}} buscas gratuitas usadas). Adicione sua chave de API em Configurações."
+    "categoryLimitReachedTooltip": "Busca por {{type}} desativada ({{used}}/{{limit}} buscas gratuitas usadas). Adicione sua chave de API em Configurações.",
+    "usersFilter": "Usuários",
+    "usersPlaceholder": "Buscar por nome de usuário...",
+    "noUsersFound": "Nenhum usuário encontrado."
   },
   "searchSort": {
     "relevance": "Relevância",
@@ -215,6 +244,7 @@
     "sortLabel": "Ordenar:",
     "sortByDate": "Data",
     "sortByGrade": "Nota",
+    "loadMore": "Carregar mais",
     "exportCategory": "Baixar esta lista em CSV",
     "exportCategorySuccess": "Lista baixada"
   },
@@ -325,6 +355,7 @@
     "carouselGoTo": "Ir para membro {{index}}",
     "projectTitle": "Sobre o projeto",
     "projectBody": "OMNILOG é como um Stremio para seus logs: um agregador de APIs para ter tudo em um só lugar. Em vez de oito apps diferentes, use um só para acompanhar filmes, séries, board games, jogos, livros, anime, manga e quadrinhos em um único painel. Busque por categoria, adicione entradas manuais quando algo não está no banco de dados e mantenha resenhas e notas juntas. Não precisa alternar entre vários apps ou planilhas—tudo que você assiste, joga e lê fica aqui.",
+    "projectHostingNote": "O app está rodando atualmente em servidores e domínio gratuitos. As requisições às vezes podem demorar um pouco.",
     "donationTitle": "Apoie o projeto",
     "donationIntro": "Se o OMNILOG for útil para você, pode apoiar o desenvolvimento com uma doação única ou apoio recorrente. Obrigado!",
     "donateKofi": "Ko-fi",
@@ -372,12 +403,18 @@
     "proLogs": "Logs ilimitados",
     "proExport": "Exportar logs em CSV",
     "proExportDesc": "Baixe todos os seus logs em arquivo quando quiser.",
+    "proStatistics": "Página de estatísticas",
+    "proStatisticsDesc": "Calendário, tempo consumido por categoria/mês/ano e logs recentes.",
+    "proProfileCustomization": "Personalizar perfil público",
+    "proProfileCustomizationDesc": "Escolha quais categorias aparecem no seu perfil compartilhado.",
     "proNoAds": "Sem anúncios",
     "currentPlan": "Plano atual",
     "usage": "{{count}} / {{limit}} logs",
     "usageUnlimited": "{{count}} logs",
     "upgradeToPro": "Assinar Pro",
     "subscribeWithPayPal": "Assinar com PayPal",
+    "subscribeWithStripe": "Assinar com Stripe",
+    "checkoutError": "Não foi possível iniciar o pagamento.",
     "hostedButtonNotAvailable": "Este plano não está disponível para a opção selecionada. Tente outro intervalo de cobrança ou entre em contato com o suporte.",
     "redirecting": "Redirecionando…",
     "upgradeSuccess": "Você agora é Pro. Obrigado por assinar!",

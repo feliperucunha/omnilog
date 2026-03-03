@@ -9,10 +9,11 @@ import { logsRouter } from "./routes/logs.js";
 import { meRouter } from "./routes/me.js";
 import { searchRouter } from "./routes/search.js";
 import { settingsRouter } from "./routes/settings.js";
-import { paypalRouter, handlePayPalWebhook } from "./routes/paypal.js";
+import { stripeRouter, handleStripeWebhook } from "./routes/stripe.js";
 import { cronRouter, runSubscriptionExpiry } from "./routes/cron.js";
 import { usersRouter } from "./routes/users.js";
 import { feedbackRouter } from "./routes/feedback.js";
+import { followsRouter } from "./routes/follows.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -32,11 +33,11 @@ app.use(
 );
 app.use(cookieParser());
 
-// PayPal webhook needs raw body for signature verification – register before express.json()
+// Stripe webhook needs raw body for signature verification – register before express.json()
 app.post(
-  "/api/paypal/webhook",
+  "/api/stripe/webhook",
   express.raw({ type: "application/json" }),
-  (req, res) => void handlePayPalWebhook(req, res)
+  (req, res) => void handleStripeWebhook(req, res)
 );
 
 app.use(express.json());
@@ -54,10 +55,11 @@ app.use("/api/items", itemsRouter);
 app.use("/api/logs", logsRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/settings", settingsRouter);
-app.use("/api/paypal", paypalRouter);
+app.use("/api/stripe", stripeRouter);
 app.use("/api/cron", cronRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/feedback", feedbackRouter);
+app.use("/api/follows", followsRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });

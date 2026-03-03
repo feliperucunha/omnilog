@@ -5,6 +5,7 @@
   },
   "nav": {
     "dashboard": "Home",
+    "statistics": "Statistics",
     "movies": "Movies",
     "tv": "TV Shows",
     "boardgames": "Board Games",
@@ -161,7 +162,16 @@
   "publicProfile": {
     "title": "Public profile",
     "titleWithName": "{{name}}'s log",
-    "backToApp": "Back to app"
+    "backToApp": "Go to app"
+  },
+  "social": {
+    "follow": "Follow",
+    "following": "Following",
+    "followSuccess": "Following!",
+    "sectionTitle": "Social",
+    "emptyFeed": "Start following your friends to see their logs.",
+    "findUsers": "Find users",
+    "userWithoutUsername": "User"
   },
   "dashboard": {
     "title": "Home",
@@ -180,7 +190,23 @@
     "byCategory": "By category",
     "byMonth": "By month",
     "byYear": "By year",
-    "noStatsYet": "Complete items with runtimes to see stats here."
+    "noStatsYet": "Complete items with runtimes to see stats here.",
+    "calendarTitle": "Calendar",
+    "calendarProOnly": "See when you completed items. Upgrade to Pro for the calendar view.",
+    "calendarPrevMonth": "Previous month",
+    "calendarNextMonth": "Next month",
+    "calendarMon": "Mon",
+    "calendarTue": "Tue",
+    "calendarWed": "Wed",
+    "calendarThu": "Thu",
+    "calendarFri": "Fri",
+    "calendarSat": "Sat",
+    "calendarSun": "Sun",
+    "calendarCompletions": "{{count}} completion(s) on {{date}}"
+  },
+  "statistics": {
+    "proOnlyTitle": "Statistics is a Pro feature",
+    "proOnlyMessage": "Please purchase the Pro plan to access statistics and export."
   },
   "search": {
     "title": "Search",
@@ -193,7 +219,10 @@
     "noResultsUntilApiKey": "No results for this search type until an API key is set.",
     "freeSearchUsage": "{{used}}/{{limit}} free searches used. Add your API key to keep searching.",
     "freeSearchLimitReached": "Search for {{type}} is disabled. {{used}}/{{limit}} free searches used. Add your API key to keep searching.",
-    "categoryLimitReachedTooltip": "{{type}} search disabled ({{used}}/{{limit}} free searches used). Add your API key in Settings."
+    "categoryLimitReachedTooltip": "{{type}} search disabled ({{used}}/{{limit}} free searches used). Add your API key in Settings.",
+    "usersFilter": "Users",
+    "usersPlaceholder": "Search by username...",
+    "noUsersFound": "No users found."
   },
   "searchSort": {
     "relevance": "Relevance",
@@ -216,6 +245,7 @@
     "sortLabel": "Sort:",
     "sortByDate": "Date",
     "sortByGrade": "Grade",
+    "loadMore": "Load more",
     "exportCategory": "Download this list as CSV",
     "exportCategorySuccess": "List downloaded"
   },
@@ -326,6 +356,7 @@
     "carouselGoTo": "Go to team member {{index}}",
     "projectTitle": "About the project",
     "projectBody": "OMNILOG is like Stremio for your logs: an aggregator of APIs so you can have everything in one place. Instead of eight separate apps, use one to track movies, TV shows, board games, video games, books, anime, manga, and comics in one place. Search by category, add custom entries when something isn't in the database, and keep your reviews and grades together. No need to jump between different apps or spreadsheets—everything you watch, play, and read lives here.",
+    "projectHostingNote": "The app currently runs on free servers and a free domain. Requests may sometimes take a while.",
     "donationTitle": "Support the project",
     "donationIntro": "If OMNILOG is useful to you, you can support its development with a one-time donation or recurring support. Thank you!",
     "donateKofi": "Ko-fi",
@@ -373,12 +404,18 @@
     "proLogs": "Unlimited logs",
     "proExport": "Export logs to CSV",
     "proExportDesc": "Download all your logs as a file anytime.",
+    "proStatistics": "Statistics page",
+    "proStatisticsDesc": "Calendar, time consumed by category/month/year, and recent logs.",
+    "proProfileCustomization": "Customize public profile",
+    "proProfileCustomizationDesc": "Choose which categories appear on your shared profile.",
     "proNoAds": "No ads",
     "currentPlan": "Current plan",
     "usage": "{{count}} / {{limit}} logs",
     "usageUnlimited": "{{count}} logs",
     "upgradeToPro": "Upgrade to Pro",
     "subscribeWithPayPal": "Subscribe with PayPal",
+    "subscribeWithStripe": "Subscribe with Stripe",
+    "checkoutError": "Could not start checkout.",
     "hostedButtonNotAvailable": "This plan is not available for the selected option yet. Try another billing interval or contact support.",
     "redirecting": "Redirecting…",
     "upgradeSuccess": "You're now Pro. Thanks for subscribing!",

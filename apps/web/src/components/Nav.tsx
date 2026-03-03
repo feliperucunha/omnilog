@@ -1,6 +1,7 @@
 import { NavLink, Link, useLocation } from "react-router-dom";
 import {
   Home,
+  BarChart3,
   Search,
   Settings,
   LogIn,
@@ -54,14 +55,15 @@ export function Nav() {
 
   const navItems: { to: string; labelKey: string; icon: React.ReactNode }[] = [
     { to: "/", labelKey: "nav.dashboard", icon: <Home size={iconSize} /> },
+    { to: "/statistics", labelKey: "nav.statistics", icon: <BarChart3 size={iconSize} /> },
     { to: "/search", labelKey: "nav.search", icon: <Search size={iconSize} /> },
     { to: "/settings", labelKey: "nav.settings", icon: <Settings size={iconSize} /> },
     { to: "/tiers", labelKey: "nav.plans", icon: <CreditCard size={iconSize} /> },
     { to: "/about", labelKey: "nav.about", icon: <Info size={iconSize} /> },
   ];
 
-  /** On mobile bottom bar: Home and Search first, then Settings and About. Icon-only, fill space. */
-  const bottomBarItems = navItems;
+  /** Mobile bottom bar: same as nav but without About (icon-only). */
+  const bottomBarItems = navItems.filter((item) => item.to !== "/about");
 
   return (
     <>

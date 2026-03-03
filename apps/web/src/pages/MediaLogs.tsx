@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Search, AlertTriangle, Plus, Download } from "lucide-react";
@@ -32,6 +32,10 @@ import { cn } from "@/lib/utils";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
 
+const LOGS_PAGE_SIZE = 24;
+
+type LogsResponse = Log[] | { data: Log[]; nextCursor: string | null };
+
 interface MediaLogsProps {
   mediaType: MediaType;
   /** When true, rendered inside Dashboard: no watermark background. */
@@ -51,7 +55,9 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
   const readOnly = !!publicUserId;
   const [savingBoardGameProvider, setSavingBoardGameProvider] = useState(false);
   const [logs, setLogs] = useState<Log[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingLog, setEditingLog] = useState<Log | null>(null);
   const [editingLogEpisodesCount, setEditingLogEpisodesCount] = useState<number | null>(null);
@@ -77,29 +83,71 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
     return { field: "volume", value: log.volume ?? 0, labelKey: "itemReviewForm.volume" };
   };
 
-  const fetchLogs = useCallback(() => {
-    setError(null);
-    setLoading(true);
-    const params = new URLSearchParams({ mediaType, sort: sortBy });
-    if (statusFilter) params.set("status", statusFilter);
-    const path = publicUserId
-      ? `/users/${publicUserId}/logs?${params.toString()}`
-      : `/logs?${params.toString()}`;
-    const fetcher = publicUserId
-      ? () => apiFetchPublic<Log[]>(path)
-      : () => apiFetchCached<Log[]>(path, { ttlMs: 2 * 60 * 1000 });
-    fetcher()
-      .then(setLogs)
-      .catch((err) => {
-        setLogs([]);
-        setError(err instanceof Error ? err.message : t("mediaLogs.couldntLoadLogs"));
-      })
-      .finally(() => setLoading(false));
-  }, [mediaType, statusFilter, sortBy, t, publicUserId]);
+  const fetchLogs = useCallback(
+    (reset = true) => {
+      if (!reset && (loadingMore || !nextCursor)) return;
+      if (reset) {
+        setError(null);
+        setLoading(true);
+        setNextCursor(null);
+      } else {
+        setLoadingMore(true);
+      }
+      const params = new URLSearchParams({
+        mediaType,
+        sort: sortBy,
+        limit: String(LOGS_PAGE_SIZE),
+      });
+      if (statusFilter) params.set("status", statusFilter);
+      if (!reset && nextCursor) params.set("cursor", nextCursor);
+      const path = publicUserId
+        ? `/users/${publicUserId}/logs?${params.toString()}`
+        : `/logs?${params.toString()}`;
+      const fetcher = publicUserId
+        ? () => apiFetchPublic<LogsResponse>(path)
+        : () =>
+            reset && !nextCursor
+              ? apiFetchCached<LogsResponse>(path, { ttlMs: 2 * 60 * 1000 })
+              : apiFetch<LogsResponse>(path);
+      fetcher()
+        .then((response) => {
+          const list = Array.isArray(response) ? response : response.data;
+          const cursor = Array.isArray(response) ? null : response.nextCursor;
+          setLogs((prev) => (reset ? list : [...prev, ...list]));
+          setNextCursor(cursor);
+        })
+        .catch((err) => {
+          if (reset) setLogs([]);
+          setError(err instanceof Error ? err.message : t("mediaLogs.couldntLoadLogs"));
+        })
+        .finally(() => {
+          setLoading(false);
+          setLoadingMore(false);
+        });
+    },
+    [mediaType, statusFilter, sortBy, nextCursor, loadingMore, t, publicUserId]
+  );
 
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    fetchLogsRef.current(true);
+  }, [mediaType, statusFilter, sortBy, publicUserId]);
+
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const fetchLogsRef = useRef(fetchLogs);
+  fetchLogsRef.current = fetchLogs;
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        fetchLogsRef.current(false);
+      },
+      { rootMargin: "200px", threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!editingLog) {
@@ -229,7 +277,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
               {t("mediaLogs.couldntLoadLogs")}
             </p>
             <p className="text-sm text-[var(--color-light)]">{error}</p>
-            <Button onClick={fetchLogs}>
+            <Button onClick={() => fetchLogs(true)}>
               {t("common.tryAgain")}
             </Button>
           </div>
@@ -539,6 +587,26 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
               </motion.div>
             ))}
           </div>
+          {nextCursor != null && (
+            <>
+              <div ref={loadMoreRef} className="min-h-[1px] w-full" aria-hidden />
+              <div className="flex flex-col items-center gap-2 py-4">
+                {loadingMore ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-[var(--color-light)]" aria-hidden />
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchLogs(false)}
+                    aria-label={t("mediaLogs.loadMore")}
+                  >
+                    {t("mediaLogs.loadMore")}
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
         </motion.div>
       )}
 

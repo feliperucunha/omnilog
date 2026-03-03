@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 
 export interface MeResponse {
-  user: { id: string; email: string; onboarded: boolean };
+  user: { id: string; username?: string; email: string; onboarded: boolean };
   theme: "light" | "dark";
   locale: "en" | "pt-BR" | "es";
   visibleMediaTypes: string[];
