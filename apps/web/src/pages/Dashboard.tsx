@@ -13,7 +13,7 @@ import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
-import { MEDIA_TYPES, type MediaType, toMediaType } from "@logeverything/shared";
+import { IN_PROGRESS_STATUSES, MEDIA_TYPES, type MediaType, toMediaType } from "@logeverything/shared";
 import type { Log } from "@logeverything/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { MediaLogs } from "@/pages/MediaLogs";
@@ -312,7 +312,11 @@ export function Dashboard() {
                                 })}
                               </span>
                             )}
-                            {log.grade != null ? (
+                            {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
+                              <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                                {t("common.inProgress")}
+                              </span>
+                            ) : log.grade != null ? (
                               <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                             ) : (
                               <span className="text-[var(--color-light)]">—</span>

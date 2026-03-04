@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { NumberCombobox } from "@/components/ui/number-combobox";
 import type { MediaType, Log } from "@logeverything/shared";
-import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
@@ -52,7 +52,8 @@ export function LogForm(props: LogFormProps) {
   const log = isEdit ? props.log : null;
   const mediaType = isEdit ? (log!.mediaType as MediaType) : (props as LogFormCreateProps).mediaType;
 
-  const [stars, setStars] = useState(isEdit ? gradeToStars(log!.grade ?? undefined) : 2.5);
+  const isInProgressInitial = isEdit && log!.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log!.status);
+  const [stars, setStars] = useState(isEdit ? (isInProgressInitial ? 0 : gradeToStars(log!.grade ?? undefined)) : 2.5);
   const [review, setReview] = useState(isEdit ? (log!.review ?? "") : "");
   const [status, setStatus] = useState<string | null>(
     isEdit ? (log!.status ?? log!.listType ?? null) : LOG_STATUS_OPTIONS[(props as LogFormCreateProps).mediaType][0]
@@ -93,7 +94,8 @@ export function LogForm(props: LogFormProps) {
 
   useEffect(() => {
     if (isEdit && log) {
-      setStars(gradeToStars(log.grade ?? undefined));
+      const inProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
+      setStars(inProgress ? 0 : gradeToStars(log.grade ?? undefined));
       setReview(log.review ?? "");
       setStatus(log.status ?? log.listType ?? null);
       setSeason(log.season ?? "");
@@ -108,7 +110,8 @@ export function LogForm(props: LogFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const grade = starsToGrade(stars);
+    const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
+    const grade = isInProgress ? null : starsToGrade(stars);
     setLoading(true);
     try {
       if (isEdit) {
@@ -152,7 +155,7 @@ export function LogForm(props: LogFormProps) {
           const completion: LogCompleteState = {
             image,
             title,
-            grade,
+            grade: grade ?? null,
             status: status ?? undefined,
             mediaType: props.log.mediaType as MediaType,
             id: props.log.externalId,
@@ -179,7 +182,7 @@ export function LogForm(props: LogFormProps) {
         const completion: LogCompleteState = {
           image,
           title,
-          grade,
+          grade: grade ?? null,
           status: status ?? undefined,
           mediaType: props.mediaType,
           id: props.externalId,

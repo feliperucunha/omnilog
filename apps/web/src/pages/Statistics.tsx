@@ -11,7 +11,7 @@ import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/an
 import { useLocale } from "@/contexts/LocaleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
-import { type Log } from "@logeverything/shared";
+import { IN_PROGRESS_STATUSES, type Log } from "@logeverything/shared";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
@@ -403,7 +403,11 @@ export function Statistics() {
                                     })}
                                   </span>
                                 )}
-                                {log.grade != null ? (
+                                {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
+                                  <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                                    {t("common.inProgress")}
+                                  </span>
+                                ) : log.grade != null ? (
                                   <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                                 ) : (
                                   <span className="text-[var(--color-light)]">—</span>

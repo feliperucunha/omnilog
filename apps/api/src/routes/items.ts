@@ -128,16 +128,17 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
     Math.max(1, parseInt(String(req.query.limit ?? req.query.reviewsLimit ?? DEFAULT_REVIEWS_LIMIT), 10) || DEFAULT_REVIEWS_LIMIT)
   );
   const where = { mediaType, externalId };
+  const whereWithGrade = { ...where, grade: { not: null } };
 
   const [reviewsTotal, gradeAgg, logs] = await Promise.all([
-    prisma.log.count({ where }),
+    prisma.log.count({ where: whereWithGrade }),
     prisma.log.aggregate({
-      where: { ...where, grade: { not: null } },
+      where: whereWithGrade,
       _avg: { grade: true },
       _count: { grade: true },
     }),
     prisma.log.findMany({
-      where,
+      where: whereWithGrade,
       include: { user: { select: { email: true, tier: true } } },
       orderBy: { createdAt: "desc" },
       skip: (reviewsPage - 1) * reviewsLimit,
@@ -252,18 +253,19 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
   }
 
   const where = { mediaType, externalId };
+  const whereWithGrade = { ...where, grade: { not: null } };
 
   const [reviewsTotal, gradeAgg, logs] = await Promise.all([
-    prisma.log.count({ where }),
+    prisma.log.count({ where: whereWithGrade }),
     prisma.log.aggregate({
-      where: { ...where, grade: { not: null } },
+      where: whereWithGrade,
       _avg: { grade: true },
       _count: { grade: true },
     }),
     reviewsLimit === 0
       ? Promise.resolve([])
       : prisma.log.findMany({
-          where,
+          where: whereWithGrade,
           include: { user: { select: { email: true, tier: true } } },
           orderBy: { createdAt: "desc" },
           skip: (reviewsPage - 1) * reviewsLimit,

@@ -145,7 +145,8 @@
     "placeholderPassword": "••••••••",
     "placeholderPasswordRegister": "Mínimo 8 caracteres, letras e números",
     "placeholderUsername": "Letras, números, underscore, hífen",
-    "close": "Fechar"
+    "close": "Fechar",
+    "inProgress": "Em progresso"
   },
   "apiKeyBanner": {
     "categoryMessage": "Chave de {{category}} ausente",

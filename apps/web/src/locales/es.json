@@ -145,7 +145,8 @@
     "placeholderPassword": "••••••••",
     "placeholderPasswordRegister": "Mínimo 8 caracteres, letras y números",
     "placeholderUsername": "Letras, números, guión bajo, guión",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "inProgress": "En curso"
   },
   "apiKeyBanner": {
     "categoryMessage": "Clave de {{category}} faltante",

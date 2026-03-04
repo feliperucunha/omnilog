@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import type { MediaType, Log } from "@logeverything/shared";
-import { LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
+import { IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
 import { apiFetch, apiFetchCached, apiFetchPublic, invalidateApiCache, invalidateLogsAndItemsCache, apiFetchFile } from "@/lib/api";
 import { LogForm } from "@/components/LogForm";
 import { CustomEntryForm } from "@/components/CustomEntryForm";
@@ -137,6 +137,10 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
   );
 
   useEffect(() => {
+    setLogs([]);
+    setNextCursor(null);
+    setError(null);
+    setLoading(true);
     fetchLogsRef.current(true);
   }, [mediaType, statusFilter, sortBy, publicUserId]);
 
@@ -565,7 +569,11 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
                               {t("dashboard.finishedIn", { duration: formatTimeToFinish(log.startedAt, log.completedAt) })}
                             </span>
                           )}
-                          {log.grade != null ? (
+                          {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
+                            <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                              {t("common.inProgress")}
+                            </span>
+                          ) : log.grade != null ? (
                             <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                           ) : (
                             <span className="text-[var(--color-light)]">—</span>

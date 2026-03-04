@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { Log } from "@logeverything/shared";
+import { IN_PROGRESS_STATUSES, type Log } from "@logeverything/shared";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
@@ -285,9 +285,13 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
                               <> · {t("dashboard.finishedIn", { duration: formatTimeToFinish(log.startedAt, log.completedAt) })}</>
                             )}
                           </p>
-                          {log.grade != null && (
+                          {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
+                            <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                              {t("common.inProgress")}
+                            </span>
+                          ) : log.grade != null ? (
                             <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
-                          )}
+                          ) : null}
                         </div>
                       </Link>
                     </li>

@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { NumberCombobox } from "@/components/ui/number-combobox";
 import type { MediaType, Log } from "@logeverything/shared";
-import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { toast } from "sonner";
 import { tapScale, tapTransition } from "@/lib/animations";
@@ -102,7 +102,8 @@ export function ItemReviewForm({
         const log = logs[0] ?? null;
         setMyLog(log);
         if (log) {
-          setStars(gradeToStars(log.grade ?? undefined));
+          const isInProgressLog = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
+          setStars(isInProgressLog ? 0 : gradeToStars(log.grade ?? undefined));
           setReview(log.review ?? "");
           setStatus(log.status ?? log.listType ?? null);
           setSeason(log.season ?? "");
@@ -119,7 +120,8 @@ export function ItemReviewForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const gradeNum = starsToGrade(stars);
+    const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
+    const gradeNum = isInProgress ? null : starsToGrade(stars);
     setSaving(true);
     try {
       const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
@@ -170,7 +172,7 @@ export function ItemReviewForm({
           onSavedComplete?.({
             image,
             title,
-            grade: gradeNum,
+            grade: gradeNum ?? null,
             status: status ?? undefined,
             mediaType,
             id: externalId,
@@ -197,7 +199,7 @@ export function ItemReviewForm({
         onSavedComplete?.({
           image,
           title,
-          grade: gradeNum,
+          grade: gradeNum ?? null,
           status: status ?? undefined,
           mediaType,
           id: externalId,
@@ -328,9 +330,17 @@ export function ItemReviewForm({
 
             <div>
               <Label className="mb-2 block text-sm font-medium text-[var(--color-lightest)]">
-                {t("itemReviewForm.rating")} ({t("common.required")})
+                {t("itemReviewForm.rating")}{" "}
+                {status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status)
+                  ? `(${t("common.optional")})`
+                  : `(${t("common.required")})`}
               </Label>
-              <StarRating value={stars} onChange={setStars} size="lg" aria-required />
+              <StarRating
+                value={stars}
+                onChange={setStars}
+                size="lg"
+                aria-required={!(status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status))}
+              />
             </div>
             <div className="space-y-2">
               <Label>{t("logForm.review")} ({t("common.optional")})</Label>

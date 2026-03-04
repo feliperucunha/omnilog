@@ -33,7 +33,7 @@ const createLogSchema = z.object({
   externalId: z.string().min(1).max(EXTERNAL_ID_MAX_LENGTH),
   title: z.string().min(1).max(TITLE_MAX_LENGTH),
   image: z.string().url().max(2048).nullable().optional(),
-  grade: z.number().min(0).max(10),
+  grade: z.number().min(0).max(10).nullable().optional(),
   review: z.string().nullable().optional(),
   listType: z.enum(LIST_TYPES as unknown as [string, ...string[]]).nullable().optional(),
   status: z.string().nullable().optional(),
@@ -401,7 +401,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     externalId,
     title,
     image,
-    grade,
+    grade: gradeInput,
     review,
     listType,
     status,
@@ -445,6 +445,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
   const now = new Date();
   const createStartedAt = isInProgress(status) ? now : null;
   const createCompletedAt = isCompleted(status) ? now : null;
+  const grade = isInProgress(status) ? null : (gradeInput ?? null);
   try {
     const existing = await prisma.log.findUnique({
       where: { userId_mediaType_externalId: { userId, mediaType, externalId: sanitizedExternalId } },
@@ -603,6 +604,7 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
   if (parsed.data.genres !== undefined) {
     data.genres = parsed.data.genres && parsed.data.genres.length > 0 ? JSON.stringify(parsed.data.genres.slice(0, 20)) : null;
   }
+  if (isInProgress(parsed.data.status)) data.grade = null;
   const updated = await prisma.log.update({
     where: { id: log.id },
     data,

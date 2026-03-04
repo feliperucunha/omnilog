@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { NumberCombobox } from "@/components/ui/number-combobox";
 import { Select } from "@/components/ui/select";
 import type { MediaType } from "@logeverything/shared";
-import { MEDIA_TYPES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
+import { IN_PROGRESS_STATUSES, MEDIA_TYPES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
@@ -77,7 +77,8 @@ export function CustomEntryForm({
       return;
     }
     const image = imageUrl.trim() ? imageUrl.trim() : null;
-    const grade = starsToGrade(stars);
+    const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
+    const grade = isInProgress ? null : starsToGrade(stars);
     setLoading(true);
     try {
       const externalId = `custom-${crypto.randomUUID()}`;
@@ -102,7 +103,7 @@ export function CustomEntryForm({
       const completion: LogCompleteState = {
         image,
         title: trimmedTitle,
-        grade,
+        grade: grade ?? null,
         status: status ?? undefined,
         mediaType,
         id: externalId,
