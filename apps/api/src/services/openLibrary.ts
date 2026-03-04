@@ -42,6 +42,7 @@ export async function getBookById(workId: string): Promise<ItemDetail | null> {
     }
   }
   const subjects = Array.isArray(data.subjects) ? data.subjects.filter((s): s is string => typeof s === "string").slice(0, 15) : [];
+  const genres = subjects.length > 0 ? subjects : null;
   return {
     id: workId,
     title: data.title ?? "Unknown",
@@ -51,6 +52,7 @@ export async function getBookById(workId: string): Promise<ItemDetail | null> {
     description: description ?? null,
     authors: authors?.length ? authors : null,
     subjects: subjects.length > 0 ? subjects : null,
+    genres,
   };
 }
 

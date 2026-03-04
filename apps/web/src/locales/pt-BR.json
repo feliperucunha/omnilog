@@ -182,6 +182,8 @@
     "byCategory": "Por categoria",
     "byMonth": "Por mês",
     "byYear": "Por ano",
+    "byGenre": "Por gênero",
+    "logsCount": "{{count}}",
     "noStatsYet": "Complete itens com tempo para ver as estatísticas aqui.",
     "calendarTitle": "Calendário",
     "calendarProOnly": "Veja quando você completou itens. Assine o Pro para o calendário.",
@@ -195,6 +197,8 @@
     "calendarSat": "Sáb",
     "calendarSun": "Dom",
     "calendarCompletions": "{{count}} conclusão(ões) em {{date}}",
+    "calendarActivityOn": "Atividade em {{date}}",
+    "calendarNoActivity": "Nenhuma atividade neste dia.",
     "yourStats": "Suas estatísticas",
     "category": "Categoria",
     "recentLogs": "Logs recentes",
@@ -221,7 +225,8 @@
     "categoryLimitReachedTooltip": "Busca por {{type}} desativada ({{used}}/{{limit}} buscas gratuitas usadas). Adicione sua chave de API em Configurações.",
     "usersFilter": "Usuários",
     "usersPlaceholder": "Buscar por nome de usuário...",
-    "noUsersFound": "Nenhum usuário encontrado."
+    "noUsersFound": "Nenhum usuário encontrado.",
+    "userLogCount": "{{count}} logs"
   },
   "searchSort": {
     "relevance": "Relevância",

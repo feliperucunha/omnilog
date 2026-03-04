@@ -4,6 +4,7 @@ import type { MediaType } from "@logeverything/shared";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { LOG_STATUS_OPTIONS } from "@logeverything/shared";
+import { serializeLog } from "../lib/serializeLog.js";
 
 /** Public (no auth) read-only profile and logs for sharing. */
 
@@ -159,7 +160,7 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
       ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
     });
     const hasMore = logs.length > takeSize;
-    const data = hasMore ? logs.slice(0, takeSize) : logs;
+    const data = (hasMore ? logs.slice(0, takeSize) : logs).map(serializeLog);
     const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null;
     res.json({ data, nextCursor });
     return;
@@ -169,5 +170,5 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
     where,
     orderBy,
   });
-  res.json(logs);
+  res.json(logs.map(serializeLog));
 });

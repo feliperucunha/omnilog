@@ -13,6 +13,7 @@ import { Logo } from "@/components/Logo";
 import { ApiKeyPrompt, type ApiKeyProvider } from "@/components/ApiKeyPrompt";
 import { ItemPageContent } from "@/components/ItemPageContent";
 import { ItemImage } from "@/components/ItemImage";
+import { GenreBadges } from "@/components/GenreBadges";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -75,6 +76,7 @@ interface SearchResponse {
 interface UserSearchResult {
   id: string;
   username?: string;
+  logCount?: number;
 }
 
 export function Search() {
@@ -481,9 +483,16 @@ export function Search() {
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-mid)]/30 text-lg font-semibold text-[var(--color-lightest)]">
                     {(user.username ?? user.id).slice(0, 1).toUpperCase()}
                   </div>
-                  <span className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
-                    {user.username ?? user.id}
-                  </span>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
+                      {user.username ?? user.id}
+                    </span>
+                    {user.logCount != null && (
+                      <span className="text-xs text-[var(--color-light)]">
+                        {t("search.userLogCount", { count: String(user.logCount) })}
+                      </span>
+                    )}
+                  </div>
                 </Link>
               </motion.div>
             ))}
@@ -559,6 +568,9 @@ export function Search() {
                       <p className="line-clamp-2 text-sm font-semibold text-[var(--color-lightest)] sm:line-clamp-1 sm:text-lg">
                         {item.title}
                       </p>
+                      {item.genres && item.genres.length > 0 && (
+                        <GenreBadges genres={item.genres} maxCount={1} />
+                      )}
                       <p className="line-clamp-1 text-xs text-[var(--color-light)] sm:line-clamp-2 sm:text-sm sm:leading-snug">
                         {(() => {
                           const parts: string[] = [item.year ?? "", item.subtitle ?? ""].filter(Boolean);

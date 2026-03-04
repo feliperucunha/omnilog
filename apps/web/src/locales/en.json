@@ -190,6 +190,8 @@
     "byCategory": "By category",
     "byMonth": "By month",
     "byYear": "By year",
+    "byGenre": "By genre",
+    "logsCount": "{{count}}",
     "noStatsYet": "Complete items with runtimes to see stats here.",
     "calendarTitle": "Calendar",
     "calendarProOnly": "See when you completed items. Upgrade to Pro for the calendar view.",
@@ -202,7 +204,9 @@
     "calendarFri": "Fri",
     "calendarSat": "Sat",
     "calendarSun": "Sun",
-    "calendarCompletions": "{{count}} completion(s) on {{date}}"
+    "calendarCompletions": "{{count}} completion(s) on {{date}}",
+    "calendarActivityOn": "Activity on {{date}}",
+    "calendarNoActivity": "No activity on this day."
   },
   "statistics": {
     "proOnlyTitle": "Statistics is a Pro feature",
@@ -222,7 +226,8 @@
     "categoryLimitReachedTooltip": "{{type}} search disabled ({{used}}/{{limit}} free searches used). Add your API key in Settings.",
     "usersFilter": "Users",
     "usersPlaceholder": "Search by username...",
-    "noUsersFound": "No users found."
+    "noUsersFound": "No users found.",
+    "userLogCount": "{{count}} logs"
   },
   "searchSort": {
     "relevance": "Relevance",

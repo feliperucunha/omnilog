@@ -18,6 +18,7 @@ import type { Log } from "@logeverything/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { MediaLogs } from "@/pages/MediaLogs";
 import { ItemImage } from "@/components/ItemImage";
+import { GenreBadges } from "@/components/GenreBadges";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
@@ -300,6 +301,9 @@ export function Dashboard() {
                           <p className="text-xs text-[var(--color-light)]">
                             {user.username ?? t("social.userWithoutUsername")} · {t(`nav.${log.mediaType}`)}
                           </p>
+                          {log.genres && log.genres.length > 0 && (
+                            <GenreBadges genres={log.genres} maxCount={1} />
+                          )}
                           <div className="flex shrink-0 items-center gap-2 mt-0.5">
                             {log.startedAt && log.completedAt && (
                               <span className="whitespace-nowrap text-xs text-[var(--color-light)]">

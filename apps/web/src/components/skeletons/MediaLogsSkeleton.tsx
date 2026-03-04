@@ -36,11 +36,12 @@ export function MediaLogsSkeleton() {
           >
             <div className="flex gap-3 p-3 flex-1 min-h-0 sm:gap-4 sm:p-4">
               <Skeleton className="h-16 w-11 shrink-0 rounded-lg sm:h-20 sm:w-14" />
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <Skeleton className="h-4 w-full max-w-[10rem] rounded" />
-                <Skeleton className="h-3 w-20 rounded" />
-                <Skeleton className="h-3 w-14 rounded" />
-              </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <Skeleton className="h-4 w-full max-w-[10rem] rounded" />
+                  <Skeleton className="h-3 w-20 rounded" />
+                  <Skeleton className="h-3 w-12 rounded" />
+                  <Skeleton className="h-3 w-14 rounded" />
+                </div>
             </div>
             <div className="flex border-t border-[var(--color-darkest)]">
               <Skeleton className="h-9 flex-1 rounded-none" />

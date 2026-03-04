@@ -5,6 +5,17 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { ItemImage } from "@/components/ItemImage";
+import { StarRating } from "@/components/StarRating";
+import { gradeToStars } from "@/lib/gradeStars";
+import { formatTimeToFinish } from "@/lib/formatDuration";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { Log } from "@logeverything/shared";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
@@ -28,12 +39,21 @@ function getMonthKey(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+function formatCalendarDayDate(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+}
+
 export function DashboardCalendar({ isPro }: { isPro: boolean }) {
   const { t } = useLocale();
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [data, setData] = useState<CalendarData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dayLogs, setDayLogs] = useState<Log[]>([]);
+  const [dayLogsLoading, setDayLogsLoading] = useState(false);
 
   const fetchCalendar = useCallback(async (y: number, m: number) => {
     if (!isPro) return;
@@ -53,6 +73,24 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
     else setData(null);
   }, [isPro, year, month, fetchCalendar]);
 
+  const fetchDayLogs = useCallback(async (dateKey: string) => {
+    setDayLogsLoading(true);
+    setDayLogs([]);
+    try {
+      const res = await apiFetch<{ data: Log[] }>(`/logs/by-date?date=${dateKey}`);
+      setDayLogs(res.data ?? []);
+    } catch {
+      setDayLogs([]);
+    } finally {
+      setDayLogsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedDate && isPro) fetchDayLogs(selectedDate);
+    else setDayLogs([]);
+  }, [selectedDate, isPro, fetchDayLogs]);
+
   const prevMonth = useCallback(() => {
     if (month === 1) {
       setYear((y) => y - 1);
@@ -71,112 +109,195 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
     }
   }, [month]);
 
+  const handleDayClick = useCallback(
+    (dateKey: string) => {
+      if (!isPro) return;
+      setSelectedDate(dateKey);
+    },
+    [isPro]
+  );
+
   const now = new Date();
   const isCurrentMonth = now.getFullYear() === year && now.getMonth() + 1 === month;
   const firstDay = new Date(year, month - 1, 1);
   const lastDay = new Date(year, month, 0);
-  const startWeekday = firstDay.getDay(); // 0 = Sun, 1 = Mon, ...
+  const startWeekday = firstDay.getDay();
   const daysInMonth = lastDay.getDate();
   const leadingBlanks = (startWeekday + 6) % 7;
 
-  const monthName = new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const monthName = new Date(year, month - 1, 1).toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
 
   return (
-    <Card
-      className={`relative min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-4 overflow-hidden md:max-w-[20rem] ${!isPro ? "select-none" : ""}`}
-      style={paperShadow}
-    >
-      {!isPro && (
-        <div
-          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[var(--color-dark)]/80 backdrop-blur-md"
-          aria-hidden
-        >
-          <p className="text-center text-sm font-medium text-[var(--color-lightest)] px-4">
-            {t("dashboard.calendarProOnly")}
-          </p>
-          <Button asChild size="sm" className="btn-gradient">
-            <Link to="/tiers">{t("tiers.upgradeToPro")}</Link>
-          </Button>
-        </div>
-      )}
-      <div className={!isPro ? "pointer-events-none blur-sm" : ""}>
-        <div className="flex min-w-0 items-center justify-between gap-2 mb-3">
-          <h3 className="text-sm font-semibold uppercase text-[var(--color-light)]">
-            {t("dashboard.calendarTitle")}
-          </h3>
-          {isPro && (
-            <div className="flex items-center gap-0.5">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-                onClick={prevMonth}
-                aria-label={t("dashboard.calendarPrevMonth")}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="min-w-[10rem] text-center text-sm font-medium text-[var(--color-lightest)]">
-                {monthName}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-                onClick={nextMonth}
-                aria-label={t("dashboard.calendarNextMonth")}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-        <div className="grid grid-cols-7 gap-0.5 text-center">
-          {WEEKDAY_KEYS.map((key) => (
-            <div key={key} className="py-1 text-xs font-medium text-[var(--color-mid)]">
-              {t(key)}
-            </div>
-          ))}
-          {Array.from({ length: leadingBlanks }, (_, i) => (
-            <div key={`blank-${i}`} className="aspect-square" />
-          ))}
-          {Array.from({ length: daysInMonth }, (_, i) => {
-            const day = i + 1;
-            const key = getMonthKey(year, month, day);
-            const count = data?.dates[key] ?? 0;
-            const isToday = isCurrentMonth && now.getDate() === day;
-            return (
-              <div
-                key={day}
-                className={`flex aspect-square flex-col items-center justify-center rounded text-xs ${
-                  isToday ? "ring-1 ring-[var(--color-mid)] bg-[var(--color-mid)]/20" : ""
-                } ${count > 0 ? "text-[var(--color-lightest)]" : "text-[var(--color-mid)]"}`}
-                title={count > 0 ? t("dashboard.calendarCompletions", { count: String(count), date: key }) : undefined}
-              >
-                <span>{day}</span>
-                {isPro && count > 0 && (
-                  <span className="mt-0.5 flex gap-0.5">
-                    {Array.from({ length: Math.min(count, 3) }, (_, j) => (
-                      <span
-                        key={j}
-                        className="h-1 w-1 rounded-full bg-[var(--btn-gradient-start)]"
-                        aria-hidden
-                      />
-                    ))}
-                    {count > 3 && (
-                      <span className="text-[10px] text-[var(--color-light)]">+{count - 3}</span>
-                    )}
-                  </span>
-                )}
+    <>
+      <Card
+        className={`relative min-w-0 w-full max-w-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)] overflow-hidden ${!isPro ? "select-none" : ""}`}
+        style={paperShadow}
+      >
+        {!isPro && (
+          <div
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[var(--color-dark)]/80 backdrop-blur-md"
+            aria-hidden
+          >
+            <p className="text-center text-sm font-medium text-[var(--color-lightest)] px-4">
+              {t("dashboard.calendarProOnly")}
+            </p>
+            <Button asChild size="sm" className="btn-gradient">
+              <Link to="/tiers">{t("tiers.upgradeToPro")}</Link>
+            </Button>
+          </div>
+        )}
+        <div className={!isPro ? "pointer-events-none blur-sm" : ""}>
+          <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[var(--color-mid)]/30 px-4 py-3">
+            <h3 className="shrink-0 text-sm font-semibold uppercase tracking-wide text-[var(--color-light)]">
+              {t("dashboard.calendarTitle")}
+            </h3>
+            {isPro && (
+              <div className="flex min-w-0 shrink items-center gap-0.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)]"
+                  onClick={prevMonth}
+                  aria-label={t("dashboard.calendarPrevMonth")}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="min-w-0 shrink text-center text-sm font-medium text-[var(--color-lightest)] truncate px-2">
+                  {monthName}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)]"
+                  onClick={nextMonth}
+                  aria-label={t("dashboard.calendarNextMonth")}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
-            );
-          })}
+            )}
+          </div>
+          <div className="grid grid-cols-7 text-center [&>*:nth-child(7n)]:border-r-0">
+            {WEEKDAY_KEYS.map((key) => (
+              <div
+                key={key}
+                className="border-b border-r border-[var(--color-mid)]/20 py-2 text-xs font-medium text-[var(--color-mid)]"
+              >
+                {t(key)}
+              </div>
+            ))}
+            {Array.from({ length: leadingBlanks }, (_, i) => (
+              <div
+                key={`blank-${i}`}
+                className="min-h-[3.5rem] border-b border-r border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/30 last:border-r-0"
+              />
+            ))}
+            {Array.from({ length: daysInMonth }, (_, i) => {
+              const day = i + 1;
+              const key = getMonthKey(year, month, day);
+              const count = data?.dates[key] ?? 0;
+              const isToday = isCurrentMonth && now.getDate() === day;
+              const DayCell = isPro ? "button" : "div";
+              return (
+                <DayCell
+                  key={day}
+                  type={isPro ? "button" : undefined}
+                  onClick={isPro ? () => handleDayClick(key) : undefined}
+                  className={`relative min-h-[3.5rem] flex flex-col items-center justify-start gap-0.5 border-b border-r border-[var(--color-mid)]/20 bg-[var(--color-dark)] pt-1.5 text-left ${
+                    isPro
+                      ? "cursor-pointer hover:bg-[var(--color-mid)]/15 active:bg-[var(--color-mid)]/25"
+                      : ""
+                  } ${isToday ? "ring-1 ring-inset ring-[var(--color-mid)] bg-[var(--color-mid)]/10" : ""}`}
+                  title={count > 0 ? t("dashboard.calendarCompletions", { count: String(count), date: key }) : undefined}
+                  aria-label={count > 0 ? t("dashboard.calendarCompletions", { count: String(count), date: key }) : `${day}`}
+                >
+                  <span
+                    className={`text-xs font-medium ${isToday ? "text-[var(--color-lightest)]" : count > 0 ? "text-[var(--color-lightest)]" : "text-[var(--color-mid)]"}`}
+                  >
+                    {day}
+                  </span>
+                  {isPro && count > 0 && (
+                    <span className="flex gap-0.5 flex-wrap justify-center px-0.5">
+                      {Array.from({ length: Math.min(count, 4) }, (_, j) => (
+                        <span
+                          key={j}
+                          className="h-1.5 w-1.5 rounded-full bg-[var(--btn-gradient-start)]"
+                          aria-hidden
+                        />
+                      ))}
+                      {count > 4 && (
+                        <span className="text-[9px] text-[var(--color-light)] leading-none">+{count - 4}</span>
+                      )}
+                    </span>
+                  )}
+                </DayCell>
+              );
+            })}
+          </div>
         </div>
         {isPro && loading && (
-          <div className="mt-2 h-6 animate-pulse rounded bg-[var(--color-darkest)]" aria-hidden />
+          <div className="h-2 animate-pulse bg-[var(--color-darkest)]" aria-hidden />
         )}
-      </div>
-    </Card>
+      </Card>
+
+      {isPro && (
+        <Dialog open={!!selectedDate} onOpenChange={(open) => !open && setSelectedDate(null)}>
+          <DialogContent
+            className="max-h-[85vh] flex flex-col max-w-md"
+            onClose={() => setSelectedDate(null)}
+          >
+            <DialogHeader>
+              <DialogTitle className="text-[var(--color-lightest)]">
+                {selectedDate ? t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate) }) : ""}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="min-h-0 overflow-y-auto -mx-1 px-1">
+              {dayLogsLoading ? (
+                <div className="py-8 flex justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
+                </div>
+              ) : dayLogs.length === 0 ? (
+                <p className="py-6 text-center text-sm text-[var(--color-light)]">
+                  {t("dashboard.calendarNoActivity")}
+                </p>
+              ) : (
+                <ul className="list-none m-0 p-0 flex flex-col gap-2">
+                  {dayLogs.map((log) => (
+                    <li key={log.id}>
+                      <Link
+                        to={`/item/${log.mediaType}/${log.externalId}`}
+                        className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
+                        onClick={() => setSelectedDate(null)}
+                      >
+                        <ItemImage src={log.image} className="h-14 w-10 shrink-0 rounded object-cover" />
+                        <div className="min-w-0 flex-1 flex flex-col gap-0.5 justify-center">
+                          <p className="truncate font-medium text-[var(--color-lightest)] text-sm">
+                            {log.title}
+                          </p>
+                          <p className="text-xs text-[var(--color-light)]">
+                            {t(`nav.${log.mediaType}`)}
+                            {log.startedAt && log.completedAt && (
+                              <> · {t("dashboard.finishedIn", { duration: formatTimeToFinish(log.startedAt, log.completedAt) })}</>
+                            )}
+                          </p>
+                          {log.grade != null && (
+                            <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+                          )}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }

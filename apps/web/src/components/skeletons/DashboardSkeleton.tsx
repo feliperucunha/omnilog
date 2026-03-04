@@ -55,6 +55,7 @@ export function DashboardSkeleton() {
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <Skeleton className="h-4 w-full max-w-[10rem] rounded" />
                   <Skeleton className="h-3 w-20 rounded" />
+                  <Skeleton className="h-3 w-12 rounded" />
                   <Skeleton className="h-3 w-14 rounded" />
                 </div>
               </div>
@@ -79,6 +80,7 @@ export function DashboardSkeleton() {
               <Skeleton className="h-12 w-9 shrink-0 rounded" />
               <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
                 <Skeleton className="h-4 w-full max-w-[12rem] rounded" />
+                <Skeleton className="h-3 w-12 rounded" />
                 <Skeleton className="h-3 w-16 rounded" />
               </div>
             </div>

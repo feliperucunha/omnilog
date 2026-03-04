@@ -26,6 +26,8 @@ const optionalInt = z.number().int().min(0).nullable().optional();
 
 const optionalFloat = z.number().min(0).nullable().optional();
 
+const genresSchema = z.array(z.string().min(1).max(80)).max(20).optional().nullable();
+
 const createLogSchema = z.object({
   mediaType: z.enum(MEDIA_TYPES as unknown as [string, ...string[]]),
   externalId: z.string().min(1).max(EXTERNAL_ID_MAX_LENGTH),
@@ -40,6 +42,7 @@ const createLogSchema = z.object({
   chapter: optionalInt,
   volume: optionalInt,
   contentHours: optionalFloat,
+  genres: genresSchema,
   boardGameSource: z.enum(["bgg", "ludopedia"]).nullable().optional(),
 });
 
@@ -54,6 +57,7 @@ const updateLogSchema = z.object({
   chapter: optionalInt,
   volume: optionalInt,
   contentHours: optionalFloat,
+  genres: genresSchema,
 });
 
 function validateStatus(mediaType: MediaType, status: string | null | undefined): boolean {
@@ -69,6 +73,8 @@ function isInProgress(status: string | null | undefined): boolean {
 function isCompleted(status: string | null | undefined): boolean {
   return status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
 }
+
+import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
 
 const FREE_LOG_LIMIT = 500;
 
@@ -129,7 +135,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
     });
     const hasMore = logs.length > takeSize;
-    const data = hasMore ? logs.slice(0, takeSize) : logs;
+    const data = (hasMore ? logs.slice(0, takeSize) : logs).map(serializeLog);
     const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null;
     res.json({ data, nextCursor });
     return;
@@ -139,7 +145,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     where,
     orderBy,
   });
-  res.json(logs);
+  res.json(logs.map(serializeLog));
 });
 
 /** GET /logs/feed - Up to 5 recent logs from followed users, ordered by startedAt desc (for Social section). */
@@ -167,13 +173,7 @@ logsRouter.get("/feed", async (req: AuthenticatedRequest, res) => {
   const data = rows.map((row) => {
     const { user, ...log } = row;
     return {
-      log: {
-        ...log,
-        startedAt: log.startedAt?.toISOString() ?? null,
-        completedAt: log.completedAt?.toISOString() ?? null,
-        createdAt: log.createdAt.toISOString(),
-        updatedAt: log.updatedAt.toISOString(),
-      },
+      log: serializeLog(log),
       user: {
         id: user.id,
         username: user.username ?? null,
@@ -183,11 +183,33 @@ logsRouter.get("/feed", async (req: AuthenticatedRequest, res) => {
   res.json({ data });
 });
 
-/** GET /logs/stats?group=category|month|year - hours of content completed per category or per period */
+/** GET /logs/stats?group=category|month|year|genre - hours (or count for genre) per category/period/genre */
 logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const groupParam = req.query.group as string;
-  const group = groupParam === "year" ? "year" : groupParam === "category" ? "category" : "month";
+  const group = groupParam === "year" ? "year" : groupParam === "genre" ? "genre" : groupParam === "category" ? "category" : "month";
+
+  if (group === "genre") {
+    const logs = await prisma.log.findMany({
+      where: { userId, genres: { not: null } },
+      select: { genres: true },
+    });
+    const byGenre: Record<string, number> = {};
+    for (const log of logs) {
+      const genres = parseGenresJson(log.genres);
+      if (!genres) continue;
+      for (const g of genres) {
+        const name = g.trim();
+        if (name) byGenre[name] = (byGenre[name] ?? 0) + 1;
+      }
+    }
+    const entries = Object.entries(byGenre)
+      .sort(([, a], [, b]) => b - a)
+      .map(([period, count]) => ({ period, hours: count }));
+    res.json({ group: "genre", data: entries });
+    return;
+  }
+
   const logs = await prisma.log.findMany({
     where: {
       userId,
@@ -222,6 +244,45 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([period, hours]) => ({ period, hours: Math.round(hours * 10) / 10 }));
   res.json({ group, data: entries });
+});
+
+/** GET /logs/by-date?date=YYYY-MM-DD - Logs completed or started on the given UTC date. Pro only. Returns { data: Log[] }. */
+logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tier: true },
+  });
+  if (user?.tier !== "pro") {
+    res.json({ data: [] });
+    return;
+  }
+  const dateParam = typeof req.query.date === "string" ? req.query.date.trim() : "";
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateParam);
+  if (!match) {
+    res.status(400).json({ error: "Invalid date; use YYYY-MM-DD" });
+    return;
+  }
+  const y = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const d = parseInt(match[3], 10);
+  if (m < 1 || m > 12 || d < 1 || d > 31) {
+    res.status(400).json({ error: "Invalid date" });
+    return;
+  }
+  const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+  const end = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999));
+  const logs = await prisma.log.findMany({
+    where: {
+      userId,
+      OR: [
+        { completedAt: { gte: start, lte: end } },
+        { startedAt: { gte: start, lte: end } },
+      ],
+    },
+    orderBy: [{ completedAt: "desc" }, { startedAt: "desc" }, { updatedAt: "desc" }],
+  });
+  res.json({ data: logs.map(serializeLog) });
 });
 
 /** GET /logs/calendar?year=YYYY&month=M - Start and end dates per day for a month. Pro only; free accounts get no data. */
@@ -349,8 +410,13 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     chapter,
     volume,
     contentHours,
+    genres: genresInput,
     boardGameSource: bodyBoardGameSource,
   } = parsed.data;
+  const genresJson =
+    genresInput && genresInput.length > 0
+      ? JSON.stringify(genresInput.slice(0, 20))
+      : null;
   const mediaType = mediaTypeRaw as MediaType;
   if (!validateStatus(mediaType, status)) {
     res.status(400).json({ error: { status: ["Invalid status for this media type"] } });
@@ -418,6 +484,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         episode: number | null;
         chapter: number | null;
         volume: number | null;
+        genres?: string | null;
       } = {
         title: sanitizedTitle,
         grade: grade ?? null,
@@ -431,6 +498,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         volume: volume ?? null,
       };
       if (image !== undefined) updateData.image = sanitizedImage ?? null;
+      if (genresJson !== undefined) updateData.genres = genresJson;
       if (isInProgress(status) && existing.startedAt == null) updateData.startedAt = now;
       if (isCompleted(status)) updateData.completedAt = now;
       log = await prisma.log.update({
@@ -473,11 +541,12 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           episode: episode ?? null,
           chapter: chapter ?? null,
           volume: volume ?? null,
+          genres: genresJson,
           boardGameSource,
         },
       });
     }
-    res.status(201).json(log);
+    res.status(201).json(serializeLog(log));
   } catch (e) {
     res.status(500).json({ error: "Failed to save log" });
   }
@@ -514,6 +583,7 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     episode?: number | null;
     chapter?: number | null;
     volume?: number | null;
+    genres?: string | null;
   } = {};
   if (parsed.data.image !== undefined) data.image = sanitizeUrl(parsed.data.image) ?? null;
   if (parsed.data.grade !== undefined) data.grade = parsed.data.grade;
@@ -530,11 +600,14 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
   if (parsed.data.episode !== undefined) data.episode = parsed.data.episode;
   if (parsed.data.chapter !== undefined) data.chapter = parsed.data.chapter;
   if (parsed.data.volume !== undefined) data.volume = parsed.data.volume;
+  if (parsed.data.genres !== undefined) {
+    data.genres = parsed.data.genres && parsed.data.genres.length > 0 ? JSON.stringify(parsed.data.genres.slice(0, 20)) : null;
+  }
   const updated = await prisma.log.update({
     where: { id: log.id },
     data,
   });
-  res.json(updated);
+  res.json(serializeLog(updated));
 });
 
 logsRouter.delete("/:id", async (req: AuthenticatedRequest, res) => {

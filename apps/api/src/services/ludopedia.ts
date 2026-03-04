@@ -55,6 +55,7 @@ function mapJogoToItemDetail(raw: {
   const playersMin = raw.qt_jogadores_min ?? raw.qt_min_jogadores;
   const playersMax = raw.qt_jogadores_max ?? raw.qt_max_jogadores;
   const playingTime = raw.vl_tempo_jogo ?? raw.tempo_jogo;
+  const genres = categories.length > 0 ? categories : null;
   return {
     id,
     title: raw.nm_jogo ?? "Unknown",
@@ -68,6 +69,7 @@ function mapJogoToItemDetail(raw: {
     minAge: typeof raw.idade_minima === "number" && raw.idade_minima > 0 ? raw.idade_minima : null,
     categories: categories.length > 0 ? categories : null,
     mechanics: mechanics.length > 0 ? mechanics : null,
+    genres,
   };
 }
 

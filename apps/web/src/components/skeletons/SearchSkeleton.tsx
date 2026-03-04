@@ -13,9 +13,10 @@ export function SearchSkeleton() {
             <Skeleton
               className="w-20 h-28 flex-shrink-0 rounded-l-lg sm:w-full sm:h-auto sm:aspect-[2/3] sm:rounded-l-none sm:rounded-t-lg"
             />
-            <div className="flex flex-1 min-w-0 flex-col justify-center gap-1 p-3 sm:justify-start sm:gap-1 sm:h-[5.5rem] sm:min-h-[5.5rem] sm:p-4 sm:pt-3">
+            <div className="flex flex-1 min-w-0 flex-col justify-center gap-1 p-3 sm:justify-start sm:gap-1 sm:min-h-[5.5rem] sm:p-4 sm:pt-3">
               <Skeleton className="h-3 w-12 rounded sm:w-14" />
               <Skeleton className="h-4 w-full max-w-[10rem] rounded sm:max-w-none" />
+              <Skeleton className="h-3 w-14 rounded" />
               <Skeleton className="h-3.5 w-2/3 rounded" />
             </div>
           </div>

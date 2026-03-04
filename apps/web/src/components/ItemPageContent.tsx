@@ -11,6 +11,7 @@ import { useLogComplete } from "@/contexts/LogCompleteContext";
 import { ItemReviewForm } from "@/components/ItemReviewForm";
 import { ItemPageSkeleton } from "@/components/skeletons";
 import { ItemImage } from "@/components/ItemImage";
+import { GenreBadges } from "@/components/GenreBadges";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish, formatTimeToBeatHours } from "@/lib/formatDuration";
@@ -117,15 +118,7 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        {hasGenres &&
-          item.genres!.map((g) => (
-            <span
-              key={g}
-              className="rounded-full bg-[var(--color-mid)]/40 px-3 py-1 text-xs font-medium text-[var(--color-lightest)]"
-            >
-              {g}
-            </span>
-          ))}
+        {hasGenres && <GenreBadges genres={item.genres!} maxCount={2} className="[&_span]:px-3 [&_span]:py-1 [&_span]:text-xs" />}
         {hasScore && scoreDisplay && (
           <span className="inline-flex items-center rounded-md bg-[var(--btn-gradient-start)]/30 px-2.5 py-1 text-sm font-semibold text-[var(--color-lightest)]">
             {scoreDisplay}/10
@@ -542,6 +535,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             image={item.image}
             runtimeMinutes={item.runtimeMinutes ?? null}
             episodesCount={item.episodesCount ?? null}
+            genres={item.genres ?? undefined}
             onSaved={() => setReviewsPage(1)}
             onSavedComplete={(state) => showLogComplete(state)}
           />

@@ -66,6 +66,8 @@ export interface SearchResult {
   subtitle?: string | null;
   /** Average time to beat in hours (games only, from RAWG playtime). */
   timeToBeatHours?: number | null;
+  /** Genre names (when available from API). Show up to 2 badges. */
+  genres?: string[] | null;
 }
 
 /** Sort option for search: value sent to API, labelKey for i18n (e.g. searchSort.titleAsc). */
@@ -270,6 +272,8 @@ export interface Log {
   startedAt: string | null;
   completedAt: string | null;
   contentHours: number | null;
+  /** Genre names (for stats and badges). Stored when logging. */
+  genres: string[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -288,6 +292,8 @@ export interface CreateLogInput {
   chapter?: number | null;
   volume?: number | null;
   contentHours?: number | null;
+  /** Genre names from item (for stats and badges). Store up to 2 when logging. */
+  genres?: string[] | null;
   /** When mediaType is boardgames: which API this id came from (bgg | ludopedia). Stored so details are fetched from the correct API. */
   boardGameSource?: BoardGameProvider | null;
 }
@@ -303,6 +309,7 @@ export interface UpdateLogInput {
   chapter?: number | null;
   volume?: number | null;
   contentHours?: number | null;
+  genres?: string[] | null;
 }
 
 export interface AuthRegisterInput {

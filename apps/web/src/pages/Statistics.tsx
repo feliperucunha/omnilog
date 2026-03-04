@@ -6,11 +6,12 @@ import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchCached, apiFetchFile } from "@/lib/api";
 import { StatisticsSkeleton } from "@/components/skeletons";
 import { ItemImage } from "@/components/ItemImage";
+import { GenreBadges } from "@/components/GenreBadges";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
-import { type Log, type MediaType } from "@logeverything/shared";
+import { type Log } from "@logeverything/shared";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
@@ -55,6 +56,8 @@ export function Statistics() {
   const [statsGroup, setStatsGroup] = useState<StatsGroup>("category");
   const [stats, setStats] = useState<StatsEntry[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [genreStats, setGenreStats] = useState<StatsEntry[]>([]);
+  const [genreStatsLoading, setGenreStatsLoading] = useState(true);
   const [statsCollapsed, setStatsCollapsedState] = useState(() => getStoredCollapsed(STORAGE_KEY_STATS));
   const [recentLogsCollapsed, setRecentLogsCollapsedState] = useState(() => getStoredCollapsed(STORAGE_KEY_RECENT));
   const [showProModal, setShowProModal] = useState(false);
@@ -90,9 +93,25 @@ export function Statistics() {
     }
   }, []);
 
+  const fetchGenreStats = useCallback(async () => {
+    setGenreStatsLoading(true);
+    try {
+      const res = await apiFetch<{ data: StatsEntry[] }>("/logs/stats?group=genre");
+      setGenreStats(res.data ?? []);
+    } catch {
+      setGenreStats([]);
+    } finally {
+      setGenreStatsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isPro) fetchStats(statsGroup);
   }, [isPro, statsGroup, fetchStats]);
+
+  useEffect(() => {
+    if (isPro) fetchGenreStats();
+  }, [isPro, fetchGenreStats]);
 
   const fetchLogs = useCallback(() => {
     setLoading(true);
@@ -119,9 +138,14 @@ export function Statistics() {
   const recent = logs.slice(0, 10); // API returns up to 10 when using limit=10
   const displayedStats =
     statsGroup === "category"
-      ? stats.filter((s) => visibleTypes.includes(s.period as MediaType))
+      ? visibleTypes.map((period) => ({
+          period,
+          hours: stats.find((s) => s.period === period)?.hours ?? 0,
+        }))
       : stats;
   const maxHours = displayedStats.length > 0 ? Math.max(...displayedStats.map((s) => s.hours), 1) : 1;
+  const maxGenreCount =
+    genreStats.length > 0 ? Math.max(...genreStats.map((s) => s.hours), 1) : 1;
 
   if (isPro && loading && logs.length === 0) {
     return (
@@ -152,8 +176,8 @@ export function Statistics() {
   };
 
   return (
-    <div className="relative flex min-w-0 flex-col gap-8 overflow-x-hidden">
-      <Dialog open={showProModal} onOpenChange={setShowProModal}>
+    <div className="relative flex min-w-0 flex-col gap-10 overflow-x-hidden">
+      <Dialog open={showProModal && !isPro} onOpenChange={setShowProModal}>
         <DialogContent onClose={() => setShowProModal(false)}>
           <DialogHeader>
             <DialogTitle className="text-[var(--color-lightest)]">
@@ -188,12 +212,45 @@ export function Statistics() {
         </Button>
       </div>
 
-      <div className={!isPro ? "pointer-events-none select-none blur-sm" : ""}>
-      <section aria-label={t("dashboard.calendarTitle")} className="min-w-0 overflow-hidden">
-        <DashboardCalendar isPro={isPro} />
-      </section>
+      <div className={`flex flex-col gap-12 ${!isPro ? "pointer-events-none select-none blur-sm" : ""}`}>
+      <div className="grid min-w-0 grid-cols-1 gap-6 overflow-hidden md:grid-cols-2 md:gap-8">
+        <section aria-label={t("dashboard.calendarTitle")} className="min-w-0 w-full">
+          <DashboardCalendar isPro={isPro} />
+        </section>
+        <Card className="min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-4" style={paperShadow}>
+          <h3 className="mb-3 text-sm font-semibold uppercase text-[var(--color-light)]">
+            {t("dashboard.byGenre")}
+          </h3>
+          {genreStatsLoading ? (
+            <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
+          ) : genreStats.length === 0 ? (
+            <p className="text-center text-sm text-[var(--color-light)]">
+              {t("dashboard.noStatsYet")}
+            </p>
+          ) : (
+            <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+              {genreStats.map(({ period, hours }) => (
+                <div key={period} className="flex min-w-0 items-center gap-3">
+                  <span className="min-w-0 max-w-[8rem] shrink-0 truncate text-xs text-[var(--color-light)]">
+                    {period}
+                  </span>
+                  <div className="h-6 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
+                    <div
+                      className="h-full rounded bg-[var(--color-mid)]"
+                      style={{ width: `${Math.max(5, (hours / maxGenreCount) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="w-12 shrink-0 text-right text-xs text-[var(--color-lightest)]">
+                    {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
-      <div className="grid min-w-0 grid-cols-1 gap-8 overflow-hidden md:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-1 gap-10 overflow-hidden md:grid-cols-2 md:gap-10">
         <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
           <button
             type="button"
@@ -333,11 +390,12 @@ export function Statistics() {
                             style={paperShadow}
                           >
                             <ItemImage src={log.image} className="h-12 w-9 shrink-0 rounded" />
-                            <div className="flex min-w-0 flex-1 items-center justify-between gap-2 overflow-hidden">
-                              <p className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
-                                {log.title}
-                              </p>
-                              <div className="flex shrink-0 items-center gap-2">
+                            <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden">
+                              <div className="flex min-w-0 items-center justify-between gap-2">
+                                <p className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
+                                  {log.title}
+                                </p>
+                                <div className="flex shrink-0 items-center gap-2">
                                 {log.startedAt && log.completedAt && (
                                   <span className="whitespace-nowrap text-xs text-[var(--color-light)]">
                                     {t("dashboard.finishedIn", {
@@ -350,7 +408,11 @@ export function Statistics() {
                                 ) : (
                                   <span className="text-[var(--color-light)]">—</span>
                                 )}
+                                </div>
                               </div>
+                              {log.genres && log.genres.length > 0 && (
+                                <GenreBadges genres={log.genres} maxCount={1} />
+                              )}
                             </div>
                           </Link>
                         </motion.div>

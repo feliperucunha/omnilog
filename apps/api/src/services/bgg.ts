@@ -64,6 +64,7 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
   const linkList = Array.isArray(links) ? links : links ? [links] : [];
   const categories = linkList.filter((l) => l["@_type"] === "boardgamecategory").map((l) => l["@_value"]).filter(Boolean) as string[];
   const mechanics = linkList.filter((l) => l["@_type"] === "boardgamemechanic").map((l) => l["@_value"]).filter(Boolean) as string[];
+  const genres = categories.length > 0 ? categories : null;
   return {
     id: item["@_id"],
     title,
@@ -77,6 +78,7 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
     minAge: minAge != null && !Number.isNaN(minAge) ? minAge : null,
     categories: categories.length > 0 ? categories : null,
     mechanics: mechanics.length > 0 ? mechanics : null,
+    genres,
   };
 }
 

@@ -99,11 +99,13 @@ export async function searchGames(
       released?: string;
       background_image?: string;
       playtime?: number;
+      genres?: Array<{ name?: string }>;
     }>;
   };
   const results = (data.results ?? []).map((item) => {
     const timeToBeatHours =
       typeof item.playtime === "number" && item.playtime > 0 ? item.playtime : null;
+    const genres = item.genres?.map((g) => g.name).filter(Boolean) as string[] | undefined;
     return {
       id: String(item.id),
       title: item.name ?? "Unknown",
@@ -111,6 +113,7 @@ export async function searchGames(
       year: item.released?.slice(0, 4) ?? null,
       subtitle: null,
       timeToBeatHours,
+      genres: genres?.length ? genres : undefined,
     };
   });
   return { results };

@@ -13,6 +13,7 @@ import { LogForm } from "@/components/LogForm";
 import { CustomEntryForm } from "@/components/CustomEntryForm";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { ItemImage } from "@/components/ItemImage";
+import { GenreBadges } from "@/components/GenreBadges";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
@@ -27,6 +28,12 @@ import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { BOARD_GAME_PROVIDERS, type BoardGameProvider } from "@logeverything/shared";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +75,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const [incrementingId, setIncrementingId] = useState<string | null>(null);
   const [exportingCategory, setExportingCategory] = useState(false);
+  const [showProModal, setShowProModal] = useState(false);
 
   const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
   const CHAPTER_TYPES: MediaType[] = ["manga"];
@@ -214,7 +222,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
   const isPro = me?.tier === "pro";
   const handleExportCategory = async () => {
     if (!isPro) {
-      navigate("/tiers");
+      setShowProModal(true);
       return;
     }
     setExportingCategory(true);
@@ -290,6 +298,25 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
 
   return (
     <div className={`relative min-h-full min-w-0 overflow-hidden pb-24 md:pb-20 ${embedded ? "" : ""}`}>
+      {!readOnly && (
+        <Dialog open={showProModal && !isPro} onOpenChange={setShowProModal}>
+          <DialogContent onClose={() => setShowProModal(false)}>
+            <DialogHeader>
+              <DialogTitle className="text-[var(--color-lightest)]">
+                {t("statistics.proOnlyTitle")}
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-[var(--color-light)]">
+              {t("statistics.proOnlyMessage")}
+            </p>
+            <Button asChild className="btn-gradient w-fit">
+              <Link to="/tiers" onClick={() => setShowProModal(false)}>
+                {t("tiers.upgradeToPro")}
+              </Link>
+            </Button>
+          </DialogContent>
+        </Dialog>
+      )}
       {!embedded && (
         <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
           <Logo alt="" className="h-40 w-auto opacity-20 sm:h-52 md:h-64" />
@@ -532,6 +559,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
                           {log.title}
                         </Link>
                         <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                          <GenreBadges genres={log.genres} maxCount={1} />
                           {log.startedAt && log.completedAt && (
                             <span className="text-[10px] sm:text-xs text-[var(--color-light)]">
                               {t("dashboard.finishedIn", { duration: formatTimeToFinish(log.startedAt, log.completedAt) })}

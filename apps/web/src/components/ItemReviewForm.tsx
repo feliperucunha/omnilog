@@ -37,6 +37,8 @@ interface ItemReviewFormProps {
   runtimeMinutes?: number | null;
   /** TV/Anime: total episodes (used to set episode when user selects completed status) */
   episodesCount?: number | null;
+  /** Genre names from item (stored with log for stats). Up to 2 sent to API. */
+  genres?: string[] | null;
   onSaved: () => void;
   onSavedComplete?: (data: LogCompleteState) => void;
 }
@@ -48,6 +50,7 @@ export function ItemReviewForm({
   image,
   runtimeMinutes,
   episodesCount,
+  genres,
   onSaved,
   onSavedComplete,
 }: ItemReviewFormProps) {
@@ -128,7 +131,8 @@ export function ItemReviewForm({
         isCompleted && showSeasonEpisode && episodesCount != null && episodesCount > 0
           ? episodesCount
           : toNum(episode);
-      const payload = {
+      const genreList = (genres ?? myLog?.genres ?? []).slice(0, 2);
+      const payload: Record<string, unknown> = {
         grade: gradeNum,
         review: review.trim() || null,
         status: status || null,
@@ -138,6 +142,7 @@ export function ItemReviewForm({
         volume: toNum(volume),
         contentHours,
       };
+      if (genreList.length > 0) payload.genres = genreList;
       if (myLog) {
         const currentStatus = myLog.status ?? myLog.listType ?? null;
         const statusChanged = (status ?? null) !== currentStatus;
