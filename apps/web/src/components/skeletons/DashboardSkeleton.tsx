@@ -11,7 +11,7 @@ export function DashboardSkeleton() {
 
       {/* Category: Mobile = horizontal scroll pills, Desktop = toggle group in box */}
       <div className="flex min-w-0 justify-center overflow-hidden">
-        <div className="flex md:hidden min-w-0 gap-2 py-2 -mx-4 px-4 overflow-x-auto">
+        <div className="scrollbar-hide flex md:hidden min-w-0 gap-2 py-2 -mx-4 px-4 overflow-x-auto">
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-10 w-24 flex-shrink-0 rounded-full" />
           ))}

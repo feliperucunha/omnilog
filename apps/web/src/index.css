@@ -14,6 +14,22 @@
   [role="button"]:not(:disabled):active {
     opacity: 0.92;
   }
+  /* Safari: respect custom styling; avoid default bevel/shadow on form controls */
+  input,
+  button,
+  textarea {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23778DA9' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M3 4.5 L6 7.5 L9 4.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 0.75rem;
+    padding-right: 2rem;
+  }
 }
 
 @layer components {
@@ -45,6 +61,15 @@
     .btn-gradient-destructive:hover:not(:disabled) {
       background: linear-gradient(135deg, var(--btn-destructive-hover-start), var(--btn-destructive-hover-end));
     }
+  }
+  /* Full-height modal: 100vh fallback for older Safari, 100dvh for modern */
+  .min-h-dvh-fallback {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  /* Safari: -webkit-backdrop-filter for backdrop-blur (Tailwind may not prefix) */
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: var(--tw-backdrop-blur, blur(12px));
   }
 }
 
@@ -190,6 +215,7 @@ body {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;

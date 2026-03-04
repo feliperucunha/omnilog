@@ -13,7 +13,7 @@ export function PublicProfileSkeleton() {
 
       <section className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]">
         <div className="flex min-w-0 justify-center overflow-hidden">
-          <div className="flex md:hidden min-w-0 gap-2 py-2 -mx-4 px-4 overflow-x-auto">
+          <div className="scrollbar-hide flex md:hidden min-w-0 gap-2 py-2 -mx-4 px-4 overflow-x-auto">
             {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-10 w-24 flex-shrink-0 rounded-full" />
             ))}

@@ -248,7 +248,7 @@ export function Dashboard() {
           <div className="flex min-w-0 w-full shrink-0 justify-center overflow-hidden">
             {/* Mobile: swipeable tab strip */}
             <div
-              className="flex md:hidden min-w-0 flex-1 overflow-x-auto overflow-y-hidden gap-2 py-1 scroll-smooth touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="scrollbar-hide flex md:hidden min-w-0 flex-1 overflow-x-auto overflow-y-hidden gap-2 py-1 scroll-smooth touch-pan-x"
               role="tablist"
               aria-label={t("dashboard.category")}
             >
