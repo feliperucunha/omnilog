@@ -99,7 +99,7 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
 
   return (
     <Card
-      className="border-[var(--color-dark)] bg-[var(--color-dark)] p-5 sm:p-6 flex flex-col gap-5"
+      className="min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-5 sm:p-6 flex flex-col gap-5 overflow-hidden"
       style={paperShadow}
     >
       {hasTagline && (
@@ -108,11 +108,11 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
         </p>
       )}
       {hasDescription && (
-        <div>
+        <div className="min-w-0 overflow-hidden">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-light)] mb-2">
             {t("itemPage.description")}
           </h3>
-          <p className="text-[var(--color-lightest)] text-sm sm:text-base leading-relaxed whitespace-pre-wrap">
+          <p className="text-[var(--color-lightest)] text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words">
             {item.description}
           </p>
         </div>
@@ -130,7 +130,7 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
           </span>
         )}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
+      <div className="grid min-w-0 grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
         {hasReleaseDate && (
           <div>
             <span className="text-[var(--color-light)]">{t("itemPage.releaseDate")}: </span>
@@ -188,7 +188,7 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
           </div>
         )}
         {hasAuthors && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.authors")}: </span>
             <span className="text-[var(--color-lightest)]">{item.authors!.join(", ")}</span>
           </div>
@@ -206,37 +206,37 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
           </div>
         )}
         {hasPlatforms && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.platforms")}: </span>
             <span className="text-[var(--color-lightest)]">{item.platforms!.join(", ")}</span>
           </div>
         )}
         {hasProductionCountries && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.productionCountries")}: </span>
             <span className="text-[var(--color-lightest)]">{item.productionCountries!.join(", ")}</span>
           </div>
         )}
         {hasSpokenLanguages && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.spokenLanguages")}: </span>
             <span className="text-[var(--color-lightest)]">{item.spokenLanguages!.join(", ")}</span>
           </div>
         )}
         {hasNetworks && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.networks")}: </span>
             <span className="text-[var(--color-lightest)]">{item.networks!.join(", ")}</span>
           </div>
         )}
         {hasDevelopers && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.developers")}: </span>
             <span className="text-[var(--color-lightest)]">{item.developers!.join(", ")}</span>
           </div>
         )}
         {hasPublishers && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.publishers")}: </span>
             <span className="text-[var(--color-lightest)]">{item.publishers!.join(", ")}</span>
           </div>
@@ -248,7 +248,7 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
           </div>
         )}
         {hasTags && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.tags")}: </span>
             <span className="text-[var(--color-lightest)]">{item.tags!.join(", ")}</span>
           </div>
@@ -260,25 +260,25 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
           </div>
         )}
         {hasCategories && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.categories")}: </span>
             <span className="text-[var(--color-lightest)]">{item.categories!.join(", ")}</span>
           </div>
         )}
         {hasMechanics && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.mechanics")}: </span>
             <span className="text-[var(--color-lightest)]">{item.mechanics!.join(", ")}</span>
           </div>
         )}
         {hasStudios && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.studios")}: </span>
             <span className="text-[var(--color-lightest)]">{item.studios!.join(", ")}</span>
           </div>
         )}
         {hasThemes && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.themes")}: </span>
             <span className="text-[var(--color-lightest)]">{item.themes!.join(", ")}</span>
           </div>
@@ -470,8 +470,9 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
+      className="min-w-0 overflow-x-hidden"
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex min-w-0 flex-col gap-8">
         <Button
           variant="ghost"
           size="sm"
@@ -481,15 +482,15 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
           <ArrowLeft size={20} />
           {t("itemPage.back")}
         </Button>
-        <div className="flex flex-wrap items-start gap-6">
-          <div className="h-64 w-44 flex-shrink-0 rounded-xl shadow-[var(--shadow-card)]">
+        <div className="flex min-w-0 flex-wrap items-start gap-6">
+          <div className="h-48 w-32 flex-shrink-0 rounded-xl shadow-[var(--shadow-card)] sm:h-64 sm:w-44">
             <ItemImage src={item.image} className="h-full w-full rounded-xl" />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <p className="text-sm font-medium uppercase text-[var(--color-light)]">
               {label}
             </p>
-            <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
+            <h1 className="text-xl font-bold text-[var(--color-lightest)] break-words sm:text-2xl">
               {item.title}
             </h1>
             {(item.year || item.subtitle) && (

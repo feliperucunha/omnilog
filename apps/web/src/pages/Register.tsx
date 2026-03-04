@@ -8,15 +8,17 @@ import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/PasswordInput";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { COOKIE_SESSION } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiValidationError } from "@/lib/api";
 import type { AuthResponse } from "@logeverything/shared";
 import { modalContentVariants } from "@/lib/animations";
+import { cn } from "@/lib/utils";
 
 function isValidPassword(p: string): boolean {
   return p.length >= 8 && /[a-zA-Z]/.test(p) && /\d/.test(p);
 }
+
+type FieldErrors = Partial<Record<"username" | "email" | "password" | "confirmPassword" | "country", string>>;
 
 export function Register() {
   const { t } = useLocale();
@@ -26,31 +28,35 @@ export function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [country, setCountry] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const clearFieldError = (field: keyof FieldErrors) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !email.trim() || !password) {
+    const errors: FieldErrors = {};
+    if (!username.trim()) errors.username = t("register.username") + " is required";
+    else if (username.trim().length < 2) errors.username = "At least 2 characters";
+    else if (!/^[a-zA-Z0-9_-]+$/.test(username.trim()))
+      errors.username = "Only letters, numbers, underscore and hyphen";
+    if (!email.trim()) errors.email = t("register.email") + " is required";
+    if (!password) errors.password = t("validation.passwordLettersAndNumbers");
+    else if (!isValidPassword(password)) errors.password = t("validation.passwordLettersAndNumbers");
+    if (password !== confirmPassword) errors.confirmPassword = t("register.passwordsDoNotMatch");
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       toast.error(t("toast.emailPasswordRequired"));
       return;
     }
-    if (username.trim().length < 2) {
-      toast.error(t("register.username") + ": " + "At least 2 characters");
-      return;
-    }
-    if (!/^[a-zA-Z0-9_-]+$/.test(username.trim())) {
-      toast.error(t("register.username") + ": " + "Only letters, numbers, underscore and hyphen");
-      return;
-    }
-    if (!isValidPassword(password)) {
-      toast.error(t("validation.passwordLettersAndNumbers"));
-      return;
-    }
-    if (password !== confirmPassword) {
-      toast.error(t("register.passwordsDoNotMatch"));
-      return;
-    }
+    setFieldErrors({});
     setLoading(true);
     try {
       const data = await apiFetch<AuthResponse>("/auth/register", {
@@ -62,11 +68,26 @@ export function Register() {
           ...(country.trim().length === 2 && { country: country.trim().toUpperCase() }),
         }),
       });
-      login(COOKIE_SESSION, { ...data.user, onboarded: data.user.onboarded ?? false });
+      login(data.token, { ...data.user, onboarded: data.user.onboarded ?? false });
       toast.success(t("toast.accountCreated"));
       navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.registrationFailed"));
+      if (err instanceof ApiValidationError) {
+        const mapped: FieldErrors = {};
+        for (const [key, value] of Object.entries(err.fieldErrors)) {
+          if (["username", "email", "password", "confirmPassword", "country"].includes(key)) {
+            mapped[key as keyof FieldErrors] = value;
+          }
+        }
+        setFieldErrors(mapped);
+        toast.error(err.message);
+      } else {
+        const msg = err instanceof Error ? err.message : t("toast.registrationFailed");
+        if (msg.includes("Email") || msg.includes("email")) setFieldErrors((p) => ({ ...p, email: msg }));
+        else if (msg.includes("Username") || msg.includes("username")) setFieldErrors((p) => ({ ...p, username: msg }));
+        else setFieldErrors({});
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -98,11 +119,19 @@ export function Register() {
                     autoComplete="username"
                     placeholder={t("common.placeholderUsername")}
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => { setUsername(e.target.value); clearFieldError("username"); }}
                     required
                     minLength={2}
                     maxLength={32}
+                    className={cn(fieldErrors.username && "border-red-500 focus-visible:ring-red-500")}
+                    aria-invalid={!!fieldErrors.username}
+                    aria-describedby={fieldErrors.username ? "register-username-error" : undefined}
                   />
+                  {fieldErrors.username && (
+                    <p id="register-username-error" className="text-xs text-red-500" role="alert">
+                      {fieldErrors.username}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>{t("register.email")}</Label>
@@ -111,21 +140,36 @@ export function Register() {
                     autoComplete="email"
                     placeholder={t("common.placeholderEmail")}
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => { setEmail(e.target.value); clearFieldError("email"); }}
                     required
+                    className={cn(fieldErrors.email && "border-red-500 focus-visible:ring-red-500")}
+                    aria-invalid={!!fieldErrors.email}
+                    aria-describedby={fieldErrors.email ? "register-email-error" : undefined}
                   />
+                  {fieldErrors.email && (
+                    <p id="register-email-error" className="text-xs text-red-500" role="alert">
+                      {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>{t("register.country")}</Label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] ring-offset-[var(--color-darkest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)]"
+                    className={cn(
+                      "flex h-10 w-full rounded-md border bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] ring-offset-[var(--color-darkest)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] disabled:cursor-not-allowed disabled:opacity-50",
+                      fieldErrors.country ? "border-red-500 focus:ring-red-500" : "border-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                    )}
                     value={country}
-                    onChange={(e) => setCountry(e.target.value)}
+                    onChange={(e) => { setCountry(e.target.value); clearFieldError("country"); }}
                     aria-label={t("register.country")}
+                    aria-invalid={!!fieldErrors.country}
                   >
                     <option value="">{t("register.countryRestOfWorld")}</option>
                     <option value="BR">{t("register.countryBrazil")}</option>
                   </select>
+                  {fieldErrors.country && (
+                    <p className="text-xs text-red-500" role="alert">{fieldErrors.country}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>{t("register.password")}</Label>
@@ -133,10 +177,18 @@ export function Register() {
                     autoComplete="new-password"
                     placeholder={t("common.placeholderPasswordRegister")}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => { setPassword(e.target.value); clearFieldError("password"); }}
                     required
                     minLength={8}
+                    className={cn(fieldErrors.password && "border-red-500 focus-visible:ring-red-500")}
+                    aria-invalid={!!fieldErrors.password}
+                    aria-describedby={fieldErrors.password ? "register-password-error" : undefined}
                   />
+                  {fieldErrors.password && (
+                    <p id="register-password-error" className="text-xs text-red-500" role="alert">
+                      {fieldErrors.password}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>{t("register.confirmPassword")}</Label>
@@ -144,10 +196,18 @@ export function Register() {
                     autoComplete="new-password"
                     placeholder={t("common.placeholderPasswordRegister")}
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => { setConfirmPassword(e.target.value); clearFieldError("confirmPassword"); }}
                     required
                     minLength={8}
+                    className={cn(fieldErrors.confirmPassword && "border-red-500 focus-visible:ring-red-500")}
+                    aria-invalid={!!fieldErrors.confirmPassword}
+                    aria-describedby={fieldErrors.confirmPassword ? "register-confirmPassword-error" : undefined}
                   />
+                  {fieldErrors.confirmPassword && (
+                    <p id="register-confirmPassword-error" className="text-xs text-red-500" role="alert">
+                      {fieldErrors.confirmPassword}
+                    </p>
+                  )}
                 </div>
                 <motion.div whileTap={{ scale: 0.98 }} transition={{ duration: 0.1 }}>
                   <Button

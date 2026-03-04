@@ -9,19 +9,23 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { modalContentVariants } from "@/lib/animations";
+import { cn } from "@/lib/utils";
 
 export function ForgotPassword() {
   const { t } = useLocale();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
+      setEmailError(t("forgotPassword.email") + " is required");
       toast.error(t("toast.emailPasswordRequired"));
       return;
     }
+    setEmailError(null);
     setLoading(true);
     try {
       await apiFetch("/auth/forgot-password", {
@@ -31,7 +35,9 @@ export function ForgotPassword() {
       setSent(true);
       toast.success(t("forgotPassword.success"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.loginFailed"));
+      const msg = err instanceof Error ? err.message : t("toast.loginFailed");
+      setEmailError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -74,9 +80,17 @@ export function ForgotPassword() {
                       autoComplete="email"
                       placeholder={t("common.placeholderEmail")}
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
                       required
+                      className={cn(emailError && "border-red-500 focus-visible:ring-red-500")}
+                      aria-invalid={!!emailError}
+                      aria-describedby={emailError ? "forgot-email-error" : undefined}
                     />
+                    {emailError && (
+                      <p id="forgot-email-error" className="text-xs text-red-500" role="alert">
+                        {emailError}
+                      </p>
+                    )}
                   </div>
                   <Button
                     type="submit"

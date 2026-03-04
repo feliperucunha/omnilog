@@ -7,10 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/PasswordInput";
 import { useLocale } from "@/contexts/LocaleContext";
-import { COOKIE_SESSION, useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiValidationError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { AuthResponse } from "@logeverything/shared";
 import { modalContentVariants } from "@/lib/animations";
@@ -32,21 +32,37 @@ function getStoredRememberLogin(): { email: string; rememberMe: boolean } {
   }
 }
 
+type LoginFieldErrors = Partial<Record<"email" | "password", string>>;
+
 export function Login() {
   const { t } = useLocale();
   const [email, setEmail] = useState(() => getStoredRememberLogin().email);
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(() => getStoredRememberLogin().rememberMe);
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const clearFieldError = (field: keyof LoginFieldErrors) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
+    const errors: LoginFieldErrors = {};
+    if (!email.trim()) errors.email = t("login.emailOrUsername") + " is required";
+    if (!password) errors.password = t("login.password") + " is required";
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       toast.error(t("toast.emailPasswordRequired"));
       return;
     }
+    setFieldErrors({});
     setLoading(true);
     try {
       const data = await apiFetch<AuthResponse>("/auth/login", {
@@ -70,11 +86,20 @@ export function Login() {
           // ignore
         }
       }
-      login(COOKIE_SESSION, { ...data.user, onboarded: data.user.onboarded ?? true });
+      login(data.token, { ...data.user, onboarded: data.user.onboarded ?? true });
       toast.success(t("toast.welcomeBack"));
       navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.loginFailed"));
+      const msg = err instanceof Error ? err.message : t("toast.loginFailed");
+      if (err instanceof ApiValidationError) {
+        const mapped: LoginFieldErrors = {};
+        if (err.fieldErrors.email) mapped.email = err.fieldErrors.email;
+        if (err.fieldErrors.password) mapped.password = err.fieldErrors.password;
+        setFieldErrors(mapped);
+      } else {
+        setFieldErrors({ email: msg, password: msg });
+      }
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -110,9 +135,17 @@ export function Login() {
                     autoComplete="username"
                     placeholder={t("login.emailOrUsername")}
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => { setEmail(e.target.value); clearFieldError("email"); }}
                     required
+                    className={cn(fieldErrors.email && "border-red-500 focus-visible:ring-red-500")}
+                    aria-invalid={!!fieldErrors.email}
+                    aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
                   />
+                  {fieldErrors.email && (
+                    <p id="login-email-error" className="text-xs text-red-500" role="alert">
+                      {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>{t("login.password")}</Label>
@@ -120,9 +153,17 @@ export function Login() {
                     autoComplete="current-password"
                     placeholder={t("common.placeholderPassword")}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => { setPassword(e.target.value); clearFieldError("password"); }}
                     required
+                    className={cn(fieldErrors.password && "border-red-500 focus-visible:ring-red-500")}
+                    aria-invalid={!!fieldErrors.password}
+                    aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
                   />
+                  {fieldErrors.password && (
+                    <p id="login-password-error" className="text-xs text-red-500" role="alert">
+                      {fieldErrors.password}
+                    </p>
+                  )}
                 </div>
                 <label
                   className={cn(

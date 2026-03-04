@@ -44,6 +44,35 @@ function parseErrorResponse(text: string, fallback: string): string {
   return fallback;
 }
 
+/** Parses 400 response body for Zod-style field errors: { error: { field: ["msg"] } }. Returns null if not field errors. */
+function parseFieldErrors(text: string): Record<string, string> | null {
+  try {
+    const data = JSON.parse(text) as { error?: Record<string, unknown> };
+    const err = data.error;
+    if (!err || typeof err !== "object" || Array.isArray(err)) return null;
+    const out: Record<string, string> = {};
+    for (const [key, value] of Object.entries(err)) {
+      const arr = Array.isArray(value) ? value : [value];
+      const first = arr.map(String).find((s) => s.length > 0);
+      if (first) out[key] = first;
+    }
+    return Object.keys(out).length > 0 ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Thrown when API returns 400 with field-level validation errors. */
+export class ApiValidationError extends Error {
+  constructor(
+    message: string,
+    public readonly fieldErrors: Record<string, string>
+  ) {
+    super(message);
+    this.name = "ApiValidationError";
+  }
+}
+
 /** Invalidate cached GET requests. Call after mutations (create/update/delete logs). */
 export function invalidateApiCache(prefix: string): void {
   invalidateByPrefix(prefix);
@@ -98,6 +127,10 @@ async function fetchInternal<T>(
         text,
         res.status === 500 ? "Something went wrong. Please try again." : res.statusText || "Request failed"
       );
+      if (res.status === 400) {
+        const fieldErrors = parseFieldErrors(text);
+        if (fieldErrors) throw new ApiValidationError(message, fieldErrors);
+      }
       throw new Error(message);
     }
 

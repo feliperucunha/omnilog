@@ -54,14 +54,14 @@ export function Topbar() {
       )}
     >
       {/* Mobile: logo only (Home + Search are in the bottom bar) */}
-      <div className="flex items-center md:hidden">
+      <div className="flex min-w-0 items-center md:hidden">
         <Link
           to="/"
-          className="flex items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
+          className="flex min-w-0 items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
           aria-label={t("nav.dashboard")}
         >
-          <Logo alt="" className="h-14 -ml-2 w-auto flex-shrink-0" />
-          <span className="-ml-4 font-bold text-2xl text-(--btn-gradient-end) dark:text-(--btn-gradient-start)">OMNILOG</span>
+          <Logo alt="" className="h-9 w-auto flex-shrink-0 sm:h-11" />
+          <span className="-ml-3 text-lg font-bold text-(--btn-gradient-end) dark:text-(--btn-gradient-start) sm:-ml-4 sm:text-xl">OMNILOG</span>
         </Link>
       </div>
 

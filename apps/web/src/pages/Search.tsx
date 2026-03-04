@@ -318,10 +318,10 @@ export function Search() {
 
   return (
     <div
-      className={`relative flex flex-col gap-6 flex-1 min-h-0 ${hasSearched ? "w-full" : ""}`}
+      className={`relative flex flex-col gap-6 flex-1 min-h-0 min-w-0 overflow-x-hidden ${hasSearched ? "w-full" : ""}`}
     >
-      <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center gap-2" aria-hidden>
-        <Logo alt="" className="h-32 w-auto opacity-20 sm:h-40 md:h-48 md:pr-4 pr-2" />
+      <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center gap-2 overflow-hidden" aria-hidden>
+        <Logo alt="" className="h-24 w-auto max-w-[90vw] opacity-20 sm:h-40 md:h-48 md:pr-4" />
         <div className="-mt-8 flex flex-col items-center">
           <span className="text-xl font-bold text-[var(--color-lightest)] opacity-80 sm:text-2xl">
             {t("app.name")}
@@ -415,9 +415,9 @@ export function Search() {
             </div>
             {hasSearched && searchFilter !== USERS_SEARCH_TYPE && (
               <div
-                className={`flex flex-wrap items-center gap-4 ${mediaType === "boardgames" ? "w-full justify-between" : ""}`}
+                className={`flex flex-wrap items-center gap-4 min-w-0 ${mediaType === "boardgames" ? "w-full justify-between" : ""}`}
               >
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
                   <Select
                     value={sortBy}
                     onValueChange={(v) => {
@@ -428,7 +428,7 @@ export function Search() {
                       value: opt.value,
                       label: t(opt.labelKey),
                     }))}
-                    triggerClassName="min-w-[10rem] h-9 max-w-none"
+                    triggerClassName="min-w-0 w-full sm:min-w-[10rem] sm:w-auto h-9 max-w-none"
                     aria-label={t("search.sortBy")}
                   />
                 </div>
@@ -515,8 +515,8 @@ export function Search() {
       )}
 
       {hasSearched && !loading && searchFilter !== USERS_SEARCH_TYPE && results.length > 0 && (
-        <motion.div variants={staggerContainer} initial="initial" animate="animate">
-          <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+        <motion.div variants={staggerContainer} initial="initial" animate="animate" className="min-w-0">
+          <div className="flex min-w-0 flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
             {results.map((item) => {
               const status = token ? logsByExternalId.get(item.id) : undefined;
               const isDropped = status === "dropped";
@@ -543,7 +543,7 @@ export function Search() {
                         ? "bg-emerald-600 text-white"
                         : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
               return (
-              <motion.div key={item.id} variants={staggerItem} className="min-h-0 sm:h-full">
+              <motion.div key={item.id} variants={staggerItem} className="min-h-0 min-w-0 sm:h-full">
                 <motion.div whileTap={tapScale} transition={tapTransition} className="h-full">
                   <button
                     type="button"
@@ -657,7 +657,7 @@ export function Search() {
             role="dialog"
             aria-label={t("itemPage.back")}
           >
-            <div className="flex-1 overflow-y-auto p-4 md:p-6">
+            <div className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 min-w-0">
               <ItemPageContent
                 mediaType={drawerItem.mediaType}
                 id={drawerItem.id}
