@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import type { MediaType, Log } from "@logeverything/shared";
-import { IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
 import { apiFetch, apiFetchCached, apiFetchPublic, invalidateApiCache, invalidateLogsAndItemsCache, apiFetchFile } from "@/lib/api";
 import { LogForm } from "@/components/LogForm";
 import { CustomEntryForm } from "@/components/CustomEntryForm";
@@ -70,6 +70,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
   const [editingLogEpisodesCount, setEditingLogEpisodesCount] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusCounts, setStatusCounts] = useState<{ total: number; byStatus: Record<string, number> } | null>(null);
   const [sortBy, setSortBy] = useState<"date" | "grade">("date");
   const [showCustomEntry, setShowCustomEntry] = useState(false);
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
@@ -136,6 +137,18 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
     [mediaType, statusFilter, sortBy, nextCursor, loadingMore, t, publicUserId]
   );
 
+  const fetchStatusCounts = useCallback(() => {
+    const path = publicUserId
+      ? `/users/${publicUserId}/logs/status-counts?mediaType=${encodeURIComponent(mediaType)}`
+      : `/logs/status-counts?mediaType=${encodeURIComponent(mediaType)}`;
+    const fetcher = publicUserId
+      ? () => apiFetchPublic<{ data: { total: number; byStatus: Record<string, number> } }>(path)
+      : () => apiFetchCached<{ data: { total: number; byStatus: Record<string, number> } }>(path, { ttlMs: 2 * 60 * 1000 });
+    fetcher()
+      .then((res) => setStatusCounts(res.data ?? null))
+      .catch(() => setStatusCounts(null));
+  }, [mediaType, publicUserId]);
+
   useEffect(() => {
     setLogs([]);
     setNextCursor(null);
@@ -143,6 +156,11 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
     setLoading(true);
     fetchLogsRef.current(true);
   }, [mediaType, statusFilter, sortBy, publicUserId]);
+
+  useEffect(() => {
+    setStatusCounts(null);
+    fetchStatusCounts();
+  }, [fetchStatusCounts]);
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const fetchLogsRef = useRef(fetchLogs);
@@ -182,6 +200,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
       invalidateLogsAndItemsCache();
       setLogs((prev) => prev.filter((l) => l.id !== id));
       setEditingLog(null);
+      fetchStatusCounts();
       toast.success(t("toast.logDeleted"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("toast.deleteFailed"));
@@ -192,7 +211,9 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
 
   const handleSaved = (completion?: LogCompleteState) => {
     setEditingLog(null);
+    invalidateLogsAndItemsCache();
     fetchLogs();
+    fetchStatusCounts();
     if (completion) showLogComplete(completion);
   };
 
@@ -426,10 +447,10 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
             value={statusFilter}
             onValueChange={setStatusFilter}
             options={[
-              { value: "", label: t("mediaLogs.filterAll") },
+              { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
               ...statusOptions.map((s) => ({
                 value: s,
-                label: t(`status.${STATUS_I18N_KEYS[s] ?? s}`),
+                label: statusCounts != null ? `${t(`status.${STATUS_I18N_KEYS[s] ?? s}`)} (${statusCounts.byStatus[s] ?? 0})` : t(`status.${STATUS_I18N_KEYS[s] ?? s}`),
               })),
             ]}
             aria-label={t("itemReviewForm.status")}
@@ -458,7 +479,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
             size="sm"
             onClick={() => setStatusFilter("")}
           >
-            {t("mediaLogs.filterAll")}
+            {statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll")}
           </Button>
           {statusOptions.map((statusValue) => (
             <Button
@@ -468,7 +489,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
               size="sm"
               onClick={() => setStatusFilter(statusValue)}
             >
-              {t(`status.${STATUS_I18N_KEYS[statusValue] ?? statusValue}`)}
+              {statusCounts != null ? `${t(`status.${STATUS_I18N_KEYS[statusValue] ?? statusValue}`)} (${statusCounts.byStatus[statusValue] ?? 0})` : t(`status.${STATUS_I18N_KEYS[statusValue] ?? statusValue}`)}
             </Button>
           ))}
         </div>
@@ -518,11 +539,25 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
       ) : (
         <motion.div variants={staggerContainer} initial="initial" animate="animate" className="min-w-0 overflow-hidden">
           <div className="flex min-w-0 flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-            {logs.map((log) => (
+            {logs.map((log) => {
+              const isDropped = log.status === "dropped";
+              const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
+              const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);
+              const listBorderClass =
+                log.status == null
+                  ? "border-[var(--color-dark)]"
+                  : isDropped
+                    ? "border-2 border-red-500"
+                    : isInProgress
+                      ? "border-2 border-amber-400"
+                      : isCompleted
+                        ? "border-2 border-emerald-600"
+                        : "border-2 border-[var(--color-mid)]";
+              return (
               <motion.div key={log.id} variants={staggerItem} className="min-h-0 sm:h-full">
                 <motion.div whileTap={tapScale} transition={tapTransition} className="h-full">
                   <Card
-                    className="relative flex flex-col min-h-0 overflow-hidden border-[var(--color-dark)] bg-[var(--color-dark)] sm:min-h-[8.5rem]"
+                    className={`relative flex flex-col min-h-0 overflow-hidden bg-[var(--color-dark)] sm:min-h-[8.5rem] ${listBorderClass}`}
                     style={cardShadow}
                   >
                     {!readOnly && deletingId === log.id && (
@@ -569,11 +604,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
                               {t("dashboard.finishedIn", { duration: formatTimeToFinish(log.startedAt, log.completedAt) })}
                             </span>
                           )}
-                          {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
-                            <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
-                              {t("common.inProgress")}
-                            </span>
-                          ) : log.grade != null ? (
+                          {log.grade != null ? (
                             <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                           ) : (
                             <span className="text-[var(--color-light)]">—</span>
@@ -621,7 +652,8 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
                   </Card>
                 </motion.div>
               </motion.div>
-            ))}
+            );
+            })}
           </div>
           {nextCursor != null && (
             <>

@@ -41,6 +41,8 @@ function getStoredCollapsed(key: string): boolean {
 }
 
 type StatsGroup = "category" | "month" | "year";
+type GenreGraphMode = "genre" | "statusOverTime";
+type StatusOverTimeGroup = "month" | "year";
 interface StatsEntry {
   period: string;
   hours: number;
@@ -58,6 +60,10 @@ export function Statistics() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [genreStats, setGenreStats] = useState<StatsEntry[]>([]);
   const [genreStatsLoading, setGenreStatsLoading] = useState(true);
+  const [genreGraphMode, setGenreGraphMode] = useState<GenreGraphMode>("genre");
+  const [statusOverTimeGroup, setStatusOverTimeGroup] = useState<StatusOverTimeGroup>("month");
+  const [statusOverTimeStats, setStatusOverTimeStats] = useState<StatsEntry[]>([]);
+  const [statusOverTimeLoading, setStatusOverTimeLoading] = useState(true);
   const [statsCollapsed, setStatsCollapsedState] = useState(() => getStoredCollapsed(STORAGE_KEY_STATS));
   const [recentLogsCollapsed, setRecentLogsCollapsedState] = useState(() => getStoredCollapsed(STORAGE_KEY_RECENT));
   const [showProModal, setShowProModal] = useState(false);
@@ -105,6 +111,18 @@ export function Statistics() {
     }
   }, []);
 
+  const fetchStatusOverTimeStats = useCallback(async (group: "completedByMonth" | "completedByYear") => {
+    setStatusOverTimeLoading(true);
+    try {
+      const res = await apiFetch<{ data: StatsEntry[] }>(`/logs/stats?group=${group}`);
+      setStatusOverTimeStats(res.data ?? []);
+    } catch {
+      setStatusOverTimeStats([]);
+    } finally {
+      setStatusOverTimeLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isPro) fetchStats(statsGroup);
   }, [isPro, statsGroup, fetchStats]);
@@ -112,6 +130,12 @@ export function Statistics() {
   useEffect(() => {
     if (isPro) fetchGenreStats();
   }, [isPro, fetchGenreStats]);
+
+  useEffect(() => {
+    if (isPro && genreGraphMode === "statusOverTime") {
+      fetchStatusOverTimeStats(statusOverTimeGroup === "year" ? "completedByYear" : "completedByMonth");
+    }
+  }, [isPro, genreGraphMode, statusOverTimeGroup, fetchStatusOverTimeStats]);
 
   const fetchLogs = useCallback(() => {
     setLoading(true);
@@ -146,6 +170,8 @@ export function Statistics() {
   const maxHours = displayedStats.length > 0 ? Math.max(...displayedStats.map((s) => s.hours), 1) : 1;
   const maxGenreCount =
     genreStats.length > 0 ? Math.max(...genreStats.map((s) => s.hours), 1) : 1;
+  const maxStatusOverTimeCount =
+    statusOverTimeStats.length > 0 ? Math.max(...statusOverTimeStats.map((s) => s.hours), 1) : 1;
 
   if (isPro && loading && logs.length === 0) {
     return (
@@ -218,30 +244,88 @@ export function Statistics() {
           <DashboardCalendar isPro={isPro} />
         </section>
         <Card className="min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-4" style={paperShadow}>
-          <h3 className="mb-3 text-sm font-semibold uppercase text-[var(--color-light)]">
-            {t("dashboard.byGenre")}
-          </h3>
-          {genreStatsLoading ? (
+          <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
+            <Button
+              variant={genreGraphMode === "genre" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setGenreGraphMode("genre")}
+            >
+              {t("dashboard.byGenre")}
+            </Button>
+            <Button
+              variant={genreGraphMode === "statusOverTime" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setGenreGraphMode("statusOverTime")}
+            >
+              {t("dashboard.byStatusOverTime")}
+            </Button>
+            {genreGraphMode === "statusOverTime" && (
+              <div className="ml-1 flex gap-1">
+                <Button
+                  variant={statusOverTimeGroup === "month" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusOverTimeGroup("month")}
+                >
+                  {t("dashboard.byMonth")}
+                </Button>
+                <Button
+                  variant={statusOverTimeGroup === "year" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusOverTimeGroup("year")}
+                >
+                  {t("dashboard.byYear")}
+                </Button>
+              </div>
+            )}
+          </div>
+          {genreGraphMode === "genre" ? (
+            genreStatsLoading ? (
+              <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
+            ) : genreStats.length === 0 ? (
+              <p className="text-center text-sm text-[var(--color-light)]">
+                {t("dashboard.noStatsYet")}
+              </p>
+            ) : (
+              <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+                {genreStats.map(({ period, hours }) => (
+                  <div key={period} className="flex min-w-0 items-center gap-3">
+                    <span className="min-w-0 max-w-[8rem] shrink-0 truncate text-xs text-[var(--color-light)]">
+                      {period}
+                    </span>
+                    <div className="h-6 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
+                      <div
+                        className="h-full rounded bg-[var(--color-mid)]"
+                        style={{ width: `${Math.max(5, (hours / maxGenreCount) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="w-12 shrink-0 text-right text-xs text-[var(--color-lightest)]">
+                      {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : statusOverTimeLoading ? (
             <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
-          ) : genreStats.length === 0 ? (
+          ) : statusOverTimeStats.length === 0 ? (
             <p className="text-center text-sm text-[var(--color-light)]">
-              {t("dashboard.noStatsYet")}
+              {t("dashboard.noStatusOverTimeYet")}
             </p>
           ) : (
             <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-              {genreStats.map(({ period, hours }) => (
+              {statusOverTimeStats.map(({ period, hours }) => (
                 <div key={period} className="flex min-w-0 items-center gap-3">
-                  <span className="min-w-0 max-w-[8rem] shrink-0 truncate text-xs text-[var(--color-light)]">
-                    {period}
+                  <span className="w-14 shrink-0 truncate text-xs text-[var(--color-light)] sm:w-20">
+                    {statusOverTimeGroup === "year" ? period : period.slice(0, 7)}
                   </span>
                   <div className="h-6 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
                     <div
                       className="h-full rounded bg-[var(--color-mid)]"
-                      style={{ width: `${Math.max(5, (hours / maxGenreCount) * 100)}%` }}
+                      style={{ width: `${Math.max(5, (hours / maxStatusOverTimeCount) * 100)}%` }}
                     />
                   </div>
-                  <span className="w-12 shrink-0 text-right text-xs text-[var(--color-lightest)]">
-                    {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
+                  <span className="w-20 shrink-0 text-right text-xs text-[var(--color-lightest)]">
+                    {t("dashboard.completedCount", { count: String(Math.round(hours)) })}
                   </span>
                 </div>
               ))}

@@ -95,6 +95,29 @@ logsRouter.get("/counts", async (req: AuthenticatedRequest, res) => {
   res.json({ data });
 });
 
+/** GET /logs/status-counts?mediaType=X - Per-status counts for one category (for filter labels). Returns { data: { total, byStatus } }. */
+logsRouter.get("/status-counts", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const mediaType = req.query.mediaType as MediaType | undefined;
+  if (!mediaType || !MEDIA_TYPES.includes(mediaType)) {
+    res.status(400).json({ error: "mediaType required and must be a valid media type" });
+    return;
+  }
+  const rows = await prisma.log.groupBy({
+    by: ["status"],
+    where: { userId, mediaType },
+    _count: { id: true },
+  });
+  let total = 0;
+  const byStatus: Record<string, number> = {};
+  for (const row of rows) {
+    const key = row.status ?? "";
+    byStatus[key] = row._count.id;
+    total += row._count.id;
+  }
+  res.json({ data: { total, byStatus } });
+});
+
 logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const mediaType = req.query.mediaType as MediaType | undefined;
@@ -183,11 +206,24 @@ logsRouter.get("/feed", async (req: AuthenticatedRequest, res) => {
   res.json({ data });
 });
 
-/** GET /logs/stats?group=category|month|year|genre - hours (or count for genre) per category/period/genre */
+/** GET /logs/stats?group=category|month|year|genre|completedByMonth|completedByYear - hours (or count for genre/completedBy*) per category/period/genre */
 logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const groupParam = req.query.group as string;
-  const group = groupParam === "year" ? "year" : groupParam === "genre" ? "genre" : groupParam === "category" ? "category" : "month";
+  const group =
+    groupParam === "year"
+      ? "year"
+      : groupParam === "genre"
+        ? "genre"
+        : groupParam === "category"
+          ? "category"
+          : groupParam === "completedByYear"
+            ? "completedByYear"
+            : groupParam === "completedByMonth"
+              ? "completedByMonth"
+              : groupParam === "month"
+                ? "month"
+                : "month";
 
   if (group === "genre") {
     const logs = await prisma.log.findMany({
@@ -207,6 +243,27 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       .sort(([, a], [, b]) => b - a)
       .map(([period, count]) => ({ period, hours: count }));
     res.json({ group: "genre", data: entries });
+    return;
+  }
+
+  if (group === "completedByMonth" || group === "completedByYear") {
+    const logs = await prisma.log.findMany({
+      where: { userId, completedAt: { not: null } },
+      select: { completedAt: true },
+    });
+    const byPeriod: Record<string, number> = {};
+    for (const log of logs) {
+      const d = log.completedAt!;
+      const key =
+        group === "completedByYear"
+          ? `${d.getUTCFullYear()}`
+          : `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+      byPeriod[key] = (byPeriod[key] ?? 0) + 1;
+    }
+    const entries = Object.entries(byPeriod)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([period, count]) => ({ period, hours: count }));
+    res.json({ group, data: entries });
     return;
   }
 

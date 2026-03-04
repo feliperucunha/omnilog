@@ -13,9 +13,15 @@ import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
-import { IN_PROGRESS_STATUSES, MEDIA_TYPES, type MediaType, toMediaType } from "@logeverything/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, MEDIA_TYPES, type MediaType, toMediaType } from "@logeverything/shared";
 import type { Log } from "@logeverything/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { MediaLogs } from "@/pages/MediaLogs";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
@@ -30,6 +36,24 @@ interface FeedEntry {
 }
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
+const BETA_MODAL_STORAGE_KEY = "logeverything.betaModalSeen";
+
+function getBetaModalSeen(userId: string): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return localStorage.getItem(`${BETA_MODAL_STORAGE_KEY}.${userId}`) === "true";
+  } catch {
+    return true;
+  }
+}
+
+function setBetaModalSeen(userId: string): void {
+  try {
+    localStorage.setItem(`${BETA_MODAL_STORAGE_KEY}.${userId}`, "true");
+  } catch {
+    // ignore
+  }
+}
 
 export function Dashboard() {
   const { t } = useLocale();
@@ -48,6 +72,7 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [feedLoading, setFeedLoading] = useState(false);
+  const [showBetaModal, setShowBetaModal] = useState(false);
 
   useEffect(() => {
     if (categoryParam && MEDIA_TYPES.includes(categoryParam as MediaType)) setSelectedCategory(toMediaType(categoryParam));
@@ -85,6 +110,15 @@ export function Dashboard() {
   useEffect(() => {
     fetchCounts();
   }, [fetchCounts]);
+
+  useEffect(() => {
+    if (me?.user?.id && !getBetaModalSeen(me.user.id)) setShowBetaModal(true);
+  }, [me?.user?.id]);
+
+  const handleBetaModalClose = useCallback(() => {
+    if (me?.user?.id) setBetaModalSeen(me.user.id);
+    setShowBetaModal(false);
+  }, [me?.user?.id]);
 
   useEffect(() => {
     if (!token) {
@@ -161,6 +195,21 @@ export function Dashboard() {
 
   return (
     <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden">
+      <Dialog open={showBetaModal} onOpenChange={(open) => !open && handleBetaModalClose()}>
+        <DialogContent onClose={handleBetaModalClose}>
+          <DialogHeader>
+            <DialogTitle className="text-[var(--color-lightest)]">
+              {t("dashboard.betaModalTitle")}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-[var(--color-light)]">
+            {t("dashboard.betaModalMessage")}
+          </p>
+          <Button onClick={handleBetaModalClose} className="w-fit">
+            {t("dashboard.betaModalGotIt")}
+          </Button>
+        </DialogContent>
+      </Dialog>
       {needsApiKeyBanner && (
         <Link
           to="/settings?open=api-keys"
@@ -285,12 +334,26 @@ export function Dashboard() {
               animate="animate"
             >
               <div className="flex min-w-0 flex-col gap-2">
-                {feed.map(({ log, user }) => (
+                {feed.map(({ log, user }) => {
+                  const isDropped = log.status === "dropped";
+                  const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
+                  const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);
+                  const listBorderClass =
+                    log.status == null
+                      ? "border border-[var(--color-dark)]"
+                      : isDropped
+                        ? "border-2 border-red-500"
+                        : isInProgress
+                          ? "border-2 border-amber-400"
+                          : isCompleted
+                            ? "border-2 border-emerald-600"
+                            : "border-2 border-[var(--color-mid)]";
+                  return (
                   <motion.li key={log.id} variants={staggerItem} className="list-none">
                     <motion.div whileTap={tapScale} transition={tapTransition}>
                       <Link
                         to={`/${user.username ?? user.id}`}
-                        className="flex min-w-0 gap-3 overflow-hidden rounded-md border border-[var(--color-dark)] bg-[var(--color-dark)] p-4 text-inherit no-underline"
+                        className={`flex min-w-0 gap-3 overflow-hidden rounded-md bg-[var(--color-dark)] p-4 text-inherit no-underline ${listBorderClass}`}
                         style={paperShadow}
                       >
                         <ItemImage src={log.image} className="h-12 w-9 shrink-0 rounded" />
@@ -312,11 +375,7 @@ export function Dashboard() {
                                 })}
                               </span>
                             )}
-                            {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
-                              <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
-                                {t("common.inProgress")}
-                              </span>
-                            ) : log.grade != null ? (
+                            {log.grade != null ? (
                               <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                             ) : (
                               <span className="text-[var(--color-light)]">—</span>
@@ -326,7 +385,8 @@ export function Dashboard() {
                       </Link>
                     </motion.div>
                   </motion.li>
-                ))}
+                  );
+                })}
               </div>
             </motion.ul>
           )}

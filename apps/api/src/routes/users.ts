@@ -119,6 +119,34 @@ usersRouter.get("/:identifier/logs/counts", async (req: Request<{ identifier: st
   res.json({ data });
 });
 
+/** GET /users/:identifier/logs/status-counts?mediaType=X - Public per-status counts for one category. Returns { data: { total, byStatus } }. */
+usersRouter.get("/:identifier/logs/status-counts", async (req: Request<{ identifier: string }>, res: Response) => {
+  const { identifier } = req.params;
+  const user = await getUserByIdentifier(identifier);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const mediaType = req.query.mediaType as MediaType | undefined;
+  if (!mediaType || !MEDIA_TYPES.includes(mediaType)) {
+    res.status(400).json({ error: "mediaType required and must be a valid media type" });
+    return;
+  }
+  const rows = await prisma.log.groupBy({
+    by: ["status"],
+    where: { userId: user.id, mediaType },
+    _count: { id: true },
+  });
+  let total = 0;
+  const byStatus: Record<string, number> = {};
+  for (const row of rows) {
+    const key = row.status ?? "";
+    byStatus[key] = row._count.id;
+    total += row._count.id;
+  }
+  res.json({ data: { total, byStatus } });
+});
+
 /** GET /users/:identifier/logs - Public list of logs (same shape as GET /logs). Supports ?limit=&cursor= for pagination. No auth. */
 usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>, res: Response) => {
   const { identifier } = req.params;

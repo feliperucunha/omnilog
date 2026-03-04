@@ -78,7 +78,14 @@ authRouter.post("/register", async (req, res) => {
     ? String(parsed.data.country).toUpperCase().slice(0, 2)
     : null;
   const user = await prisma.user.create({
-    data: { username, email, password: hashed, ...(country && { country }) },
+    data: {
+      username,
+      email,
+      password: hashed,
+      ...(country && { country }),
+      tier: "pro",
+      subscriptionEndsAt: null, // beta: all new accounts get Pro with no expiry
+    },
     select: { id: true, username: true, email: true, onboarded: true },
   });
   const token = jwt.sign(
