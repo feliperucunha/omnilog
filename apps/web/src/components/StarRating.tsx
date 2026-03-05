@@ -2,9 +2,9 @@ import { useRef, useState } from "react";
 import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Value in stars: 0, 0.5, 1, ..., 5. DB stores 0–10 (value * 2). */
+/** Value in stars: 0, 0.5, 1, ..., 5, or null for unset (gray). DB stores 0–10 (value * 2). */
 interface StarRatingProps {
-  value: number;
+  value: number | null;
   onChange?: (stars: number) => void;
   readOnly?: boolean;
   size?: "sm" | "md" | "lg";
@@ -28,7 +28,7 @@ export function StarRating({
 }: StarRatingProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoverValue, setHoverValue] = useState<number | null>(null);
-  const displayValue = hoverValue ?? value;
+  const displayValue = hoverValue ?? value ?? 0;
   const clamped = Math.max(0, Math.min(5, displayValue));
 
   const handlePointer = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -54,12 +54,12 @@ export function StarRating({
     <div
       ref={containerRef}
       role={readOnly ? "img" : "slider"}
-      aria-label={readOnly ? `${value} stars` : "Rating"}
+      aria-label={readOnly ? `${value ?? 0} stars` : "Rating"}
       aria-required={ariaRequired}
       aria-valuemin={readOnly ? undefined : 0}
       aria-valuemax={readOnly ? undefined : 5}
-      aria-valuenow={readOnly ? undefined : value}
-      aria-valuetext={readOnly ? undefined : `${value} stars`}
+      aria-valuenow={readOnly ? undefined : (value ?? 0)}
+      aria-valuetext={readOnly ? undefined : value == null ? "No rating" : `${value} stars`}
       className={cn(
         "inline-flex items-center gap-0.5",
         !readOnly && "cursor-pointer select-none",

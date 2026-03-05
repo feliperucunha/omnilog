@@ -28,7 +28,7 @@ export const LOG_STATUS_OPTIONS: Record<MediaType, readonly string[]> = {
   movies: ["watched", "plan to watch"],
   tv: ["completed", "watching", "plan to watch", "dropped"],
   boardgames: ["played", "plan to play"],
-  games: ["played", "plan to play", "dropped", "playing"],
+  games: ["completed", "plan to play", "dropped", "playing"],
   books: ["read", "plan to read", "reading"],
   anime: ["completed", "watching", "plan to watch", "dropped"],
   manga: ["read", "plan to read", "reading"],

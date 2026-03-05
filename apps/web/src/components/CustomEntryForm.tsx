@@ -49,7 +49,7 @@ export function CustomEntryForm({
   const [mediaType, setMediaType] = useState<MediaType>(initialMediaType ?? "movies");
   const [title, setTitle] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [stars, setStars] = useState(2.5);
+  const [stars, setStars] = useState<number | null>(null);
   const [review, setReview] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [season, setSeason] = useState<number | "">("");
@@ -78,7 +78,7 @@ export function CustomEntryForm({
     }
     const image = imageUrl.trim() ? imageUrl.trim() : null;
     const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-    const grade = isInProgress ? null : starsToGrade(stars);
+    const grade = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
     setLoading(true);
     try {
       const externalId = `custom-${crypto.randomUUID()}`;
@@ -247,7 +247,7 @@ export function CustomEntryForm({
                 <Label className="mb-1 block text-sm font-medium text-[var(--color-lightest)]">
                   {t("itemReviewForm.rating")}
                 </Label>
-                <StarRating value={stars} onChange={setStars} size="lg" />
+                <StarRating value={stars} onChange={(s) => setStars(s)} size="lg" />
               </div>
               <div className="space-y-2">
                 <Label>{t("logForm.review")}</Label>

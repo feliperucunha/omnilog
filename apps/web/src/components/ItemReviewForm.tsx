@@ -59,7 +59,7 @@ export function ItemReviewForm({
   const { me } = useMe();
   const [myLog, setMyLog] = useState<Log | null>(null);
   const [loadingLog, setLoadingLog] = useState(true);
-  const [stars, setStars] = useState(2.5);
+  const [stars, setStars] = useState<number | null>(null);
   const [review, setReview] = useState("");
   const [status, setStatus] = useState<string | null>(LOG_STATUS_OPTIONS[mediaType][0]);
   const [season, setSeason] = useState<number | "">("");
@@ -106,7 +106,7 @@ export function ItemReviewForm({
         setMyLog(log);
         if (log) {
           const isInProgressLog = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
-          setStars(isInProgressLog ? 0 : gradeToStars(log.grade ?? undefined));
+          setStars(isInProgressLog ? null : (log.grade != null ? gradeToStars(log.grade) : null));
           setReview(log.review ?? "");
           setStatus(log.status ?? log.listType ?? null);
           setSeason(log.season ?? "");
@@ -125,7 +125,7 @@ export function ItemReviewForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-    const gradeNum = isInProgress ? null : starsToGrade(stars);
+    const gradeNum = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
     setSaving(true);
     try {
       const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
@@ -245,7 +245,7 @@ export function ItemReviewForm({
           <div className="flex flex-col gap-4">
             <div>
               <Label className="mb-2 block text-sm font-medium text-[var(--color-lightest)]">
-                {t("itemReviewForm.status")} ({t("common.optional")})
+                {t("itemReviewForm.status")}
               </Label>
               <Select
                 value={status ?? ""}
@@ -337,7 +337,7 @@ export function ItemReviewForm({
             {showHoursToBeat && (
               <div className="space-y-2">
                 <Label className="text-sm text-[var(--color-lightest)]">
-                  {t("itemReviewForm.hoursToBeat")} ({t("common.optional")})
+                  {t("itemReviewForm.hoursToBeat")}
                 </Label>
                 <Input
                   type="number"
@@ -361,20 +361,16 @@ export function ItemReviewForm({
 
             <div>
               <Label className="mb-2 block text-sm font-medium text-[var(--color-lightest)]">
-                {t("itemReviewForm.rating")}{" "}
-                {status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status)
-                  ? `(${t("common.optional")})`
-                  : `(${t("common.required")})`}
+                {t("itemReviewForm.rating")}
               </Label>
               <StarRating
                 value={stars}
-                onChange={setStars}
+                onChange={(s) => setStars(s)}
                 size="lg"
-                aria-required={!(status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status))}
               />
             </div>
             <div className="space-y-2">
-              <Label>{t("logForm.review")} ({t("common.optional")})</Label>
+              <Label>{t("logForm.review")}</Label>
               <Textarea
                 placeholder={t("itemReviewForm.reviewPlaceholder")}
                 value={review}

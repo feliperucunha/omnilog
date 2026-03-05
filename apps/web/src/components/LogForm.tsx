@@ -53,7 +53,9 @@ export function LogForm(props: LogFormProps) {
   const mediaType = isEdit ? (log!.mediaType as MediaType) : (props as LogFormCreateProps).mediaType;
 
   const isInProgressInitial = isEdit && log!.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log!.status);
-  const [stars, setStars] = useState(isEdit ? (isInProgressInitial ? 0 : gradeToStars(log!.grade ?? undefined)) : 2.5);
+  const [stars, setStars] = useState<number | null>(
+    isEdit ? (isInProgressInitial ? null : (log!.grade != null ? gradeToStars(log!.grade) : null)) : null
+  );
   const [review, setReview] = useState(isEdit ? (log!.review ?? "") : "");
   const [status, setStatus] = useState<string | null>(
     isEdit ? (log!.status ?? log!.listType ?? null) : LOG_STATUS_OPTIONS[(props as LogFormCreateProps).mediaType][0]
@@ -95,7 +97,7 @@ export function LogForm(props: LogFormProps) {
   useEffect(() => {
     if (isEdit && log) {
       const inProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
-      setStars(inProgress ? 0 : gradeToStars(log.grade ?? undefined));
+      setStars(inProgress ? null : (log.grade != null ? gradeToStars(log.grade) : null));
       setReview(log.review ?? "");
       setStatus(log.status ?? log.listType ?? null);
       setSeason(log.season ?? "");
@@ -111,7 +113,7 @@ export function LogForm(props: LogFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-    const grade = isInProgress ? null : starsToGrade(stars);
+    const grade = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
     setLoading(true);
     try {
       if (isEdit) {
@@ -307,12 +309,12 @@ export function LogForm(props: LogFormProps) {
               )}
               <div>
                 <Label className="mb-1 block text-sm font-medium text-[var(--color-lightest)]">
-                  {t("itemReviewForm.rating")} ({t("common.required")})
+                  {t("itemReviewForm.rating")}
                 </Label>
-                <StarRating value={stars} onChange={setStars} size="lg" aria-required />
+                <StarRating value={stars} onChange={(s) => setStars(s)} size="lg" />
               </div>
               <div className="space-y-2">
-                <Label>{t("logForm.review")} ({t("common.optional")})</Label>
+                <Label>{t("logForm.review")}</Label>
                 <Textarea
                   placeholder={t("logForm.reviewPlaceholder")}
                   value={review ?? ""}
