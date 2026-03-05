@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
@@ -65,6 +66,7 @@ export function ItemReviewForm({
   const [episode, setEpisode] = useState<number | "">("");
   const [chapter, setChapter] = useState<number | "">("");
   const [volume, setVolume] = useState<number | "">("");
+  const [hoursToBeat, setHoursToBeat] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
 
   type ProgressOptions = {
@@ -80,6 +82,7 @@ export function ItemReviewForm({
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
+  const showHoursToBeat = mediaType === "games";
 
   useEffect(() => {
     if (!showSeasonEpisode && !showChapterVolume) return;
@@ -110,6 +113,7 @@ export function ItemReviewForm({
           setEpisode(log.episode ?? "");
           setChapter(log.chapter ?? "");
           setVolume(log.volume ?? "");
+          setHoursToBeat(log.hoursToBeat != null ? log.hoursToBeat : "");
         }
       })
       .catch(() => setMyLog(null))
@@ -144,6 +148,7 @@ export function ItemReviewForm({
         volume: toNum(volume),
         contentHours,
       };
+      if (showHoursToBeat) payload.hoursToBeat = toNum(hoursToBeat);
       if (genreList.length > 0) payload.genres = genreList;
       if (myLog) {
         const currentStatus = myLog.status ?? myLog.listType ?? null;
@@ -155,7 +160,8 @@ export function ItemReviewForm({
           toNum(season) === (myLog.season ?? null) &&
           episodeForPayload === (myLog.episode ?? null) &&
           toNum(chapter) === (myLog.chapter ?? null) &&
-          toNum(volume) === (myLog.volume ?? null);
+          toNum(volume) === (myLog.volume ?? null) &&
+          (!showHoursToBeat || toNum(hoursToBeat) === (myLog.hoursToBeat ?? null));
         if (noChange) {
           setSaving(false);
           return;
@@ -325,6 +331,31 @@ export function ItemReviewForm({
                     optionsLoading={progressOptionsLoading}
                   />
                 </div>
+              </div>
+            )}
+
+            {showHoursToBeat && (
+              <div className="space-y-2">
+                <Label className="text-sm text-[var(--color-lightest)]">
+                  {t("itemReviewForm.hoursToBeat")} ({t("common.optional")})
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  placeholder="—"
+                  value={hoursToBeat === "" ? "" : hoursToBeat}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "") setHoursToBeat("");
+                    else {
+                      const n = parseFloat(v);
+                      if (Number.isFinite(n)) setHoursToBeat(n);
+                    }
+                  }}
+                  className="w-full max-w-[8rem]"
+                  aria-label={t("itemReviewForm.hoursToBeat")}
+                />
               </div>
             )}
 

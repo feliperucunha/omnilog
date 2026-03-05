@@ -42,6 +42,7 @@ const createLogSchema = z.object({
   chapter: optionalInt,
   volume: optionalInt,
   contentHours: optionalFloat,
+  hoursToBeat: optionalFloat,
   genres: genresSchema,
   boardGameSource: z.enum(["bgg", "ludopedia"]).nullable().optional(),
 });
@@ -57,6 +58,7 @@ const updateLogSchema = z.object({
   chapter: optionalInt,
   volume: optionalInt,
   contentHours: optionalFloat,
+  hoursToBeat: optionalFloat,
   genres: genresSchema,
 });
 
@@ -412,7 +414,7 @@ logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
     orderBy: { updatedAt: "desc" },
   });
   const header =
-    "mediaType,externalId,title,grade,status,season,episode,chapter,volume,startedAt,completedAt,contentHours,review,createdAt,updatedAt\n";
+    "mediaType,externalId,title,grade,status,season,episode,chapter,volume,startedAt,completedAt,contentHours,hoursToBeat,review,createdAt,updatedAt\n";
   const escape = (v: string | number | null | undefined): string => {
     if (v == null) return "";
     const s = String(v);
@@ -434,6 +436,7 @@ logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
         escape(l.startedAt?.toISOString()),
         escape(l.completedAt?.toISOString()),
         escape(l.contentHours),
+        escape(l.hoursToBeat),
         escape(l.review),
         escape(l.createdAt?.toISOString()),
         escape(l.updatedAt?.toISOString()),
@@ -467,6 +470,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     chapter,
     volume,
     contentHours,
+    hoursToBeat,
     genres: genresInput,
     boardGameSource: bodyBoardGameSource,
   } = parsed.data;
@@ -538,6 +542,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         startedAt?: Date | null;
         completedAt?: Date | null;
         contentHours: number | null;
+        hoursToBeat: number | null;
         season: number | null;
         episode: number | null;
         chapter: number | null;
@@ -550,6 +555,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         listType: listType ?? null,
         status: status ?? null,
         contentHours: contentHours ?? null,
+        hoursToBeat: hoursToBeat ?? null,
         season: season ?? null,
         episode: episode ?? null,
         chapter: chapter ?? null,
@@ -595,6 +601,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           startedAt: createStartedAt,
           completedAt: createCompletedAt,
           contentHours: contentHours ?? null,
+          hoursToBeat: hoursToBeat ?? null,
           season: season ?? null,
           episode: episode ?? null,
           chapter: chapter ?? null,
@@ -637,6 +644,7 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     startedAt?: Date | null;
     completedAt?: Date | null;
     contentHours?: number | null;
+    hoursToBeat?: number | null;
     season?: number | null;
     episode?: number | null;
     chapter?: number | null;
@@ -654,6 +662,7 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     if (isCompleted(parsed.data.status)) data.completedAt = now;
   }
   if (parsed.data.contentHours !== undefined) data.contentHours = parsed.data.contentHours;
+  if (parsed.data.hoursToBeat !== undefined) data.hoursToBeat = parsed.data.hoursToBeat;
   if (parsed.data.season !== undefined) data.season = parsed.data.season;
   if (parsed.data.episode !== undefined) data.episode = parsed.data.episode;
   if (parsed.data.chapter !== undefined) data.chapter = parsed.data.chapter;

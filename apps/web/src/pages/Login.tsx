@@ -9,6 +9,7 @@ import { PasswordInput } from "@/components/PasswordInput";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
+import { AuthNavbar } from "@/components/AuthNavbar";
 import { toast } from "sonner";
 import { apiFetch, ApiValidationError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -106,9 +107,9 @@ export function Login() {
   };
 
   return (
-    <div
-      className="flex min-h-screen items-center justify-center bg-[var(--color-darkest)] p-4"
-    >
+    <div className="flex min-h-screen flex-col bg-[var(--color-darkest)]">
+      <AuthNavbar />
+      <div className="flex flex-1 items-center justify-center p-4">
       <motion.div
         initial="initial"
         animate="animate"
@@ -212,6 +213,7 @@ export function Login() {
           </CardContent>
         </Card>
       </motion.div>
+      </div>
     </div>
   );
 }

@@ -84,6 +84,7 @@ model Log {
   startedAt    DateTime? // when set to in-progress (watching/reading/playing)
   completedAt  DateTime? // when set to completed
   contentHours Float?   // duration of content in hours (for stats)
+  hoursToBeat  Float?  // games only: how long it took the user to beat (hours)
   season       Int?     // tv, anime
   episode      Int?     // tv, anime
   chapter      Int?     // anime, manga, comics

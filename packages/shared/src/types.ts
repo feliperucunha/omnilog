@@ -272,6 +272,8 @@ export interface Log {
   startedAt: string | null;
   completedAt: string | null;
   contentHours: number | null;
+  /** Games only: how long it took the user to beat (hours). */
+  hoursToBeat: number | null;
   /** Genre names (for stats and badges). Stored when logging. */
   genres: string[] | null;
   createdAt: string;
@@ -292,6 +294,8 @@ export interface CreateLogInput {
   chapter?: number | null;
   volume?: number | null;
   contentHours?: number | null;
+  /** Games only: how long it took to beat (hours). */
+  hoursToBeat?: number | null;
   /** Genre names from item (for stats and badges). Store up to 2 when logging. */
   genres?: string[] | null;
   /** When mediaType is boardgames: which API this id came from (bgg | ludopedia). Stored so details are fetched from the correct API. */
@@ -309,6 +313,8 @@ export interface UpdateLogInput {
   chapter?: number | null;
   volume?: number | null;
   contentHours?: number | null;
+  /** Games only: how long it took to beat (hours). */
+  hoursToBeat?: number | null;
   genres?: string[] | null;
 }
 

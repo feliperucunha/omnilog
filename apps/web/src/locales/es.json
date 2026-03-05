@@ -307,6 +307,7 @@
     "episode": "Episodio",
     "chapter": "Capítulo",
     "volume": "Volumen",
+    "hoursToBeat": "Horas para completar",
     "grade": "Nota (0–10)",
     "rating": "Valoración",
     "reviewPlaceholder": "Tu opinión...",
