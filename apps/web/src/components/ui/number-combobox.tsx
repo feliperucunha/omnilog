@@ -140,7 +140,7 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
         {open && options.length > 0 && !dropdownInPortal && (
           <ul
             role="listbox"
-            className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] py-1 shadow-[var(--shadow-lg)]"
+            className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto overflow-x-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] py-1 shadow-[var(--shadow-lg)] [-webkit-overflow-scrolling:touch] [touch-action:manipulation]"
           >
             {options.map((n) => (
               <li
@@ -148,15 +148,16 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
                 role="option"
                 aria-selected={value === n}
                 className={cn(
-                  "cursor-pointer px-3 py-2 text-sm",
+                  "cursor-pointer min-h-[44px] flex items-center px-3 py-2 text-sm [touch-action:manipulation]",
                   value === n
                     ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
-                    : "text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/30"
+                    : "text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/30 active:bg-[var(--color-mid)]/40"
                 )}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   handleSelect(n);
                 }}
+                onClick={() => handleSelect(n)}
               >
                 {n}
               </li>
@@ -168,7 +169,8 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
             <ul
               id={listIdRef.current ?? undefined}
               role="listbox"
-              className="fixed z-[100] max-h-48 overflow-auto rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] py-1 shadow-[var(--shadow-lg)]"
+              data-dropdown-portal
+              className="fixed z-[100] max-h-48 overflow-y-auto overflow-x-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] py-1 shadow-[var(--shadow-lg)] [-webkit-overflow-scrolling:touch] [touch-action:manipulation]"
               style={{
                 top: dropdownRect.top + 4,
                 left: dropdownRect.left,
@@ -181,15 +183,16 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
                   role="option"
                   aria-selected={value === n}
                   className={cn(
-                    "cursor-pointer px-3 py-2 text-sm",
+                    "cursor-pointer min-h-[44px] flex items-center px-3 py-2 text-sm [touch-action:manipulation]",
                     value === n
                       ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
-                      : "text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/30"
+                      : "text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/30 active:bg-[var(--color-mid)]/40"
                   )}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     handleSelect(n);
                   }}
+                  onClick={() => handleSelect(n)}
                 >
                   {n}
                 </li>

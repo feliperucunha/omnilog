@@ -114,9 +114,22 @@ export function ItemReviewForm({
           setChapter(log.chapter ?? "");
           setVolume(log.volume ?? "");
           setHoursToBeat(log.hoursToBeat != null ? log.hoursToBeat : "");
+        } else {
+          setStars(null);
+          setReview("");
+          setStatus(LOG_STATUS_OPTIONS[mediaType][0]);
+          setSeason("");
+          setEpisode("");
+          setChapter("");
+          setVolume("");
+          setHoursToBeat("");
         }
       })
-      .catch(() => setMyLog(null))
+      .catch(() => {
+        setMyLog(null);
+        setStars(null);
+        setReview("");
+      })
       .finally(() => setLoadingLog(false));
   }, [mediaType, externalId]);
 

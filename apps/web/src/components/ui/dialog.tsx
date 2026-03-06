@@ -37,7 +37,14 @@ const DialogContent = React.forwardRef<
         className
       )}
       onEscapeKeyDown={onClose}
-      onPointerDownOutside={onClose}
+      onPointerDownOutside={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest("[data-radix-select-content]") || target.closest("[data-dropdown-portal]")) {
+          e.preventDefault();
+          return;
+        }
+        onClose?.();
+      }}
       {...props}
     >
       {children}

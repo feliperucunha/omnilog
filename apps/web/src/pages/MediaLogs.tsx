@@ -590,7 +590,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
                     )}
                     <div className="flex gap-3 p-3 flex-1 min-h-0 sm:gap-4 sm:p-4">
                       <ItemImage src={log.image} className="h-16 w-11 flex-shrink-0 rounded-lg sm:h-20 sm:w-14" />
-                        <div className="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
+                        <div className="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden min-h-[7rem] sm:min-h-[7.5rem]">
                         <Link
                           to={`/item/${log.mediaType}/${log.externalId}`}
                           className="line-clamp-1 font-semibold text-[var(--color-lightest)] no-underline hover:underline text-sm sm:text-base"
@@ -620,11 +620,15 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
                             </div>
                           );
                         })()}
-                        {log.review && (
-                          <p className="line-clamp-2 text-xs sm:text-sm text-[var(--color-light)] min-h-0">
-                            {log.review}
-                          </p>
-                        )}
+                        <div className="min-h-[2.5rem] flex items-start">
+                          {log.review ? (
+                            <p className="line-clamp-2 text-xs sm:text-sm text-[var(--color-light)] min-h-0">
+                              {log.review}
+                            </p>
+                          ) : (
+                            <span className="invisible text-xs sm:text-sm line-clamp-2">—</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     {!readOnly && (
