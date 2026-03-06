@@ -118,7 +118,7 @@ export function CustomEntryForm({
   };
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onCancel()}>
+    <Dialog open modal={false} onOpenChange={(open) => !open && onCancel()}>
       <DialogContent onClose={onCancel}>
         <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
           <h3 className="mb-4 text-lg font-semibold text-[var(--color-lightest)]">

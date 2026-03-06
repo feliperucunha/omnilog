@@ -200,7 +200,7 @@ export function LogForm(props: LogFormProps) {
   };
 
   return (
-    <Dialog open onOpenChange={(open) => !open && props.onCancel()}>
+    <Dialog open modal={false} onOpenChange={(open) => !open && props.onCancel()}>
       <DialogContent onClose={props.onCancel}>
         <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
           <div className="mb-4 flex gap-4">
