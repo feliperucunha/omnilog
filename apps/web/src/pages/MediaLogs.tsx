@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react";
 import type { MediaType, Log } from "@logeverything/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@logeverything/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { apiFetch, apiFetchCached, apiFetchPublic, invalidateApiCache, invalidateLogsAndItemsCache, apiFetchFile } from "@/lib/api";
+import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, apiFetchFile } from "@/lib/api";
 import { LogForm } from "@/components/LogForm";
 import { CustomEntryForm } from "@/components/CustomEntryForm";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
@@ -55,7 +55,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
   const { t } = useLocale();
   const navigate = useNavigate();
   const { showLogComplete } = useLogComplete();
-  const { me, refetch: refetchMe } = useMe();
+  const { me } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
   const provider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);

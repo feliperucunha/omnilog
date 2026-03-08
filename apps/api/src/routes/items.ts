@@ -187,7 +187,13 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
     }),
     (async () => {
       if (sort === "likes" || sort === "dislikes") {
-        const orderedIds = await getReviewLogIdsByReaction(mediaType, externalId, sort, skip, reviewsLimit);
+        const orderedIds = await getReviewLogIdsByReaction(
+          mediaType,
+          externalId,
+          sort === "likes" ? "like" : "dislike",
+          skip,
+          reviewsLimit
+        );
         if (orderedIds.length === 0) return [];
         const byId = new Map(
           (
@@ -365,7 +371,7 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
             const orderedIds = await getReviewLogIdsByReaction(
               mediaType,
               externalId,
-              reviewsSort,
+              reviewsSort === "likes" ? "like" : "dislike",
               reviewsSkip,
               reviewsLimit
             );

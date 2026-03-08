@@ -129,7 +129,7 @@ export function Search() {
   const [drawerItem, setDrawerItem] = useState<{ mediaType: MediaType; id: string } | null>(null);
   const [logsByExternalId, setLogsByExternalId] = useState<Map<string, string>>(new Map());
   const { token } = useAuth();
-  const { me, refetch: refetchMe } = useMe();
+  const { me } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
   const provider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);

@@ -13,13 +13,7 @@ import { useLogComplete } from "@/contexts/LogCompleteContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { ItemReviewForm } from "@/components/ItemReviewForm";
 import { ItemPageSkeleton } from "@/components/skeletons";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select } from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
 import { StarRating } from "@/components/StarRating";
@@ -593,17 +587,15 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                   setReviewsSort(v as ReviewSortKey);
                   setReviewsPage(1);
                 }}
-              >
-                <SelectTrigger className="w-[10rem]" aria-label={t("reviews.sortBy")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="recent">{t("reviews.sortRecent")}</SelectItem>
-                  <SelectItem value="oldest">{t("reviews.sortOldest")}</SelectItem>
-                  <SelectItem value="likes">{t("reviews.sortLikes")}</SelectItem>
-                  <SelectItem value="dislikes">{t("reviews.sortDislikes")}</SelectItem>
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: "recent", label: t("reviews.sortRecent") },
+                  { value: "oldest", label: t("reviews.sortOldest") },
+                  { value: "likes", label: t("reviews.sortLikes") },
+                  { value: "dislikes", label: t("reviews.sortDislikes") },
+                ]}
+                triggerClassName="w-[10rem]"
+                aria-label={t("reviews.sortBy")}
+              />
             )}
           </div>
           {reviewsLoading ? (
