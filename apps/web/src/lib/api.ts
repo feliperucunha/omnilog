@@ -6,7 +6,7 @@ if (import.meta.env.DEV && API_BASE.startsWith("https://localhost")) {
 if (API_BASE.startsWith("http") && !API_BASE.endsWith("/api")) {
   API_BASE = API_BASE.replace(/\/?$/, "") + "/api";
 }
-const DEFAULT_TIMEOUT_MS = 15000;
+const DEFAULT_TIMEOUT_MS = 35000;
 
 import { getCached, setCached, invalidateByPrefix } from "./cache.js";
 
@@ -27,6 +27,20 @@ function dispatchLogout(): void {
 
 /** Error code returned by API for log limit (free tier). Check err.message === this to show tier message. */
 export const LOG_LIMIT_REACHED_CODE = "LOG_LIMIT_REACHED";
+
+/** Error code when the user's API key was rejected by the provider (401/403). */
+export const INVALID_API_KEY_CODE = "INVALID_API_KEY";
+
+/** Thrown when API returns 400 with code INVALID_API_KEY. provider is the key to use with API_KEY_META. */
+export class InvalidApiKeyError extends Error {
+  constructor(
+    message: string,
+    public readonly provider: string
+  ) {
+    super(message);
+    this.name = "InvalidApiKeyError";
+  }
+}
 
 function parseErrorResponse(text: string, fallback: string): string {
   try {
@@ -128,6 +142,17 @@ async function fetchInternal<T>(
         res.status === 500 ? "Something went wrong. Please try again." : res.statusText || "Request failed"
       );
       if (res.status === 400) {
+        try {
+          const data = JSON.parse(text) as { code?: string; provider?: string };
+          if (data.code === INVALID_API_KEY_CODE && typeof data.provider === "string") {
+            window.dispatchEvent(
+              new CustomEvent("api:invalid-key", { detail: { provider: data.provider } })
+            );
+            throw new InvalidApiKeyError(message, data.provider);
+          }
+        } catch (e) {
+          if (e instanceof InvalidApiKeyError) throw e;
+        }
         const fieldErrors = parseFieldErrors(text);
         if (fieldErrors) throw new ApiValidationError(message, fieldErrors);
       }

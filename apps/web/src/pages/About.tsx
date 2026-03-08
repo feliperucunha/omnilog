@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Heart, Github } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
+import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,12 @@ const TEAM_MEMBERS = [
 export function About() {
   const { t } = useLocale();
   const { token } = useAuth();
-  const [expanded, setExpanded] = useState(false);
+  const { setPageTitle } = usePageTitle() ?? {};
+  const [expanded, setExpanded] = useState(true);
+  useEffect(() => {
+    setPageTitle?.(t("about.title"));
+    return () => setPageTitle?.(null);
+  }, [t, setPageTitle]);
   const [rating, setRating] = useState<number>(5);
   const [comments, setComments] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -131,10 +137,6 @@ export function About() {
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
       className="flex flex-col gap-8 w-full"
     >
-      <h1 className="text-xl font-bold text-[var(--color-lightest)] sm:text-2xl">
-        {t("about.title")}
-      </h1>
-
       {/* Team */}
       <section className="w-full">
         <h2 className="mb-3 sm:mb-4 text-base font-semibold text-[var(--color-lightest)] sm:text-lg">

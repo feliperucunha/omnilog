@@ -1,6 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import type { SearchResult, ItemDetail } from "@logeverything/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
+import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const BASE = "https://boardgamegeek.com/xmlapi2";
 
@@ -17,6 +18,7 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
   const token = apiToken ?? process.env.BGG_API_TOKEN;
   if (!token) return null;
   const res = await fetch(`${BASE}/thing?id=${id}`, { headers: bggHeaders(token) });
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("bgg");
   if (!res.ok) return null;
   const xml = await res.text();
   const parser = new XMLParser({ ignoreAttributes: false });
@@ -102,6 +104,7 @@ export async function searchBoardGames(
     `${BASE}/search?query=${encodeURIComponent(q)}&type=boardgame`,
     { headers: bggHeaders(token) }
   );
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("bgg");
   if (!res.ok) return { results: [] };
   const xml = await res.text();
   const parser = new XMLParser({ ignoreAttributes: false });
@@ -114,6 +117,7 @@ export async function searchBoardGames(
 
   const ids = itemsList.slice(0, 20).map((i) => i["@_id"]).join(",");
   const thingRes = await fetch(`${BASE}/thing?id=${ids}`, { headers: bggHeaders(token) });
+  if (thingRes.status === 401 || thingRes.status === 403) throw new InvalidApiKeyError("bgg");
   if (!thingRes.ok) return { results: [] };
   const thingXml = await thingRes.text();
   const thingParsed = parser.parse(thingXml) as {

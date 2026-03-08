@@ -28,7 +28,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <App />
                 </VisibleMediaTypesProvider>
               </MeProvider>
-            <Toaster position="top-center" richColors />
+            <Toaster position="top-center" richColors duration={2500} />
           </AuthProvider>
           </BrowserRouter>
         </ErrorBoundary>

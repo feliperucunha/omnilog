@@ -1,5 +1,6 @@
 import type { SearchResult, ItemDetail } from "@logeverything/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
+import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const BASE = "https://api.themoviedb.org/3";
 const IMAGE_BASE = "https://image.tmdb.org/t/p/w200";
@@ -12,6 +13,7 @@ export async function getMovieById(id: string, apiKey?: string | null): Promise<
   const key = getKey(apiKey);
   if (!key) return null;
   const res = await fetch(`${BASE}/movie/${id}?api_key=${key}`);
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res.ok) return null;
   const data = (await res.json()) as {
     id?: number;
@@ -53,6 +55,7 @@ export async function getTvById(id: string, apiKey?: string | null): Promise<Ite
   const key = getKey(apiKey);
   if (!key) return null;
   const res = await fetch(`${BASE}/tv/${id}?api_key=${key}`);
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res.ok) return null;
   const data = (await res.json()) as {
     id?: number;
@@ -105,6 +108,7 @@ export async function getTvSeasonEpisodeNumbers(
   const res = await fetch(
     `${BASE}/tv/${seriesId}/season/${seasonNumber}?api_key=${key}`
   );
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res.ok) return [];
   const data = (await res.json()) as {
     episodes?: Array<{ episode_number?: number }>;
@@ -135,6 +139,7 @@ export async function searchMovies(
   const res = await fetch(
     `${BASE}/search/movie?api_key=${key}&query=${encodeURIComponent(q)}`
   );
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res.ok) return { results: [] };
   const data = (await res.json()) as { results?: Array<{ id: number; title?: string; release_date?: string; poster_path?: string }> };
   let results = (data.results ?? []).slice(0, 20).map((item) => ({
@@ -167,6 +172,7 @@ export async function searchTv(
   const res = await fetch(
     `${BASE}/search/tv?api_key=${key}&query=${encodeURIComponent(q)}`
   );
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res.ok) return { results: [] };
   const data = (await res.json()) as { results?: Array<{ id: number; name?: string; first_air_date?: string; poster_path?: string }> };
   let results = (data.results ?? []).slice(0, 20).map((item) => ({

@@ -97,6 +97,8 @@
     "advanced": "Advanced",
     "apiKeys": "API Keys",
     "apiKeysIntro": "Add API keys to enable search for movies, TV, games, and board games. Keys are stored in your account.",
+    "apiKeyTutorialIntro": "You will register a new application with each provider; that registration provides an access key which is required for this website to work.",
+    "bggApprovalBadge": "Typically ~5 days for key approval",
     "apiKeysSupport": "Contact support",
     "language": "Language",
     "languageLabel": "App language",
@@ -121,7 +123,14 @@
     "boardGameProviderSaved": "Board game source updated.",
     "showCompleteModal": "Show completion modal after logging",
     "showCompleteModalEnabled": "Enabled",
-    "showCompleteModalIntro": "When on, a confirmation modal appears after you add or update a log. Stored on this device only."
+    "showCompleteModalIntro": "When on, a confirmation modal appears after you add or update a log. Stored on this device only.",
+    "apiKeyTutorial": {
+      "tmdb": "1. Go to themoviedb.org and create a free account or log in.\n2. Open Settings → API from the left menu (or go to the link below).\n3. Click \"Request an API Key\" and choose \"Developer\".\n4. Accept the terms and fill the form (Application URL: your site or http://localhost:5173, Application Summary: e.g. \"Personal media log\").\n5. On the API page, copy the \"API Key (v3 auth)\" and paste it below.",
+      "rawg": "1. Go to rawg.io and sign up or log in.\n2. Open the API docs link below and look for \"Get your API key\" or the signup form.\n3. Register for an API key (free tier available).\n4. Copy the key from your account/dashboard and paste it below.",
+      "bgg": "1. Go to boardgamegeek.com and log in (or create an account).\n2. Open the Applications link below.\n3. Click to create a new application (e.g. \"OMNILOG\").\n4. Choose non-commercial if it's for personal use; submit and wait for approval (can take a few days).\n5. Once approved, open your application and create a Token.\n6. Copy the Bearer token and paste it below.",
+      "ludopedia": "1. Create an account at https://ludopedia.com.br/novousuario or log in at ludopedia.com.br.\n2. Open Aplicativos (https://www.ludopedia.com.br/aplicativos) and create an application.\n3. Use Ludopedia's OAuth flow to obtain an access token (see API documentation). The key required for Ominilog is the Access Token (ACCESS_TOKEN).\n4. The token is valid for 60 days; paste it below.",
+      "comicvine": "1. Go to comicvine.gamespot.com and create a free account or log in.\n2. Open the API documentation link below.\n3. Request an API key (free) from the Comic Vine API page.\n4. Copy your API key and paste it below."
+    }
   },
   "common": {
     "required": "required",
@@ -152,13 +161,21 @@
   "apiKeyBanner": {
     "categoryMessage": "{{category}} key missing",
     "addKeyInSettings": "Add key in Settings",
+    "invalidKeyMessage": "Your {{name}} API key appears to be invalid.",
+    "invalidKeyMessageMultiple": "Your API key for {{names}} appears to be invalid.",
+    "invalidKeyOpenSettings": "Open Settings",
     "searchMessage": "Add a {{provider}} key in Settings to save it to your account ({{category}} search).",
     "searchMessageWithCount": "{{used}}/{{limit}} free searches used for {{category}}. Add a {{provider}} key in Settings to keep searching."
   },
   "reviews": {
     "pageOf": "Page {{current}} of {{total}} ({{count}} reviews)",
     "prev": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "sortBy": "Sort reviews",
+    "sortRecent": "Most recent",
+    "sortOldest": "Oldest",
+    "sortLikes": "Most likes",
+    "sortDislikes": "Most dislikes"
   },
   "publicProfile": {
     "title": "Public profile",
@@ -172,7 +189,10 @@
     "sectionTitle": "Social",
     "emptyFeed": "Start following your friends to see their logs.",
     "findUsers": "Find users",
-    "userWithoutUsername": "User"
+    "userWithoutUsername": "User",
+    "viewFullReview": "View full review",
+    "reviewBy": "by {{name}}",
+    "viewProfile": "View {{name}}'s profile"
   },
   "dashboard": {
     "title": "Home",
@@ -319,6 +339,7 @@
     "watched": "Watched",
     "planToWatch": "Plan to watch",
     "completed": "Completed",
+    "completedForVideo": "Completed",
     "watching": "Watching",
     "dropped": "Dropped",
     "played": "Played",

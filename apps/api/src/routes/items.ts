@@ -2,6 +2,7 @@ import { Router } from "express";
 import { MEDIA_TYPES } from "@logeverything/shared";
 import type { MediaType } from "@logeverything/shared";
 import { prisma } from "../lib/prisma.js";
+import { getReactionsForLogs } from "../lib/reactions.js";
 import { sanitizeText, EXTERNAL_ID_MAX_LENGTH } from "../lib/sanitize.js";
 import { optionalAuthMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
@@ -12,6 +13,7 @@ import { getAnimeById, getMangaById } from "../services/jikan.js";
 import { getBoardGameById } from "../services/bgg.js";
 import { getBoardGameByIdLudopedia } from "../services/ludopedia.js";
 import { getVolumeById } from "../services/comicvine.js";
+import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 export const itemsRouter = Router();
 itemsRouter.use(optionalAuthMiddleware);
@@ -33,6 +35,34 @@ async function getUserKeys(userId: string) {
 
 const DEFAULT_REVIEWS_LIMIT = 10;
 const MAX_REVIEWS_LIMIT = 50;
+
+const REVIEW_SORT_OPTIONS = ["recent", "oldest", "likes", "dislikes"] as const;
+type ReviewSort = (typeof REVIEW_SORT_OPTIONS)[number];
+
+function parseReviewSort(sort: unknown): ReviewSort {
+  return REVIEW_SORT_OPTIONS.includes(sort as ReviewSort) ? (sort as ReviewSort) : "recent";
+}
+
+/** Fetch review log IDs in order for likes or dislikes sort (raw query). */
+async function getReviewLogIdsByReaction(
+  mediaType: string,
+  externalId: string,
+  reactionType: "like" | "dislike",
+  skip: number,
+  take: number
+): Promise<string[]> {
+  const rows = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT l.id FROM "Log" l
+    LEFT JOIN (
+      SELECT "logId", COUNT(*)::int as c FROM "LogReaction"
+      WHERE type = ${reactionType} GROUP BY "logId"
+    ) r ON r."logId" = l.id
+    WHERE l."mediaType" = ${mediaType} AND l."externalId" = ${externalId} AND l.grade IS NOT NULL
+    ORDER BY COALESCE(r.c, 0) DESC, l."createdAt" DESC
+    LIMIT ${take} OFFSET ${skip}
+  `;
+  return rows.map((r) => r.id);
+}
 
 /** GET /items/:mediaType/:externalId/progress-options - options for season/episode/chapter/volume dropdowns. */
 itemsRouter.get("/:mediaType/:externalId/progress-options", async (req: AuthenticatedRequest, res) => {
@@ -104,6 +134,21 @@ itemsRouter.get("/:mediaType/:externalId/progress-options", async (req: Authenti
     }
     res.json({});
   } catch (err) {
+    if (err instanceof InvalidApiKeyError) {
+      const userHadKey =
+        err.provider === "tmdb"
+          ? !!keys?.tmdbApiKey
+          : err.provider === "comicvine"
+            ? !!keys?.comicVineApiKey
+            : false;
+      if (userHadKey) {
+        return res.status(400).json({
+          error: "Invalid API key",
+          code: "INVALID_API_KEY",
+          provider: err.provider,
+        });
+      }
+    }
     console.error("Progress options error:", err);
     res.status(500).json({ error: "Failed to load options" });
   }
@@ -127,8 +172,11 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
     MAX_REVIEWS_LIMIT,
     Math.max(1, parseInt(String(req.query.limit ?? req.query.reviewsLimit ?? DEFAULT_REVIEWS_LIMIT), 10) || DEFAULT_REVIEWS_LIMIT)
   );
+  const sort = parseReviewSort(req.query.sort);
   const where = { mediaType, externalId };
   const whereWithGrade = { ...where, grade: { not: null } };
+  const currentUserId = req.user?.userId ?? null;
+  const skip = (reviewsPage - 1) * reviewsLimit;
 
   const [reviewsTotal, gradeAgg, logs] = await Promise.all([
     prisma.log.count({ where: whereWithGrade }),
@@ -137,13 +185,30 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
       _avg: { grade: true },
       _count: { grade: true },
     }),
-    prisma.log.findMany({
-      where: whereWithGrade,
-      include: { user: { select: { email: true, tier: true } } },
-      orderBy: { createdAt: "desc" },
-      skip: (reviewsPage - 1) * reviewsLimit,
-      take: reviewsLimit,
-    }),
+    (async () => {
+      if (sort === "likes" || sort === "dislikes") {
+        const orderedIds = await getReviewLogIdsByReaction(mediaType, externalId, sort, skip, reviewsLimit);
+        if (orderedIds.length === 0) return [];
+        const byId = new Map(
+          (
+            await prisma.log.findMany({
+              where: { id: { in: orderedIds } },
+              include: { user: { select: { email: true, tier: true } } },
+            })
+          ).map((l) => [l.id, l])
+        );
+        return orderedIds.map((id) => byId.get(id)).filter(Boolean) as Awaited<
+          ReturnType<typeof prisma.log.findMany<{ include: { user: { select: { email: true; tier: true } } } }>>
+        >;
+      }
+      return prisma.log.findMany({
+        where: whereWithGrade,
+        include: { user: { select: { email: true, tier: true } } },
+        orderBy: { createdAt: sort === "oldest" ? "asc" : "desc" },
+        skip,
+        take: reviewsLimit,
+      });
+    })(),
   ]);
 
   const meanGrade =
@@ -151,23 +216,32 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
       ? gradeAgg._avg.grade
       : null;
 
-  const reviews = logs.map((l) => ({
-    id: l.id,
-    userEmail: l.user.email,
-    isPro: l.user.tier === "pro",
-    grade: l.grade,
-    review: l.review,
-    listType: l.listType,
-    status: l.status,
-    season: l.season,
-    episode: l.episode,
-    chapter: l.chapter,
-    volume: l.volume,
-    startedAt: l.startedAt?.toISOString() ?? null,
-    completedAt: l.completedAt?.toISOString() ?? null,
-    contentHours: l.contentHours,
-    createdAt: l.createdAt.toISOString(),
-  }));
+  const logIds = logs.map((l) => l.id);
+  const reactionMap = await getReactionsForLogs(logIds, currentUserId);
+
+  const reviews = logs.map((l) => {
+    const stats = reactionMap.get(l.id);
+    return {
+      id: l.id,
+      userEmail: l.user.email,
+      isPro: l.user.tier === "pro",
+      grade: l.grade,
+      review: l.review,
+      listType: l.listType,
+      status: l.status,
+      season: l.season,
+      episode: l.episode,
+      chapter: l.chapter,
+      volume: l.volume,
+      startedAt: l.startedAt?.toISOString() ?? null,
+      completedAt: l.completedAt?.toISOString() ?? null,
+      contentHours: l.contentHours,
+      createdAt: l.createdAt.toISOString(),
+      likesCount: stats?.likesCount ?? 0,
+      dislikesCount: stats?.dislikesCount ?? 0,
+      userReaction: stats?.userReaction ?? null,
+    };
+  });
 
   res.json({
     reviews,
@@ -196,7 +270,9 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     requestedLimit === 0
       ? 0
       : Math.min(MAX_REVIEWS_LIMIT, Math.max(1, requestedLimit || DEFAULT_REVIEWS_LIMIT));
+  const reviewsSort = parseReviewSort(req.query.reviewsSort ?? req.query.sort);
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
+  const currentUserId = req.user?.userId ?? null;
 
   let boardProviderUsed: "bgg" | "ludopedia" | null = null;
 
@@ -244,6 +320,25 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
         break;
     }
   } catch (err) {
+    if (err instanceof InvalidApiKeyError) {
+      const userHadKey =
+        err.provider === "tmdb"
+          ? !!keys?.tmdbApiKey
+          : err.provider === "rawg"
+            ? !!keys?.rawgApiKey
+            : err.provider === "bgg"
+              ? !!keys?.bggApiToken
+              : err.provider === "ludopedia"
+                ? !!keys?.ludopediaApiToken
+                : !!keys?.comicVineApiKey;
+      if (userHadKey) {
+        return res.status(400).json({
+          error: "Invalid API key",
+          code: "INVALID_API_KEY",
+          provider: err.provider,
+        });
+      }
+    }
     console.error("Item fetch error:", err);
   }
 
@@ -255,6 +350,7 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
   const where = { mediaType, externalId };
   const whereWithGrade = { ...where, grade: { not: null } };
 
+  const reviewsSkip = (reviewsPage - 1) * reviewsLimit;
   const [reviewsTotal, gradeAgg, logs] = await Promise.all([
     prisma.log.count({ where: whereWithGrade }),
     prisma.log.aggregate({
@@ -264,13 +360,36 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     }),
     reviewsLimit === 0
       ? Promise.resolve([])
-      : prisma.log.findMany({
-          where: whereWithGrade,
-          include: { user: { select: { email: true, tier: true } } },
-          orderBy: { createdAt: "desc" },
-          skip: (reviewsPage - 1) * reviewsLimit,
-          take: reviewsLimit,
-        }),
+      : (async () => {
+          if (reviewsSort === "likes" || reviewsSort === "dislikes") {
+            const orderedIds = await getReviewLogIdsByReaction(
+              mediaType,
+              externalId,
+              reviewsSort,
+              reviewsSkip,
+              reviewsLimit
+            );
+            if (orderedIds.length === 0) return [];
+            const byId = new Map(
+              (
+                await prisma.log.findMany({
+                  where: { id: { in: orderedIds } },
+                  include: { user: { select: { email: true, tier: true } } },
+                })
+              ).map((l) => [l.id, l])
+            );
+            return orderedIds.map((id) => byId.get(id)).filter(Boolean) as Awaited<
+              ReturnType<typeof prisma.log.findMany<{ include: { user: { select: { email: true; tier: true } } } }>>
+            >;
+          }
+          return prisma.log.findMany({
+            where: whereWithGrade,
+            include: { user: { select: { email: true, tier: true } } },
+            orderBy: { createdAt: reviewsSort === "oldest" ? "asc" : "desc" },
+            skip: reviewsSkip,
+            take: reviewsLimit,
+          });
+        })(),
   ]);
 
   const meanGrade =
@@ -278,23 +397,32 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
       ? gradeAgg._avg.grade
       : null;
 
-  const reviews = logs.map((l) => ({
-    id: l.id,
-    userEmail: l.user.email,
-    isPro: l.user.tier === "pro",
-    grade: l.grade,
-    review: l.review,
-    listType: l.listType,
-    status: l.status,
-    season: l.season,
-    episode: l.episode,
-    chapter: l.chapter,
-    volume: l.volume,
-    startedAt: l.startedAt?.toISOString() ?? null,
-    completedAt: l.completedAt?.toISOString() ?? null,
-    contentHours: l.contentHours,
-    createdAt: l.createdAt.toISOString(),
-  }));
+  const logIds = logs.map((l) => l.id);
+  const reactionMap = await getReactionsForLogs(logIds, currentUserId);
+
+  const reviews = logs.map((l) => {
+    const stats = reactionMap.get(l.id);
+    return {
+      id: l.id,
+      userEmail: l.user.email,
+      isPro: l.user.tier === "pro",
+      grade: l.grade,
+      review: l.review,
+      listType: l.listType,
+      status: l.status,
+      season: l.season,
+      episode: l.episode,
+      chapter: l.chapter,
+      volume: l.volume,
+      startedAt: l.startedAt?.toISOString() ?? null,
+      completedAt: l.completedAt?.toISOString() ?? null,
+      contentHours: l.contentHours,
+      createdAt: l.createdAt.toISOString(),
+      likesCount: stats?.likesCount ?? 0,
+      dislikesCount: stats?.dislikesCount ?? 0,
+      userReaction: stats?.userReaction ?? null,
+    };
+  });
 
   const logWithImage = await prisma.log.findFirst({
     where: { mediaType, externalId, image: { not: null } },

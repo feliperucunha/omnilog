@@ -7,6 +7,7 @@ import { Register } from "@/pages/Register";
 import { ForgotPassword } from "@/pages/ForgotPassword";
 import { ResetPassword } from "@/pages/ResetPassword";
 import { LogCompleteProvider } from "@/contexts/LogCompleteContext";
+import { InvalidApiKeyProvider } from "@/contexts/InvalidApiKeyContext";
 import { Onboarding } from "@/pages/Onboarding";
 import { Dashboard } from "@/pages/Dashboard";
 import { Statistics } from "@/pages/Statistics";
@@ -47,6 +48,7 @@ export default function App() {
   return (
     <LogCompleteProvider>
       <RequireOnboarded>
+        <InvalidApiKeyProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -77,6 +79,7 @@ export default function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </InvalidApiKeyProvider>
       </RequireOnboarded>
     </LogCompleteProvider>
   );

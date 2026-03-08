@@ -3,6 +3,7 @@ export type {
   BoardGameProvider,
   ListType,
   LogStatus,
+  ReactionType,
   SearchResult,
   SearchSortOption,
   ItemDetail,

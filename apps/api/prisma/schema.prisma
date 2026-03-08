@@ -40,6 +40,7 @@ model User {
   createdAt           DateTime @default(now())
   updatedAt      DateTime @updatedAt
   logs          Log[]
+  logReactions  LogReaction[]
   feedbacks      Feedback[]
   followsFollowing  Follow[] @relation("FollowFollowing")
   followsFollowers  Follow[] @relation("FollowFollower")
@@ -93,9 +94,24 @@ model Log {
   genres         String?  // JSON array of genre names (for stats and badges)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  reactions   LogReaction[]
 
   @@unique([userId, mediaType, externalId])
   @@index([userId])
   @@index([userId, mediaType])
   @@index([mediaType, externalId])
+}
+
+model LogReaction {
+  id        String   @id @default(cuid())
+  logId     String
+  userId    String
+  type      String   // "like" | "dislike"
+  createdAt DateTime @default(now())
+  log       Log      @relation(fields: [logId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, logId])
+  @@index([logId])
+  @@index([userId])
 }

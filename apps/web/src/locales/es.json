@@ -97,6 +97,8 @@
     "advanced": "Avanzado",
     "apiKeys": "Claves de API",
     "apiKeysIntro": "Añade claves de API para buscar películas, series, juegos y juegos de mesa. Las claves se guardan en tu cuenta.",
+    "apiKeyTutorialIntro": "Registrarás una nueva aplicación en cada proveedor; ese registro te dará una clave de acceso necesaria para que el sitio funcione.",
+    "bggApprovalBadge": "Suele tardar ~5 días en aprobar la clave",
     "apiKeysSupport": "Contactar con soporte",
     "language": "Idioma",
     "languageLabel": "Idioma de la app",
@@ -120,7 +122,14 @@
     "boardGameProviderSaved": "Fuente de juegos de mesa actualizada.",
     "showCompleteModal": "Mostrar modal de confirmación al registrar",
     "showCompleteModalEnabled": "Activado",
-    "showCompleteModalIntro": "Si está activado, aparece un modal de confirmación después de añadir o actualizar un registro. Se guarda solo en este dispositivo."
+    "showCompleteModalIntro": "Si está activado, aparece un modal de confirmación después de añadir o actualizar un registro. Se guarda solo en este dispositivo.",
+    "apiKeyTutorial": {
+      "tmdb": "1. Entra en themoviedb.org y crea una cuenta gratuita o inicia sesión.\n2. Abre Ajustes → API en el menú de la izquierda (o usa el enlace de abajo).\n3. Haz clic en \"Request an API Key\" y elige \"Developer\".\n4. Acepta los términos y rellena el formulario (Application URL: tu sitio o http://localhost:5173, Application Summary: ej. \"Registro de medios personal\").\n5. En la página de la API, copia el \"API Key (v3 auth)\" y pégalo abajo.",
+      "rawg": "1. Entra en rawg.io y regístrate o inicia sesión.\n2. Abre el enlace de la documentación de la API de abajo y busca \"Get your API key\" o el formulario de registro.\n3. Regístrate para obtener una clave de API (hay plan gratuito).\n4. Copia la clave de tu cuenta/panel y pégala abajo.",
+      "bgg": "1. Entra en boardgamegeek.com e inicia sesión (o crea una cuenta).\n2. Abre el enlace Applications de abajo.\n3. Haz clic para crear una nueva aplicación (ej.: \"OMNILOG\").\n4. Elige uso no comercial si es para uso personal; envía y espera la aprobación (puede tardar unos días).\n5. Una vez aprobada, abre tu aplicación y crea un Token.\n6. Copia el Bearer token y pégalo abajo.",
+      "ludopedia": "1. Crea una cuenta en https://ludopedia.com.br/novousuario o inicia sesión en ludopedia.com.br.\n2. Abre Aplicativos (https://www.ludopedia.com.br/aplicativos) y crea una aplicación.\n3. Usa el flujo OAuth de Ludopedia para obtener un token de acceso (consulta la documentación de la API). La clave necesaria para Ominilog es el Access Token (ACCESS_TOKEN).\n4. El token es válido 60 días; pégalo abajo.",
+      "comicvine": "1. Entra en comicvine.gamespot.com y crea una cuenta gratuita o inicia sesión.\n2. Abre el enlace de la documentación de la API de abajo.\n3. Solicita una clave de API (gratuita) en la página de Comic Vine API.\n4. Copia tu clave de API y pégala abajo."
+    }
   },
   "common": {
     "required": "obligatorio",
@@ -151,13 +160,21 @@
   "apiKeyBanner": {
     "categoryMessage": "Clave de {{category}} faltante",
     "addKeyInSettings": "Añadir clave en Ajustes",
+    "invalidKeyMessage": "Tu clave de API de {{name}} parece ser inválida.",
+    "invalidKeyMessageMultiple": "Tu clave de API para {{names}} parece ser inválida.",
+    "invalidKeyOpenSettings": "Abrir Ajustes",
     "searchMessage": "Añade una clave {{provider}} en Ajustes para guardarla en tu cuenta (búsqueda en {{category}}).",
     "searchMessageWithCount": "{{used}}/{{limit}} búsquedas gratuitas usadas para {{category}}. Añade una clave {{provider}} en Ajustes para seguir buscando."
   },
   "reviews": {
     "pageOf": "Página {{current}} de {{total}} ({{count}} reseñas)",
     "prev": "Anterior",
-    "next": "Siguiente"
+    "next": "Siguiente",
+    "sortBy": "Ordenar reseñas",
+    "sortRecent": "Más recientes",
+    "sortOldest": "Más antiguas",
+    "sortLikes": "Más likes",
+    "sortDislikes": "Más dislikes"
   },
   "publicProfile": {
     "title": "Perfil público",
@@ -171,7 +188,10 @@
     "sectionTitle": "Social",
     "emptyFeed": "Empieza a seguir a tus amigos para ver sus logs.",
     "findUsers": "Buscar usuarios",
-    "userWithoutUsername": "Usuario"
+    "userWithoutUsername": "Usuario",
+    "viewFullReview": "Ver reseña completa",
+    "reviewBy": "por {{name}}",
+    "viewProfile": "Ver perfil de {{name}}"
   },
   "dashboard": {
     "title": "Inicio",
@@ -318,6 +338,7 @@
     "watched": "Visto",
     "planToWatch": "Quiero ver",
     "completed": "Completado",
+    "completedForVideo": "Completado",
     "watching": "Viendo",
     "dropped": "Abandonado",
     "played": "Jugado",

@@ -8,7 +8,8 @@ import { ItemImage } from "@/components/ItemImage";
 import { useLocale } from "@/contexts/LocaleContext";
 import { Logo } from "@/components/Logo";
 import { overlayVariants, modalContentVariants } from "@/lib/animations";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, STATUS_I18N_KEYS } from "@logeverything/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@logeverything/shared";
+import { getStatusLabel } from "@/lib/statusLabel";
 
 function statusColor(status: string | null | undefined): string {
   if (!status) return "text-[var(--color-light)]";
@@ -26,7 +27,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const { t } = useLocale();
   const { image, title, grade, status } = state;
   const stars = grade != null ? gradeToStars(grade) : 0;
-  const statusLabel = status ? t(`status.${STATUS_I18N_KEYS[status] ?? status}`) : t("logComplete.logged");
+  const statusLabel = status ? getStatusLabel(t, status, state.mediaType) : t("logComplete.logged");
 
   return (
     <motion.div
@@ -56,11 +57,11 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
             type="button"
             variant="ghost"
             size="icon"
-            className="h-11 min-h-11 w-11 min-w-11 shrink-0 rounded-full text-[var(--color-light)] hover:bg-[var(--color-mid)]/30 hover:text-[var(--color-lightest)] active:bg-[var(--color-mid)]/40 md:h-9 md:min-h-0 md:w-9 md:min-w-0"
+            className="h-12 min-h-12 w-12 min-w-12 shrink-0 rounded-full text-[var(--color-light)] hover:bg-[var(--color-mid)]/30 hover:text-[var(--color-lightest)] active:bg-[var(--color-mid)]/40 md:h-11 md:min-h-0 md:w-11 md:min-w-0"
             onClick={onClose}
             aria-label={t("common.close")}
           >
-            <X className="h-5 w-5" />
+            <X className="h-6 w-6" />
           </Button>
         </header>
 

@@ -1,4 +1,5 @@
 import type { SearchResult, ItemDetail } from "@logeverything/shared";
+import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const BASE = "https://api.rawg.io/api";
 
@@ -10,6 +11,7 @@ export async function getGameById(id: string, apiKey?: string | null): Promise<I
   const key = getKey(apiKey);
   if (!key) return null;
   const res = await fetch(`${BASE}/games/${id}?key=${key}`);
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("rawg");
   if (!res.ok) return null;
   const data = (await res.json()) as {
     id?: number;
@@ -91,6 +93,7 @@ export async function searchGames(
   const res = await fetch(
     `${BASE}/games?${params.toString()}`
   );
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("rawg");
   if (!res.ok) return { results: [] };
   const data = (await res.json()) as {
     results?: Array<{

@@ -77,6 +77,7 @@ function isCompleted(status: string | null | undefined): boolean {
 }
 
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
+import { getReactionsForLogs } from "../lib/reactions.js";
 
 const FREE_LOG_LIMIT = 500;
 
@@ -195,10 +196,23 @@ logsRouter.get("/feed", async (req: AuthenticatedRequest, res) => {
       },
     },
   });
+  const logIds = rows.map((r) => r.id);
+  const reactionMap = await getReactionsForLogs(logIds, userId);
   const data = rows.map((row) => {
     const { user, ...log } = row;
+    const serialized = serializeLog(log) as ReturnType<typeof serializeLog> & {
+      likesCount?: number;
+      dislikesCount?: number;
+      userReaction?: "like" | "dislike" | null;
+    };
+    const stats = reactionMap.get(row.id);
+    if (stats) {
+      serialized.likesCount = stats.likesCount;
+      serialized.dislikesCount = stats.dislikesCount;
+      serialized.userReaction = stats.userReaction ?? null;
+    }
     return {
-      log: serializeLog(log),
+      log: serialized,
       user: {
         id: user.id,
         username: user.username ?? null,
@@ -206,6 +220,38 @@ logsRouter.get("/feed", async (req: AuthenticatedRequest, res) => {
     };
   });
   res.json({ data });
+});
+
+const setReactionSchema = z.object({ type: z.enum(["like", "dislike"]) });
+
+/** PUT /logs/:id/reaction - Set current user's reaction (like or dislike) on a log. */
+logsRouter.put("/:id/reaction", async (req: AuthenticatedRequest, res) => {
+  const logId = req.params.id;
+  const parsed = setReactionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body: type must be 'like' or 'dislike'" });
+    return;
+  }
+  const userId = req.user!.userId;
+  const log = await prisma.log.findUnique({ where: { id: logId }, select: { id: true } });
+  if (!log) {
+    res.status(404).json({ error: "Log not found" });
+    return;
+  }
+  await prisma.logReaction.upsert({
+    where: { userId_logId: { userId, logId } },
+    create: { logId, userId, type: parsed.data.type },
+    update: { type: parsed.data.type },
+  });
+  res.status(204).end();
+});
+
+/** DELETE /logs/:id/reaction - Remove current user's reaction. */
+logsRouter.delete("/:id/reaction", async (req: AuthenticatedRequest, res) => {
+  const logId = req.params.id;
+  const userId = req.user!.userId;
+  await prisma.logReaction.deleteMany({ where: { logId, userId } });
+  res.status(204).end();
 });
 
 /** GET /logs/stats?group=category|month|year|genre|completedByMonth|completedByYear - hours (or count for genre/completedBy*) per category/period/genre */
@@ -305,7 +351,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   res.json({ group, data: entries });
 });
 
-/** GET /logs/by-date?date=YYYY-MM-DD - Logs completed or started on the given UTC date. Pro only. Returns { data: Log[] }. */
+/** GET /logs/by-date?date=YYYY-MM-DD&timezoneOffsetMinutes=? - Logs completed or started on the given date (in user's local time). Pro only. Returns { data: Log[] }. */
 logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const user = await prisma.user.findUnique({
@@ -329,8 +375,12 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
     res.status(400).json({ error: "Invalid date" });
     return;
   }
-  const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
-  const end = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999));
+  const tzOffsetMinutes = typeof req.query.timezoneOffsetMinutes === "string"
+    ? parseInt(req.query.timezoneOffsetMinutes, 10)
+    : 0;
+  const offsetMs = Number.isFinite(tzOffsetMinutes) ? tzOffsetMinutes * 60 * 1000 : 0;
+  const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - offsetMs);
+  const end = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999) - offsetMs);
   const logs = await prisma.log.findMany({
     where: {
       userId,
@@ -361,6 +411,10 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
   const monthParam = typeof req.query.month === "string" ? parseInt(req.query.month, 10) : new Date().getMonth() + 1;
   const year = Number.isFinite(yearParam) ? yearParam : new Date().getFullYear();
   const month = Number.isFinite(monthParam) ? Math.max(1, Math.min(12, monthParam)) : new Date().getMonth() + 1;
+  const tzOffsetMinutes = typeof req.query.timezoneOffsetMinutes === "string"
+    ? parseInt(req.query.timezoneOffsetMinutes, 10)
+    : 0;
+  const offsetMs = Number.isFinite(tzOffsetMinutes) ? tzOffsetMinutes * 60 * 1000 : 0;
   const start = new Date(Date.UTC(year, month - 1, 1));
   const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
   const logs = await prisma.log.findMany({
@@ -374,8 +428,11 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
     select: { startedAt: true, completedAt: true },
   });
   const dates: Record<string, number> = {};
-  const toKey = (d: Date) =>
-    `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  const toKey = (d: Date) => {
+    const localMs = d.getTime() + offsetMs;
+    const local = new Date(localMs);
+    return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}-${String(local.getUTCDate()).padStart(2, "0")}`;
+  };
   for (const log of logs) {
     if (log.startedAt && log.startedAt >= start && log.startedAt <= end) {
       const key = toKey(log.startedAt);

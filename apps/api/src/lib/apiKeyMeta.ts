@@ -36,7 +36,7 @@ export const API_KEY_META = {
     link: "https://ludopedia.com.br/api/documentacao.html",
     tutorial: `1. Go to ludopedia.com.br and log in (or create an account).
 2. Open Aplicativos (https://www.ludopedia.com.br/aplicativos) and create an application.
-3. Use Ludopedia's OAuth flow to obtain an access token (see API documentation).
+3. Use Ludopedia's OAuth flow to obtain an access token (see API documentation). The key required for Ominilog is the Access Token (ACCESS_TOKEN).
 4. The token is valid for 60 days; paste it below.`,
   },
   comicvine: {

@@ -1,7 +1,8 @@
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Settings, Info, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
+import { usePageTitle } from "@/contexts/PageTitleContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
 import { toast } from "sonner";
@@ -18,6 +19,15 @@ import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 
+const ROUTE_TITLE_KEYS: Record<string, string> = {
+  "/": "nav.dashboard",
+  "/statistics": "nav.statistics",
+  "/search": "nav.search",
+  "/settings": "nav.settings",
+  "/about": "nav.about",
+  "/tiers": "nav.plans",
+};
+
 const LOCALE_SHORT_LABELS: Record<Locale, string> = {
   en: "EN",
   "pt-BR": "PT",
@@ -28,6 +38,12 @@ export function Topbar() {
   const { t, locale, setLocale } = useLocale();
   const { token, user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const pageTitleContext = usePageTitle();
+
+  const fallbackTitleKey = ROUTE_TITLE_KEYS[location.pathname];
+  const displayTitle =
+    pageTitleContext?.pageTitle ?? (fallbackTitleKey ? t(fallbackTitleKey) : null);
 
   const handleLocaleChange = (newLocale: Locale) => {
     setLocale(newLocale);
@@ -50,22 +66,42 @@ export function Topbar() {
   return (
     <header
       className={cn(
-        "flex h-14 flex-shrink-0 items-center gap-3 sm:gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-3 py-2 sm:p-4"
+        "sticky top-0 z-30 flex h-14 flex-shrink-0 items-center gap-3 sm:gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-3 py-2 sm:p-4"
       )}
     >
-      {/* Mobile: logo only (Home + Search are in the bottom bar) */}
-      <div className="flex min-w-0 items-center md:hidden">
-        <Link
-          to="/"
-          className="flex min-w-0 items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
-          aria-label={t("nav.dashboard")}
-        >
-          <Logo alt="" className="h-9 w-auto flex-shrink-0 sm:h-11" />
-          <span className="-ml-3 text-lg font-bold text-(--btn-gradient-end) dark:text-(--btn-gradient-start) sm:-ml-4 sm:text-xl">OMNILOG</span>
-        </Link>
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {/* Mobile: logo + title (or OMNILOG when no title) */}
+        <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
+          <Link
+            to="/"
+            className="flex shrink-0 items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
+            aria-label={t("nav.dashboard")}
+          >
+            <Logo alt="" className="h-9 w-auto flex-shrink-0 sm:h-11" />
+          </Link>
+          {displayTitle ? (
+            <span className="min-w-0 truncate text-lg font-semibold text-[var(--color-lightest)]">
+              {displayTitle}
+            </span>
+          ) : (
+            <span className="-ml-1 text-lg font-bold text-(--btn-gradient-end) dark:text-(--btn-gradient-start)">OMNILOG</span>
+          )}
+        </div>
+        {/* Desktop: page title only */}
+        {displayTitle && (
+          <span className="min-w-0 truncate text-lg font-semibold text-[var(--color-lightest)] hidden md:block md:text-xl">
+            {displayTitle}
+          </span>
+        )}
       </div>
 
-      <div className="ml-auto flex flex-shrink-0 items-center gap-2 sm:gap-3">
+      {pageTitleContext?.rightSlot && (
+        <div className="flex flex-shrink-0 items-center">
+          {pageTitleContext.rightSlot}
+        </div>
+      )}
+
+        <div className="ml-auto flex flex-shrink-0 items-center gap-2 sm:gap-3">
         {/* Theme and locale: in header when logged out, inside avatar menu when logged in */}
         {!token && (
           <>
@@ -161,7 +197,7 @@ export function Topbar() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-      </div>
+        </div>
     </header>
   );
 }

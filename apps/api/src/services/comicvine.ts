@@ -1,5 +1,6 @@
 import type { SearchResult, ItemDetail } from "@logeverything/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
+import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const BASE = "https://comicvine.gamespot.com/api";
 
@@ -24,6 +25,7 @@ export async function getVolumeById(
   const key = getKey(apiKey);
   if (!key?.trim()) return null;
   const res = await fetch(buildUrl(`/volume/4050-${id.replace(/^4050-/, "")}/`, key));
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("comicvine");
   if (!res.ok) return null;
   const data = (await res.json()) as {
     status_code?: number;
@@ -72,6 +74,7 @@ export async function searchComics(
     limit: "20",
   });
   const res = await fetch(url);
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("comicvine");
   if (!res.ok) return { results: [] };
   const data = (await res.json()) as {
     status_code?: number;

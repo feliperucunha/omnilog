@@ -5,6 +5,7 @@
  */
 import type { SearchResult, ItemDetail } from "@logeverything/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
+import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const BASE = "https://ludopedia.com.br/api/v1";
 
@@ -82,6 +83,7 @@ export async function getBoardGameByIdLudopedia(
   const res = await fetch(`${BASE}/jogos/${encodeURIComponent(id)}`, {
     headers: ludopediaHeaders(token),
   });
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("ludopedia");
   if (!res.ok) return null;
   const data = (await res.json()) as Record<string, unknown>;
   return mapJogoToItemDetail(data as Parameters<typeof mapJogoToItemDetail>[0]);
@@ -149,6 +151,7 @@ export async function searchBoardGamesLudopedia(
     method: "GET",
     headers: ludopediaHeaders(token),
   });
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("ludopedia");
   if (!res.ok) return { results: [] };
   const data = (await res.json()) as JogosResponse;
   const results = parseJogosResponse(data);

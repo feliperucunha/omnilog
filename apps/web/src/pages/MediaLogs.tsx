@@ -7,7 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import type { MediaType, Log } from "@logeverything/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@logeverything/shared";
+import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, apiFetchPublic, invalidateApiCache, invalidateLogsAndItemsCache, apiFetchFile } from "@/lib/api";
 import { LogForm } from "@/components/LogForm";
 import { CustomEntryForm } from "@/components/CustomEntryForm";
@@ -26,7 +27,6 @@ import { useLogComplete } from "@/contexts/LogCompleteContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select } from "@/components/ui/select";
 import {
   Dialog,
@@ -34,7 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { BOARD_GAME_PROVIDERS, type BoardGameProvider } from "@logeverything/shared";
+import { ReviewModal } from "@/components/ReviewModal";
 import { cn } from "@/lib/utils";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
@@ -58,9 +58,12 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
   const { me, refetch: refetchMe } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
   const provider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
-  const needsKeyBanner = !publicUserId && provider != null && me?.apiKeys && !me.apiKeys[provider];
+  const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
+  const needsKeyBanner =
+    !publicUserId &&
+    provider != null &&
+    (mediaType === "boardgames" ? !hasBoardGameKey : me?.apiKeys && !me.apiKeys[provider]);
   const readOnly = !!publicUserId;
-  const [savingBoardGameProvider, setSavingBoardGameProvider] = useState(false);
   const [logs, setLogs] = useState<Log[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,6 +80,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
   const [incrementingId, setIncrementingId] = useState<string | null>(null);
   const [exportingCategory, setExportingCategory] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
+  const [reviewModalLog, setReviewModalLog] = useState<Log | null>(null);
 
   const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
   const CHAPTER_TYPES: MediaType[] = ["manga"];
@@ -267,24 +271,6 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
     }
   };
 
-  const handleBoardGameProviderChange = async (newProvider: BoardGameProvider) => {
-    if (me?.boardGameProvider === newProvider) return;
-    setSavingBoardGameProvider(true);
-    try {
-      await apiFetch("/settings/board-game-provider", {
-        method: "PUT",
-        body: JSON.stringify({ provider: newProvider }),
-      });
-      await refetchMe();
-      invalidateApiCache("/search");
-      toast.success(t("settings.boardGameProviderSaved"));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
-    } finally {
-      setSavingBoardGameProvider(false);
-    }
-  };
-
   if (loading && logs.length === 0) {
     return (
       <motion.div
@@ -342,6 +328,13 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
           </DialogContent>
         </Dialog>
       )}
+      {reviewModalLog && (
+        <ReviewModal
+          open={!!reviewModalLog}
+          onClose={() => setReviewModalLog(null)}
+          log={reviewModalLog}
+        />
+      )}
       {!embedded && (
         <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
           <Logo alt="" className="h-40 w-auto opacity-20 sm:h-52 md:h-64" />
@@ -371,29 +364,6 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
         </h1>
         {!readOnly && (
           <div className="flex min-w-0 flex-shrink-0 flex-wrap items-center gap-3">
-            {mediaType === "boardgames" && (
-              <div className="flex flex-wrap items-center gap-2">
-                <ToggleGroup
-                  type="single"
-                  value={boardGameProvider}
-                  onValueChange={(v) => v && handleBoardGameProviderChange(v as BoardGameProvider)}
-                  disabled={savingBoardGameProvider}
-                  className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5"
-                  aria-label={t("settings.boardGameProviderLabel")}
-                >
-                  {BOARD_GAME_PROVIDERS.map((p) => (
-                    <ToggleGroupItem
-                      key={p}
-                      value={p}
-                      className="h-8 px-3 text-sm"
-                      aria-label={p === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
-                    >
-                      {p === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-              </div>
-            )}
             <motion.div whileTap={tapScale} transition={tapTransition}>
               <Button
                 type="button"
@@ -450,7 +420,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
               { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
               ...statusOptions.map((s) => ({
                 value: s,
-                label: statusCounts != null ? `${t(`status.${STATUS_I18N_KEYS[s] ?? s}`)} (${statusCounts.byStatus[s] ?? 0})` : t(`status.${STATUS_I18N_KEYS[s] ?? s}`),
+                label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
               })),
             ]}
             aria-label={t("itemReviewForm.status")}
@@ -489,7 +459,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
               size="sm"
               onClick={() => setStatusFilter(statusValue)}
             >
-              {statusCounts != null ? `${t(`status.${STATUS_I18N_KEYS[statusValue] ?? statusValue}`)} (${statusCounts.byStatus[statusValue] ?? 0})` : t(`status.${STATUS_I18N_KEYS[statusValue] ?? statusValue}`)}
+              {statusCounts != null ? `${getStatusLabel(t, statusValue, mediaType)} (${statusCounts.byStatus[statusValue] ?? 0})` : getStatusLabel(t, statusValue, mediaType)}
             </Button>
           ))}
         </div>
@@ -620,11 +590,28 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
                             </div>
                           );
                         })()}
-                        <div className="min-h-[2.5rem] flex items-start">
+                        <div className="min-h-[2.5rem] flex flex-col items-start gap-1">
                           {log.review ? (
-                            <p className="line-clamp-2 text-xs sm:text-sm text-[var(--color-light)] min-h-0">
-                              {log.review}
-                            </p>
+                            <>
+                              <p className="line-clamp-2 text-xs sm:text-sm text-[var(--color-light)] min-h-0">
+                                {log.review}
+                              </p>
+                              {readOnly && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-auto p-0 text-xs text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setReviewModalLog(log);
+                                  }}
+                                >
+                                  {t("social.viewFullReview")}
+                                </Button>
+                              )}
+                            </>
                           ) : (
                             <span className="invisible text-xs sm:text-sm line-clamp-2">—</span>
                           )}

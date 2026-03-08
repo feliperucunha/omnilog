@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { NumberCombobox } from "@/components/ui/number-combobox";
 import { Select } from "@/components/ui/select";
 import type { MediaType } from "@logeverything/shared";
-import { IN_PROGRESS_STATUSES, MEDIA_TYPES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
+import { IN_PROGRESS_STATUSES, MEDIA_TYPES, LOG_STATUS_OPTIONS } from "@logeverything/shared";
+import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
@@ -179,7 +180,7 @@ export function CustomEntryForm({
                     { value: "", label: "—" },
                     ...statusOptions.map((value) => ({
                       value,
-                      label: t(`status.${STATUS_I18N_KEYS[value] ?? value}`),
+                      label: getStatusLabel(t, value, mediaType),
                     })),
                   ]}
                   placeholder="—"

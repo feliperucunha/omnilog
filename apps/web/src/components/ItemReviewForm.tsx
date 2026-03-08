@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { NumberCombobox } from "@/components/ui/number-combobox";
 import type { MediaType, Log } from "@logeverything/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS, STATUS_I18N_KEYS } from "@logeverything/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@logeverything/shared";
+import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { toast } from "sonner";
 import { tapScale, tapTransition } from "@/lib/animations";
@@ -273,7 +274,7 @@ export function ItemReviewForm({
                   { value: "", label: "—" },
                   ...statusOptions.map((value) => ({
                     value,
-                    label: t(`status.${STATUS_I18N_KEYS[value] ?? value}`),
+                    label: getStatusLabel(t, value, mediaType),
                   })),
                 ]}
                 placeholder="—"

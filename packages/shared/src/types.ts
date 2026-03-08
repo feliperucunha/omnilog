@@ -222,6 +222,9 @@ export interface ItemDetail {
   subjects?: string[] | null;
 }
 
+/** Current user's reaction to a log/review */
+export type ReactionType = "like" | "dislike";
+
 /** A review shown on the item page (from any user) */
 export interface ItemReview {
   id: string;
@@ -240,6 +243,12 @@ export interface ItemReview {
   completedAt: string | null;
   contentHours: number | null;
   createdAt: string;
+  /** Number of like reactions (thumbs up). */
+  likesCount?: number;
+  /** Number of dislike reactions (thumbs down). */
+  dislikesCount?: number;
+  /** Current user's reaction, if any. */
+  userReaction?: ReactionType | null;
 }
 
 export interface ItemPageData {
@@ -278,6 +287,12 @@ export interface Log {
   genres: string[] | null;
   createdAt: string;
   updatedAt: string;
+  /** Number of like reactions (feed/reviews). */
+  likesCount?: number;
+  /** Number of dislike reactions (feed/reviews). */
+  dislikesCount?: number;
+  /** Current user's reaction, if any. */
+  userReaction?: ReactionType | null;
 }
 
 export interface CreateLogInput {

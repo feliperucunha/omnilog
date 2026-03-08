@@ -9,6 +9,7 @@ import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
+import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
 import { IN_PROGRESS_STATUSES, type Log } from "@logeverything/shared";
@@ -52,6 +53,7 @@ export function Statistics() {
   const { t } = useLocale();
   const { me } = useMe();
   const { visibleTypes } = useVisibleMediaTypes();
+  const { setPageTitle, setRightSlot } = usePageTitle() ?? {};
   const isPro = me?.tier === "pro";
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,6 +149,47 @@ export function Statistics() {
       .finally(() => setLoading(false));
   }, []);
 
+  const handleExportClick = useCallback(() => {
+    if (!isPro) {
+      setShowProModal(true);
+      return;
+    }
+    setExporting(true);
+    apiFetchFile("/logs/export")
+      .then(({ blob, filename }) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(t("tiers.exportSuccess"));
+      })
+      .catch((err) => toast.error(err instanceof Error ? err.message : t("tiers.exportFailed")))
+      .finally(() => setExporting(false));
+  }, [isPro, t]);
+
+  useEffect(() => {
+    setPageTitle?.(t("nav.statistics"));
+    setRightSlot?.(
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-2 shrink-0"
+        onClick={handleExportClick}
+        disabled={exporting}
+        aria-label={t("tiers.exportLogs")}
+      >
+        <Download className="h-4 w-4" aria-hidden />
+        {exporting ? t("common.saving") : t("tiers.exportLogs")}
+      </Button>
+    );
+    return () => {
+      setPageTitle?.(null);
+      setRightSlot?.(null);
+    };
+  }, [t, setPageTitle, setRightSlot, handleExportClick, exporting]);
+
   useEffect(() => {
     if (isPro) fetchLogs();
     else {
@@ -181,26 +224,6 @@ export function Statistics() {
     );
   }
 
-  const handleExportClick = () => {
-    if (!isPro) {
-      setShowProModal(true);
-      return;
-    }
-    setExporting(true);
-    apiFetchFile("/logs/export")
-      .then(({ blob, filename }) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success(t("tiers.exportSuccess"));
-      })
-      .catch((err) => toast.error(err instanceof Error ? err.message : t("tiers.exportFailed")))
-      .finally(() => setExporting(false));
-  };
-
   return (
     <div className="relative flex min-w-0 flex-col gap-10 overflow-x-hidden">
       <Dialog open={showProModal && !isPro} onOpenChange={setShowProModal}>
@@ -220,23 +243,6 @@ export function Statistics() {
           </Button>
         </DialogContent>
       </Dialog>
-
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-bold text-[var(--color-lightest)] sm:text-2xl">
-          {t("nav.statistics")}
-        </h2>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2 shrink-0"
-          onClick={handleExportClick}
-          disabled={exporting}
-          aria-label={t("tiers.exportLogs")}
-        >
-          <Download className="h-4 w-4" aria-hidden />
-          {exporting ? t("common.saving") : t("tiers.exportLogs")}
-        </Button>
-      </div>
 
       <div className={`flex flex-col gap-12 ${!isPro ? "pointer-events-none select-none blur-sm" : ""}`}>
       <div className="grid min-w-0 grid-cols-1 gap-6 overflow-hidden md:grid-cols-2 md:gap-8">

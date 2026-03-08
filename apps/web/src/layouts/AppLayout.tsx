@@ -2,6 +2,29 @@ import { Outlet } from "react-router-dom";
 import { Nav } from "@/components/Nav";
 import { Topbar } from "@/components/Topbar";
 import { AdBanner } from "@/components/AdBanner";
+import { InvalidApiKeyBanner } from "@/components/InvalidApiKeyBanner";
+import { PageTitleProvider, usePageTitle } from "@/contexts/PageTitleContext";
+
+function AppLayoutContent() {
+  const pageTitle = usePageTitle();
+  const belowNavbar = pageTitle?.belowNavbar;
+
+  return (
+    <>
+      <Topbar />
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+        {belowNavbar != null && belowNavbar !== false && (
+          <div className="w-full shrink-0">{belowNavbar}</div>
+        )}
+        <div className="flex min-w-0 flex-1 flex-col p-4 md:p-6">
+          <InvalidApiKeyBanner />
+          <Outlet />
+          <AdBanner />
+        </div>
+      </div>
+    </>
+  );
+}
 
 export function AppLayout() {
   return (
@@ -10,11 +33,9 @@ export function AppLayout() {
       <main
         className="flex min-h-screen min-w-0 flex-1 flex-col pb-20 md:pb-6 md:pl-[255px]"
       >
-        <Topbar />
-        <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-4 md:p-6">
-          <Outlet />
-          <AdBanner />
-        </div>
+        <PageTitleProvider>
+          <AppLayoutContent />
+        </PageTitleProvider>
       </main>
     </div>
   );

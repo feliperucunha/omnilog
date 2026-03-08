@@ -97,6 +97,8 @@
     "advanced": "Avançado",
     "apiKeys": "Chaves de API",
     "apiKeysIntro": "Adicione chaves de API para buscar filmes, séries, jogos e board games. As chaves ficam salvas na sua conta.",
+    "apiKeyTutorialIntro": "Você vai registrar uma nova aplicação em cada provedor; esse registro gera uma chave de acesso necessária para o site funcionar.",
+    "bggApprovalBadge": "Geralmente ~5 dias para aprovação da chave",
     "apiKeysSupport": "Falar com o suporte",
     "language": "Idioma",
     "languageLabel": "Idioma do app",
@@ -120,7 +122,14 @@
     "boardGameProviderSaved": "Fonte de jogos de tabuleiro atualizada.",
     "showCompleteModal": "Mostrar modal de conclusão ao registrar",
     "showCompleteModalEnabled": "Ativado",
-    "showCompleteModalIntro": "Quando ativo, um modal de confirmação aparece após adicionar ou atualizar um registro. Salvo apenas neste dispositivo."
+    "showCompleteModalIntro": "Quando ativo, um modal de confirmação aparece após adicionar ou atualizar um registro. Salvo apenas neste dispositivo.",
+    "apiKeyTutorial": {
+      "tmdb": "1. Acesse themoviedb.org e crie uma conta gratuita ou faça login.\n2. Abra Configurações → API no menu à esquerda (ou use o link abaixo).\n3. Clique em \"Request an API Key\" e escolha \"Developer\".\n4. Aceite os termos e preencha o formulário (Application URL: seu site ou http://localhost:5173, Application Summary: ex. \"Registro de mídia pessoal\").\n5. Na página da API, copie o \"API Key (v3 auth)\" e cole abaixo.",
+      "rawg": "1. Acesse rawg.io e cadastre-se ou faça login.\n2. Abra o link da documentação da API abaixo e procure por \"Get your API key\" ou o formulário de cadastro.\n3. Registre-se para obter uma chave de API (plano gratuito disponível).\n4. Copie a chave da sua conta/painel e cole abaixo.",
+      "bgg": "1. Acesse boardgamegeek.com e faça login (ou crie uma conta).\n2. Abra o link Applications abaixo.\n3. Clique para criar uma nova aplicação (ex.: \"OMNILOG\").\n4. Escolha uso não comercial se for para uso pessoal; envie e aguarde a aprovação (pode levar alguns dias).\n5. Após aprovado, abra sua aplicação e crie um Token.\n6. Copie o Bearer token e cole abaixo.",
+      "ludopedia": "1. Crie uma conta em https://ludopedia.com.br/novousuario ou faça login em ludopedia.com.br.\n2. Abra Aplicativos (https://www.ludopedia.com.br/aplicativos) e crie uma aplicação.\n3. Use o fluxo OAuth da Ludopedia para obter um token de acesso (veja a documentação da API). A chave necessária para o Ominilog é o Access Token (ACCESS_TOKEN).\n4. O token vale por 60 dias; cole abaixo.",
+      "comicvine": "1. Acesse comicvine.gamespot.com e crie uma conta gratuita ou faça login.\n2. Abra o link da documentação da API abaixo.\n3. Solicite uma chave de API (gratuita) na página da Comic Vine API.\n4. Copie sua chave de API e cole abaixo."
+    }
   },
   "common": {
     "required": "obrigatório",
@@ -151,13 +160,21 @@
   "apiKeyBanner": {
     "categoryMessage": "Chave de {{category}} ausente",
     "addKeyInSettings": "Adicionar chave em Configurações",
+    "invalidKeyMessage": "Sua chave de API {{name}} parece estar inválida.",
+    "invalidKeyMessageMultiple": "Sua chave de API para {{names}} parece estar inválida.",
+    "invalidKeyOpenSettings": "Abrir Configurações",
     "searchMessage": "Adicione uma chave {{provider}} em Configurações para salvar na sua conta (busca em {{category}}).",
     "searchMessageWithCount": "{{used}}/{{limit}} buscas gratuitas usadas para {{category}}. Adicione uma chave {{provider}} em Configurações para continuar."
   },
   "reviews": {
     "pageOf": "Página {{current}} de {{total}} ({{count}} resenhas)",
     "prev": "Anterior",
-    "next": "Próxima"
+    "next": "Próxima",
+    "sortBy": "Ordenar resenhas",
+    "sortRecent": "Mais recentes",
+    "sortOldest": "Mais antigas",
+    "sortLikes": "Mais curtidas",
+    "sortDislikes": "Mais dislikes"
   },
   "publicProfile": {
     "title": "Perfil público",
@@ -171,7 +188,10 @@
     "sectionTitle": "Social",
     "emptyFeed": "Comece a seguir seus amigos para ver os logs deles.",
     "findUsers": "Encontrar usuários",
-    "userWithoutUsername": "Usuário"
+    "userWithoutUsername": "Usuário",
+    "viewFullReview": "Ver resenha completa",
+    "reviewBy": "por {{name}}",
+    "viewProfile": "Ver perfil de {{name}}"
   },
   "dashboard": {
     "title": "Início",
@@ -318,6 +338,7 @@
     "watched": "Assistido",
     "planToWatch": "Quero assistir",
     "completed": "Completo",
+    "completedForVideo": "Assistido",
     "watching": "Assistindo",
     "dropped": "Abandonado",
     "played": "Jogado",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -55,18 +55,22 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
   const [dayLogs, setDayLogs] = useState<Log[]>([]);
   const [dayLogsLoading, setDayLogsLoading] = useState(false);
 
+  const tzOffsetMinutes = useMemo(() => -new Date().getTimezoneOffset(), []);
+
   const fetchCalendar = useCallback(async (y: number, m: number) => {
     if (!isPro) return;
     setLoading(true);
     try {
-      const res = await apiFetch<CalendarData>(`/logs/calendar?year=${y}&month=${m}`);
+      const res = await apiFetch<CalendarData>(
+        `/logs/calendar?year=${y}&month=${m}&timezoneOffsetMinutes=${tzOffsetMinutes}`
+      );
       setData(res);
     } catch {
       setData({ year: y, month: m, dates: {} });
     } finally {
       setLoading(false);
     }
-  }, [isPro]);
+  }, [isPro, tzOffsetMinutes]);
 
   useEffect(() => {
     if (isPro) fetchCalendar(year, month);
@@ -77,14 +81,16 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
     setDayLogsLoading(true);
     setDayLogs([]);
     try {
-      const res = await apiFetch<{ data: Log[] }>(`/logs/by-date?date=${dateKey}`);
+      const res = await apiFetch<{ data: Log[] }>(
+        `/logs/by-date?date=${dateKey}&timezoneOffsetMinutes=${tzOffsetMinutes}`
+      );
       setDayLogs(res.data ?? []);
     } catch {
       setDayLogs([]);
     } finally {
       setDayLogsLoading(false);
     }
-  }, []);
+  }, [tzOffsetMinutes]);
 
   useEffect(() => {
     if (selectedDate && isPro) fetchDayLogs(selectedDate);

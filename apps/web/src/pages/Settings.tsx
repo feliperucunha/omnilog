@@ -13,6 +13,7 @@ import { apiFetch, invalidateApiCache, apiFetchFile } from "@/lib/api";
 import { toast } from "sonner";
 import { API_KEY_META, type ApiKeyProvider } from "@/lib/apiKeyMeta";
 import { useLocale, LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
+import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { getShowCompleteModal, SHOW_COMPLETE_MODAL_STORAGE_KEY } from "@/contexts/LogCompleteContext";
@@ -32,6 +33,11 @@ export function Settings() {
   const { t, locale, setLocale } = useLocale();
   const { token } = useAuth();
   const { me, refetch: refetchMe, loading } = useMe();
+  const { setPageTitle } = usePageTitle() ?? {};
+  useEffect(() => {
+    setPageTitle?.(t("settings.title"));
+    return () => setPageTitle?.(null);
+  }, [t, setPageTitle]);
   const { refetch: refetchVisibleTypes } = useVisibleMediaTypes();
   const [status, setStatus] = useState<KeysStatus | null>(null);
   const [tmdb, setTmdb] = useState("");
@@ -94,6 +100,12 @@ export function Settings() {
       else if (provider === "ludopedia") body.ludopedia = value;
       else body.comicvine = value;
       await apiFetch("/settings/api-keys", { method: "PUT", body: JSON.stringify(body) });
+      if (provider === "bgg" || provider === "ludopedia") {
+        await apiFetch("/settings/board-game-provider", {
+          method: "PUT",
+          body: JSON.stringify({ provider }),
+        });
+      }
       invalidateApiCache("/search");
       await refetchMe();
       setStatus((prev) =>
@@ -174,10 +186,6 @@ export function Settings() {
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
     >
       <div className="flex flex-col gap-8">
-        <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
-          {t("settings.title")}
-        </h1>
-
         <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-6">
             {me && (
@@ -421,9 +429,14 @@ export function Settings() {
           {advancedOpen && (
             <div className="border-t border-[var(--color-dark)] px-4 pb-4 pt-2">
               <div className="mb-4 flex items-start gap-2">
-                <p className="flex-1 text-sm text-[var(--color-light)]">
-                  {t("settings.apiKeysIntro")}
-                </p>
+                <div className="flex-1 space-y-1">
+                  <p className="text-sm text-[var(--color-light)]">
+                    {t("settings.apiKeysIntro")}
+                  </p>
+                  <p className="text-sm text-[var(--color-light)]">
+                    {t("settings.apiKeyTutorialIntro")}
+                  </p>
+                </div>
                 <a
                   href="mailto:feliperubenmv@gmail.com"
                   className="shrink-0 rounded p-1 text-[var(--color-light)] transition-colors hover:text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
@@ -467,14 +480,21 @@ export function Settings() {
                           <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
                             {meta.name}
                           </h3>
-                          {isSet && (
-                            <span className="rounded bg-[var(--color-darkest)] px-2 py-0.5 text-xs text-[var(--color-light)]">
-                              {t("settings.keySaved")}
-                            </span>
-                          )}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {provider === "bgg" && (
+                              <span className="rounded border border-[var(--color-mid)]/50 bg-[var(--color-darkest)]/80 px-2 py-0.5 text-xs text-[var(--color-light)]">
+                                {t("settings.bggApprovalBadge")}
+                              </span>
+                            )}
+                            {isSet && (
+                              <span className="rounded bg-[var(--color-darkest)] px-2 py-0.5 text-xs text-[var(--color-light)]">
+                                {t("settings.keySaved")}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <p className="whitespace-pre-wrap text-sm text-[var(--color-light)]">
-                          {meta.tutorial}
+                          {t(`settings.apiKeyTutorial.${provider}`)}
                         </p>
                         <a
                           href={meta.link}

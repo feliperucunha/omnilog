@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Share2, AlertTriangle } from "lucide-react";
+import { Share2, AlertTriangle, User, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchCached } from "@/lib/api";
 import { DashboardSkeleton } from "@/components/skeletons";
 import { useLocale } from "@/contexts/LocaleContext";
+import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,6 +30,9 @@ import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
+import { ReviewModal } from "@/components/ReviewModal";
+import { ReactionButtons } from "@/components/ReactionButtons";
+import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 
 interface FeedEntry {
   log: Log;
@@ -37,6 +41,16 @@ interface FeedEntry {
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 const BETA_MODAL_STORAGE_KEY = "logeverything.betaModalSeen";
+const SOCIAL_COLLAPSED_STORAGE_KEY = "logeverything.dashboard.socialCollapsed";
+
+function getSocialCollapsedDefault(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(SOCIAL_COLLAPSED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 function getBetaModalSeen(userId: string): boolean {
   if (typeof window === "undefined") return true;
@@ -60,6 +74,7 @@ export function Dashboard() {
   const { token } = useAuth();
   const { me } = useMe();
   const { visibleTypes } = useVisibleMediaTypes();
+  const { setPageTitle, setRightSlot, setBelowNavbar } = usePageTitle() ?? {};
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryParam = searchParams.get("category");
   const defaultCategory: MediaType = visibleTypes.length > 0 ? toMediaType(visibleTypes[0]) : "movies";
@@ -73,6 +88,20 @@ export function Dashboard() {
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [feedLoading, setFeedLoading] = useState(false);
   const [showBetaModal, setShowBetaModal] = useState(false);
+  const [reviewModalEntry, setReviewModalEntry] = useState<FeedEntry | null>(null);
+  const [socialCollapsed, setSocialCollapsed] = useState(getSocialCollapsedDefault);
+
+  const toggleSocialCollapsed = useCallback(() => {
+    setSocialCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SOCIAL_COLLAPSED_STORAGE_KEY, next ? "true" : "false");
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (categoryParam && MEDIA_TYPES.includes(categoryParam as MediaType)) setSelectedCategory(toMediaType(categoryParam));
@@ -148,14 +177,66 @@ export function Dashboard() {
     }
   }, [me?.user?.id, visibleTypes, selectedCategory, t]);
 
+  useEffect(() => {
+    setPageTitle?.(t("dashboard.title"));
+    return () => {
+      setPageTitle?.(null);
+      setRightSlot?.(null);
+      setBelowNavbar?.(null);
+    };
+  }, [t, setPageTitle, setRightSlot, setBelowNavbar]);
+
+  useEffect(() => {
+    if (me?.user?.id) {
+      setRightSlot?.(
+        <Button type="button" variant="outline" size="sm" onClick={handleShare} aria-label={t("dashboard.share")}>
+          <Share2 className="size-4 shrink-0" aria-hidden />
+          <span className="hidden sm:inline">{t("dashboard.share")}</span>
+        </Button>
+      );
+    } else {
+      setRightSlot?.(null);
+    }
+    return () => setRightSlot?.(null);
+  }, [me?.user?.id, handleShare, t, setRightSlot]);
+
+  useEffect(() => {
+    if (visibleTypes.length === 0) {
+      setBelowNavbar?.(null);
+      return;
+    }
+    const byTypeMap = Object.fromEntries(
+      MEDIA_TYPES.map((type) => [type, counts?.[type] ?? 0])
+    ) as Record<MediaType, number>;
+    setBelowNavbar?.(
+      <StickyCategoryStrip
+        items={visibleTypes.map((type) => ({
+          value: type,
+          label: t(`nav.${type}`),
+          count: byTypeMap[type] ?? 0,
+        }))}
+        selectedValue={selectedCategory}
+        onSelect={(v) => setCategory(v as MediaType)}
+        mobileOnly
+        stickyTop="top-14"
+        aria-label={t("dashboard.category")}
+      />
+    );
+    return () => setBelowNavbar?.(null);
+  }, [visibleTypes, selectedCategory, counts, t, setBelowNavbar, setCategory]);
+
   const byType = Object.fromEntries(
     MEDIA_TYPES.map((type) => [type, counts?.[type] ?? 0])
   ) as Record<MediaType, number>;
 
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
   const apiKeyProvider = getApiKeyProviderForMediaType(selectedCategory, boardGameProvider);
+  const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
   const needsApiKeyBanner =
-    apiKeyProvider != null && me?.apiKeys && !me.apiKeys[apiKeyProvider];
+    apiKeyProvider != null &&
+    (selectedCategory === "boardgames"
+      ? !hasBoardGameKey
+      : me?.apiKeys && !me.apiKeys[apiKeyProvider]);
 
   if (loading && counts === null) {
     return (
@@ -210,67 +291,13 @@ export function Dashboard() {
           </Button>
         </DialogContent>
       </Dialog>
-      {needsApiKeyBanner && (
-        <Link
-          to="/settings?open=api-keys"
-          className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-3 text-left no-underline transition-colors text-[var(--color-warning-text)] hover:border-[var(--color-warning-hover-border)] hover:bg-[var(--color-warning-hover-bg)]"
-        >
-          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)]" aria-hidden />
-          <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--color-warning-text)]">
-            {t("apiKeyBanner.categoryMessage", {
-              category: t(`nav.${selectedCategory}`),
-              provider: API_KEY_META[apiKeyProvider].name,
-            })}
-          </p>
-          <span className="shrink-0 text-xs font-medium text-[var(--color-warning-text-muted)]">
-            {t("apiKeyBanner.addKeyInSettings")} →
-          </span>
-        </Link>
-      )}
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-bold text-[var(--color-lightest)] sm:text-2xl">
-          {t("dashboard.title")}
-        </h2>
-        {me?.user?.id && (
-          <Button type="button" variant="outline" size="sm" onClick={handleShare} aria-label={t("dashboard.share")}>
-            <Share2 className="size-4 shrink-0" aria-hidden />
-            <span className="hidden sm:inline">{t("dashboard.share")}</span>
-          </Button>
-        )}
-      </div>
-
       {visibleTypes.length > 0 && (
         <section
-          aria-label={t("dashboard.category")}
-          className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
-        >
-          {/* Category selector: mobile swipeable tabs, desktop toggle group */}
-          <div className="flex min-w-0 w-full shrink-0 justify-center overflow-hidden">
-            {/* Mobile: swipeable tab strip */}
-            <div
-              className="scrollbar-hide flex md:hidden min-w-0 flex-1 overflow-x-auto overflow-y-hidden gap-2 py-1 scroll-smooth touch-pan-x"
-              role="tablist"
-              aria-label={t("dashboard.category")}
-            >
-              {visibleTypes.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  role="tab"
-                  aria-selected={selectedCategory === type}
-                  aria-label={`${t(`nav.${type}`)} (${byType[type] ?? 0})`}
-                  onClick={() => setCategory(type as MediaType)}
-                  className={
-                    selectedCategory === type
-                      ? "btn-gradient flex-shrink-0 rounded-full px-4 py-2.5 text-sm font-medium text-[var(--btn-text)] transition-colors whitespace-nowrap"
-                      : "flex-shrink-0 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4 py-2.5 text-sm font-medium text-[var(--color-light)] transition-colors whitespace-nowrap"
-                  }
-                >
-                  {t(`nav.${type}`)} ({byType[type] ?? 0})
-                </button>
-              ))}
-            </div>
+            aria-label={t("dashboard.category")}
+            className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
+          >
             {/* Desktop: toggle group */}
+            <div className="flex min-w-0 w-full shrink-0 justify-center overflow-hidden">
             <ToggleGroup
               type="single"
               value={selectedCategory}
@@ -290,15 +317,46 @@ export function Dashboard() {
               ))}
             </ToggleGroup>
           </div>
+            {needsApiKeyBanner && (
+            <Link
+              to="/settings?open=api-keys"
+              className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-3 text-left no-underline transition-colors text-[var(--color-warning-text)] hover:border-[var(--color-warning-hover-border)] hover:bg-[var(--color-warning-hover-bg)]"
+            >
+              <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)]" aria-hidden />
+              <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--color-warning-text)]">
+                {t("apiKeyBanner.categoryMessage", {
+                  category: t(`nav.${selectedCategory}`),
+                  provider: API_KEY_META[apiKeyProvider].name,
+                })}
+              </p>
+              <span className="shrink-0 text-xs font-medium text-[var(--color-warning-text-muted)]">
+                {t("apiKeyBanner.addKeyInSettings")} →
+              </span>
+            </Link>
+          )}
           <MediaLogs mediaType={selectedCategory} embedded />
         </section>
       )}
 
       {token && (
         <section aria-label={t("social.sectionTitle")} className="flex min-w-0 flex-col gap-4 overflow-hidden">
-          <h2 className="text-lg font-semibold text-[var(--color-lightest)]">
-            {t("social.sectionTitle")}
-          </h2>
+          <button
+            type="button"
+            onClick={toggleSocialCollapsed}
+            className="flex min-w-0 items-center gap-2 rounded-md py-1 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
+            aria-expanded={!socialCollapsed}
+            aria-controls="dashboard-social-content"
+            id="dashboard-social-heading"
+          >
+            {socialCollapsed ? (
+              <ChevronRight className="h-5 w-5 shrink-0" aria-hidden />
+            ) : (
+              <ChevronDown className="h-5 w-5 shrink-0" aria-hidden />
+            )}
+            <span className="min-w-0 truncate">{t("social.sectionTitle")}</span>
+          </button>
+          {!socialCollapsed && (
+          <div id="dashboard-social-content" role="region" aria-labelledby="dashboard-social-heading">
           {feedLoading ? (
             <div className="flex flex-col gap-2">
               {[1, 2, 3].map((i) => (
@@ -334,7 +392,7 @@ export function Dashboard() {
               animate="animate"
             >
               <div className="flex min-w-0 flex-col gap-2">
-                {feed.map(({ log, user }) => {
+                {feed.map(({ log, user: feedUser }) => {
                   const isDropped = log.status === "dropped";
                   const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
                   const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);
@@ -350,45 +408,115 @@ export function Dashboard() {
                             : "border-2 border-[var(--color-mid)]";
                   return (
                   <motion.li key={log.id} variants={staggerItem} className="list-none">
-                    <motion.div whileTap={tapScale} transition={tapTransition}>
-                      <Link
-                        to={`/${user.username ?? user.id}`}
-                        className={`flex min-w-0 gap-3 overflow-hidden rounded-md bg-[var(--color-dark)] p-4 text-inherit no-underline ${listBorderClass}`}
-                        style={paperShadow}
-                      >
-                        <ItemImage src={log.image} className="h-12 w-9 shrink-0 rounded" />
-                        <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden">
-                          <p className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
-                            {log.title}
-                          </p>
-                          <p className="text-xs text-[var(--color-light)]">
-                            {user.username ?? t("social.userWithoutUsername")} · {t(`nav.${log.mediaType}`)}
-                          </p>
-                          {log.genres && log.genres.length > 0 && (
-                            <GenreBadges genres={log.genres} maxCount={1} />
-                          )}
-                          <div className="flex shrink-0 items-center gap-2 mt-0.5">
-                            {log.startedAt && log.completedAt && (
-                              <span className="whitespace-nowrap text-xs text-[var(--color-light)]">
-                                {t("dashboard.finishedIn", {
-                                  duration: formatTimeToFinish(log.startedAt, log.completedAt),
-                                })}
-                              </span>
+                    <motion.div
+                      whileTap={tapScale}
+                      transition={tapTransition}
+                      className={`flex min-w-0 flex-col overflow-hidden rounded-md bg-[var(--color-dark)] p-4 ${listBorderClass}`}
+                      style={paperShadow}
+                    >
+                      <div className="flex min-w-0 gap-3">
+                        <Link
+                          to={`/item/${log.mediaType}/${log.externalId}`}
+                          className="flex min-w-0 shrink-0 items-start gap-3 overflow-hidden text-inherit no-underline hover:opacity-90"
+                        >
+                          <ItemImage src={log.image} className="h-12 w-9 shrink-0 rounded" />
+                          <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden">
+                            <p className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
+                              {log.title}
+                            </p>
+                            {log.genres && log.genres.length > 0 && (
+                              <GenreBadges genres={log.genres} maxCount={1} />
                             )}
-                            {log.grade != null ? (
-                              <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
-                            ) : (
-                              <span className="text-[var(--color-light)]">—</span>
-                            )}
+                            <div className="flex shrink-0 items-center gap-2 mt-0.5">
+                              {log.startedAt && log.completedAt && (
+                                <span className="whitespace-nowrap text-xs text-[var(--color-light)]">
+                                  {t("dashboard.finishedIn", {
+                                    duration: formatTimeToFinish(log.startedAt, log.completedAt),
+                                  })}
+                                </span>
+                              )}
+                              {log.grade != null ? (
+                                <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+                              ) : (
+                                <span className="text-[var(--color-light)]">—</span>
+                              )}
+                            </div>
+                          </div>
+                        </Link>
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <Link
+                          to={`/${feedUser.username ?? feedUser.id}`}
+                          className="text-xs text-[var(--color-light)] hover:text-[var(--color-lightest)] hover:underline"
+                        >
+                          {feedUser.username ?? t("social.userWithoutUsername")} · {t(`nav.${log.mediaType}`)}
+                        </Link>
+                        <Link
+                          to={`/${feedUser.username ?? feedUser.id}`}
+                          className="flex shrink-0 rounded p-1 text-[var(--color-light)] hover:bg-[var(--color-darkest)] hover:text-[var(--color-lightest)]"
+                          aria-label={t("social.viewProfile", { name: feedUser.username ?? feedUser.id })}
+                        >
+                          <User className="size-3.5" aria-hidden />
+                        </Link>
+                      </div>
+                      {log.review && (
+                        <div className="mt-3 flex flex-col gap-2 border-t border-[var(--color-darkest)] pt-3">
+                          <p className="line-clamp-2 text-xs text-[var(--color-light)]">
+                            {log.review}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="w-fit text-xs"
+                              onClick={() => setReviewModalEntry({ log, user: feedUser })}
+                            >
+                              {t("social.viewFullReview")}
+                            </Button>
+                            <ReactionButtons
+                              logId={log.id}
+                              likesCount={log.likesCount ?? 0}
+                              dislikesCount={log.dislikesCount ?? 0}
+                              userReaction={log.userReaction ?? null}
+                              disabled={!token}
+                              onReactionChange={(payload) => {
+                                setFeed((prev) =>
+                                  prev.map((e) =>
+                                    e.log.id === log.id
+                                      ? {
+                                          ...e,
+                                          log: {
+                                            ...e.log,
+                                            likesCount: payload.likesCount,
+                                            dislikesCount: payload.dislikesCount,
+                                            userReaction: payload.userReaction,
+                                          },
+                                        }
+                                      : e
+                                  )
+                                );
+                              }}
+                            />
                           </div>
                         </div>
-                      </Link>
+                      )}
                     </motion.div>
                   </motion.li>
                   );
                 })}
               </div>
+              {reviewModalEntry && (
+                <ReviewModal
+                  open={!!reviewModalEntry}
+                  onClose={() => setReviewModalEntry(null)}
+                  log={reviewModalEntry.log}
+                  user={reviewModalEntry.user}
+                />
+              )}
             </motion.ul>
+          )}
+          </div>
           )}
         </section>
       )}

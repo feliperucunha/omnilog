@@ -14,6 +14,7 @@ import { searchAnime, searchManga } from "../services/jikan.js";
 import { searchBoardGames } from "../services/bgg.js";
 import { searchBoardGamesLudopedia } from "../services/ludopedia.js";
 import { searchComics } from "../services/comicvine.js";
+import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 export const searchRouter = Router();
 searchRouter.use(optionalAuthMiddleware);
@@ -343,6 +344,25 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
       }
     }
   } catch (err) {
+    if (err instanceof InvalidApiKeyError) {
+      const userHadKey =
+        err.provider === "tmdb"
+          ? !!keys?.tmdbApiKey
+          : err.provider === "rawg"
+            ? !!keys?.rawgApiKey
+            : err.provider === "bgg"
+              ? !!keys?.bggApiToken
+              : err.provider === "ludopedia"
+                ? !!keys?.ludopediaApiToken
+                : !!keys?.comicVineApiKey;
+      if (userHadKey) {
+        return res.status(400).json({
+          error: "Invalid API key",
+          code: "INVALID_API_KEY",
+          provider: err.provider,
+        });
+      }
+    }
     console.error("Search error:", err);
     res.status(502).json({ error: "Search failed" });
   }
@@ -350,7 +370,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
 
 const USER_SEARCH_MAX = 20;
 
-/** GET /search/users?q= - Search users by username (for Social / Follow). Returns { users: Array<{ id, username, logCount }> }. */
+/** GET /search/users?q= - Search users by username (for Social / Follow). Returns { users: Array<{ id, username, logCount, following? }> }. */
 searchRouter.get("/users", async (req: AuthenticatedRequest, res) => {
   const rawQ = typeof req.query.q === "string" ? req.query.q : "";
   const q = sanitizeText(rawQ.trim(), 100);
@@ -370,11 +390,23 @@ searchRouter.get("/users", async (req: AuthenticatedRequest, res) => {
     take: USER_SEARCH_MAX,
     orderBy: { username: "asc" },
   });
+  let followingIds = new Set<string>();
+  if (req.user && users.length > 0) {
+    const follows = await prisma.follow.findMany({
+      where: {
+        followerId: req.user.userId,
+        followingId: { in: users.map((u) => u.id) },
+      },
+      select: { followingId: true },
+    });
+    followingIds = new Set(follows.map((f) => f.followingId));
+  }
   res.json({
     users: users.map((u) => ({
       id: u.id,
       username: u.username ?? undefined,
       logCount: u._count.logs,
+      ...(req.user && { following: followingIds.has(u.id) }),
     })),
   });
 });

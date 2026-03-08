@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { MEDIA_TYPES, SEARCH_SORT_OPTIONS, type MediaType, type SearchResult } from "@logeverything/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, STATUS_I18N_KEYS } from "@logeverything/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@logeverything/shared";
+import { getStatusLabel } from "@/lib/statusLabel";
 import { toast } from "sonner";
 import { apiFetch, apiFetchCached, invalidateApiCache } from "@/lib/api";
 import { SearchSkeleton } from "@/components/skeletons";
@@ -17,16 +18,17 @@ import { GenreBadges } from "@/components/GenreBadges";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { useLocale } from "@/contexts/LocaleContext";
+import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
-import { BOARD_GAME_PROVIDERS, type BoardGameProvider } from "@logeverything/shared";
+import type { BoardGameProvider } from "@logeverything/shared";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Link } from "react-router-dom";
-import { AlertTriangle, X } from "lucide-react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { AlertTriangle, UserCheck, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
+import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import type { Log } from "@logeverything/shared";
 
 const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
@@ -77,12 +79,22 @@ interface UserSearchResult {
   id: string;
   username?: string;
   logCount?: number;
+  following?: boolean;
 }
 
 export function Search() {
   const { t } = useLocale();
   const location = useLocation();
   const { visibleTypes } = useVisibleMediaTypes();
+  const { setPageTitle, setBelowNavbar } = usePageTitle() ?? {};
+  useEffect(() => {
+    setPageTitle?.(t("nav.search"));
+    return () => {
+      setPageTitle?.(null);
+      setBelowNavbar?.(null);
+    };
+  }, [t, setPageTitle, setBelowNavbar]);
+
   const state = location.state as { mediaType?: MediaType; query?: string } | null;
   const stateMediaType = state?.mediaType;
   const stateQuery = state?.query ?? "";
@@ -91,6 +103,7 @@ export function Search() {
   const [searchFilter, setSearchFilter] = useState<SearchFilter>(stateMediaType ?? defaultType);
   const mediaType = searchFilter === USERS_SEARCH_TYPE ? defaultType : searchFilter;
   const [sortBy, setSortBy] = useState<string>("relevance");
+  const [loadingFollowId, setLoadingFollowId] = useState<string | null>(null);
   const [query, setQuery] = useState(stateQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
@@ -119,8 +132,10 @@ export function Search() {
   const { me, refetch: refetchMe } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
   const provider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
-  const needsKeyBanner = provider != null && me?.apiKeys && !me.apiKeys[provider];
-  const [savingBoardGameProvider, setSavingBoardGameProvider] = useState(false);
+  const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
+  const needsKeyBanner =
+    provider != null &&
+    (mediaType === "boardgames" ? !hasBoardGameKey : me?.apiKeys && !me.apiKeys[provider]);
   const [bannerDismissed, setBannerDismissed] = useState(() => {
     if (typeof sessionStorage === "undefined") return false;
     return sessionStorage.getItem(`${SEARCH_BANNER_DISMISSED_KEY}-${mediaType}`) === "1";
@@ -255,25 +270,6 @@ export function Search() {
     [searchFilter, sortBy, t, me?.boardGameProvider]
   );
 
-  const handleBoardGameProviderChange = useCallback(
-    async (newProvider: BoardGameProvider) => {
-      if (me?.boardGameProvider === newProvider) return;
-      setSavingBoardGameProvider(true);
-      try {
-        await apiFetch("/settings/board-game-provider", {
-          method: "PUT",
-          body: JSON.stringify({ provider: newProvider }),
-        });
-        await refetchMe();
-        invalidateApiCache("/search");
-        if (query.trim()) await runSearch(query);
-      } finally {
-        setSavingBoardGameProvider(false);
-      }
-    },
-    [me?.boardGameProvider, refetchMe, query, runSearch]
-  );
-
   const hasRunInitialSearch = useRef(false);
   const [hasSearched, setHasSearched] = useState(!!stateQuery.trim());
   useEffect(() => {
@@ -316,6 +312,77 @@ export function Search() {
     toast.success(t("toast.trySearchingAgain"));
   }, [t]);
 
+  const handleFollowClick = useCallback(
+    async (e: React.MouseEvent, targetUserId: string, currentlyFollowing: boolean) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!token || loadingFollowId) return;
+      setLoadingFollowId(targetUserId);
+      try {
+        if (currentlyFollowing) {
+          await apiFetch(`/follows/${targetUserId}`, { method: "DELETE" });
+          setUserResults((prev) =>
+            prev.map((u) => (u.id === targetUserId ? { ...u, following: false } : u))
+          );
+        } else {
+          await apiFetch("/follows", {
+            method: "POST",
+            body: JSON.stringify({ userId: targetUserId }),
+          });
+          setUserResults((prev) =>
+            prev.map((u) => (u.id === targetUserId ? { ...u, following: true } : u))
+          );
+          toast.success(t("social.followSuccess"));
+        }
+      } catch {
+        toast.error(t("common.tryAgain"));
+      } finally {
+        setLoadingFollowId(null);
+      }
+    },
+    [token, loadingFollowId, t]
+  );
+
+  useEffect(() => {
+    setBelowNavbar?.(
+      <StickyCategoryStrip
+        items={[
+          ...effectiveVisibleTypes.map((type) => {
+            const typeProvider = getApiKeyProviderForMediaType(type, boardGameProvider);
+            const hasKeyForType = typeProvider == null || !!me?.apiKeys?.[typeProvider];
+            const categoryLimitReached = limitReachedByCategory[type];
+            return {
+              value: type,
+              label: t(`nav.${type}`),
+              disabled: !hasKeyForType && !!categoryLimitReached,
+            };
+          }),
+          { value: USERS_SEARCH_TYPE, label: t("search.usersFilter") },
+        ]}
+        selectedValue={searchFilter}
+        onSelect={(v) => {
+          setSearchFilter(v as MediaType | typeof USERS_SEARCH_TYPE);
+          if (query.trim()) runSearch(query, v as MediaType | typeof USERS_SEARCH_TYPE);
+        }}
+        showCount={false}
+        mobileOnly
+        stickyTop="top-14"
+        aria-label={t("dashboard.category")}
+      />
+    );
+    return () => setBelowNavbar?.(null);
+  }, [
+    effectiveVisibleTypes,
+    searchFilter,
+    query,
+    boardGameProvider,
+    me?.apiKeys,
+    limitReachedByCategory,
+    t,
+    setBelowNavbar,
+    runSearch,
+  ]);
+
   return (
     <div
       className={`relative flex flex-col gap-6 flex-1 min-h-0 min-w-0 overflow-x-hidden ${hasSearched ? "w-full" : ""}`}
@@ -333,12 +400,6 @@ export function Search() {
       </div>
 
       <div className="relative z-10 flex flex-col gap-6 flex-1 min-h-0">
-      <h2
-        className={`text-2xl font-bold text-[var(--color-lightest)] shrink-0 ${!hasSearched ? "hidden" : ""}`}
-      >
-        {t("search.title")}
-      </h2>
-
       <motion.div
         className={hasSearched ? "shrink-0 w-full" : "flex-1 flex flex-col justify-end items-center min-h-0"}
         layout
@@ -362,7 +423,8 @@ export function Search() {
               autoFocus={!hasSearched}
               aria-label={t("search.search")}
             />
-            <div className="flex flex-wrap gap-2 mt-2 items-center justify-center">
+            {/* Desktop: category buttons */}
+            <div className="hidden md:flex flex-wrap gap-2 mt-2 items-center justify-center">
               {[...effectiveVisibleTypes, USERS_SEARCH_TYPE].map((filter) => {
                 if (filter === USERS_SEARCH_TYPE) {
                   return (
@@ -415,7 +477,7 @@ export function Search() {
             </div>
             {hasSearched && searchFilter !== USERS_SEARCH_TYPE && (
               <div
-                className={`flex flex-wrap items-center gap-4 min-w-0 ${mediaType === "boardgames" ? "w-full justify-between" : ""}`}
+                className="flex flex-wrap items-center gap-4 min-w-0"
               >
                 <div className="flex flex-wrap items-center gap-2 min-w-0">
                   <Select
@@ -432,29 +494,6 @@ export function Search() {
                     aria-label={t("search.sortBy")}
                   />
                 </div>
-                {mediaType === "boardgames" && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ToggleGroup
-                      type="single"
-                      value={boardGameProvider}
-                      onValueChange={(v) => v && handleBoardGameProviderChange(v as BoardGameProvider)}
-                      disabled={savingBoardGameProvider}
-                      className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5"
-                      aria-label={t("settings.boardGameProviderLabel")}
-                    >
-                      {BOARD_GAME_PROVIDERS.map((provider) => (
-                        <ToggleGroupItem
-                          key={provider}
-                          value={provider}
-                          className="h-8 px-3 text-sm"
-                          aria-label={provider === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
-                        >
-                          {provider === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
-                  </div>
-                )}
               </div>
             )}
           </motion.div>
@@ -474,28 +513,58 @@ export function Search() {
       {hasSearched && !loading && searchFilter === USERS_SEARCH_TYPE && userResults.length > 0 && (
         <motion.div variants={staggerContainer} initial="initial" animate="animate">
           <div className="flex flex-col gap-2">
-            {userResults.map((user) => (
-              <motion.div key={user.id} variants={staggerItem}>
-                <Link
-                  to={`/${user.username ?? user.id}`}
-                  className="flex min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-[var(--color-dark)] bg-[var(--color-dark)] p-4 text-inherit no-underline shadow-[var(--shadow-sm)] transition-opacity hover:opacity-95"
+            {userResults.map((user) => {
+              const isOwnProfile = token && me?.user?.id === user.id;
+              const showFollowButton = token && !isOwnProfile;
+              const followLoading = loadingFollowId === user.id;
+              return (
+                <motion.div
+                  key={user.id}
+                  variants={staggerItem}
+                  className="flex min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-[var(--color-dark)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-sm)]"
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-mid)]/30 text-lg font-semibold text-[var(--color-lightest)]">
-                    {(user.username ?? user.id).slice(0, 1).toUpperCase()}
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
-                      {user.username ?? user.id}
-                    </span>
-                    {user.logCount != null && (
-                      <span className="text-xs text-[var(--color-light)]">
-                        {t("search.userLogCount", { count: String(user.logCount) })}
+                  <Link
+                    to={`/${user.username ?? user.id}`}
+                    className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden text-inherit no-underline transition-opacity hover:opacity-95"
+                  >
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-mid)]/30 text-lg font-semibold text-[var(--color-lightest)]">
+                      {(user.username ?? user.id).slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
+                        {user.username ?? user.id}
                       </span>
-                    )}
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
+                      {user.logCount != null && (
+                        <span className="text-xs text-[var(--color-light)]">
+                          {t("search.userLogCount", { count: String(user.logCount) })}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                  {showFollowButton && (
+                    <Button
+                      type="button"
+                      variant={user.following ? "secondary" : "default"}
+                      size="sm"
+                      className="shrink-0"
+                      disabled={followLoading}
+                      onClick={(e) => handleFollowClick(e, user.id, !!user.following)}
+                    >
+                      {followLoading ? (
+                        t("common.saving")
+                      ) : user.following ? (
+                        <>
+                          <UserCheck className="h-4 w-4 shrink-0" aria-hidden />
+                          <span className="ml-1.5">{t("social.following")}</span>
+                        </>
+                      ) : (
+                        t("social.follow")
+                      )}
+                    </Button>
+                  )}
+                </motion.div>
+              );
+            })}
           </div>
         </motion.div>
       )}
@@ -555,9 +624,9 @@ export function Search() {
                       {token && status && (
                         <span
                           className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
-                          title={t(`status.${STATUS_I18N_KEYS[status] ?? status}`)}
+                          title={getStatusLabel(t, status, mediaType)}
                         >
-                          {t(`status.${STATUS_I18N_KEYS[status] ?? status}`)}
+                          {getStatusLabel(t, status, mediaType)}
                         </span>
                       )}
                     </div>
@@ -622,7 +691,7 @@ export function Search() {
             provider={requiresApiKey.provider}
             name={t(`nav.${mediaType}`)}
             link={requiresApiKey.link}
-            tutorial={requiresApiKey.tutorial}
+            tutorial={t(`settings.apiKeyTutorial.${requiresApiKey.provider}`)}
             onSaved={handleApiKeySaved}
           />
         </div>

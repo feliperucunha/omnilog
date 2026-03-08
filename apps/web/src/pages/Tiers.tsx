@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useLocale } from "@/contexts/LocaleContext";
+import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
@@ -24,7 +25,12 @@ export function Tiers() {
   const { t } = useLocale();
   const { token } = useAuth();
   const { me, refetch, loading } = useMe();
+  const { setPageTitle } = usePageTitle() ?? {};
   const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    setPageTitle?.(t("tiers.title"));
+    return () => setPageTitle?.(null);
+  }, [t, setPageTitle]);
   const [interval, setInterval] = useState<"monthly" | "yearly">("monthly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -127,9 +133,6 @@ export function Tiers() {
       className="mx-auto max-w-4xl space-y-8 px-4 py-6 pb-24 md:pb-20"
     >
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-[var(--color-lightest)] sm:text-3xl">
-          {t("tiers.title")}
-        </h1>
         <p className="mt-2 text-[var(--color-light)]">
           {t("tiers.subtitle")}
         </p>

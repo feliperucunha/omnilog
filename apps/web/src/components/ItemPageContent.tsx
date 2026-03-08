@@ -4,12 +4,22 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
-import { STATUS_I18N_KEYS, type ItemDetail, type ItemPageData, type ItemReview, type MediaType } from "@logeverything/shared";
+import type { ItemDetail, ItemPageData, ItemReview, MediaType } from "@logeverything/shared";
+import { ReactionButtons } from "@/components/ReactionButtons";
+import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetchCached } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLogComplete } from "@/contexts/LogCompleteContext";
+import { usePageTitle } from "@/contexts/PageTitleContext";
 import { ItemReviewForm } from "@/components/ItemReviewForm";
 import { ItemPageSkeleton } from "@/components/skeletons";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
 import { StarRating } from "@/components/StarRating";
@@ -338,6 +348,9 @@ export interface ItemPageContentProps {
 
 const REVIEWS_PAGE_SIZE = 10;
 
+const REVIEW_SORT_OPTIONS = ["recent", "oldest", "likes", "dislikes"] as const;
+type ReviewSortKey = (typeof REVIEW_SORT_OPTIONS)[number];
+
 interface ReviewsResponse {
   reviews: ItemReview[];
   meanGrade: number | null;
@@ -354,7 +367,15 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reviewsPage, setReviewsPage] = useState(1);
+  const [reviewsSort, setReviewsSort] = useState<ReviewSortKey>("recent");
   const { token } = useAuth();
+  const { setPageTitle } = usePageTitle() ?? {};
+
+  useEffect(() => {
+    const title = data?.item?.title ?? null;
+    setPageTitle?.(title);
+    return () => setPageTitle?.(null);
+  }, [data?.item?.title, setPageTitle]);
 
   const fetchItem = useCallback(() => {
     setError(null);
@@ -373,11 +394,12 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
   }, [mediaType, id, t]);
 
   const fetchReviews = useCallback(
-    (page: number) => {
+    (page: number, sort: ReviewSortKey) => {
       setReviewsLoading(true);
       const params = new URLSearchParams({
         page: String(page),
         limit: String(REVIEWS_PAGE_SIZE),
+        sort,
       });
       apiFetchCached<ReviewsResponse>(
         `/items/${mediaType}/${id}/reviews?${params.toString()}`,
@@ -413,8 +435,8 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
 
   useEffect(() => {
     if (!data?.item) return;
-    fetchReviews(reviewsPage);
-  }, [data?.item, reviewsPage, fetchReviews]);
+    fetchReviews(reviewsPage, reviewsSort);
+  }, [data?.item, reviewsPage, reviewsSort, fetchReviews]);
 
   if (loading && !data) {
     return (
@@ -560,9 +582,30 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
         )}
 
         <div className="flex flex-col gap-4">
-          <h2 className="text-xl font-semibold text-[var(--color-lightest)]">
-            {t("common.reviews")}
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-xl font-semibold text-[var(--color-lightest)]">
+              {t("common.reviews")}
+            </h2>
+            {reviews.length > 0 && (
+              <Select
+                value={reviewsSort}
+                onValueChange={(v) => {
+                  setReviewsSort(v as ReviewSortKey);
+                  setReviewsPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[10rem]" aria-label={t("reviews.sortBy")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent">{t("reviews.sortRecent")}</SelectItem>
+                  <SelectItem value="oldest">{t("reviews.sortOldest")}</SelectItem>
+                  <SelectItem value="likes">{t("reviews.sortLikes")}</SelectItem>
+                  <SelectItem value="dislikes">{t("reviews.sortDislikes")}</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          </div>
           {reviewsLoading ? (
             <Card
               className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6"
@@ -614,7 +657,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                             <span
                               className="rounded bg-[var(--color-darkest)] px-1.5 py-0.5 text-xs text-[var(--color-light)]"
                             >
-                              {t(`status.${STATUS_I18N_KEYS[r.status ?? r.listType ?? ""] ?? r.status ?? r.listType}`)}
+                              {getStatusLabel(t, r.status ?? r.listType ?? null, mediaType)}
                             </span>
                           )}
                           {(r.season != null || r.episode != null) && (
@@ -635,6 +678,32 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                           <span className="text-sm text-[var(--color-light)]">
                             {new Date(r.createdAt).toLocaleDateString()}
                           </span>
+                          <ReactionButtons
+                            logId={r.id}
+                            likesCount={r.likesCount ?? 0}
+                            dislikesCount={r.dislikesCount ?? 0}
+                            userReaction={r.userReaction ?? null}
+                            disabled={!token}
+                            onReactionChange={(payload) => {
+                              setData((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      reviews: prev.reviews.map((rev) =>
+                                        rev.id === r.id
+                                          ? {
+                                              ...rev,
+                                              likesCount: payload.likesCount,
+                                              dislikesCount: payload.dislikesCount,
+                                              userReaction: payload.userReaction,
+                                            }
+                                          : rev
+                                      ),
+                                    }
+                                  : prev
+                              );
+                            }}
+                          />
                         </div>
                         {r.review && (
                           <p
