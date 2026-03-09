@@ -470,6 +470,10 @@
     "exportFailed": "Falha na exportação",
     "logLimitReached": "Você atingiu o limite de 500 logs no plano Grátis. Assine o Pro para logs ilimitados."
   },
+  "coldStart": {
+    "error": "Algo deu errado. Verifique sua conexão e tente novamente.",
+    "timedOut": "Está demorando mais que o normal. O servidor pode estar acordando."
+  },
   "errorBoundary": {
     "title": "Algo deu errado",
     "message": "Ocorreu um erro inesperado.",

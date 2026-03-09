@@ -6,18 +6,35 @@ if (import.meta.env.DEV && API_BASE.startsWith("https://localhost")) {
 if (API_BASE.startsWith("http") && !API_BASE.endsWith("/api")) {
   API_BASE = API_BASE.replace(/\/?$/, "") + "/api";
 }
-const DEFAULT_TIMEOUT_MS = 35000;
+/** Match cold-start wait (50s) so the first request is not aborted too early. */
+const DEFAULT_TIMEOUT_MS = 55_000;
 
 /** Called once when the first API response is received (cold-start UX). Set from app root. */
 let onFirstApiResponse: (() => void) | null = null;
+let onFirstApiError: (() => void) | null = null;
+let firstApiOutcomeFired = false;
+
 export function setOnFirstApiResponse(callback: () => void): void {
   onFirstApiResponse = callback;
 }
+export function setOnFirstApiError(callback: () => void): void {
+  onFirstApiError = callback;
+}
+
 function fireFirstApiResponseOnce(): void {
-  if (onFirstApiResponse) {
-    onFirstApiResponse();
-    onFirstApiResponse = null;
-  }
+  if (firstApiOutcomeFired) return;
+  firstApiOutcomeFired = true;
+  onFirstApiResponse?.();
+  onFirstApiResponse = null;
+  onFirstApiError = null;
+}
+
+function fireFirstApiErrorOnce(): void {
+  if (firstApiOutcomeFired) return;
+  firstApiOutcomeFired = true;
+  onFirstApiError?.();
+  onFirstApiResponse = null;
+  onFirstApiError = null;
 }
 
 import { getCached, setCached, invalidateByPrefix } from "./cache.js";
@@ -209,6 +226,7 @@ export async function apiFetchPublic<T>(path: string, options?: RequestInit): Pr
     return JSON.parse(text) as T;
   } catch (err) {
     clearTimeout(timeoutId);
+    fireFirstApiErrorOnce();
     if (err instanceof Error) {
       if (err.name === "AbortError") throw new Error("Request took too long. Please try again.");
       throw err;

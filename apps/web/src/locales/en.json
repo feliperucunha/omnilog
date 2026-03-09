@@ -471,6 +471,10 @@
     "exportFailed": "Export failed",
     "logLimitReached": "You've reached the 500-log limit on the Free plan. Upgrade to Pro for unlimited logs."
   },
+  "coldStart": {
+    "error": "Something went wrong. Please check your connection and try again.",
+    "timedOut": "Taking longer than usual. The server may be waking up."
+  },
   "errorBoundary": {
     "title": "Something went wrong",
     "message": "An unexpected error occurred.",
