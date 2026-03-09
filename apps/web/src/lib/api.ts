@@ -8,6 +8,18 @@ if (API_BASE.startsWith("http") && !API_BASE.endsWith("/api")) {
 }
 const DEFAULT_TIMEOUT_MS = 35000;
 
+/** Called once when the first API response is received (cold-start UX). Set from app root. */
+let onFirstApiResponse: (() => void) | null = null;
+export function setOnFirstApiResponse(callback: () => void): void {
+  onFirstApiResponse = callback;
+}
+function fireFirstApiResponseOnce(): void {
+  if (onFirstApiResponse) {
+    onFirstApiResponse();
+    onFirstApiResponse = null;
+  }
+}
+
 import { getCached, setCached, invalidateByPrefix } from "./cache.js";
 
 /** Sentinel for cookie-based sessions (no token in localStorage). */
@@ -122,6 +134,7 @@ async function fetchInternal<T>(
       headers: { ...getAuthHeaders(), ...fetchOptions.headers },
     });
     clearTimeout(timeoutId);
+    fireFirstApiResponseOnce();
 
     const text = await res.text();
 
@@ -186,6 +199,7 @@ export async function apiFetchPublic<T>(path: string, options?: RequestInit): Pr
       headers: { "Content-Type": "application/json", ...options?.headers },
     });
     clearTimeout(timeoutId);
+    fireFirstApiResponseOnce();
     const text = await res.text();
     if (!res.ok) {
       const message = parseErrorResponse(text, res.status === 404 ? "Not found" : "Request failed");

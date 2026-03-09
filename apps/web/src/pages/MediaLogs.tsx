@@ -34,12 +34,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ReviewModal } from "@/components/ReviewModal";
 import { cn } from "@/lib/utils";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
 
 const LOGS_PAGE_SIZE = 24;
+/** Character count for review preview before "View more". ~2 lines on mobile. */
+const REVIEW_PREVIEW_LENGTH = 120;
 
 type LogsResponse = Log[] | { data: Log[]; nextCursor: string | null };
 
@@ -80,7 +81,8 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
   const [incrementingId, setIncrementingId] = useState<string | null>(null);
   const [exportingCategory, setExportingCategory] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
-  const [reviewModalLog, setReviewModalLog] = useState<Log | null>(null);
+  /** Log id whose review is expanded in-card (no modal). */
+  const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
 
   const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
   const CHAPTER_TYPES: MediaType[] = ["manga"];
@@ -327,13 +329,6 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
             </Button>
           </DialogContent>
         </Dialog>
-      )}
-      {reviewModalLog && (
-        <ReviewModal
-          open={!!reviewModalLog}
-          onClose={() => setReviewModalLog(null)}
-          log={reviewModalLog}
-        />
       )}
       {!embedded && (
         <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
@@ -592,26 +587,37 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
                         })()}
                         <div className="min-h-[2.5rem] flex flex-col items-start gap-1">
                           {log.review ? (
-                            <>
-                              <p className="line-clamp-2 text-xs sm:text-sm text-[var(--color-light)] min-h-0">
-                                {log.review}
-                              </p>
-                              {readOnly && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-auto p-0 text-xs text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setReviewModalLog(log);
-                                  }}
-                                >
-                                  {t("social.viewFullReview")}
-                                </Button>
-                              )}
-                            </>
+                            (() => {
+                              const review = log.review;
+                              const isExpanded = expandedReviewLogId === log.id;
+                              const truncated = review.length > REVIEW_PREVIEW_LENGTH;
+                              const preview = truncated && !isExpanded
+                                ? review.slice(0, REVIEW_PREVIEW_LENGTH)
+                                : review;
+                              return (
+                                <>
+                                  <p className="text-xs sm:text-sm text-[var(--color-light)] min-h-0 whitespace-pre-wrap break-words">
+                                    {preview}
+                                    {truncated && !isExpanded && " ... "}
+                                  </p>
+                                  {truncated && (
+                                    <Button
+                                      type="button"
+                                      variant="link"
+                                      size="sm"
+                                      className="h-auto p-0 text-xs text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setExpandedReviewLogId(isExpanded ? null : log.id);
+                                      }}
+                                    >
+                                      {isExpanded ? t("social.viewLess") : t("social.viewMore")}
+                                    </Button>
+                                  )}
+                                </>
+                              );
+                            })()
                           ) : (
                             <span className="invisible text-xs sm:text-sm line-clamp-2">—</span>
                           )}

@@ -190,6 +190,8 @@
     "findUsers": "Buscar usuarios",
     "userWithoutUsername": "Usuario",
     "viewFullReview": "Ver reseña completa",
+    "viewMore": "Ver más",
+    "viewLess": "Ver menos",
     "reviewBy": "por {{name}}",
     "viewProfile": "Ver perfil de {{name}}"
   },

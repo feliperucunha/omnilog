@@ -30,7 +30,6 @@ import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
-import { ReviewModal } from "@/components/ReviewModal";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 
@@ -40,6 +39,8 @@ interface FeedEntry {
 }
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
+/** Character count for review preview before "View more". ~2 lines on mobile. */
+const REVIEW_PREVIEW_LENGTH = 120;
 const BETA_MODAL_STORAGE_KEY = "logeverything.betaModalSeen";
 const SOCIAL_COLLAPSED_STORAGE_KEY = "logeverything.dashboard.socialCollapsed";
 
@@ -88,7 +89,8 @@ export function Dashboard() {
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [feedLoading, setFeedLoading] = useState(false);
   const [showBetaModal, setShowBetaModal] = useState(false);
-  const [reviewModalEntry, setReviewModalEntry] = useState<FeedEntry | null>(null);
+  /** Log id whose review is expanded in-card (no modal). */
+  const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
   const [socialCollapsed, setSocialCollapsed] = useState(getSocialCollapsedDefault);
 
   const toggleSocialCollapsed = useCallback(() => {
@@ -461,19 +463,34 @@ export function Dashboard() {
                       </div>
                       {log.review && (
                         <div className="mt-3 flex flex-col gap-2 border-t border-[var(--color-darkest)] pt-3">
-                          <p className="line-clamp-2 text-xs text-[var(--color-light)]">
-                            {log.review}
-                          </p>
+                          {(() => {
+                            const review = log.review;
+                            const isExpanded = expandedReviewLogId === log.id;
+                            const truncated = review.length > REVIEW_PREVIEW_LENGTH;
+                            const preview = truncated && !isExpanded
+                              ? review.slice(0, REVIEW_PREVIEW_LENGTH)
+                              : review;
+                            return (
+                              <>
+                                <p className="text-xs text-[var(--color-light)] whitespace-pre-wrap break-words">
+                                  {preview}
+                                  {truncated && !isExpanded && " ... "}
+                                </p>
+                                {truncated && (
+                                  <Button
+                                    type="button"
+                                    variant="link"
+                                    size="sm"
+                                    className="w-fit h-auto p-0 text-xs text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300"
+                                    onClick={() => setExpandedReviewLogId(isExpanded ? null : log.id)}
+                                  >
+                                    {isExpanded ? t("social.viewLess") : t("social.viewMore")}
+                                  </Button>
+                                )}
+                              </>
+                            );
+                          })()}
                           <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="w-fit text-xs"
-                              onClick={() => setReviewModalEntry({ log, user: feedUser })}
-                            >
-                              {t("social.viewFullReview")}
-                            </Button>
                             <ReactionButtons
                               logId={log.id}
                               likesCount={log.likesCount ?? 0}
@@ -506,14 +523,6 @@ export function Dashboard() {
                   );
                 })}
               </div>
-              {reviewModalEntry && (
-                <ReviewModal
-                  open={!!reviewModalEntry}
-                  onClose={() => setReviewModalEntry(null)}
-                  log={reviewModalEntry.log}
-                  user={reviewModalEntry.user}
-                />
-              )}
             </motion.ul>
           )}
           </div>

@@ -10,6 +10,7 @@ import { LocaleSync } from "@/components/LocaleSync";
 import { MeProvider } from "@/contexts/MeContext";
 import { VisibleMediaTypesProvider } from "@/contexts/VisibleMediaTypesContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ColdStartLoader } from "@/components/ColdStartLoader";
 import App from "./App";
 import "./fonts.css";
 import "./index.css";
@@ -25,6 +26,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <VisibleMediaTypesProvider>
                   <ThemeSync />
                   <LocaleSync />
+                  <ColdStartLoader />
                   <App />
                 </VisibleMediaTypesProvider>
               </MeProvider>

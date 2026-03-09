@@ -191,6 +191,8 @@
     "findUsers": "Find users",
     "userWithoutUsername": "User",
     "viewFullReview": "View full review",
+    "viewMore": "View more",
+    "viewLess": "View less",
     "reviewBy": "by {{name}}",
     "viewProfile": "View {{name}}'s profile"
   },
