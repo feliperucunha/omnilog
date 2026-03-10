@@ -78,6 +78,11 @@ function isCompleted(status: string | null | undefined): boolean {
 
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
+import {
+  handleLogCreated,
+  handleReviewCreated,
+  handleReviewLiked,
+} from "../services/gamification.service.js";
 
 const FREE_LOG_LIMIT = 500;
 
@@ -233,7 +238,10 @@ logsRouter.put("/:id/reaction", async (req: AuthenticatedRequest, res) => {
     return;
   }
   const userId = req.user!.userId;
-  const log = await prisma.log.findUnique({ where: { id: logId }, select: { id: true } });
+  const log = await prisma.log.findUnique({
+    where: { id: logId },
+    select: { id: true, userId: true },
+  });
   if (!log) {
     res.status(404).json({ error: "Log not found" });
     return;
@@ -243,6 +251,9 @@ logsRouter.put("/:id/reaction", async (req: AuthenticatedRequest, res) => {
     create: { logId, userId, type: parsed.data.type },
     update: { type: parsed.data.type },
   });
+  if (parsed.data.type === "like") {
+    handleReviewLiked(logId, log.userId).catch(() => {});
+  }
   res.status(204).end();
 });
 
@@ -589,6 +600,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     }
     let log;
     if (existing) {
+      const hadReview = Boolean(existing.review && existing.review.trim().length > 0);
       const updateData: {
         title: string;
         image?: string | null;
@@ -626,6 +638,9 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         where: { id: existing.id },
         data: updateData,
       });
+      if (!hadReview && sanitizedReview && sanitizedReview.trim().length > 0) {
+        handleReviewCreated(userId, log.id, log.mediaType, sanitizedReview).catch(() => {});
+      }
     } else {
       // Enforce free-tier limit again immediately before create (prevents race conditions / bypass)
       const userForCreate = await prisma.user.findUnique({
@@ -667,6 +682,10 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           boardGameSource,
         },
       });
+      handleLogCreated(userId).catch(() => {});
+      if (sanitizedReview && sanitizedReview.trim().length > 0) {
+        handleReviewCreated(userId, log.id, mediaType, sanitizedReview).catch(() => {});
+      }
     }
     res.status(201).json(serializeLog(log));
   } catch (e) {
@@ -732,6 +751,17 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     where: { id: log.id },
     data,
   });
+  const hadReview = Boolean(log.review && log.review.trim().length > 0);
+  const newReview =
+    parsed.data.review !== undefined ? sanitizeReview(parsed.data.review) : null;
+  if (
+    parsed.data.review !== undefined &&
+    !hadReview &&
+    newReview &&
+    newReview.trim().length > 0
+  ) {
+    handleReviewCreated(userId, updated.id, log.mediaType, newReview).catch(() => {});
+  }
   res.json(serializeLog(updated));
 });
 

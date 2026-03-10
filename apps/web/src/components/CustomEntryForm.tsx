@@ -39,12 +39,15 @@ interface CustomEntryFormProps {
   mediaType?: MediaType;
   onSaved: (completion?: LogCompleteState) => void;
   onCancel: () => void;
+  /** When true, render only the form (no Dialog). Used inside CustomBatchEntryModal. */
+  embedded?: boolean;
 }
 
 export function CustomEntryForm({
   mediaType: initialMediaType,
   onSaved,
   onCancel,
+  embedded = false,
 }: CustomEntryFormProps) {
   const { t } = useLocale();
   const [mediaType, setMediaType] = useState<MediaType>(initialMediaType ?? "movies");
@@ -118,14 +121,14 @@ export function CustomEntryForm({
     }
   };
 
-  return (
-    <Dialog open modal={false} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent onClose={onCancel}>
-        <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
-          <h3 className="mb-4 text-lg font-semibold text-[var(--color-lightest)]">
-            {t("customEntry.dialogTitle")}
-          </h3>
-          <form onSubmit={handleSubmit}>
+  const formContent = (
+    <>
+      {!embedded && (
+        <h3 className="mb-4 text-lg font-semibold text-[var(--color-lightest)]">
+          {t("customEntry.dialogTitle")}
+        </h3>
+      )}
+      <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-4">
               {showMediaTypeSelector && (
                 <div className="space-y-2">
@@ -283,6 +286,18 @@ export function CustomEntryForm({
               </div>
             </div>
           </form>
+    </>
+  );
+
+  if (embedded) {
+    return <motion.div initial="initial" animate="animate" variants={modalContentVariants}>{formContent}</motion.div>;
+  }
+
+  return (
+    <Dialog open modal={false} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent onClose={onCancel}>
+        <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
+          {formContent}
         </motion.div>
       </DialogContent>
     </Dialog>

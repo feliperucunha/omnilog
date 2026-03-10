@@ -15,6 +15,31 @@ enum Tier {
   pro
 }
 
+enum BadgeMedium {
+  MOVIE
+  TV_SHOW
+  ANIME
+  MANGA
+  COMIC
+  BOOK
+}
+
+enum BadgeRarity {
+  common
+  rare
+  epic
+  legendary
+}
+
+enum BadgeConditionType {
+  FIRST_REVIEW
+  REVIEW_COUNT_PER_MEDIA
+  REVIEW_COUNT_GLOBAL
+  MEDIA_TYPES_REVIEWED
+  REVIEW_LIKES
+  REVIEW_STREAK
+}
+
 model User {
   id                   String    @id @default(cuid())
   username             String?   @unique
@@ -37,6 +62,11 @@ model User {
   subscriptionEndsAt   DateTime?       // Pro access until this date; cron clears tier when past; null = endless (e.g. testing)
   country             String?  // ISO 3166-1 alpha-2 e.g. BR for pricing
   onboarded           Boolean  @default(false)
+  xpTotal             Int      @default(0)
+  level               Int      @default(1)
+  currentStreak       Int      @default(0)
+  lastReviewDate      DateTime?
+  selectedBadgeIds    String?  // JSON array of up to 3 badge IDs for profile display
   createdAt           DateTime @default(now())
   updatedAt      DateTime @updatedAt
   logs          Log[]
@@ -44,6 +74,61 @@ model User {
   feedbacks      Feedback[]
   followsFollowing  Follow[] @relation("FollowFollowing")
   followsFollowers  Follow[] @relation("FollowFollower")
+  userBadges     UserBadge[]
+  userXpEntries  UserXp[]
+  reviewStats    UserReviewStats?
+}
+
+model Badge {
+  id              String             @id @default(cuid())
+  name            String
+  description     String
+  icon            String
+  medium          BadgeMedium?
+  rarity          BadgeRarity        @default(common)
+  conditionType   BadgeConditionType
+  conditionValue  Int
+  hidden          Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  userBadges      UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  earnedAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([badgeId])
+}
+
+model UserXp {
+  id          String   @id @default(cuid())
+  userId      String
+  actionType  String
+  xp          Int
+  referenceId String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserReviewStats {
+  userId                 String   @id
+  movieReviews           Int      @default(0)
+  tvShowReviews          Int      @default(0)
+  animeReviews           Int      @default(0)
+  mangaReviews           Int      @default(0)
+  comicReviews           Int      @default(0)
+  bookReviews            Int      @default(0)
+  totalReviews           Int      @default(0)
+  distinctMediaReviewed  Int      @default(0)
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Follow {

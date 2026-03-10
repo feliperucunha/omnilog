@@ -3,10 +3,48 @@ import { MEDIA_TYPES } from "@logeverything/shared";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
+import { getBadgeProgress } from "../services/gamification.service.js";
 
 export const meRouter = Router();
 
 meRouter.use(authMiddleware);
+
+/** GET /me/badges/progress - Earned badges, next badges with progress bar data, per-medium current/next, xp/level. */
+meRouter.get("/badges/progress", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const data = await getBadgeProgress(req.user.userId);
+  res.json({
+    earnedBadges: data.earnedBadges.map((b) => ({ ...b, medium: b.medium })),
+    nextBadges: data.nextBadges.map((n) => ({
+      ...n,
+      badge: { ...n.badge, medium: n.badge.medium },
+    })),
+    perMedium: data.perMedium,
+    xpTotal: data.xpTotal,
+    level: data.level,
+  });
+});
+
+/** GET /me/badges - List badges the current user has earned. */
+meRouter.get("/badges", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const userBadges = await prisma.userBadge.findMany({
+    where: { userId: req.user.userId },
+    include: { badge: true },
+    orderBy: { earnedAt: "desc" },
+  });
+  res.json({
+    data: userBadges.map((ub) => ({
+      id: ub.badge.id,
+      name: ub.badge.name,
+      description: ub.badge.description,
+      icon: ub.badge.icon,
+      medium: ub.badge.medium,
+      rarity: ub.badge.rarity,
+      earnedAt: ub.earnedAt.toISOString(),
+    })),
+  });
+});
 
 /** Get current user and all settings in one call. */
 meRouter.get("/", async (req: AuthenticatedRequest, res) => {

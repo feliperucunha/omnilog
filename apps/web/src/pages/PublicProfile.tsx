@@ -35,11 +35,19 @@ const RESERVED_PATHS = new Set([
   "api",
 ]);
 
+interface ProfileBadge {
+  id: string;
+  name: string;
+  icon: string;
+  medium: string | null;
+}
+
 interface PublicProfileResponse {
   id: string;
   username: string | null;
   visibleMediaTypes: string[];
   logCount: number;
+  selectedBadges?: ProfileBadge[];
 }
 
 export function PublicProfile() {
@@ -172,11 +180,29 @@ export function PublicProfile() {
     ? t("publicProfile.titleWithName", { name: profile.username })
     : t("publicProfile.title");
 
+  const selectedBadges = profile?.selectedBadges ?? [];
+
   return (
     <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold text-[var(--color-lightest)] sm:text-2xl">{title}</h1>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h1 className="text-xl font-bold text-[var(--color-lightest)] sm:text-2xl">{title}</h1>
+          {selectedBadges.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2" aria-label={t("settings.profileBadges")}>
+              {selectedBadges.map((b) => (
+                <span
+                  key={b.id}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)]/80 px-3 py-1 text-sm text-[var(--color-lightest)]"
+                  title={b.name}
+                >
+                  <span aria-hidden>{b.icon}</span>
+                  <span className="truncate max-w-[140px]">{b.name}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
           {token && !isOwnProfile && (
             <Button
               type="button"

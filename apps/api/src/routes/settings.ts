@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { sanitizeApiKey } from "../lib/sanitize.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
+import { setSelectedBadges } from "../services/gamification.service.js";
 
 const onboardingSchema = z.object({
   theme: z.enum(["light", "dark"]),
@@ -222,6 +223,41 @@ settingsRouter.put("/board-game-provider", async (req: AuthenticatedRequest, res
     data: { boardGameProvider: parsed.data.provider },
   });
   res.json({ ok: true, provider: parsed.data.provider });
+});
+
+const profileBadgesSchema = z.object({
+  badgeIds: z.array(z.string().min(1)).max(3),
+});
+
+/** GET /settings/profile-badges - Get currently selected profile badge IDs (up to 3). */
+settingsRouter.get("/profile-badges", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { selectedBadgeIds: true },
+  });
+  let badgeIds: string[] = [];
+  if (user?.selectedBadgeIds) {
+    try {
+      const parsed = JSON.parse(user.selectedBadgeIds) as unknown;
+      badgeIds = Array.isArray(parsed) ? parsed.slice(0, 3) : [];
+    } catch {
+      // ignore
+    }
+  }
+  res.json({ badgeIds });
+});
+
+/** PUT /settings/profile-badges - Set up to 3 badges to display on profile. */
+settingsRouter.put("/profile-badges", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const parsed = profileBadgesSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body: badgeIds must be an array of up to 3 badge IDs" });
+    return;
+  }
+  await setSelectedBadges(req.user.userId, parsed.data.badgeIds);
+  res.json({ ok: true, badgeIds: parsed.data.badgeIds });
 });
 
 /** Complete onboarding: set theme, visible media types, and onboarded = true. */

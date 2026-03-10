@@ -11,7 +11,7 @@ import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@l
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, apiFetchFile } from "@/lib/api";
 import { LogForm } from "@/components/LogForm";
-import { CustomEntryForm } from "@/components/CustomEntryForm";
+import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
@@ -44,15 +44,28 @@ const REVIEW_PREVIEW_LENGTH = 120;
 
 type LogsResponse = Log[] | { data: Log[]; nextCursor: string | null };
 
+export interface CategoryBadgeProgress {
+  mediaType: string;
+  currentBadge: { id: string; name: string; icon: string } | null;
+  nextBadge: {
+    badge: { id: string; name: string; icon: string; medium: string | null; rarity: string };
+    current: number;
+    target: number;
+    progressPct: number;
+  } | null;
+}
+
 interface MediaLogsProps {
   mediaType: MediaType;
   /** When true, rendered inside Dashboard: no watermark background. */
   embedded?: boolean;
   /** When set, read-only public profile: fetch from /users/:id/logs, hide all write UI. */
   publicUserId?: string;
+  /** When set (e.g. from Dashboard), show current/next badge for this category. */
+  badgeProgress?: CategoryBadgeProgress | null;
 }
 
-export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLogsProps) {
+export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProgress: badgeProgressProp }: MediaLogsProps) {
   const { t } = useLocale();
   const navigate = useNavigate();
   const { showLogComplete } = useLogComplete();
@@ -83,6 +96,19 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
   const [showProModal, setShowProModal] = useState(false);
   /** Log id whose review is expanded in-card (no modal). */
   const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
+  const [badgeProgressFetched, setBadgeProgressFetched] = useState<CategoryBadgeProgress | null>(null);
+
+  const badgeProgress = badgeProgressProp ?? (readOnly ? null : badgeProgressFetched);
+
+  useEffect(() => {
+    if (readOnly || badgeProgressProp != null || !me) return;
+    apiFetch<{ perMedium: CategoryBadgeProgress[] }>("/me/badges/progress")
+      .then((res) => {
+        const forMedia = res.perMedium?.find((p) => p.mediaType === mediaType) ?? null;
+        setBadgeProgressFetched(forMedia);
+      })
+      .catch(() => setBadgeProgressFetched(null));
+  }, [readOnly, badgeProgressProp, mediaType, me]);
 
   const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
   const CHAPTER_TYPES: MediaType[] = ["manga"];
@@ -353,11 +379,12 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
           </span>
         </Link>
       )}
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 overflow-hidden">
-        <h1 className="min-w-0 truncate text-2xl font-bold text-[var(--color-lightest)]">
-          {label}
-        </h1>
-        {!readOnly && (
+      <div className="flex min-w-0 flex-col gap-2 sm:gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 overflow-hidden">
+          <h1 className="min-w-0 truncate text-2xl font-bold text-[var(--color-lightest)]">
+            {label}
+          </h1>
+          {!readOnly && (
           <div className="flex min-w-0 flex-shrink-0 flex-wrap items-center gap-3">
             <motion.div whileTap={tapScale} transition={tapTransition}>
               <Button
@@ -367,7 +394,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
               >
                 <span className="inline-flex items-center gap-2">
                   <Plus className="size-4 shrink-0" aria-hidden />
-                  {t("customEntry.addCustomEntry")}
+                  {t("customEntry.addCustomBatchEntry")}
                 </span>
               </Button>
             </motion.div>
@@ -392,9 +419,42 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId }: MediaLo
             </Button>
           </div>
         )}
+        </div>
+        {!readOnly && badgeProgress && (
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+            {badgeProgress.currentBadge && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)]/80 px-2.5 py-1 text-xs font-medium text-[var(--color-lightest)] sm:px-3 sm:py-1.5 sm:text-sm"
+                title={badgeProgress.currentBadge.name}
+              >
+                <span aria-hidden>{badgeProgress.currentBadge.icon}</span>
+                <span className="max-w-[120px] truncate sm:max-w-[180px]">{badgeProgress.currentBadge.name}</span>
+              </span>
+            )}
+            {badgeProgress.nextBadge && (
+              <div className="flex min-w-0 flex-1 items-center gap-2 min-[400px]:min-w-0">
+                <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)] max-w-[200px] sm:max-w-[240px]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
+                    style={{
+                      width: `${Math.min(100, badgeProgress.nextBadge.progressPct)}%`,
+                      minWidth: badgeProgress.nextBadge.current > 0 ? "4px" : 0,
+                    }}
+                  />
+                </div>
+                <span className="shrink-0 text-xs text-[var(--color-light)]" title={badgeProgress.nextBadge.badge.name}>
+                  {t("mediaLogs.badgeProgressReviews", {
+                    current: String(badgeProgress.nextBadge.current),
+                    target: String(badgeProgress.nextBadge.target),
+                  })}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       {!readOnly && showCustomEntry && (
-        <CustomEntryForm
+        <CustomBatchEntryModal
           mediaType={mediaType}
           onSaved={(completion) => {
             setShowCustomEntry(false);

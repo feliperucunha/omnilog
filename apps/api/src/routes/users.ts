@@ -18,9 +18,15 @@ function looksLikeCuid(id: string): boolean {
 async function getUserByIdentifier(identifier: string) {
   if (!identifier || identifier.length > 100) return null;
   if (looksLikeCuid(identifier)) {
-    return prisma.user.findUnique({ where: { id: identifier }, select: { id: true, username: true, visibleMediaTypes: true } });
+    return prisma.user.findUnique({
+      where: { id: identifier },
+      select: { id: true, username: true, visibleMediaTypes: true, selectedBadgeIds: true },
+    });
   }
-  return prisma.user.findUnique({ where: { username: identifier }, select: { id: true, username: true, visibleMediaTypes: true } });
+  return prisma.user.findUnique({
+    where: { username: identifier },
+    select: { id: true, username: true, visibleMediaTypes: true, selectedBadgeIds: true },
+  });
 }
 
 /** GET /users/:identifier - Public profile by username or id. No email or secrets. */
@@ -31,7 +37,27 @@ usersRouter.get("/:identifier", async (req: Request<{ identifier: string }>, res
     res.status(404).json({ error: "User not found" });
     return;
   }
-  const logCount = await prisma.log.count({ where: { userId: user.id } });
+  const [logCount, selectedBadges] = await Promise.all([
+    prisma.log.count({ where: { userId: user.id } }),
+    (async () => {
+      let badgeIds: string[] = [];
+      if (user.selectedBadgeIds) {
+        try {
+          const parsed = JSON.parse(user.selectedBadgeIds) as unknown;
+          badgeIds = Array.isArray(parsed) ? parsed.slice(0, 3) : [];
+        } catch {
+          // ignore
+        }
+      }
+      if (badgeIds.length === 0) return [];
+      const badges = await prisma.badge.findMany({
+        where: { id: { in: badgeIds } },
+        select: { id: true, name: true, icon: true, medium: true },
+      });
+      const order = new Map(badgeIds.map((id, i) => [id, i]));
+      return badges.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    })(),
+  ]);
   let visibleMediaTypes: string[] = [...MEDIA_TYPES];
   if (user.visibleMediaTypes) {
     try {
@@ -49,6 +75,12 @@ usersRouter.get("/:identifier", async (req: Request<{ identifier: string }>, res
     username: user.username ?? null,
     visibleMediaTypes,
     logCount,
+    selectedBadges: selectedBadges.map((b) => ({
+      id: b.id,
+      name: b.name,
+      icon: b.icon,
+      medium: b.medium,
+    })),
   });
 });
 

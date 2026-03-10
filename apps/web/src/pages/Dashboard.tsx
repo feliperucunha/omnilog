@@ -43,6 +43,7 @@ const paperShadow = { boxShadow: "var(--shadow-sm)" };
 const REVIEW_PREVIEW_LENGTH = 120;
 const BETA_MODAL_STORAGE_KEY = "logeverything.betaModalSeen";
 const SOCIAL_COLLAPSED_STORAGE_KEY = "logeverything.dashboard.socialCollapsed";
+const BADGES_COLLAPSED_STORAGE_KEY = "logeverything.dashboard.badgesCollapsed";
 
 function getSocialCollapsedDefault(): boolean {
   if (typeof window === "undefined") return false;
@@ -51,6 +52,37 @@ function getSocialCollapsedDefault(): boolean {
   } catch {
     return false;
   }
+}
+
+function getBadgesCollapsedDefault(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(BADGES_COLLAPSED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+interface BadgeProgressResponse {
+  earnedBadges: Array<{ id: string; name: string; icon: string; medium: string | null; rarity: string }>;
+  nextBadges: Array<{
+    badge: { id: string; name: string; icon: string; medium: string | null; rarity: string };
+    current: number;
+    target: number;
+    progressPct: number;
+  }>;
+  perMedium: Array<{
+    mediaType: string;
+    currentBadge: { id: string; name: string; icon: string } | null;
+    nextBadge: {
+      badge: { id: string; name: string; icon: string; medium: string | null; rarity: string };
+      current: number;
+      target: number;
+      progressPct: number;
+    } | null;
+  }>;
+  xpTotal: number;
+  level: number;
 }
 
 function getBetaModalSeen(userId: string): boolean {
@@ -92,6 +124,20 @@ export function Dashboard() {
   /** Log id whose review is expanded in-card (no modal). */
   const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
   const [socialCollapsed, setSocialCollapsed] = useState(getSocialCollapsedDefault);
+  const [badgesCollapsed, setBadgesCollapsed] = useState(getBadgesCollapsedDefault);
+  const [badgeProgress, setBadgeProgress] = useState<BadgeProgressResponse | null>(null);
+
+  const toggleBadgesCollapsed = useCallback(() => {
+    setBadgesCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(BADGES_COLLAPSED_STORAGE_KEY, next ? "true" : "false");
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
 
   const toggleSocialCollapsed = useCallback(() => {
     setSocialCollapsed((prev) => {
@@ -161,6 +207,16 @@ export function Dashboard() {
       .then((res) => setFeed(res.data ?? []))
       .catch(() => setFeed([]))
       .finally(() => setFeedLoading(false));
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setBadgeProgress(null);
+      return;
+    }
+    apiFetch<BadgeProgressResponse>("/me/badges/progress")
+      .then(setBadgeProgress)
+      .catch(() => setBadgeProgress(null));
   }, [token]);
 
   const handleShare = useCallback(async () => {
@@ -336,7 +392,112 @@ export function Dashboard() {
               </span>
             </Link>
           )}
-          <MediaLogs mediaType={selectedCategory} embedded />
+          <MediaLogs
+            mediaType={selectedCategory}
+            embedded
+            badgeProgress={
+              badgeProgress?.perMedium.find((p) => p.mediaType === selectedCategory) ?? null
+            }
+          />
+        </section>
+      )}
+
+      {token && (
+        <section aria-label={t("dashboard.badgesSectionTitle")} className="flex min-w-0 flex-col gap-4 overflow-hidden">
+          <button
+            type="button"
+            onClick={toggleBadgesCollapsed}
+            className="flex min-w-0 items-center gap-2 rounded-md py-1 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
+            aria-expanded={!badgesCollapsed}
+            aria-controls="dashboard-badges-content"
+            id="dashboard-badges-heading"
+          >
+            {badgesCollapsed ? (
+              <ChevronRight className="h-5 w-5 shrink-0" aria-hidden />
+            ) : (
+              <ChevronDown className="h-5 w-5 shrink-0" aria-hidden />
+            )}
+            <span className="min-w-0 truncate">{t("dashboard.badgesSectionTitle")}</span>
+            {badgeProgress && (
+              <span className="shrink-0 text-sm font-normal text-[var(--color-light)]">
+                {t("dashboard.badgesEarnedCount", { count: String(badgeProgress.earnedBadges.length) })}
+              </span>
+            )}
+          </button>
+          {!badgesCollapsed && (
+            <div id="dashboard-badges-content" role="region" aria-labelledby="dashboard-badges-heading">
+              {!badgeProgress ? (
+                <div className="min-h-[80px] flex items-center justify-center rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50">
+                  <span className="text-sm text-[var(--color-light)]">{t("common.loading")}</span>
+                </div>
+              ) : (
+                <div className="flex min-w-0 flex-col gap-4 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50 p-4">
+                  {badgeProgress.nextBadges.length > 0 ? (
+                    <div className="flex min-w-0 flex-col gap-2">
+                      <p className="text-sm font-medium text-[var(--color-lightest)]">
+                        {t("dashboard.badgesNextBadge")}
+                      </p>
+                      <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                        <span className="shrink-0 text-2xl" aria-hidden>
+                          {badgeProgress.nextBadges[0].badge.icon}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-[var(--color-lightest)]">
+                            {badgeProgress.nextBadges[0].badge.name}
+                          </p>
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)]">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
+                                style={{
+                                  width: `${Math.min(100, badgeProgress.nextBadges[0].progressPct)}%`,
+                                  minWidth: badgeProgress.nextBadges[0].current > 0 ? "4px" : 0,
+                                }}
+                              />
+                            </div>
+                            <span className="shrink-0 text-xs text-[var(--color-light)]">
+                              {t("dashboard.badgesProgressLabel", {
+                                current: String(badgeProgress.nextBadges[0].current),
+                                target: String(badgeProgress.nextBadges[0].target),
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[var(--color-light)]">
+                      {t("dashboard.badgesNoNextBadge")}
+                    </p>
+                  )}
+                  {badgeProgress.earnedBadges.length > 0 && (
+                    <div className="flex min-w-0 flex-wrap gap-2">
+                      {badgeProgress.earnedBadges.slice(0, 8).map((b) => (
+                        <span
+                          key={b.id}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/60 px-2.5 py-1 text-xs text-[var(--color-lightest)]"
+                          title={b.name}
+                        >
+                          <span aria-hidden>{b.icon}</span>
+                          <span className="max-w-[100px] truncate sm:max-w-[140px]">{b.name}</span>
+                        </span>
+                      ))}
+                      {badgeProgress.earnedBadges.length > 8 && (
+                        <span className="text-xs text-[var(--color-light)]">
+                          +{badgeProgress.earnedBadges.length - 8}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {badgeProgress.earnedBadges.length === 0 && badgeProgress.nextBadges.length === 0 && (
+                    <p className="text-sm text-[var(--color-light)]">
+                      {t("dashboard.badgesWriteReviews")}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </section>
       )}
 

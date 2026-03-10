@@ -53,6 +53,11 @@ export function Settings() {
   const [advancedOpen, setAdvancedOpen] = useState(() => searchParams.get("open") === "api-keys");
   const [exporting, setExporting] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(() => getShowCompleteModal());
+  type EarnedBadge = { id: string; name: string; description: string; icon: string; medium: string | null; rarity: string; earnedAt: string };
+  const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);
+  const [selectedBadgeIds, setSelectedBadgeIds] = useState<string[]>([]);
+  const [profileBadgesLoading, setProfileBadgesLoading] = useState(true);
+  const [savingProfileBadges, setSavingProfileBadges] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("open") === "api-keys") setAdvancedOpen(true);
@@ -75,6 +80,21 @@ export function Settings() {
       setSelectedMediaTypes(new Set(me.visibleMediaTypes as MediaType[]));
     }
   }, [me?.visibleMediaTypes]);
+
+  useEffect(() => {
+    if (!token) return;
+    setProfileBadgesLoading(true);
+    Promise.all([
+      apiFetch<{ data: EarnedBadge[] }>("/me/badges"),
+      apiFetch<{ badgeIds: string[] }>("/settings/profile-badges"),
+    ])
+      .then(([badgesRes, profileRes]) => {
+        setEarnedBadges(badgesRes.data ?? []);
+        setSelectedBadgeIds(profileRes.badgeIds ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setProfileBadgesLoading(false));
+  }, [token]);
 
   const handleSave = async (provider: ApiKeyProvider) => {
     const value =
@@ -152,6 +172,28 @@ export function Settings() {
     }
   };
 
+  const handleToggleProfileBadge = async (badgeId: string) => {
+    const next = selectedBadgeIds.includes(badgeId)
+      ? selectedBadgeIds.filter((id) => id !== badgeId)
+      : selectedBadgeIds.length >= 3
+        ? [...selectedBadgeIds.slice(1), badgeId]
+        : [...selectedBadgeIds, badgeId];
+    setSelectedBadgeIds(next);
+    setSavingProfileBadges(true);
+    try {
+      await apiFetch("/settings/profile-badges", {
+        method: "PUT",
+        body: JSON.stringify({ badgeIds: next }),
+      });
+      toast.success(t("settings.profileBadgesSaved"));
+    } catch (err) {
+      setSelectedBadgeIds(selectedBadgeIds);
+      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
+    } finally {
+      setSavingProfileBadges(false);
+    }
+  };
+
   const handleToggleMediaType = async (type: MediaType) => {
     const next = new Set(selectedMediaTypes);
     if (next.has(type)) next.delete(type);
@@ -187,12 +229,18 @@ export function Settings() {
     >
       <div className="flex flex-col gap-8">
         <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
-          <div className="flex flex-col gap-6">
+          <h2 className="text-base font-semibold text-[var(--color-lightest)] mb-1">
+            {t("settings.general")}
+          </h2>
+          <p className="text-sm text-[var(--color-light)] mb-5">
+            {t("settings.generalIntro")}
+          </p>
+          <div className="divide-y divide-[var(--color-mid)]/20">
             {me && (
-              <div>
-                <h3 className="text-lg font-semibold text-[var(--color-lightest)] mb-2">
+              <div className="flex flex-col gap-2 py-4 first:pt-0">
+                <span className="text-sm font-medium text-[var(--color-lightest)]">
                   {t("settings.subscription")}
-                </h3>
+                </span>
                 <p className="text-sm text-[var(--color-light)]">
                   {me.tier === "pro" ? (
                     me.daysRemaining != null ? (
@@ -201,36 +249,70 @@ export function Settings() {
                           ? t("settings.subscriptionDaysLeftOne")
                           : t("settings.subscriptionDaysLeft", { count: String(me.daysRemaining) })}
                         {" · "}
-                        <Link to="/tiers" className="underline hover:no-underline">
+                        <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
                           {t("tiers.manageSubscription")}
                         </Link>
                       </>
                     ) : (
-                      <Link to="/tiers" className="underline hover:no-underline">
+                      <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
                         {t("tiers.manageSubscription")}
                       </Link>
                     )
                   ) : (
-                    <Link to="/tiers" className="underline hover:no-underline">
+                    <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
                       {t("settings.viewPlans")}
                     </Link>
                   )}
                 </p>
               </div>
             )}
-            <div>
-              <h3 className="text-lg font-semibold text-[var(--color-lightest)] mb-2">
-                {t("nav.theme")}
-              </h3>
-              <ThemeSwitcher />
+            <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-[var(--color-lightest)]">
+                  {t("settings.language")}
+                </span>
+              </div>
+              <div className="shrink-0">
+                <ToggleGroup
+                  type="single"
+                  value={locale}
+                  onValueChange={(v) => v && handleLocaleChange(v as Locale)}
+                  className="inline-flex rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-0.5 gap-0"
+                  aria-label={t("settings.language")}
+                >
+                  {LOCALE_OPTIONS.map((opt) => (
+                    <ToggleGroupItem
+                      key={opt.value}
+                      value={opt.value}
+                      className="h-9 px-4 text-sm font-medium data-[state=on]:bg-[var(--color-mid)]/50 data-[state=on]:text-[var(--color-lightest)] rounded-md"
+                      aria-label={opt.label}
+                    >
+                      {LOCALE_SHORT_LABELS[opt.value]}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </div>
             </div>
-            <div>
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center  gap-3 rounded-md py-2 transition-colors hover:bg-[var(--color-darkest)]/50",
-                  "focus-within:ring-2 focus-within:ring-[var(--color-mid)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--color-dark)]"
-                )}
-              >
+            <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-[var(--color-lightest)]">
+                  {t("nav.theme")}
+                </span>
+              </div>
+              <div className="shrink-0">
+                <ThemeSwitcher />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 last:pb-0">
+              <label className="flex cursor-pointer flex-col gap-1 min-w-0 focus-within:outline-none">
+                <span className="text-sm font-medium text-[var(--color-lightest)]">
+                  {t("settings.showCompleteModal")}
+                </span>
+                <span id="show-complete-modal-desc" className="text-xs text-[var(--color-light)]">
+                  {t("settings.showCompleteModalIntro")}
+                </span>
+              </label>
+              <div className="shrink-0">
                 <input
                   type="checkbox"
                   checked={showCompleteModal}
@@ -239,41 +321,58 @@ export function Settings() {
                     setShowCompleteModal(checked);
                     localStorage.setItem(SHOW_COMPLETE_MODAL_STORAGE_KEY, checked ? "true" : "false");
                   }}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                  className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--btn-gradient-start)] focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
+                  aria-describedby="show-complete-modal-desc"
                 />
-                <span className="flex flex-col gap-1 text-left">
-                  <span className="text-lg font-semibold text-[var(--color-lightest)]">
-                    {t("settings.showCompleteModal")}
-                  </span>
-                  <span className="text-sm text-[var(--color-light)]">
-                    {t("settings.showCompleteModalIntro")}
-                  </span>
-                </span>
-              </label>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-[var(--color-lightest)] mb-2">
-                {t("settings.language")}
-              </h3>
-              <ToggleGroup
-                type="single"
-                value={locale}
-                onValueChange={(v) => v && handleLocaleChange(v as Locale)}
-                className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5 gap-0"
-                aria-label={t("settings.language")}
-              >
-                {LOCALE_OPTIONS.map((opt) => (
-                  <ToggleGroupItem
-                    key={opt.value}
-                    value={opt.value}
-                    className="h-8 px-3 text-sm data-[state=on]:bg-[var(--color-mid)]/50"
-                    aria-label={opt.label}
-                  >
-                    {LOCALE_SHORT_LABELS[opt.value]}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
+          </div>
+        </Card>
+
+        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+          <div className="flex flex-col gap-4">
+            <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
+              {t("settings.profileBadges")}
+            </h3>
+            <p className="text-sm text-[var(--color-light)]">
+              {t("settings.profileBadgesIntro")}
+            </p>
+            {profileBadgesLoading ? (
+              <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
+            ) : earnedBadges.length === 0 ? (
+              <p className="text-sm text-[var(--color-light)]">
+                {t("settings.profileBadgesNoBadges")}
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-[var(--color-light)]">
+                  {t("settings.profileBadgesSelected", { count: String(selectedBadgeIds.length) })}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {earnedBadges.map((b) => {
+                    const selected = selectedBadgeIds.includes(b.id);
+                    return (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => handleToggleProfileBadge(b.id)}
+                        disabled={savingProfileBadges}
+                        className={cn(
+                          "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition-colors",
+                          selected
+                            ? "border-[var(--btn-gradient-start)] bg-[var(--color-mid)]/30 text-[var(--color-lightest)]"
+                            : "border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 text-[var(--color-light)] hover:bg-[var(--color-darkest)]"
+                        )}
+                        title={b.description}
+                      >
+                        <span aria-hidden>{b.icon}</span>
+                        <span className="max-w-[180px] truncate">{b.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </Card>
 
