@@ -283,10 +283,25 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
                 t("batchEntry.confirmAndAddAll")
               )}
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+            <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={confirming}>
               {t("common.cancel")}
             </Button>
           </div>
+          {confirming && batchProgress && batchProgress.total > 0 && (
+            <div className="mt-4 flex flex-col gap-2" role="progressbar" aria-valuenow={batchProgress.current} aria-valuemin={0} aria-valuemax={batchProgress.total} aria-label={t("batchEntry.addingProgress", { current: String(batchProgress.current), total: String(batchProgress.total) })}>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--color-darkest)]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-300"
+                  style={{
+                    width: `${Math.round((batchProgress.current / batchProgress.total) * 100)}%`,
+                  }}
+                />
+              </div>
+              <p className="text-center text-sm font-medium text-[var(--color-lightest)]">
+                {Math.round((batchProgress.current / batchProgress.total) * 100)}%
+              </p>
+            </div>
+          )}
         </div>
       )}
 
