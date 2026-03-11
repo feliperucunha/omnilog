@@ -95,6 +95,35 @@ add("3 Day Review Streak", "You wrote reviews 3 days in a row.", "📅", null, "
 add("7 Day Review Streak", "You wrote reviews 7 days in a row.", "📆", null, "REVIEW_STREAK", 7, "rare");
 add("30 Day Review Streak", "You wrote reviews 30 days in a row.", "🗓️", null, "REVIEW_STREAK", 30, "legendary");
 
+// First log per medium (items added, with or without review)
+add("First Movie Log", "You added your first movie.", "🎬", "MOVIE", "LOG_COUNT_PER_MEDIA", 1);
+add("First TV Show Log", "You added your first TV show.", "📺", "TV_SHOW", "LOG_COUNT_PER_MEDIA", 1);
+add("First Anime Log", "You added your first anime.", "🌸", "ANIME", "LOG_COUNT_PER_MEDIA", 1);
+add("First Manga Log", "You added your first manga.", "📖", "MANGA", "LOG_COUNT_PER_MEDIA", 1);
+add("First Comic Log", "You added your first comic.", "💬", "COMIC", "LOG_COUNT_PER_MEDIA", 1);
+add("First Book Log", "You added your first book.", "📚", "BOOK", "LOG_COUNT_PER_MEDIA", 1);
+
+// Log progression per medium (items added)
+const logTiers = [
+  [5, "I", "Logger", "common"],
+  [10, "II", "Logger", "common"],
+  [25, "", "Enthusiast", "rare"],
+  [50, "", "Expert", "epic"],
+] as const;
+for (const { medium, label, icon } of media) {
+  for (const [value, num, title, rarity] of logTiers) {
+    const name = num ? `${label} ${title} ${num} (${value})` : `${label} ${title} (${value})`;
+    const desc = `You added ${value} ${label.toLowerCase()} items.`;
+    add(name, desc, icon, medium, "LOG_COUNT_PER_MEDIA", value, rarity as "common" | "rare" | "epic" | "legendary");
+  }
+}
+
+// Global log badges
+add("Multi-Medium Collector", "You added items in 3 different media types.", "🌐", null, "LOG_MEDIA_TYPES_LOGGED", 3, "rare");
+add("Omni Collector", "You added items in all 6 media types.", "🌟", null, "LOG_MEDIA_TYPES_LOGGED", 6, "legendary");
+add("Dedicated Logger", "You added 25 items total.", "✨", null, "LOG_COUNT_GLOBAL", 25, "rare");
+add("Prolific Logger", "You added 100 items total.", "🏆", null, "LOG_COUNT_GLOBAL", 100, "legendary");
+
 async function main() {
   for (const b of badges) {
     const existing = await prisma.badge.findFirst({ where: { name: b.name } });

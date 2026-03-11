@@ -3,12 +3,46 @@
  * Requires at least a "Name" column (case-insensitive). Optional: review/comment, rate/grade.
  */
 
-const MAX_ROWS = 500;
-const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
+const MAX_ROWS = 100;
+const MAX_FILE_BYTES = 1 * 1024 * 1024; // 1MB
 
-const NAME_ALIASES = ["name", "title", "nome", "título"];
-const REVIEW_ALIASES = ["review", "reviews", "comment", "comments", "review/comment", "resenha", "reseña"];
-const GRADE_ALIASES = ["rate", "rating", "grade", "grade/rate", "nota", "calificación", "score"];
+// Column header aliases for EN, PT-BR, ES so imports work in all three languages
+const NAME_ALIASES = [
+  "name",
+  "title",
+  "nome",
+  "título",
+  "titulo",
+  "nombre",
+  "nome do item",
+  "nombre del artículo",
+];
+const REVIEW_ALIASES = [
+  "review",
+  "reviews",
+  "comment",
+  "comments",
+  "review/comment",
+  "review comment",
+  "resenha",
+  "reseña",
+  "comentario",
+  "comentarios",
+  "notas",
+];
+const GRADE_ALIASES = [
+  "rate",
+  "rating",
+  "grade",
+  "grade/rate",
+  "nota",
+  "notas",
+  "calificación",
+  "calificacion",
+  "score",
+  "nota (0-10)",
+  "rate (0-10)",
+];
 
 function normalizeHeader(h: string): string {
   return h.trim().toLowerCase().replace(/\s+/g, " ");
@@ -96,7 +130,7 @@ export function parseSheetFile(file: File): Promise<SheetParseResult> {
   if (file.size > MAX_FILE_BYTES) {
     return Promise.resolve({
       ok: false,
-      error: "File too large. Maximum size is 10MB.",
+      error: "File too large. Maximum size is 1MB.",
     });
   }
 

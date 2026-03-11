@@ -11,7 +11,7 @@ import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@
 import { useMe } from "@/contexts/MeContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { toast } from "sonner";
-import { Loader2, Upload, FileSpreadsheet } from "lucide-react";
+import { Loader2, Upload, FileSpreadsheet, ChevronDown, ChevronRight } from "lucide-react";
 import { parseSheetFile, type ParsedRow, type SheetParseResult } from "@/lib/parseSheet";
 
 const DELAY_BETWEEN_REQUESTS_MS = 350;
@@ -42,6 +42,8 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
   const [previewRow, setPreviewRow] = useState<ParsedRow | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
+  const [failedReasons, setFailedReasons] = useState<Array<{ name: string; reason: string }>>([]);
+  const [exampleOpen, setExampleOpen] = useState(false);
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +54,7 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
       setParseError(null);
       setPreviewResult(null);
       setPreviewRow(null);
+      setFailedReasons([]);
       if (!f) return;
       setLoadingParse(true);
       try {
@@ -99,8 +102,9 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
     const status = getDefaultCompletedStatus(mediaType);
     setConfirming(true);
     setBatchProgress({ current: 0, total: parseResult.rows.length });
+    setFailedReasons([]);
+    const reasons: Array<{ name: string; reason: string }> = [];
     let added = 0;
-    let failed = 0;
     for (let i = 0; i < parseResult.rows.length; i++) {
       setBatchProgress({ current: i + 1, total: parseResult.rows.length });
       const row = parseResult.rows[i];
@@ -128,27 +132,35 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
           });
           added++;
         } else {
-          failed++;
+          reasons.push({
+            name: row.name,
+            reason: t("batchEntry.noResultFor", { name: row.name }),
+          });
         }
         await new Promise((r) => setTimeout(r, DELAY_BETWEEN_REQUESTS_MS));
       } catch (err) {
         const msg = err instanceof Error ? err.message : "";
         if (msg === LOG_LIMIT_REACHED_CODE) {
+          reasons.push({ name: row.name, reason: t("tiers.logLimitReached") });
           toast.error(t("tiers.logLimitReached"));
           break;
         }
-        failed++;
+        reasons.push({
+          name: row.name,
+          reason: msg || t("batchEntry.unknownError"),
+        });
       }
     }
     setConfirming(false);
     setBatchProgress(null);
+    setFailedReasons(reasons);
     invalidateLogsAndItemsCache();
     if (added > 0) {
       toast.success(t("batchEntry.addedCount", { count: String(added) }));
       onDone();
     }
-    if (failed > 0) {
-      toast.error(t("batchEntry.someFailed", { count: String(failed) }));
+    if (reasons.length > 0) {
+      toast.error(t("batchEntry.someFailed", { count: String(reasons.length) }));
     }
   }, [parseResult, mediaType, boardGameProvider, t, onDone]);
 
@@ -183,6 +195,65 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
         <p className="text-xs text-[var(--color-light)]">
           {t("batchEntry.fileHint")}
         </p>
+        <div className="rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/30 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setExampleOpen((o) => !o)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/10 focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-inset"
+            aria-expanded={exampleOpen}
+          >
+            {exampleOpen ? (
+              <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            )}
+            {t("batchEntry.exampleFormatTitle")}
+          </button>
+          {exampleOpen && (
+            <div className="border-t border-[var(--color-mid)]/20 px-3 py-3">
+              <p className="mb-3 text-xs text-[var(--color-light)]">
+                {t("batchEntry.exampleFormatIntro")}
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[280px] border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--color-mid)]/30">
+                      <th className="py-2 pr-3 text-left font-semibold text-[var(--color-lightest)]">
+                        {t("batchEntry.exampleColumnName")}
+                      </th>
+                      <th className="py-2 pr-3 text-left font-semibold text-[var(--color-lightest)]">
+                        {t("batchEntry.exampleColumnReview")}
+                      </th>
+                      <th className="py-2 text-left font-semibold text-[var(--color-lightest)]">
+                        {t("batchEntry.exampleColumnRate")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-[var(--color-light)]">
+                    <tr className="border-b border-[var(--color-mid)]/20">
+                      <td className="py-1.5 pr-3">The Shawshank Redemption</td>
+                      <td className="py-1.5 pr-3">A masterpiece.</td>
+                      <td className="py-1.5">9.5</td>
+                    </tr>
+                    <tr className="border-b border-[var(--color-mid)]/20">
+                      <td className="py-1.5 pr-3">Inception</td>
+                      <td className="py-1.5 pr-3"></td>
+                      <td className="py-1.5">8</td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 pr-3">Interstellar</td>
+                      <td className="py-1.5 pr-3">Loved the visuals.</td>
+                      <td className="py-1.5">9</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-xs text-[var(--color-light)]">
+                {t("batchEntry.exampleFormatNote")}
+              </p>
+            </div>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="file"
@@ -270,14 +341,7 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
               {confirming ? (
                 <>
                   <Loader2 className="size-4 animate-spin" aria-hidden />
-                  <span className="ml-2">
-                    {batchProgress
-                      ? t("batchEntry.addingProgress", {
-                          current: String(batchProgress.current),
-                          total: String(batchProgress.total),
-                        })
-                      : t("common.saving")}
-                  </span>
+                  <span className="ml-2">{t("batchEntry.adding")}</span>
                 </>
               ) : (
                 t("batchEntry.confirmAndAddAll")
@@ -300,6 +364,20 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
               <p className="text-center text-sm font-medium text-[var(--color-lightest)]">
                 {Math.round((batchProgress.current / batchProgress.total) * 100)}%
               </p>
+            </div>
+          )}
+          {failedReasons.length > 0 && (
+            <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+              <p className="mb-2 text-sm font-medium text-red-400">
+                {t("batchEntry.failedReasonsTitle", { count: String(failedReasons.length) })}
+              </p>
+              <ul className="max-h-40 list-inside list-disc space-y-1 overflow-y-auto text-xs text-[var(--color-light)]">
+                {failedReasons.map(({ name, reason }, idx) => (
+                  <li key={`${idx}-${name}`}>
+                    <span className="font-medium text-[var(--color-lightest)]">{name}</span>: {reason}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

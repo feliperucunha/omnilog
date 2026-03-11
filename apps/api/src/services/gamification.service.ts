@@ -175,9 +175,10 @@ export async function handleReviewLiked(logId: string, recipientUserId: string):
   await checkAndGrantBadges(recipientUserId);
 }
 
-/** Call when user adds a log (without review). */
+/** Call when user adds a log (with or without review). */
 export async function handleLogCreated(userId: string): Promise<void> {
   await grantXp(userId, "LOG_ITEM", XP_LOG_ITEM);
+  await checkAndGrantBadges(userId);
 }
 
 async function getStats(userId: string) {
@@ -209,9 +210,61 @@ async function getReviewLikesCount(userId: string): Promise<number> {
   return count;
 }
 
+/** Log counts per medium and total (for log-based badges). Uses actual Log table. */
+type LogStats = {
+  movieLogs: number;
+  tvShowLogs: number;
+  animeLogs: number;
+  mangaLogs: number;
+  comicLogs: number;
+  bookLogs: number;
+  totalLogs: number;
+  distinctMediaLogged: number;
+};
+
+const LOG_STATS_KEYS: Record<BadgeMedium, keyof LogStats> = {
+  MOVIE: "movieLogs",
+  TV_SHOW: "tvShowLogs",
+  ANIME: "animeLogs",
+  MANGA: "mangaLogs",
+  COMIC: "comicLogs",
+  BOOK: "bookLogs",
+};
+
+async function getLogStats(userId: string): Promise<LogStats> {
+  const mediaList = [...BADGE_MEDIA_TYPES];
+  const groups = await prisma.log.groupBy({
+    by: ["mediaType"],
+    where: {
+      userId,
+      mediaType: { in: mediaList },
+    },
+    _count: { id: true },
+  });
+  const zero: LogStats = {
+    movieLogs: 0,
+    tvShowLogs: 0,
+    animeLogs: 0,
+    mangaLogs: 0,
+    comicLogs: 0,
+    bookLogs: 0,
+    totalLogs: 0,
+    distinctMediaLogged: 0,
+  };
+  for (const g of groups) {
+    const key = LOG_STATS_KEYS[MEDIA_TO_BADGE[g.mediaType]];
+    const count = (g._count as { id: number } | undefined)?.id ?? 0;
+    if (key) (zero as Record<string, number>)[key] = count;
+  }
+  zero.totalLogs = groups.reduce((s, g) => s + ((g._count as { id: number } | undefined)?.id ?? 0), 0);
+  zero.distinctMediaLogged = groups.length;
+  return zero;
+}
+
 function getCurrentValueForCondition(
   conditionType: BadgeConditionType,
   stats: Awaited<ReturnType<typeof getStats>>,
+  logStats: LogStats,
   medium: BadgeMedium | null,
   reviewLikes: number,
   currentStreak: number
@@ -230,6 +283,13 @@ function getCurrentValueForCondition(
       return reviewLikes;
     case "REVIEW_STREAK":
       return currentStreak;
+    case "LOG_COUNT_PER_MEDIA":
+      if (!medium) return 0;
+      return logStats[LOG_STATS_KEYS[medium]];
+    case "LOG_COUNT_GLOBAL":
+      return logStats.totalLogs;
+    case "LOG_MEDIA_TYPES_LOGGED":
+      return logStats.distinctMediaLogged;
     default:
       return 0;
   }
@@ -239,19 +299,21 @@ function evaluateCondition(
   conditionType: BadgeConditionType,
   conditionValue: number,
   stats: Awaited<ReturnType<typeof getStats>>,
+  logStats: LogStats,
   medium: BadgeMedium | null,
   reviewLikes: number,
   currentStreak: number
 ): boolean {
-  const current = getCurrentValueForCondition(conditionType, stats, medium, reviewLikes, currentStreak);
+  const current = getCurrentValueForCondition(conditionType, stats, logStats, medium, reviewLikes, currentStreak);
   return current >= conditionValue;
 }
 
 export async function checkAndGrantBadges(userId: string): Promise<void> {
-  const [ownedBadgeIds, allBadges, stats, reviewLikes, user] = await Promise.all([
+  const [ownedBadgeIds, allBadges, stats, logStats, reviewLikes, user] = await Promise.all([
     prisma.userBadge.findMany({ where: { userId }, select: { badgeId: true } }).then((r) => new Set(r.map((b) => b.badgeId))),
     prisma.badge.findMany({ where: { hidden: false } }),
     getStats(userId),
+    getLogStats(userId),
     getReviewLikesCount(userId),
     prisma.user.findUnique({ where: { id: userId }, select: { currentStreak: true, selectedBadgeIds: true } }),
   ]);
@@ -265,6 +327,7 @@ export async function checkAndGrantBadges(userId: string): Promise<void> {
       badge.conditionType,
       badge.conditionValue,
       stats,
+      logStats,
       badge.medium,
       reviewLikes,
       currentStreak
@@ -320,7 +383,7 @@ export async function getBadgeProgress(userId: string): Promise<{
   xpTotal: number;
   level: number;
 }> {
-  const [user, ownedBadges, allBadges, stats, reviewLikes] = await Promise.all([
+  const [user, ownedBadges, allBadges, stats, logStats, reviewLikes] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { xpTotal: true, level: true, currentStreak: true },
@@ -331,6 +394,7 @@ export async function getBadgeProgress(userId: string): Promise<{
     }),
     prisma.badge.findMany({ where: { hidden: false }, orderBy: [{ medium: "asc" }, { conditionValue: "asc" }] }),
     getStats(userId),
+    getLogStats(userId),
     getReviewLikesCount(userId),
   ]);
   const currentStreak = user?.currentStreak ?? 0;
@@ -352,6 +416,7 @@ export async function getBadgeProgress(userId: string): Promise<{
     const current = getCurrentValueForCondition(
       badge.conditionType,
       stats,
+      logStats,
       badge.medium,
       reviewLikes,
       currentStreak
