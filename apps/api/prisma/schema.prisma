@@ -109,6 +109,20 @@ model UserBadge {
   @@index([badgeId])
 }
 
+model Milestone {
+  id        String       @id @default(cuid())
+  metric    String       // "reviews" | "logs"
+  scope     String       // "global" | "per_medium"
+  medium    BadgeMedium? // null when scope = global
+  threshold Int
+  label     String
+  icon      String
+  sortOrder Int          @default(0) // for stable ordering
+
+  @@unique([metric, scope, medium, threshold])
+  @@index([metric, scope])
+}
+
 model UserXp {
   id          String   @id @default(cuid())
   userId      String

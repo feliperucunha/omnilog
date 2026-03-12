@@ -634,6 +634,15 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                           <span className="text-sm font-medium text-[var(--color-lightest)]">
                             {r.userEmail}
                           </span>
+                          {(r.reviewerLevelLabel ?? r.reviewerLevelIcon) && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded bg-[var(--color-darkest)] px-1.5 py-0.5 text-xs text-[var(--color-light)]"
+                              title={r.reviewerLevelLabel ?? undefined}
+                            >
+                              {r.reviewerLevelIcon && <span aria-hidden>{r.reviewerLevelIcon}</span>}
+                              {r.reviewerLevelLabel && <span>{r.reviewerLevelLabel}</span>}
+                            </span>
+                          )}
                           {r.isPro && (
                             <span
                               className="rounded bg-[var(--btn-gradient-start)]/20 px-1.5 py-0.5 text-xs font-semibold text-[var(--btn-gradient-start)]"

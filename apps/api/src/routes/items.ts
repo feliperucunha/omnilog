@@ -14,6 +14,7 @@ import { getBoardGameById } from "../services/bgg.js";
 import { getBoardGameByIdLudopedia } from "../services/ludopedia.js";
 import { getVolumeById } from "../services/comicvine.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
+import { getReviewerLevelsBatch } from "../services/reviewerLevel.service.js";
 
 export const itemsRouter = Router();
 itemsRouter.use(optionalAuthMiddleware);
@@ -223,14 +224,21 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
       : null;
 
   const logIds = logs.map((l) => l.id);
-  const reactionMap = await getReactionsForLogs(logIds, currentUserId);
+  const [reactionMap, reviewerLevels] = await Promise.all([
+    getReactionsForLogs(logIds, currentUserId),
+    getReviewerLevelsBatch(logs.map((l) => l.userId)),
+  ]);
 
   const reviews = logs.map((l) => {
     const stats = reactionMap.get(l.id);
+    const levelInfo = reviewerLevels.get(l.userId);
     return {
       id: l.id,
       userEmail: l.user.email,
       isPro: l.user.tier === "pro",
+      reviewerLevel: levelInfo?.level,
+      reviewerLevelLabel: levelInfo?.label,
+      reviewerLevelIcon: levelInfo?.icon,
       grade: l.grade,
       review: l.review,
       listType: l.listType,
@@ -404,14 +412,21 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
       : null;
 
   const logIds = logs.map((l) => l.id);
-  const reactionMap = await getReactionsForLogs(logIds, currentUserId);
+  const [reactionMap, reviewerLevels] = await Promise.all([
+    getReactionsForLogs(logIds, currentUserId),
+    getReviewerLevelsBatch(logs.map((l) => l.userId)),
+  ]);
 
   const reviews = logs.map((l) => {
     const stats = reactionMap.get(l.id);
+    const levelInfo = reviewerLevels.get(l.userId);
     return {
       id: l.id,
       userEmail: l.user.email,
       isPro: l.user.tier === "pro",
+      reviewerLevel: levelInfo?.level,
+      reviewerLevelLabel: levelInfo?.label,
+      reviewerLevelIcon: levelInfo?.icon,
       grade: l.grade,
       review: l.review,
       listType: l.listType,

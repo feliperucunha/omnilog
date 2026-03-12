@@ -16,6 +16,7 @@ import { feedbackRouter } from "./routes/feedback.js";
 import { followsRouter } from "./routes/follows.js";
 import { prisma } from "./lib/prisma.js";
 import { runSeedBadges } from "./scripts/seedBadges.js";
+import { runSeedMilestones } from "./scripts/seedMilestones.js";
 import { APP_VERSION } from "@dogument/shared";
 
 const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
@@ -107,6 +108,13 @@ app.listen(PORT, () => {
       if (n === 0) return runSeedBadges().then(() => console.log("Badges seeded."));
     })
     .catch((e) => console.error("Badge seed check failed:", e));
+
+  void prisma.milestone
+    .count()
+    .then((n) => {
+      if (n === 0) return runSeedMilestones().then(() => console.log("Milestones seeded."));
+    })
+    .catch((e) => console.error("Milestone seed check failed:", e));
 
   // Run subscription expiry in-process: on startup and every 24h (no external cron needed)
   void runSubscriptionExpiry().then((n) => {

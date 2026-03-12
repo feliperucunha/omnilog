@@ -64,26 +64,21 @@ function getBadgesCollapsedDefault(): boolean {
   }
 }
 
-interface BadgeProgressResponse {
-  earnedBadges: Array<{ id: string; name: string; icon: string; medium: string | null; rarity: string }>;
-  nextBadges: Array<{
-    badge: { id: string; name: string; icon: string; medium: string | null; rarity: string };
-    current: number;
-    target: number;
-    progressPct: number;
-  }>;
-  perMedium: Array<{
-    mediaType: string;
-    currentBadge: { id: string; name: string; icon: string } | null;
-    nextBadge: {
-      badge: { id: string; name: string; icon: string; medium: string | null; rarity: string };
-      current: number;
-      target: number;
-      progressPct: number;
-    } | null;
-  }>;
-  xpTotal: number;
-  level: number;
+/** Milestone progress from GET /me/milestones/progress */
+interface ScopeProgress {
+  current: number;
+  next: { threshold: number; label: string; icon: string } | null;
+  progressPct: number;
+  earned: Array<{ threshold: number; label: string; icon: string }>;
+}
+interface PerMediumMilestoneProgress {
+  mediaType: string;
+  reviews: ScopeProgress;
+  logs: ScopeProgress;
+}
+interface MilestoneProgressResponse {
+  perMedium: PerMediumMilestoneProgress[];
+  global: { reviews: ScopeProgress; logs: ScopeProgress };
 }
 
 function getBetaModalSeen(userId: string): boolean {
@@ -128,7 +123,7 @@ export function Dashboard() {
   const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
   const [socialCollapsed, setSocialCollapsed] = useState(getSocialCollapsedDefault);
   const [badgesCollapsed, setBadgesCollapsed] = useState(getBadgesCollapsedDefault);
-  const [badgeProgress, setBadgeProgress] = useState<BadgeProgressResponse | null>(null);
+  const [milestoneProgress, setMilestoneProgress] = useState<MilestoneProgressResponse | null>(null);
 
   const toggleBadgesCollapsed = useCallback(() => {
     setBadgesCollapsed((prev) => {
@@ -225,12 +220,12 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!token) {
-      setBadgeProgress(null);
+      setMilestoneProgress(null);
       return;
     }
-    apiFetch<BadgeProgressResponse>("/me/badges/progress")
-      .then(setBadgeProgress)
-      .catch(() => setBadgeProgress(null));
+    apiFetch<MilestoneProgressResponse>("/me/milestones/progress")
+      .then(setMilestoneProgress)
+      .catch(() => setMilestoneProgress(null));
   }, [token]);
 
   const handleShare = useCallback(async () => {
@@ -409,8 +404,8 @@ export function Dashboard() {
           <MediaLogs
             mediaType={selectedCategory}
             embedded
-            badgeProgress={
-              badgeProgress?.perMedium.find((p) => p.mediaType === selectedCategory) ?? null
+            milestoneProgress={
+              milestoneProgress?.perMedium.find((p) => p.mediaType === selectedCategory) ?? null
             }
           />
         </section>
@@ -432,35 +427,37 @@ export function Dashboard() {
               <ChevronDown className="h-5 w-5 shrink-0" aria-hidden />
             )}
             <span className="min-w-0 truncate">{t("dashboard.badgesSectionTitle")}</span>
-            {badgeProgress && (
-              <span className="shrink-0 text-sm font-normal text-[var(--color-light)]">
-                {t("dashboard.badgesEarnedCount", { count: String(badgeProgress.earnedBadges.length) })}
-              </span>
-            )}
+            {milestoneProgress && (() => {
+              const pm = milestoneProgress.perMedium.find((p) => p.mediaType === selectedCategory);
+              const earnedCount = (pm ? pm.reviews.earned.length + pm.logs.earned.length : 0) +
+                milestoneProgress.global.reviews.earned.length + milestoneProgress.global.logs.earned.length;
+              return earnedCount > 0 ? (
+                <span className="shrink-0 text-sm font-normal text-[var(--color-light)]">
+                  {t("dashboard.badgesEarnedCount", { count: String(earnedCount) })}
+                </span>
+              ) : null;
+            })()}
           </button>
           {!badgesCollapsed && (
             <div id="dashboard-badges-content" role="region" aria-labelledby="dashboard-badges-heading">
-              {!badgeProgress ? (
+              {!milestoneProgress ? (
                 <div className="min-h-[80px] flex items-center justify-center rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50">
                   <span className="text-sm text-[var(--color-light)]">{t("common.loading")}</span>
                 </div>
               ) : (
                 <div className="flex min-w-0 flex-col gap-4 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50 p-4">
                   {(() => {
-                    const perMediumForCategory = badgeProgress.perMedium.find(
-                      (p) => p.mediaType === selectedCategory
-                    );
-                    const primaryNext =
-                      perMediumForCategory?.nextBadge ?? badgeProgress.nextBadges[0] ?? null;
-                    const inProgressList = badgeProgress.perMedium.filter(
-                      (p) => p.nextBadge && p.nextBadge.current > 0
-                    );
+                    const pm = milestoneProgress.perMedium.find((p) => p.mediaType === selectedCategory);
+                    const scope = pm?.reviews ?? milestoneProgress.global.reviews;
+                    const next = scope.next;
+                    const displayCurrent = Math.min(scope.current, next?.threshold ?? scope.current);
+                    const displayPct = scope.progressPct;
                     return (
                       <>
-                        {primaryNext ? (
+                        {next ? (
                           <div className="flex min-w-0 flex-col gap-2">
                             <p className="text-sm font-medium text-[var(--color-lightest)]">
-                              {perMediumForCategory?.nextBadge
+                              {pm
                                 ? t("dashboard.badgesNextForCategory", {
                                     category: t(`nav.${selectedCategory}`),
                                   })
@@ -468,26 +465,26 @@ export function Dashboard() {
                             </p>
                             <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
                               <span className="shrink-0 text-2xl" aria-hidden>
-                                {primaryNext.badge.icon}
+                                {next.icon}
                               </span>
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-medium text-[var(--color-lightest)]">
-                                  {primaryNext.badge.name}
+                                  {next.label}
                                 </p>
                                 <div className="mt-1.5 flex items-center gap-2">
                                   <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)]">
                                     <div
                                       className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
                                       style={{
-                                        width: `${Math.min(100, primaryNext.progressPct)}%`,
-                                        minWidth: primaryNext.current > 0 ? "4px" : 0,
+                                        width: `${displayPct}%`,
+                                        minWidth: displayCurrent > 0 ? "4px" : 0,
                                       }}
                                     />
                                   </div>
                                   <span className="shrink-0 text-xs text-[var(--color-light)]">
                                     {t("dashboard.badgesProgressLabel", {
-                                      current: String(primaryNext.current),
-                                      target: String(primaryNext.target),
+                                      current: String(displayCurrent),
+                                      target: String(next.threshold),
                                     })}
                                   </span>
                                 </div>
@@ -499,63 +496,26 @@ export function Dashboard() {
                             {t("dashboard.badgesNoNextBadge")}
                           </p>
                         )}
-                        {inProgressList.length > 0 && (
-                          <div className="flex min-w-0 flex-col gap-2">
-                            <p className="text-sm font-medium text-[var(--color-lightest)]">
-                              {t("dashboard.badgesInProgress")}
-                            </p>
-                            <ul className="flex min-w-0 flex-col gap-1.5">
-                              {inProgressList.map((p) => (
-                                <li
-                                  key={p.mediaType}
-                                  className="flex min-w-0 items-center gap-2 text-sm"
-                                >
-                                  <span className="shrink-0" aria-hidden>
-                                    {p.nextBadge!.badge.icon}
-                                  </span>
-                                  <span className="w-16 shrink-0 truncate text-[var(--color-light)]">
-                                    {t(`nav.${p.mediaType}`)}
-                                  </span>
-                                  <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)]">
-                                    <div
-                                      className="h-full rounded-full bg-[var(--color-mid)]/60 transition-all duration-300"
-                                      style={{
-                                        width: `${Math.min(100, p.nextBadge!.progressPct)}%`,
-                                        minWidth: "4px",
-                                      }}
-                                    />
-                                  </div>
-                                  <span className="shrink-0 text-xs text-[var(--color-light)]">
-                                    {t("dashboard.badgesProgressLabel", {
-                                      current: String(p.nextBadge!.current),
-                                      target: String(p.nextBadge!.target),
-                                    })}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {badgeProgress.earnedBadges.length > 0 && (
+                        {pm && (pm.reviews.earned.length > 0 || pm.logs.earned.length > 0) && (
                           <div className="flex min-w-0 flex-wrap gap-2">
-                            {badgeProgress.earnedBadges.slice(0, 8).map((b) => (
+                            {[...pm.reviews.earned, ...pm.logs.earned].slice(0, 8).map((m, i) => (
                               <span
-                                key={b.id}
+                                key={`${m.threshold}-${m.label}-${i}`}
                                 className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/60 px-2.5 py-1 text-xs text-[var(--color-lightest)]"
-                                title={b.name}
+                                title={m.label}
                               >
-                                <span aria-hidden>{b.icon}</span>
-                                <span className="max-w-[100px] truncate sm:max-w-[140px]">{b.name}</span>
+                                <span aria-hidden>{m.icon}</span>
+                                <span className="max-w-[100px] truncate sm:max-w-[140px]">{m.label}</span>
                               </span>
                             ))}
-                            {badgeProgress.earnedBadges.length > 8 && (
+                            {pm.reviews.earned.length + pm.logs.earned.length > 8 && (
                               <span className="text-xs text-[var(--color-light)]">
-                                +{badgeProgress.earnedBadges.length - 8}
+                                +{pm.reviews.earned.length + pm.logs.earned.length - 8}
                               </span>
                             )}
                           </div>
                         )}
-                        {badgeProgress.earnedBadges.length === 0 && !primaryNext && (
+                        {(!pm || (pm.reviews.earned.length === 0 && pm.logs.earned.length === 0)) && !next && (
                           <p className="text-sm text-[var(--color-light)]">
                             {t("dashboard.badgesAddOrReview")}
                           </p>

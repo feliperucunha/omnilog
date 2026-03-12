@@ -45,15 +45,21 @@ const REVIEW_PREVIEW_LENGTH = 120;
 
 type LogsResponse = Log[] | { data: Log[]; nextCursor: string | null };
 
-export interface CategoryBadgeProgress {
+/** Milestone progress for one category (reviews + logs). */
+export interface CategoryMilestoneProgress {
   mediaType: string;
-  currentBadge: { id: string; name: string; icon: string } | null;
-  nextBadge: {
-    badge: { id: string; name: string; icon: string; medium: string | null; rarity: string };
+  reviews: {
     current: number;
-    target: number;
+    next: { threshold: number; label: string; icon: string } | null;
     progressPct: number;
-  } | null;
+    earned: Array<{ threshold: number; label: string; icon: string }>;
+  };
+  logs: {
+    current: number;
+    next: { threshold: number; label: string; icon: string } | null;
+    progressPct: number;
+    earned: Array<{ threshold: number; label: string; icon: string }>;
+  };
 }
 
 interface MediaLogsProps {
@@ -62,11 +68,11 @@ interface MediaLogsProps {
   embedded?: boolean;
   /** When set, read-only public profile: fetch from /users/:id/logs, hide all write UI. */
   publicUserId?: string;
-  /** When set (e.g. from Dashboard), show current/next badge for this category. */
-  badgeProgress?: CategoryBadgeProgress | null;
+  /** When set (e.g. from Dashboard), show next milestone progress for this category. */
+  milestoneProgress?: CategoryMilestoneProgress | null;
 }
 
-export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProgress: badgeProgressProp }: MediaLogsProps) {
+export function MediaLogs({ mediaType, embedded = false, publicUserId, milestoneProgress: milestoneProgressProp }: MediaLogsProps) {
   const { t } = useLocale();
   const navigate = useNavigate();
   const { showLogComplete } = useLogComplete();
@@ -97,19 +103,19 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProg
   const [showProModal, setShowProModal] = useState(false);
   /** Log id whose review is expanded in-card (no modal). */
   const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
-  const [badgeProgressFetched, setBadgeProgressFetched] = useState<CategoryBadgeProgress | null>(null);
+  const [milestoneProgressFetched, setMilestoneProgressFetched] = useState<CategoryMilestoneProgress | null>(null);
 
-  const badgeProgress = badgeProgressProp ?? (readOnly ? null : badgeProgressFetched);
+  const milestoneProgress = milestoneProgressProp ?? (readOnly ? null : milestoneProgressFetched);
 
   useEffect(() => {
-    if (readOnly || badgeProgressProp != null || !me) return;
-    apiFetch<{ perMedium: CategoryBadgeProgress[] }>("/me/badges/progress")
+    if (readOnly || milestoneProgressProp != null || !me) return;
+    apiFetch<{ perMedium: CategoryMilestoneProgress[] }>("/me/milestones/progress")
       .then((res) => {
         const forMedia = res.perMedium?.find((p) => p.mediaType === mediaType) ?? null;
-        setBadgeProgressFetched(forMedia);
+        setMilestoneProgressFetched(forMedia);
       })
-      .catch(() => setBadgeProgressFetched(null));
-  }, [readOnly, badgeProgressProp, mediaType, me]);
+      .catch(() => setMilestoneProgressFetched(null));
+  }, [readOnly, milestoneProgressProp, mediaType, me]);
 
   const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
   const CHAPTER_TYPES: MediaType[] = ["manga"];
@@ -422,38 +428,49 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProg
           </div>
         )}
         </div>
-        {!readOnly && badgeProgress && (
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-            {badgeProgress.currentBadge && (
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)]/80 px-2.5 py-1 text-xs font-medium text-[var(--color-lightest)] sm:px-3 sm:py-1.5 sm:text-sm"
-                title={badgeProgress.currentBadge.name}
-              >
-                <span aria-hidden>{badgeProgress.currentBadge.icon}</span>
-                <span className="max-w-[120px] truncate sm:max-w-[180px]">{badgeProgress.currentBadge.name}</span>
-              </span>
-            )}
-            {badgeProgress.nextBadge && (
-              <div className="flex min-w-0 flex-1 items-center gap-2 min-[400px]:min-w-0">
-                <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)] max-w-[200px] sm:max-w-[240px]">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
-                    style={{
-                      width: `${Math.min(100, badgeProgress.nextBadge.progressPct)}%`,
-                      minWidth: badgeProgress.nextBadge.current > 0 ? "4px" : 0,
-                    }}
-                  />
-                </div>
-                <span className="shrink-0 text-xs text-[var(--color-light)]" title={badgeProgress.nextBadge.badge.name}>
-                  {t("mediaLogs.badgeProgressReviews", {
-                    current: String(badgeProgress.nextBadge.current),
-                    target: String(badgeProgress.nextBadge.target),
-                  })}
+        {!readOnly && milestoneProgress && (() => {
+          const scope = milestoneProgress.reviews.next ? milestoneProgress.reviews : milestoneProgress.logs;
+          const currentBadge = milestoneProgress.reviews.earned.length > 0
+            ? milestoneProgress.reviews.earned[milestoneProgress.reviews.earned.length - 1]
+            : milestoneProgress.logs.earned.length > 0
+              ? milestoneProgress.logs.earned[milestoneProgress.logs.earned.length - 1]
+              : null;
+          const next = scope.next;
+          const displayCurrent = next ? Math.min(scope.current, next.threshold) : scope.current;
+          const displayPct = scope.progressPct;
+          return (
+            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+              {currentBadge && (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)]/80 px-2.5 py-1 text-xs font-medium text-[var(--color-lightest)] sm:px-3 sm:py-1.5 sm:text-sm"
+                  title={currentBadge.label}
+                >
+                  <span aria-hidden>{currentBadge.icon}</span>
+                  <span className="max-w-[120px] truncate sm:max-w-[180px]">{currentBadge.label}</span>
                 </span>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+              {next && (
+                <div className="flex min-w-0 flex-1 items-center gap-2 min-[400px]:min-w-0">
+                  <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)] max-w-[200px] sm:max-w-[240px]">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
+                      style={{
+                        width: `${displayPct}%`,
+                        minWidth: displayCurrent > 0 ? "4px" : 0,
+                      }}
+                    />
+                  </div>
+                  <span className="shrink-0 text-xs text-[var(--color-light)]" title={next.label}>
+                    {t("mediaLogs.badgeProgressReviews", {
+                      current: String(displayCurrent),
+                      target: String(next.threshold),
+                    })}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
       {!readOnly && showCustomEntry && (
         <CustomBatchEntryModal

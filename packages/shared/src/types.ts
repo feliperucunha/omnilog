@@ -231,6 +231,12 @@ export interface ItemReview {
   userEmail: string;
   /** True when the review author is on the Pro tier */
   isPro?: boolean;
+  /** Reviewer level (1-based) for badge of honor on review pages */
+  reviewerLevel?: number;
+  /** Label for reviewer level (e.g. "Critic", "Expert") */
+  reviewerLevelLabel?: string;
+  /** Icon for reviewer level (emoji or icon key) */
+  reviewerLevelIcon?: string;
   grade: number | null;
   review: string | null;
   listType: string | null;

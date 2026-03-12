@@ -81,6 +81,7 @@ import { getReactionsForLogs } from "../lib/reactions.js";
 import {
   handleLogCreated,
   handleReviewCreated,
+  handleReviewRemoved,
   handleReviewLiked,
 } from "../services/gamification.service.js";
 
@@ -647,6 +648,12 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         } catch (err) {
           console.error("Gamification (review created on upsert):", err);
         }
+      } else if (hadReview && (!sanitizedReview || sanitizedReview.trim().length === 0)) {
+        try {
+          await handleReviewRemoved(userId, log.mediaType);
+        } catch (err) {
+          console.error("Gamification (review removed on upsert):", err);
+        }
       }
       const body = serializeLog(log) as Record<string, unknown>;
       if (newBadges.length > 0) body.newBadges = newBadges;
@@ -792,6 +799,16 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     } catch (err) {
       console.error("Gamification (review added on update):", err);
     }
+  } else if (
+    parsed.data.review !== undefined &&
+    hadReview &&
+    (!newReview || newReview.trim().length === 0)
+  ) {
+    try {
+      await handleReviewRemoved(userId, log.mediaType);
+    } catch (err) {
+      console.error("Gamification (review removed on update):", err);
+    }
   }
   const body = serializeLog(updated) as Record<string, unknown>;
   if (newBadges.length > 0) body.newBadges = newBadges;
@@ -806,6 +823,14 @@ logsRouter.delete("/:id", async (req: AuthenticatedRequest, res) => {
   if (!log) {
     res.status(404).json({ error: "Log not found" });
     return;
+  }
+  const hadReview = Boolean(log.review && log.review.trim().length > 0);
+  if (hadReview) {
+    try {
+      await handleReviewRemoved(userId, log.mediaType);
+    } catch (err) {
+      console.error("Gamification (review removed on log delete):", err);
+    }
   }
   await prisma.log.delete({ where: { id: log.id } });
   res.status(204).send();

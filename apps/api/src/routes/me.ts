@@ -3,26 +3,17 @@ import { MEDIA_TYPES } from "@dogument/shared";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
-import { getBadgeProgress } from "../services/gamification.service.js";
+import { getMilestoneProgress } from "../services/milestone.service.js";
 
 export const meRouter = Router();
 
 meRouter.use(authMiddleware);
 
-/** GET /me/badges/progress - Earned badges, next badges with progress bar data, per-medium current/next, xp/level. */
-meRouter.get("/badges/progress", async (req: AuthenticatedRequest, res) => {
+/** GET /me/milestones/progress - Per-medium and global milestone progress (reviews + logs). Simple next-milestone + progress. */
+meRouter.get("/milestones/progress", async (req: AuthenticatedRequest, res) => {
   if (!req.user) return;
-  const data = await getBadgeProgress(req.user.userId);
-  res.json({
-    earnedBadges: data.earnedBadges.map((b) => ({ ...b, medium: b.medium })),
-    nextBadges: data.nextBadges.map((n) => ({
-      ...n,
-      badge: { ...n.badge, medium: n.badge.medium },
-    })),
-    perMedium: data.perMedium,
-    xpTotal: data.xpTotal,
-    level: data.level,
-  });
+  const data = await getMilestoneProgress(req.user.userId);
+  res.json(data);
 });
 
 /** GET /me/badges - List badges the current user has earned. */
