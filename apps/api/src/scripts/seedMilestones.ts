@@ -16,6 +16,14 @@ const REVIEW_TIERS = [
   [10, "Reviewer II", "⭐"],
   [25, "Critic", "🏅"],
   [50, "Expert", "🏆"],
+  [75, "Veteran Reviewer", "📜"],
+  [100, "Century Critic", "💯"],
+  [150, "Prolific Writer", "✒️"],
+  [200, "Dedicated Critic", "🎯"],
+  [250, "Master Reviewer", "🌟"],
+  [300, "Elite Reviewer", "👑"],
+  [400, "Legendary Critic", "🔥"],
+  [500, "Hall of Fame", "🏛️"],
 ] as const;
 
 const LOG_TIERS = [
@@ -24,16 +32,28 @@ const LOG_TIERS = [
   [10, "Logger II", "📚"],
   [25, "Enthusiast", "🌟"],
   [50, "Expert", "👑"],
+  [75, "Veteran Logger", "📜"],
+  [100, "Century Logger", "💯"],
+  [150, "Prolific Logger", "✒️"],
+  [200, "Dedicated Logger", "🎯"],
+  [250, "Master Logger", "🌟"],
+  [300, "Elite Logger", "👑"],
+  [400, "Legendary Logger", "🔥"],
+  [500, "Hall of Fame Logger", "🏛️"],
 ] as const;
 
 const GLOBAL_REVIEW_TIERS = [
   [25, "Dedicated Reviewer", "✨"],
   [100, "Prolific Critic", "🏆"],
+  [250, "Master Critic", "🌟"],
+  [500, "Hall of Fame Reviewer", "🏛️"],
 ] as const;
 
 const GLOBAL_LOG_TIERS = [
   [25, "Dedicated Logger", "✨"],
   [100, "Prolific Logger", "🏆"],
+  [250, "Master Logger", "🌟"],
+  [500, "Hall of Fame Logger", "🏛️"],
 ] as const;
 
 /** Ensures all milestone definitions exist. Run on API startup or CLI. */

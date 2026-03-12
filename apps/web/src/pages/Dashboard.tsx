@@ -491,11 +491,11 @@ export function Dashboard() {
                               </div>
                             </div>
                           </div>
-                        ) : (
+                        ) : scope.earned.length > 0 ? (
                           <p className="text-sm text-[var(--color-light)]">
                             {t("dashboard.badgesNoNextBadge")}
                           </p>
-                        )}
+                        ) : null}
                         {pm && (pm.reviews.earned.length > 0 || pm.logs.earned.length > 0) && (
                           <div className="flex min-w-0 flex-wrap gap-2">
                             {[...pm.reviews.earned, ...pm.logs.earned].slice(0, 8).map((m, i) => (
@@ -515,7 +515,7 @@ export function Dashboard() {
                             )}
                           </div>
                         )}
-                        {(!pm || (pm.reviews.earned.length === 0 && pm.logs.earned.length === 0)) && !next && (
+                        {!next && scope.earned.length === 0 && (
                           <p className="text-sm text-[var(--color-light)]">
                             {t("dashboard.badgesAddOrReview")}
                           </p>

@@ -109,12 +109,10 @@ app.listen(PORT, () => {
     })
     .catch((e) => console.error("Badge seed check failed:", e));
 
-  void prisma.milestone
-    .count()
-    .then((n) => {
-      if (n === 0) return runSeedMilestones().then(() => console.log("Milestones seeded."));
-    })
-    .catch((e) => console.error("Milestone seed check failed:", e));
+  // Idempotent upsert: ensures milestones exist (empty DB or new tiers). Run on every startup.
+  void runSeedMilestones()
+    .then(() => console.log("Milestones synced."))
+    .catch((e) => console.error("Milestone seed failed:", e));
 
   // Run subscription expiry in-process: on startup and every 24h (no external cron needed)
   void runSubscriptionExpiry().then((n) => {
