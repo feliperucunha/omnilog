@@ -73,14 +73,14 @@ export async function runSeedMilestones(): Promise<void> {
         metric_scope_medium_threshold: {
           metric: "reviews",
           scope: "global",
-          medium: null,
+          medium: null as unknown as BadgeMedium,
           threshold,
         },
       },
       create: {
         metric: "reviews",
         scope: "global",
-        medium: null,
+        medium: null as unknown as BadgeMedium,
         threshold,
         label,
         icon,
@@ -123,14 +123,14 @@ export async function runSeedMilestones(): Promise<void> {
         metric_scope_medium_threshold: {
           metric: "logs",
           scope: "global",
-          medium: null,
+          medium: null as unknown as BadgeMedium,
           threshold,
         },
       },
       create: {
         metric: "logs",
         scope: "global",
-        medium: null,
+        medium: null as unknown as BadgeMedium,
         threshold,
         label,
         icon,
