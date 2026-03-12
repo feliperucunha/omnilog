@@ -1,4 +1,5 @@
 import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
 
 const LOGO_LIGHT = "/logo.png";
 const LOGO_DARK = "/logo-dark.png";
@@ -12,8 +13,17 @@ interface LogoProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src
   src?: string;
 }
 
+/** Dark logo uses mix-blend-lighten so dark edges/anti-aliasing blend into dark backgrounds. */
 export function Logo({ className, alt = "", src: srcOverride, ...props }: LogoProps) {
   const { colorScheme } = useTheme();
   const src = srcOverride ?? getLogoSrc(colorScheme);
-  return <img src={src} alt={alt} className={className} {...props} />;
+  const isDarkLogo = src === LOGO_DARK;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={cn(isDarkLogo && "mix-blend-lighten", className)}
+      {...props}
+    />
+  );
 }
