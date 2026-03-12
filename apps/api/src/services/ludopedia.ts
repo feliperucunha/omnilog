@@ -3,7 +3,7 @@
  * Docs: https://ludopedia.com.br/api/documentacao.html
  * Auth: Bearer token (obtain via Ludopedia OAuth / aplicativos).
  */
-import type { SearchResult, ItemDetail } from "@logeverything/shared";
+import type { SearchResult, ItemDetail } from "@dogument/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
@@ -14,7 +14,7 @@ function ludopediaHeaders(apiToken?: string | null): HeadersInit {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     Accept: "application/json",
-    "User-Agent": "Logeverything/1.0 (https://github.com/logeverything)",
+    "User-Agent": "Dogument/1.0 (https://github.com/dogument)",
   };
   if (t) headers["Authorization"] = `Bearer ${t}`;
   return headers;

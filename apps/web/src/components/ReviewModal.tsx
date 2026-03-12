@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ItemImage } from "@/components/ItemImage";
 import { useLocale } from "@/contexts/LocaleContext";
-import type { Log } from "@logeverything/shared";
+import type { Log } from "@dogument/shared";
 
 interface ReviewModalProps {
   open: boolean;

@@ -10,7 +10,7 @@ import { StarRating } from "@/components/StarRating";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 
-const FEEDBACK_COOLDOWN_KEY = "logeverything_feedback_cooldown";
+const FEEDBACK_COOLDOWN_KEY = "dogument_feedback_cooldown";
 const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
 function formatCooldown(seconds: number): string {

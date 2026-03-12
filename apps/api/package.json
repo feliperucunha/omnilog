@@ -1,5 +1,5 @@
 {
-  "name": "@logeverything/api",
+  "name": "@dogument/api",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
     "db:seed:badges": "tsx src/scripts/seedBadges.ts"
   },
   "dependencies": {
-    "@logeverything/shared": "workspace:*",
+    "@dogument/shared": "workspace:*",
     "@prisma/client": "^5.22.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",

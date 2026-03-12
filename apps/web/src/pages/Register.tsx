@@ -11,7 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AuthNavbar } from "@/components/AuthNavbar";
 import { toast } from "sonner";
 import { apiFetch, ApiValidationError } from "@/lib/api";
-import type { AuthResponse } from "@logeverything/shared";
+import type { AuthResponse } from "@dogument/shared";
 import { modalContentVariants } from "@/lib/animations";
 import { cn } from "@/lib/utils";
 

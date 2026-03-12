@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useState, type ReactNode } from
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { LogCompleteModal } from "@/components/LogCompleteModal";
 
-export const SHOW_COMPLETE_MODAL_STORAGE_KEY = "logeverything-showCompleteModal";
+export const SHOW_COMPLETE_MODAL_STORAGE_KEY = "dogument-showCompleteModal";
 
 export function getShowCompleteModal(): boolean {
   if (typeof localStorage === "undefined") return true;

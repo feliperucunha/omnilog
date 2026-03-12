@@ -1,9 +1,9 @@
 import { Router, type Request, type Response } from "express";
-import { MEDIA_TYPES } from "@logeverything/shared";
-import type { MediaType } from "@logeverything/shared";
+import { MEDIA_TYPES } from "@dogument/shared";
+import type { MediaType } from "@dogument/shared";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { LOG_STATUS_OPTIONS } from "@logeverything/shared";
+import { LOG_STATUS_OPTIONS } from "@dogument/shared";
 import { serializeLog } from "../lib/serializeLog.js";
 
 /** Public (no auth) read-only profile and logs for sharing. */

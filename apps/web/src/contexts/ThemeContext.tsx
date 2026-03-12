@@ -18,7 +18,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const STORAGE_KEY = "logeverything-theme";
+const STORAGE_KEY = "dogument-theme";
 
 function getInitialScheme(): ColorScheme {
   if (typeof document === "undefined") return "dark";

@@ -4,7 +4,7 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
-import { MEDIA_TYPES, type MediaType } from "@logeverything/shared";
+import { MEDIA_TYPES, type MediaType } from "@dogument/shared";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 

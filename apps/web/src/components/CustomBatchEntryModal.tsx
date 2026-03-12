@@ -6,7 +6,7 @@ import {
 import { CustomEntryForm } from "@/components/CustomEntryForm";
 import { BatchEntryTab } from "@/components/BatchEntryTab";
 import { useLocale } from "@/contexts/LocaleContext";
-import type { MediaType } from "@logeverything/shared";
+import type { MediaType } from "@dogument/shared";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { cn } from "@/lib/utils";
 

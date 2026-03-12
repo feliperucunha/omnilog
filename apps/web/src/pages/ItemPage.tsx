@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import type { MediaType } from "@logeverything/shared";
+import type { MediaType } from "@dogument/shared";
 import { ItemPageContent } from "@/components/ItemPageContent";
 
 export function ItemPage() {

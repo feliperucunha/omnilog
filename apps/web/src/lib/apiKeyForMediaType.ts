@@ -1,5 +1,5 @@
-import type { MediaType } from "@logeverything/shared";
-import type { BoardGameProvider } from "@logeverything/shared";
+import type { MediaType } from "@dogument/shared";
+import type { BoardGameProvider } from "@dogument/shared";
 import type { ApiKeyProvider } from "@/lib/apiKeyMeta";
 
 /** Media types that require a user/saved API key (anime & manga do not). */

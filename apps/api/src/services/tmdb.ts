@@ -1,4 +1,4 @@
-import type { SearchResult, ItemDetail } from "@logeverything/shared";
+import type { SearchResult, ItemDetail } from "@dogument/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 

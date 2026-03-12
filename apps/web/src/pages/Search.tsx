@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { MEDIA_TYPES, SEARCH_SORT_OPTIONS, type MediaType, type SearchResult } from "@logeverything/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@logeverything/shared";
+import { MEDIA_TYPES, SEARCH_SORT_OPTIONS, type MediaType, type SearchResult } from "@dogument/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@dogument/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { toast } from "sonner";
 import { apiFetch, apiFetchCached, invalidateApiCache } from "@/lib/api";
@@ -23,16 +23,16 @@ import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
-import type { BoardGameProvider } from "@logeverything/shared";
+import type { BoardGameProvider } from "@dogument/shared";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Link } from "react-router-dom";
 import { AlertTriangle, UserCheck, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
-import type { Log } from "@logeverything/shared";
+import type { Log } from "@dogument/shared";
 
 const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
-const FREE_SEARCH_USAGE_STORAGE_KEY = "logeverything_free_search_usage";
+const FREE_SEARCH_USAGE_STORAGE_KEY = "dogument_free_search_usage";
 
 function getFreeSearchUsageKey(type: MediaType, boardProvider: BoardGameProvider): string {
   return type === "boardgames" ? `boardgames-${boardProvider}` : type;

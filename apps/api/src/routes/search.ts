@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
-import { MEDIA_TYPES, SEARCH_SORT_OPTIONS } from "@logeverything/shared";
-import type { MediaType, SearchResult } from "@logeverything/shared";
+import { MEDIA_TYPES, SEARCH_SORT_OPTIONS } from "@dogument/shared";
+import type { MediaType, SearchResult } from "@dogument/shared";
 import { prisma } from "../lib/prisma.js";
 import { sanitizeText, SEARCH_QUERY_MAX_LENGTH } from "../lib/sanitize.js";
 import { optionalAuthMiddleware } from "../middleware/auth.js";

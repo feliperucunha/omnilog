@@ -1,4 +1,4 @@
-# Logeverything
+# Dogument
 
 A responsive web app to log and rate movies, TV shows, board games, video games, books, and anime. Built as a Turborepo monorepo with a React frontend and Node API.
 
@@ -19,7 +19,7 @@ A responsive web app to log and rate movies, TV shows, board games, video games,
    Or build only the shared package:
 
    ```bash
-   pnpm --filter @logeverything/shared build
+   pnpm --filter @dogument/shared build
    ```
 
 3. **Environment and database** (API uses PostgreSQL, e.g. Supabase):
@@ -53,11 +53,11 @@ Register an account on the web app, then use Search to find media and add logs (
 ## Deploy (Option B: frontend and API separate)
 
 - **Frontend** (e.g. Vercel, Netlify): Set `VITE_API_URL` to your deployed API base URL (e.g. `https://your-api.up.railway.app/api`). Build uses this at compile time.
-- **Backend** (e.g. Render): Set **Root Directory** to empty (repo root). **Build Command:** `pnpm install && pnpm run build --filter=@logeverything/api...` **Start Command:** `node apps/api/dist/index.js`. Env: `DATABASE_URL` (Supabase; append `?pgbouncer=true` when using Transaction pooler port 6543), `JWT_SECRET` (min 32 chars), `WEB_ORIGIN` (deployed frontend URL). See `apps/api/.env.example`. Optional: use `render.yaml` (Blueprint) for the same config.
+- **Backend** (e.g. Render): Set **Root Directory** to empty (repo root). **Build Command:** `pnpm install && pnpm run build --filter=@dogument/api...` **Start Command:** `node apps/api/dist/index.js`. Env: `DATABASE_URL` (Supabase; append `?pgbouncer=true` when using Transaction pooler port 6543), `JWT_SECRET` (min 32 chars), `WEB_ORIGIN` (deployed frontend URL). See `apps/api/.env.example`. Optional: use `render.yaml` (Blueprint) for the same config.
 
 ## Stack
 
 - **Monorepo**: pnpm workspaces + Turborepo
-- **Shared**: `@logeverything/shared` – TypeScript types
+- **Shared**: `@dogument/shared` – TypeScript types
 - **API**: Express, Prisma (PostgreSQL / Supabase), JWT auth, Zod, proxy to TMDB / RAWG / Open Library / Jikan / BGG
 - **Web**: React 18, Vite, Tailwind CSS, React Router, Framer Motion, Sonner

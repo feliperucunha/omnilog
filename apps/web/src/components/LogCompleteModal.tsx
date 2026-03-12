@@ -8,7 +8,7 @@ import { ItemImage } from "@/components/ItemImage";
 import { useLocale } from "@/contexts/LocaleContext";
 import { Logo } from "@/components/Logo";
 import { overlayVariants, modalContentVariants } from "@/lib/animations";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@logeverything/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@dogument/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 
 function statusColor(status: string | null | undefined): string {

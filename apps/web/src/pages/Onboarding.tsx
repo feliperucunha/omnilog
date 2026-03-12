@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { apiFetch } from "@/lib/api";
-import { MEDIA_TYPES, type MediaType } from "@logeverything/shared";
+import { MEDIA_TYPES, type MediaType } from "@dogument/shared";
 import { cn } from "@/lib/utils";
 
 export function Onboarding() {

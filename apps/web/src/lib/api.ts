@@ -43,7 +43,7 @@ import { getCached, setCached, invalidateByPrefix } from "./cache.js";
 const COOKIE_SESSION = "cookie";
 
 function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem("logeverything_token");
+  const token = localStorage.getItem("dogument_token");
   const headers: HeadersInit = { "Content-Type": "application/json" };
   if (token && token !== COOKIE_SESSION) headers["Authorization"] = `Bearer ${token}`;
   return headers;
@@ -158,8 +158,8 @@ async function fetchInternal<T>(
     if (res.status === 401) {
       const message = parseErrorResponse(text, "Session expired. Please sign in again.");
       if (!skipAuthRedirect) {
-        localStorage.removeItem("logeverything_token");
-        localStorage.removeItem("logeverything_user");
+        localStorage.removeItem("dogument_token");
+        localStorage.removeItem("dogument_user");
         dispatchLogout();
         window.location.href = "/login";
       }

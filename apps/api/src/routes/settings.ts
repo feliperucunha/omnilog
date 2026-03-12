@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { MEDIA_TYPES } from "@logeverything/shared";
+import { MEDIA_TYPES } from "@dogument/shared";
 import { prisma } from "../lib/prisma.js";
 import { sanitizeApiKey } from "../lib/sanitize.js";
 import { authMiddleware } from "../middleware/auth.js";

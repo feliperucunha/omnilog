@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { MEDIA_TYPES } from "@logeverything/shared";
+import { MEDIA_TYPES } from "@dogument/shared";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";

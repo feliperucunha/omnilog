@@ -13,10 +13,10 @@ import { AuthNavbar } from "@/components/AuthNavbar";
 import { toast } from "sonner";
 import { apiFetch, ApiValidationError } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { AuthResponse } from "@logeverything/shared";
+import type { AuthResponse } from "@dogument/shared";
 import { modalContentVariants } from "@/lib/animations";
 
-const REMEMBER_LOGIN_KEY = "logeverything-remember-login";
+const REMEMBER_LOGIN_KEY = "dogument-remember-login";
 
 function getStoredRememberLogin(): { email: string; rememberMe: boolean } {
   if (typeof window === "undefined") return { email: "", rememberMe: false };

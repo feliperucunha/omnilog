@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm run build --filter=@logeverything/web...",
+  "buildCommand": "pnpm run build --filter=@dogument/web...",
   "outputDirectory": "apps/web/dist",
   "installCommand": "pnpm install",
   "framework": null,

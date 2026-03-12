@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { MEDIA_TYPES } from "@logeverything/shared";
-import type { MediaType } from "@logeverything/shared";
+import { MEDIA_TYPES } from "@dogument/shared";
+import type { MediaType } from "@dogument/shared";
 import { prisma } from "../lib/prisma.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
 import { sanitizeText, EXTERNAL_ID_MAX_LENGTH } from "../lib/sanitize.js";

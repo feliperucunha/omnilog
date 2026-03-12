@@ -1,5 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
-import type { SearchResult, ItemDetail } from "@logeverything/shared";
+import type { SearchResult, ItemDetail } from "@dogument/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
@@ -8,7 +8,7 @@ const BASE = "https://boardgamegeek.com/xmlapi2";
 function bggHeaders(token?: string | null): HeadersInit {
   const t = token ?? process.env.BGG_API_TOKEN;
   const headers: HeadersInit = {
-    "User-Agent": "Logeverything/1.0 (https://github.com/logeverything)",
+    "User-Agent": "Dogument/1.0 (https://github.com/dogument)",
   };
   if (t) headers["Authorization"] = `Bearer ${t}`;
   return headers;

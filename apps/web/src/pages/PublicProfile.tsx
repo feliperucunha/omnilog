@@ -8,7 +8,7 @@ import { PublicProfileSkeleton } from "@/components/skeletons";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
-import { MEDIA_TYPES, type MediaType, toMediaType } from "@logeverything/shared";
+import { MEDIA_TYPES, type MediaType, toMediaType } from "@dogument/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { MediaLogs } from "@/pages/MediaLogs";
 import { toast } from "sonner";

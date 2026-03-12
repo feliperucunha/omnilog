@@ -1,5 +1,5 @@
-import { STATUS_I18N_KEYS } from "@logeverything/shared";
-import type { MediaType } from "@logeverything/shared";
+import { STATUS_I18N_KEYS } from "@dogument/shared";
+import type { MediaType } from "@dogument/shared";
 
 const VIDEO_MEDIA_TYPES: MediaType[] = ["movies", "tv", "anime"];
 

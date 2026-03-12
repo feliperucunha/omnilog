@@ -19,7 +19,7 @@ const messages: Record<Locale, Record<string, unknown>> = {
   es: es as Record<string, unknown>,
 };
 
-const STORAGE_KEY = "logeverything-locale";
+const STORAGE_KEY = "dogument-locale";
 
 function getInitialLocale(): Locale {
   if (typeof document === "undefined") return "en";

@@ -8,8 +8,8 @@ import {
 } from "react";
 import { apiFetch } from "@/lib/api";
 
-const TOKEN_KEY = "logeverything_token";
-const USER_KEY = "logeverything_user";
+const TOKEN_KEY = "dogument_token";
+const USER_KEY = "dogument_user";
 
 /** Use this as token when session is cookie-based (no token in localStorage). */
 export const COOKIE_SESSION = "cookie";

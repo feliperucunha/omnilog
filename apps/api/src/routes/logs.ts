@@ -6,8 +6,8 @@ import {
   LIST_TYPES,
   LOG_STATUS_OPTIONS,
   MEDIA_TYPES,
-} from "@logeverything/shared";
-import type { MediaType } from "@logeverything/shared";
+} from "@dogument/shared";
+import type { MediaType } from "@dogument/shared";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import {

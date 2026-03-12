@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { IN_PROGRESS_STATUSES, type Log } from "@logeverything/shared";
+import { IN_PROGRESS_STATUSES, type Log } from "@dogument/shared";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 

@@ -14,8 +14,8 @@ import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, MEDIA_TYPES, type MediaType, toMediaType } from "@logeverything/shared";
-import type { Log } from "@logeverything/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, MEDIA_TYPES, type MediaType, toMediaType } from "@dogument/shared";
+import type { Log } from "@dogument/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Dialog,
@@ -42,9 +42,9 @@ interface FeedEntry {
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 /** Character count for review preview before "View more". ~2 lines on mobile. */
 const REVIEW_PREVIEW_LENGTH = 120;
-const BETA_MODAL_STORAGE_KEY = "logeverything.betaModalSeen";
-const SOCIAL_COLLAPSED_STORAGE_KEY = "logeverything.dashboard.socialCollapsed";
-const BADGES_COLLAPSED_STORAGE_KEY = "logeverything.dashboard.badgesCollapsed";
+const BETA_MODAL_STORAGE_KEY = "dogument.betaModalSeen";
+const SOCIAL_COLLAPSED_STORAGE_KEY = "dogument.dashboard.socialCollapsed";
+const BADGES_COLLAPSED_STORAGE_KEY = "dogument.dashboard.badgesCollapsed";
 
 function getSocialCollapsedDefault(): boolean {
   if (typeof window === "undefined") return false;

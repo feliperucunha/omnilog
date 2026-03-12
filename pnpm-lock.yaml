@@ -14,7 +14,7 @@ importers:
 
   apps/api:
     dependencies:
-      '@logeverything/shared':
+      '@dogument/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@prisma/client':
@@ -84,7 +84,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@logeverything/shared':
+      '@dogument/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@radix-ui/react-dialog':

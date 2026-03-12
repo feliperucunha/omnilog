@@ -12,7 +12,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
-import { IN_PROGRESS_STATUSES, type Log } from "@logeverything/shared";
+import { IN_PROGRESS_STATUSES, type Log } from "@dogument/shared";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
@@ -29,8 +29,8 @@ import { toast } from "sonner";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
-const STORAGE_KEY_STATS = "logeverything.statistics.statsCollapsed";
-const STORAGE_KEY_RECENT = "logeverything.statistics.recentLogsCollapsed";
+const STORAGE_KEY_STATS = "dogument.statistics.statsCollapsed";
+const STORAGE_KEY_RECENT = "dogument.statistics.recentLogsCollapsed";
 
 function getStoredCollapsed(key: string): boolean {
   if (typeof window === "undefined") return false;
