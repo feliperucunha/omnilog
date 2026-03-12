@@ -10,6 +10,7 @@ import type { MediaType, Log } from "@logeverything/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@logeverything/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, apiFetchFile } from "@/lib/api";
+import { showAchievementToasts } from "@/lib/achievementToast";
 import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
@@ -254,10 +255,11 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProg
     const next = value + 1;
     setIncrementingId(log.id);
     try {
-      const updated = await apiFetch<Log>(`/logs/${log.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ [field]: next }),
-      });
+      const updated = await apiFetch<Log & { newBadges?: Array<{ id: string; name: string; icon: string }> }>(
+        `/logs/${log.id}`,
+        { method: "PATCH", body: JSON.stringify({ [field]: next }) }
+      );
+      if (updated.newBadges?.length) showAchievementToasts(updated.newBadges, t("dashboard.badgesAchievementUnlocked"));
       invalidateLogsAndItemsCache();
       setLogs((prev) => prev.map((l) => (l.id === log.id ? updated : l)));
       toast.success(t("toast.logUpdated"));
@@ -578,11 +580,12 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProg
                       : isCompleted
                         ? "border-2 border-emerald-600"
                         : "border-2 border-[var(--color-mid)]";
+              const isReviewExpanded = embedded && expandedReviewLogId === log.id;
               return (
               <motion.div key={log.id} variants={staggerItem} className="min-h-0 sm:h-full">
                 <motion.div whileTap={tapScale} transition={tapTransition} className="h-full">
                   <Card
-                    className={`relative flex flex-col min-h-0 overflow-hidden bg-[var(--color-dark)] sm:min-h-[8.5rem] ${listBorderClass}`}
+                    className={`relative flex flex-col min-h-0 overflow-hidden bg-[var(--color-dark)] ${embedded && !isReviewExpanded ? "h-[193px] min-h-[193px] max-h-[193px] sm:h-[193px] sm:min-h-[193px] sm:max-h-[193px]" : embedded ? "" : "sm:min-h-[8.5rem]"} ${listBorderClass}`}
                     style={cardShadow}
                   >
                     {!readOnly && deletingId === log.id && (
@@ -613,9 +616,9 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProg
                         </Button>
                       </div>
                     )}
-                    <div className="flex gap-3 p-3 flex-1 min-h-0 sm:gap-4 sm:p-4">
+                    <div className="flex min-h-0 gap-3 p-3 flex-1 sm:gap-4 sm:p-4">
                       <ItemImage src={log.image} className="h-16 w-11 flex-shrink-0 rounded-lg sm:h-20 sm:w-14" />
-                        <div className="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden min-h-[7rem] sm:min-h-[7.5rem]">
+                        <div className={`flex min-w-0 flex-1 flex-col gap-1 overflow-hidden ${embedded ? "min-h-0" : "min-h-[7rem] sm:min-h-[7.5rem]"}`}>
                         <Link
                           to={`/item/${log.mediaType}/${log.externalId}`}
                           className="line-clamp-1 font-semibold text-[var(--color-lightest)] no-underline hover:underline text-sm sm:text-base"
@@ -645,7 +648,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProg
                             </div>
                           );
                         })()}
-                        <div className="min-h-[2.5rem] flex flex-col items-start gap-1">
+                        <div className={`flex flex-col items-start gap-1 min-h-0 ${embedded && !isReviewExpanded ? "flex-1 overflow-hidden" : embedded ? "" : "min-h-[2.5rem]"}`}>
                           {log.review ? (
                             (() => {
                               const review = log.review;
@@ -654,18 +657,21 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProg
                               const preview = truncated && !isExpanded
                                 ? review.slice(0, REVIEW_PREVIEW_LENGTH)
                                 : review;
+                              const showClamp = embedded && truncated && !isExpanded;
                               return (
                                 <>
-                                  <p className="text-xs sm:text-sm text-[var(--color-light)] min-h-0 whitespace-pre-wrap break-words">
-                                    {preview}
-                                    {truncated && !isExpanded && " ... "}
-                                  </p>
+                                  <div className={showClamp ? "line-clamp-2 max-w-[210px]" : "max-w-[210px]"}>
+                                    <p className="text-xs sm:text-sm text-[var(--color-light)] whitespace-pre-wrap break-words">
+                                      {preview}
+                                      {truncated && !isExpanded && " ... "}
+                                    </p>
+                                  </div>
                                   {truncated && (
                                     <Button
                                       type="button"
                                       variant="link"
                                       size="sm"
-                                      className="h-auto p-0 text-xs text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300"
+                                      className="shrink-0 h-auto p-0 text-xs text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300"
                                       onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
@@ -685,7 +691,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProg
                       </div>
                     </div>
                     {!readOnly && (
-                      <div className="flex border-t border-[var(--color-darkest)]">
+                      <div className="flex shrink-0 border-t border-[var(--color-darkest)]">
                         <Button
                           variant="ghost"
                           size="sm"

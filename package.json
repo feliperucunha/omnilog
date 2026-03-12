@@ -1,5 +1,5 @@
 {
-  "name": "logeverything",
+  "name": "dogument",
   "private": true,
   "scripts": {
     "dev": "turbo run dev",

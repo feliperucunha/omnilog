@@ -28,11 +28,11 @@ export function CustomBatchEntryModal({
 
   return (
     <Dialog open modal={false} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent onClose={onCancel}>
-        <h3 className="mb-4 text-lg font-semibold text-[var(--color-lightest)]">
-          {t("customEntry.dialogTitleFull")}
-        </h3>
-        <div className="mb-4 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
+      <DialogContent
+        onClose={onCancel}
+        className="flex max-h-[85dvh] w-[calc(100vw-2rem)] max-w-lg flex-col gap-0 overflow-hidden p-4 sm:p-6"
+      >
+        <div className="mb-3 shrink-0 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1 sm:mb-4">
           <button
             type="button"
             onClick={() => setTab("custom")}
@@ -58,16 +58,18 @@ export function CustomBatchEntryModal({
             {t("customEntry.tabBatch")}
           </button>
         </div>
-        {tab === "custom" ? (
-          <CustomEntryForm
-            embedded
-            mediaType={mediaType}
-            onSaved={onSaved}
-            onCancel={onCancel}
-          />
-        ) : (
-          <BatchEntryTab onDone={onSaved} onCancel={onCancel} />
-        )}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {tab === "custom" ? (
+            <CustomEntryForm
+              embedded
+              mediaType={mediaType}
+              onSaved={onSaved}
+              onCancel={onCancel}
+            />
+          ) : (
+            <BatchEntryTab onDone={onSaved} onCancel={onCancel} />
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

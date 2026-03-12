@@ -1,7 +1,7 @@
 {
   "app": {
-    "name": "OMNILOG",
-    "subtitle": "Log Everything in One Place"
+    "name": "Dogument",
+    "subtitle": "Track everything you watch, play, and read."
   },
   "nav": {
     "dashboard": "Home",
@@ -137,7 +137,7 @@
     "apiKeyTutorial": {
       "tmdb": "1. Go to themoviedb.org and create a free account or log in.\n2. Open Settings → API from the left menu (or go to the link below).\n3. Click \"Request an API Key\" and choose \"Developer\".\n4. Accept the terms and fill the form (Application URL: your site or http://localhost:5173, Application Summary: e.g. \"Personal media log\").\n5. On the API page, copy the \"API Key (v3 auth)\" and paste it below.",
       "rawg": "1. Go to rawg.io and sign up or log in.\n2. Open the API docs link below and look for \"Get your API key\" or the signup form.\n3. Register for an API key (free tier available).\n4. Copy the key from your account/dashboard and paste it below.",
-      "bgg": "1. Go to boardgamegeek.com and log in (or create an account).\n2. Open the Applications link below.\n3. Click to create a new application (e.g. \"OMNILOG\").\n4. Choose non-commercial if it's for personal use; submit and wait for approval (can take a few days).\n5. Once approved, open your application and create a Token.\n6. Copy the Bearer token and paste it below.",
+      "bgg": "1. Go to boardgamegeek.com and log in (or create an account).\n2. Open the Applications link below.\n3. Click to create a new application (e.g. \"Dogument\").\n4. Choose non-commercial if it's for personal use; submit and wait for approval (can take a few days).\n5. Once approved, open your application and create a Token.\n6. Copy the Bearer token and paste it below.",
       "ludopedia": "1. Create an account at https://ludopedia.com.br/novousuario or log in at ludopedia.com.br.\n2. Open Aplicativos (https://www.ludopedia.com.br/aplicativos) and create an application.\n3. Use Ludopedia's OAuth flow to obtain an access token (see API documentation). The key required for Ominilog is the Access Token (ACCESS_TOKEN).\n4. The token is valid for 60 days; paste it below.",
       "comicvine": "1. Go to comicvine.gamespot.com and create a free account or log in.\n2. Open the API documentation link below.\n3. Request an API key (free) from the Comic Vine API page.\n4. Copy your API key and paste it below."
     }
@@ -198,6 +198,8 @@
     "following": "Following",
     "followSuccess": "Following!",
     "sectionTitle": "Social",
+    "filterAll": "All",
+    "filterByFriend": "By friend",
     "emptyFeed": "Start following your friends to see their logs.",
     "findUsers": "Find users",
     "userWithoutUsername": "User",
@@ -235,10 +237,14 @@
     "noStatusOverTimeYet": "Complete items to see completions over time.",
     "badgesSectionTitle": "Badges",
     "badgesNextBadge": "Next badge",
+    "badgesNextForCategory": "Next for {{category}}",
+    "badgesInProgress": "In progress",
     "badgesProgressLabel": "{{current}} / {{target}}",
     "badgesNoNextBadge": "All badges earned in this category!",
     "badgesEarnedCount": "{{count}} earned",
     "badgesWriteReviews": "Write reviews to unlock more badges.",
+    "badgesAddOrReview": "Add items or write reviews to earn badges.",
+    "badgesAchievementUnlocked": "Achievement Unlocked!",
     "calendarTitle": "Calendar",
     "calendarProOnly": "See when you completed items. Upgrade to Pro for the calendar view.",
     "calendarPrevMonth": "Previous month",
@@ -394,12 +400,17 @@
     "invalidImageUrl": "Please enter a valid image URL"
   },
   "batchEntry": {
+    "apiKeyRequired": "Batch import for this category requires an API key. Add your {{provider}} key in Settings to use this feature.",
+    "apiKeyRequiredBoardgames": "Batch import for board games requires a Board Game Geek or Ludopedia API key. Add one in Settings to use this feature.",
     "category": "Category",
+    "defaultStatus": "Default status",
+    "allowedStatusesHint": "Allowed statuses for this category",
     "uploadFile": "Upload sheet",
-    "fileHint": "CSV or XLSX, max 100 rows and 1MB. Must have a Name column; optional Review and Rate (0–10) columns.",
+    "fileHint": "CSV or XLSX, max 100 rows and 1MB. Must have a Name column; optional Status, Review and Rate (0–10) columns.",
     "exampleFormatTitle": "Example format (show table)",
-    "exampleFormatIntro": "Your file must have a header row. The first column must be Name (or Title). You can use Review and Rate (0–10) for optional review text and grade. Column names are case-insensitive; common aliases like \"Review/comment\" or \"Grade/rate\" work.",
+    "exampleFormatIntro": "Your file must have a header row. The first column must be Name (or Title). You can use Status, Review and Rate (0–10) for optional status, review text and grade. Column names are case-insensitive; common aliases like \"Review/comment\" or \"Grade/rate\" work. Status must match one of the allowed values for the selected category.",
     "exampleColumnName": "Name",
+    "exampleColumnStatus": "Status",
     "exampleColumnReview": "Review",
     "exampleColumnRate": "Rate (0–10)",
     "exampleFormatNote": "In CSV, separate columns with commas. In Excel, one row per item. We match each name to the selected category (e.g. Movies) and add the first search result.",
@@ -440,10 +451,10 @@
     "carouselNext": "Next team member",
     "carouselGoTo": "Go to team member {{index}}",
     "projectTitle": "About the project",
-    "projectBody": "OMNILOG is like Stremio for your logs: an aggregator of APIs so you can have everything in one place. Instead of eight separate apps, use one to track movies, TV shows, board games, video games, books, anime, manga, and comics in one place. Search by category, add custom entries when something isn't in the database, and keep your reviews and grades together. No need to jump between different apps or spreadsheets—everything you watch, play, and read lives here.",
+    "projectBody": "Dogument is like Stremio for your logs: an aggregator of APIs so you can have everything in one place. Instead of eight separate apps, use one to track movies, TV shows, board games, video games, books, anime, manga, and comics in one place. Search by category, add custom entries when something isn't in the database, and keep your reviews and grades together. No need to jump between different apps or spreadsheets—everything you watch, play, and read lives here.",
     "projectHostingNote": "The app currently runs on free servers and a free domain. Requests may sometimes take a while.",
     "donationTitle": "Support the project",
-    "donationIntro": "If OMNILOG is useful to you, you can support its development with a one-time donation or recurring support. Thank you!",
+    "donationIntro": "If Dogument is useful to you, you can support its development with a one-time donation or recurring support. Thank you!",
     "donateKofi": "Ko-fi",
     "donateGitHub": "GitHub Sponsors",
     "donationNotConfigured": "Donation links are not configured. Set VITE_DONATION_KOFI_URL and/or VITE_DONATION_GITHUB_SPONSORS_URL in your deployment environment to show them here.",

@@ -43,6 +43,14 @@ const GRADE_ALIASES = [
   "nota (0-10)",
   "rate (0-10)",
 ];
+const STATUS_ALIASES = [
+  "status",
+  "state",
+  "status/state",
+  "estado",
+  "situação",
+  "situacao",
+];
 
 function normalizeHeader(h: string): string {
   return h.trim().toLowerCase().replace(/\s+/g, " ");
@@ -52,13 +60,15 @@ export interface ParsedRow {
   name: string;
   review: string | null;
   grade: number | null;
+  /** Raw status from file (e.g. "watched", "plan to watch"). Validated against allowed options per category when importing. */
+  status: string | null;
 }
 
 export type SheetParseResult =
   | {
       ok: true;
       rows: ParsedRow[];
-      columns: { name: string; review: string | null; grade: string | null };
+      columns: { name: string; review: string | null; grade: string | null; status: string | null };
     }
   | { ok: false; error: string };
 
@@ -207,6 +217,7 @@ function parseSheetRows(rows: string[][]): SheetParseResult {
 
   const reviewIdx = findColumnIndex(rawHeaders, REVIEW_ALIASES);
   const gradeIdx = findColumnIndex(rawHeaders, GRADE_ALIASES);
+  const statusIdx = findColumnIndex(rawHeaders, STATUS_ALIASES);
 
   const dataRows = rows.slice(1);
   const parsed: ParsedRow[] = [];
@@ -219,7 +230,9 @@ function parseSheetRows(rows: string[][]): SheetParseResult {
       reviewIdx >= 0 ? String(row[reviewIdx] ?? "").trim() || null : null;
     const grade =
       gradeIdx >= 0 ? parseGrade(String(row[gradeIdx] ?? "")) : null;
-    parsed.push({ name, review, grade });
+    const status =
+      statusIdx >= 0 ? String(row[statusIdx] ?? "").trim() || null : null;
+    parsed.push({ name, review, grade, status });
   }
 
   if (parsed.length === 0) {
@@ -233,6 +246,7 @@ function parseSheetRows(rows: string[][]): SheetParseResult {
       name: rawHeaders[nameIdx] ?? "Name",
       review: reviewIdx >= 0 ? (rawHeaders[reviewIdx] ?? null) : null,
       grade: gradeIdx >= 0 ? (rawHeaders[gradeIdx] ?? null) : null,
+      status: statusIdx >= 0 ? (rawHeaders[statusIdx] ?? null) : null,
     },
   };
 }

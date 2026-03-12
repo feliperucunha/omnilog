@@ -179,7 +179,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   res.json(logs.map(serializeLog));
 });
 
-/** GET /logs/feed - Up to 5 recent logs from followed users, ordered by startedAt desc (for Social section). */
+/** GET /logs/feed - Up to 5 recent logs from followed users, ordered by startedAt desc (for Social section). Optional ?userId= to filter by one friend. */
 logsRouter.get("/feed", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const followings = await prisma.follow.findMany({
@@ -191,8 +191,10 @@ logsRouter.get("/feed", async (req: AuthenticatedRequest, res) => {
     res.json({ data: [] });
     return;
   }
+  const filterUserId = typeof req.query.userId === "string" ? req.query.userId.trim() : null;
+  const userIds = filterUserId && followingIds.includes(filterUserId) ? [filterUserId] : followingIds;
   const rows = await prisma.log.findMany({
-    where: { userId: { in: followingIds } },
+    where: { userId: { in: userIds } },
     orderBy: [{ startedAt: "desc" }, { updatedAt: "desc" }],
     take: 5,
     include: {
@@ -638,9 +640,18 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         where: { id: existing.id },
         data: updateData,
       });
+      let newBadges: Array<{ id: string; name: string; icon: string }> = [];
       if (!hadReview && sanitizedReview && sanitizedReview.trim().length > 0) {
-        handleReviewCreated(userId, log.id, log.mediaType, sanitizedReview).catch(() => {});
+        try {
+          newBadges = await handleReviewCreated(userId, log.id, log.mediaType, sanitizedReview);
+        } catch (err) {
+          console.error("Gamification (review created on upsert):", err);
+        }
       }
+      const body = serializeLog(log) as Record<string, unknown>;
+      if (newBadges.length > 0) body.newBadges = newBadges;
+      res.status(201).json(body);
+      return;
     } else {
       // Enforce free-tier limit again immediately before create (prevents race conditions / bypass)
       const userForCreate = await prisma.user.findUnique({
@@ -682,12 +693,27 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           boardGameSource,
         },
       });
-      handleLogCreated(userId).catch(() => {});
-      if (sanitizedReview && sanitizedReview.trim().length > 0) {
-        handleReviewCreated(userId, log.id, mediaType, sanitizedReview).catch(() => {});
+      const newBadges: Array<{ id: string; name: string; icon: string }> = [];
+      try {
+        const fromLog = await handleLogCreated(userId);
+        newBadges.push(...fromLog);
+        if (sanitizedReview && sanitizedReview.trim().length > 0) {
+          const fromReview = await handleReviewCreated(userId, log.id, mediaType, sanitizedReview);
+          const seen = new Set(newBadges.map((b) => b.id));
+          for (const b of fromReview) {
+            if (!seen.has(b.id)) {
+              seen.add(b.id);
+              newBadges.push(b);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Gamification:", err);
       }
+      const body = serializeLog(log) as Record<string, unknown>;
+      if (newBadges.length > 0) body.newBadges = newBadges;
+      res.status(201).json(body);
     }
-    res.status(201).json(serializeLog(log));
   } catch (e) {
     res.status(500).json({ error: "Failed to save log" });
   }
@@ -754,15 +780,22 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
   const hadReview = Boolean(log.review && log.review.trim().length > 0);
   const newReview =
     parsed.data.review !== undefined ? sanitizeReview(parsed.data.review) : null;
+  let newBadges: Array<{ id: string; name: string; icon: string }> = [];
   if (
     parsed.data.review !== undefined &&
     !hadReview &&
     newReview &&
     newReview.trim().length > 0
   ) {
-    handleReviewCreated(userId, updated.id, log.mediaType, newReview).catch(() => {});
+    try {
+      newBadges = await handleReviewCreated(userId, updated.id, log.mediaType, newReview);
+    } catch (err) {
+      console.error("Gamification (review added on update):", err);
+    }
   }
-  res.json(serializeLog(updated));
+  const body = serializeLog(updated) as Record<string, unknown>;
+  if (newBadges.length > 0) body.newBadges = newBadges;
+  res.json(body);
 });
 
 logsRouter.delete("/:id", async (req: AuthenticatedRequest, res) => {

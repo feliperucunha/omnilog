@@ -115,7 +115,7 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
             aria-label={ariaLabel}
             aria-expanded={open}
             aria-haspopup="listbox"
-            className="pr-9 bg-[var(--color-darkest)]"
+            className="pr-9 bg-[var(--color-darkest)] focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           {optionsLoading && (
             <span

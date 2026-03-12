@@ -141,7 +141,7 @@ export function Statistics() {
 
   const fetchLogs = useCallback(() => {
     setLoading(true);
-    apiFetchCached<Log[] | { data: Log[]; nextCursor: string | null }>("/logs?limit=10&sort=date", {
+    apiFetchCached<Log[] | { data: Log[]; nextCursor: string | null }>("/logs?limit=5&sort=date", {
       ttlMs: 2 * 60 * 1000,
     })
       .then((res) => setLogs(Array.isArray(res) ? res : res.data))
@@ -202,7 +202,7 @@ export function Statistics() {
     if (!isPro) setShowProModal(true);
   }, [isPro]);
 
-  const recent = logs.slice(0, 10); // API returns up to 10 when using limit=10
+  const recent = logs.slice(0, 5); // Show only the 5 most recent logs
   const displayedStats =
     statsGroup === "category"
       ? visibleTypes.map((period) => ({
@@ -345,7 +345,7 @@ export function Statistics() {
           <button
             type="button"
             onClick={() => setStatsCollapsed(!statsCollapsed)}
-            className="flex w-full items-center gap-2 rounded-lg text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)]"
+            className="flex w-full items-center gap-2 rounded-lg text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)] focus:outline-none"
             aria-expanded={!statsCollapsed}
           >
             {statsCollapsed ? (
@@ -442,7 +442,7 @@ export function Statistics() {
           <button
             type="button"
             onClick={() => setRecentLogsCollapsed(!recentLogsCollapsed)}
-            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)]"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)] focus:outline-none"
             aria-expanded={!recentLogsCollapsed}
           >
             {recentLogsCollapsed ? (

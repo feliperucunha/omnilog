@@ -124,7 +124,8 @@ add("Omni Collector", "You added items in all 6 media types.", "🌟", null, "LO
 add("Dedicated Logger", "You added 25 items total.", "✨", null, "LOG_COUNT_GLOBAL", 25, "rare");
 add("Prolific Logger", "You added 100 items total.", "🏆", null, "LOG_COUNT_GLOBAL", 100, "legendary");
 
-async function main() {
+/** Run from API startup or CLI: ensures all badge definitions exist in the DB. Does not disconnect Prisma. */
+export async function runSeedBadges(): Promise<void> {
   for (const b of badges) {
     const existing = await prisma.badge.findFirst({ where: { name: b.name } });
     const data = {
@@ -145,9 +146,15 @@ async function main() {
   console.log(`Seeded ${badges.length} badges.`);
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+const isRunDirectly =
+  typeof process !== "undefined" &&
+  process.argv[1] != null &&
+  (process.argv[1].endsWith("seedBadges.ts") || process.argv[1].endsWith("seedBadges.js"));
+if (isRunDirectly) {
+  runSeedBadges()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(() => prisma.$disconnect());
+}

@@ -13,6 +13,7 @@ import type { MediaType, Log } from "@logeverything/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@logeverything/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
+import { showAchievementToasts } from "@/lib/achievementToast";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -148,10 +149,11 @@ export function LogForm(props: LogFormProps) {
           props.onCancel();
           return;
         }
-        await apiFetch(`/logs/${props.log.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(payload),
-        });
+        const updated = await apiFetch<Log & { newBadges?: Array<{ id: string; name: string; icon: string }> }>(
+          `/logs/${props.log.id}`,
+          { method: "PATCH", body: JSON.stringify(payload) }
+        );
+        if (updated.newBadges?.length) showAchievementToasts(updated.newBadges, t("dashboard.badgesAchievementUnlocked"));
         toast.success(t("toast.logUpdated"));
         invalidateLogsAndItemsCache();
         if (statusChanged) {
@@ -168,18 +170,22 @@ export function LogForm(props: LogFormProps) {
           props.onSaved();
         }
       } else {
-        await apiFetch("/logs", {
-          method: "POST",
-          body: JSON.stringify({
-            mediaType: props.mediaType,
-            externalId: props.externalId,
-            title: props.title,
-            image: image ?? null,
-            grade,
-            review,
-            status: status ?? null,
-          }),
-        });
+        const created = await apiFetch<Log & { newBadges?: Array<{ id: string; name: string; icon: string }> }>(
+          "/logs",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              mediaType: props.mediaType,
+              externalId: props.externalId,
+              title: props.title,
+              image: image ?? null,
+              grade,
+              review,
+              status: status ?? null,
+            }),
+          }
+        );
+        if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
         toast.success(t("toast.logSaved"));
         invalidateLogsAndItemsCache();
         const completion: LogCompleteState = {

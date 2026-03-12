@@ -90,16 +90,16 @@ async function ensureReviewStats(userId: string): Promise<{
   return row;
 }
 
-/** Call when a new review is added (log created with review, or log updated from no review to having review). */
+/** Call when a new review is added (log created with review, or log updated from no review to having review). Returns badges newly granted. */
 export async function handleReviewCreated(
   userId: string,
   logId: string,
   mediaType: string,
   reviewText: string | null
-): Promise<void> {
-  if (!reviewText || reviewText.trim().length === 0) return;
+): Promise<NewBadge[]> {
+  if (!reviewText || reviewText.trim().length === 0) return [];
   const medium = MEDIA_TO_BADGE[mediaType];
-  if (!medium) return; // boardgames, games don't count toward badge stats
+  if (!medium) return []; // boardgames, games don't count toward badge stats
 
   const stats = await ensureReviewStats(userId);
   const column = getStatsColumn(medium);
@@ -166,7 +166,7 @@ export async function handleReviewCreated(
     data: { lastReviewDate: now, currentStreak: newStreak },
   });
 
-  await checkAndGrantBadges(userId);
+  return checkAndGrantBadges(userId);
 }
 
 /** Call when a log receives a like (reaction type=like). Grants XP to the log owner. */
@@ -175,10 +175,10 @@ export async function handleReviewLiked(logId: string, recipientUserId: string):
   await checkAndGrantBadges(recipientUserId);
 }
 
-/** Call when user adds a log (with or without review). */
-export async function handleLogCreated(userId: string): Promise<void> {
+/** Call when user adds a log (with or without review). Returns badges newly granted by this action. */
+export async function handleLogCreated(userId: string): Promise<NewBadge[]> {
   await grantXp(userId, "LOG_ITEM", XP_LOG_ITEM);
-  await checkAndGrantBadges(userId);
+  return checkAndGrantBadges(userId);
 }
 
 async function getStats(userId: string) {
@@ -233,13 +233,9 @@ const LOG_STATS_KEYS: Record<BadgeMedium, keyof LogStats> = {
 
 async function getLogStats(userId: string): Promise<LogStats> {
   const mediaList = [...BADGE_MEDIA_TYPES];
-  const groups = await prisma.log.groupBy({
-    by: ["mediaType"],
-    where: {
-      userId,
-      mediaType: { in: mediaList },
-    },
-    _count: { id: true },
+  const logs = await prisma.log.findMany({
+    where: { userId, mediaType: { in: mediaList } },
+    select: { mediaType: true },
   });
   const zero: LogStats = {
     movieLogs: 0,
@@ -251,13 +247,19 @@ async function getLogStats(userId: string): Promise<LogStats> {
     totalLogs: 0,
     distinctMediaLogged: 0,
   };
-  for (const g of groups) {
-    const key = LOG_STATS_KEYS[MEDIA_TO_BADGE[g.mediaType]];
-    const count = (g._count as { id: number } | undefined)?.id ?? 0;
-    if (key) (zero as Record<string, number>)[key] = count;
+  const seenMedia = new Set<string>();
+  for (const log of logs) {
+    const medium = MEDIA_TO_BADGE[log.mediaType];
+    if (medium) {
+      const key = LOG_STATS_KEYS[medium];
+      if (key) {
+        (zero as Record<string, number>)[key] = ((zero as Record<string, number>)[key] as number) + 1;
+        seenMedia.add(log.mediaType);
+      }
+    }
   }
-  zero.totalLogs = groups.reduce((s, g) => s + ((g._count as { id: number } | undefined)?.id ?? 0), 0);
-  zero.distinctMediaLogged = groups.length;
+  zero.totalLogs = logs.length;
+  zero.distinctMediaLogged = seenMedia.size;
   return zero;
 }
 
@@ -308,7 +310,9 @@ function evaluateCondition(
   return current >= conditionValue;
 }
 
-export async function checkAndGrantBadges(userId: string): Promise<void> {
+export type NewBadge = { id: string; name: string; icon: string };
+
+export async function checkAndGrantBadges(userId: string): Promise<NewBadge[]> {
   const [ownedBadgeIds, allBadges, stats, logStats, reviewLikes, user] = await Promise.all([
     prisma.userBadge.findMany({ where: { userId }, select: { badgeId: true } }).then((r) => new Set(r.map((b) => b.badgeId))),
     prisma.badge.findMany({ where: { hidden: false } }),
@@ -320,6 +324,7 @@ export async function checkAndGrantBadges(userId: string): Promise<void> {
 
   const currentStreak = user?.currentStreak ?? 0;
   const selectedBadgeIds = user?.selectedBadgeIds ? (JSON.parse(user.selectedBadgeIds) as string[]) : null;
+  const newlyGranted: NewBadge[] = [];
 
   for (const badge of allBadges) {
     if (ownedBadgeIds.has(badge.id)) continue;
@@ -336,6 +341,7 @@ export async function checkAndGrantBadges(userId: string): Promise<void> {
       await prisma.userBadge.create({
         data: { userId, badgeId: badge.id },
       });
+      newlyGranted.push({ id: badge.id, name: badge.name, icon: badge.icon });
       let newSelected: string[] = Array.isArray(selectedBadgeIds) ? selectedBadgeIds : [];
       if (newSelected.length < 3) {
         newSelected = [...newSelected, badge.id].slice(0, 3);
@@ -346,6 +352,7 @@ export async function checkAndGrantBadges(userId: string): Promise<void> {
       }
     }
   }
+  return newlyGranted;
 }
 
 export async function setSelectedBadges(userId: string, badgeIds: string[]): Promise<void> {

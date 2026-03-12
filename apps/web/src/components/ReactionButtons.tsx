@@ -44,7 +44,23 @@ export function ReactionButtons({
   const handleReaction = async (type: ReactionType) => {
     if (disabled || loading) return;
     const next = userReaction === type ? null : type; // toggle off if same, else set
+    const prevLike = userReaction === "like" ? 1 : 0;
+    const prevDislike = userReaction === "dislike" ? 1 : 0;
+    const newLike = next === "like" ? 1 : 0;
+    const newDislike = next === "dislike" ? 1 : 0;
+    const newLikes = likesCount - prevLike + newLike;
+    const newDislikes = dislikesCount - prevDislike + newDislike;
+    const prevLikes = likesCount;
+    const prevDislikes = dislikesCount;
+    const prevReaction = userReaction;
+
+    // Optimistic update: show new counts and reaction immediately
+    setLikesCount(newLikes);
+    setDislikesCount(newDislikes);
+    setUserReaction(next);
+    onReactionChange?.({ likesCount: newLikes, dislikesCount: newDislikes, userReaction: next });
     setLoading(true);
+
     try {
       if (next) {
         await apiFetch(`/logs/${logId}/reaction`, {
@@ -54,19 +70,13 @@ export function ReactionButtons({
       } else {
         await apiFetch(`/logs/${logId}/reaction`, { method: "DELETE" });
       }
-      const prevLike = userReaction === "like" ? 1 : 0;
-      const prevDislike = userReaction === "dislike" ? 1 : 0;
-      const newLike = next === "like" ? 1 : 0;
-      const newDislike = next === "dislike" ? 1 : 0;
-      const newLikes = likesCount - prevLike + newLike;
-      const newDislikes = dislikesCount - prevDislike + newDislike;
-      setLikesCount(newLikes);
-      setDislikesCount(newDislikes);
-      setUserReaction(next);
-      onReactionChange?.({ likesCount: newLikes, dislikesCount: newDislikes, userReaction: next });
       invalidateLogsAndItemsCache();
     } catch {
-      // keep previous state on error
+      // Revert optimistic update on error
+      setLikesCount(prevLikes);
+      setDislikesCount(prevDislikes);
+      setUserReaction(prevReaction);
+      onReactionChange?.({ likesCount: prevLikes, dislikesCount: prevDislikes, userReaction: prevReaction });
     } finally {
       setLoading(false);
     }

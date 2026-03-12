@@ -10,6 +10,24 @@ const followBodySchema = z.object({
   userId: z.string().min(1).max(100),
 });
 
+/** GET /follows - List users the current user follows. Returns { data: Array<{ id, username }> }. */
+followsRouter.get("/", async (req: AuthenticatedRequest, res: Response) => {
+  const followerId = req.user!.userId;
+  const followings = await prisma.follow.findMany({
+    where: { followerId },
+    select: {
+      following: {
+        select: { id: true, username: true },
+      },
+    },
+  });
+  const data = followings.map((f) => ({
+    id: f.following.id,
+    username: f.following.username ?? null,
+  }));
+  res.json({ data });
+});
+
 /** POST /follows - Follow a user. Body: { userId }. */
 followsRouter.post("/", async (req: AuthenticatedRequest, res: Response) => {
   const followerId = req.user!.userId;

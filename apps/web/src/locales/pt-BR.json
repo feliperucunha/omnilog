@@ -1,7 +1,7 @@
 {
   "app": {
-    "name": "OMNILOG",
-    "subtitle": "Registre tudo em um só lugar"
+    "name": "Dogument",
+    "subtitle": "Acompanhe tudo que você assiste, joga e lê."
   },
   "nav": {
     "dashboard": "Início",
@@ -136,7 +136,7 @@
     "apiKeyTutorial": {
       "tmdb": "1. Acesse themoviedb.org e crie uma conta gratuita ou faça login.\n2. Abra Configurações → API no menu à esquerda (ou use o link abaixo).\n3. Clique em \"Request an API Key\" e escolha \"Developer\".\n4. Aceite os termos e preencha o formulário (Application URL: seu site ou http://localhost:5173, Application Summary: ex. \"Registro de mídia pessoal\").\n5. Na página da API, copie o \"API Key (v3 auth)\" e cole abaixo.",
       "rawg": "1. Acesse rawg.io e cadastre-se ou faça login.\n2. Abra o link da documentação da API abaixo e procure por \"Get your API key\" ou o formulário de cadastro.\n3. Registre-se para obter uma chave de API (plano gratuito disponível).\n4. Copie a chave da sua conta/painel e cole abaixo.",
-      "bgg": "1. Acesse boardgamegeek.com e faça login (ou crie uma conta).\n2. Abra o link Applications abaixo.\n3. Clique para criar uma nova aplicação (ex.: \"OMNILOG\").\n4. Escolha uso não comercial se for para uso pessoal; envie e aguarde a aprovação (pode levar alguns dias).\n5. Após aprovado, abra sua aplicação e crie um Token.\n6. Copie o Bearer token e cole abaixo.",
+      "bgg": "1. Acesse boardgamegeek.com e faça login (ou crie uma conta).\n2. Abra o link Applications abaixo.\n3. Clique para criar uma nova aplicação (ex.: \"Dogument\").\n4. Escolha uso não comercial se for para uso pessoal; envie e aguarde a aprovação (pode levar alguns dias).\n5. Após aprovado, abra sua aplicação e crie um Token.\n6. Copie o Bearer token e cole abaixo.",
       "ludopedia": "1. Crie uma conta em https://ludopedia.com.br/novousuario ou faça login em ludopedia.com.br.\n2. Abra Aplicativos (https://www.ludopedia.com.br/aplicativos) e crie uma aplicação.\n3. Use o fluxo OAuth da Ludopedia para obter um token de acesso (veja a documentação da API). A chave necessária para o Ominilog é o Access Token (ACCESS_TOKEN).\n4. O token vale por 60 dias; cole abaixo.",
       "comicvine": "1. Acesse comicvine.gamespot.com e crie uma conta gratuita ou faça login.\n2. Abra o link da documentação da API abaixo.\n3. Solicite uma chave de API (gratuita) na página da Comic Vine API.\n4. Copie sua chave de API e cole abaixo."
     }
@@ -197,6 +197,8 @@
     "following": "Seguindo",
     "followSuccess": "Seguindo!",
     "sectionTitle": "Social",
+    "filterAll": "Todos",
+    "filterByFriend": "Por amigo",
     "emptyFeed": "Comece a seguir seus amigos para ver os logs deles.",
     "findUsers": "Encontrar usuários",
     "userWithoutUsername": "Usuário",
@@ -227,10 +229,14 @@
     "noStatusOverTimeYet": "Complete itens para ver conclusões ao longo do tempo.",
     "badgesSectionTitle": "Emblemas",
     "badgesNextBadge": "Próximo emblema",
+    "badgesNextForCategory": "Próximo para {{category}}",
+    "badgesInProgress": "Em progresso",
     "badgesProgressLabel": "{{current}} / {{target}}",
     "badgesNoNextBadge": "Todos os emblemas desta categoria conquistados!",
     "badgesEarnedCount": "{{count}} conquistados",
     "badgesWriteReviews": "Escreva resenhas para desbloquear mais emblemas.",
+    "badgesAddOrReview": "Adicione itens ou escreva resenhas para conquistar emblemas.",
+    "badgesAchievementUnlocked": "Conquista desbloqueada!",
     "calendarTitle": "Calendário",
     "calendarProOnly": "Veja quando você completou itens. Assine o Pro para o calendário.",
     "calendarPrevMonth": "Mês anterior",
@@ -393,12 +399,17 @@
     "invalidImageUrl": "Digite uma URL de imagem válida"
   },
   "batchEntry": {
+    "apiKeyRequired": "A importação em lote desta categoria exige uma chave de API. Adicione sua chave {{provider}} em Configurações para usar este recurso.",
+    "apiKeyRequiredBoardgames": "A importação em lote de jogos de tabuleiro exige uma chave de API do Board Game Geek ou da Ludopedia. Adicione uma em Configurações para usar este recurso.",
     "category": "Categoria",
+    "defaultStatus": "Status padrão",
+    "allowedStatusesHint": "Status permitidos para esta categoria",
     "uploadFile": "Enviar planilha",
-    "fileHint": "CSV ou XLSX, máx. 100 linhas e 1MB. Deve ter coluna Nome; opcionais Resenha e Nota (0–10).",
+    "fileHint": "CSV ou XLSX, máx. 100 linhas e 1MB. Deve ter coluna Nome; opcionais Status, Resenha e Nota (0–10).",
     "exampleFormatTitle": "Exemplo de formato (mostrar tabela)",
-    "exampleFormatIntro": "O arquivo deve ter uma linha de cabeçalho. A primeira coluna deve ser Nome (ou Título). Você pode usar Resenha e Nota (0–10) para texto e nota opcionais. Nomes de coluna não diferenciam maiúsculas; aliases como \"Resenha\" ou \"Nota\" funcionam.",
+    "exampleFormatIntro": "O arquivo deve ter uma linha de cabeçalho. A primeira coluna deve ser Nome (ou Título). Você pode usar Status, Resenha e Nota (0–10) para status, texto e nota opcionais. Nomes de coluna não diferenciam maiúsculas; aliases como \"Resenha\" ou \"Nota\" funcionam. O status deve ser um dos valores permitidos para a categoria selecionada.",
     "exampleColumnName": "Nome",
+    "exampleColumnStatus": "Status",
     "exampleColumnReview": "Resenha",
     "exampleColumnRate": "Nota (0–10)",
     "exampleFormatNote": "Em CSV, separe as colunas com vírgulas. No Excel, uma linha por item. Cada nome é buscado na categoria selecionada (ex.: Filmes) e o primeiro resultado é adicionado.",
@@ -439,10 +450,10 @@
     "carouselNext": "Próximo membro",
     "carouselGoTo": "Ir para membro {{index}}",
     "projectTitle": "Sobre o projeto",
-    "projectBody": "OMNILOG é como um Stremio para seus logs: um agregador de APIs para ter tudo em um só lugar. Em vez de oito apps diferentes, use um só para acompanhar filmes, séries, board games, jogos, livros, anime, manga e quadrinhos em um único painel. Busque por categoria, adicione entradas manuais quando algo não está no banco de dados e mantenha resenhas e notas juntas. Não precisa alternar entre vários apps ou planilhas—tudo que você assiste, joga e lê fica aqui.",
+    "projectBody": "Dogument é como um Stremio para seus logs: um agregador de APIs para ter tudo em um só lugar. Em vez de oito apps diferentes, use um só para acompanhar filmes, séries, board games, jogos, livros, anime, manga e quadrinhos em um único painel. Busque por categoria, adicione entradas manuais quando algo não está no banco de dados e mantenha resenhas e notas juntas. Não precisa alternar entre vários apps ou planilhas—tudo que você assiste, joga e lê fica aqui.",
     "projectHostingNote": "O app está rodando atualmente em servidores e domínio gratuitos. As requisições às vezes podem demorar um pouco.",
     "donationTitle": "Apoie o projeto",
-    "donationIntro": "Se o OMNILOG for útil para você, pode apoiar o desenvolvimento com uma doação única ou apoio recorrente. Obrigado!",
+    "donationIntro": "Se o Dogument for útil para você, pode apoiar o desenvolvimento com uma doação única ou apoio recorrente. Obrigado!",
     "donateKofi": "Ko-fi",
     "donateGitHub": "GitHub Sponsors",
     "donationNotConfigured": "Links de doação não configurados. Defina VITE_DONATION_KOFI_URL e/ou VITE_DONATION_GITHUB_SPONSORS_URL no ambiente de deploy para exibi-los aqui.",

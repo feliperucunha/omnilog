@@ -70,21 +70,21 @@ export function Topbar() {
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        {/* Mobile: logo + title (or OMNILOG when no title) */}
+        {/* Mobile: logo + title (or app name when no title) */}
         <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
           <Link
             to="/"
             className="flex shrink-0 items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
             aria-label={t("nav.dashboard")}
           >
-            <Logo alt="" className="h-9 w-auto flex-shrink-0 sm:h-11" />
+            <Logo alt={t("app.name")} className="h-9 w-auto flex-shrink-0 sm:h-11" />
           </Link>
           {displayTitle ? (
             <span className="min-w-0 truncate text-lg font-semibold text-[var(--color-lightest)]">
               {displayTitle}
             </span>
           ) : (
-            <span className="-ml-1 text-lg font-bold text-(--btn-gradient-end) dark:text-(--btn-gradient-start)">OMNILOG</span>
+            <span className="brand-title -ml-1 text-lg font-bold text-(--btn-gradient-end) dark:text-(--btn-gradient-start)">{t("app.name")}</span>
           )}
         </div>
         {/* Desktop: page title only */}
@@ -136,7 +136,7 @@ export function Topbar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 rounded-full border border-[var(--color-light)] bg-[var(--color-mid)]/30 p-0 text-lg font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/50"
+                className="h-10 w-10 rounded-full border border-[var(--color-light)] bg-[var(--color-mid)]/30 p-0 text-lg font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/50 focus-visible:ring-0 focus-visible:ring-offset-0"
                 aria-label={t("nav.settings")}
               >
                 {initial}

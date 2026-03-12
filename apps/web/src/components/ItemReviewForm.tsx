@@ -11,6 +11,7 @@ import type { MediaType, Log } from "@logeverything/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@logeverything/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
+import { showAchievementToasts } from "@/lib/achievementToast";
 import { toast } from "sonner";
 import { tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -180,11 +181,12 @@ export function ItemReviewForm({
           setSaving(false);
           return;
         }
-        const updated = await apiFetch<Log>(`/logs/${myLog.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(payload),
-        });
+        const updated = await apiFetch<Log & { newBadges?: Array<{ id: string; name: string; icon: string }> }>(
+          `/logs/${myLog.id}`,
+          { method: "PATCH", body: JSON.stringify(payload) }
+        );
         setMyLog(updated);
+        if (updated.newBadges?.length) showAchievementToasts(updated.newBadges, t("dashboard.badgesAchievementUnlocked"));
         toast.success(t("toast.reviewUpdated"));
         invalidateLogsAndItemsCache();
         onSaved();
@@ -208,11 +210,12 @@ export function ItemReviewForm({
         };
         if (mediaType === "boardgames" && (me?.boardGameProvider === "bgg" || me?.boardGameProvider === "ludopedia"))
           createBody.boardGameSource = me.boardGameProvider;
-        const created = await apiFetch<Log>("/logs", {
-          method: "POST",
-          body: JSON.stringify(createBody),
-        });
+        const created = await apiFetch<Log & { newBadges?: Array<{ id: string; name: string; icon: string }> }>(
+          "/logs",
+          { method: "POST", body: JSON.stringify(createBody) }
+        );
         setMyLog(created);
+        if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
         toast.success(t("toast.reviewSaved"));
         invalidateLogsAndItemsCache();
         onSaved();

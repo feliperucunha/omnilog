@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MediaLogs } from "@/pages/MediaLogs";
+import { Select } from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
 import { StarRating } from "@/components/StarRating";
@@ -120,6 +121,8 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [feedLoading, setFeedLoading] = useState(false);
+  const [feedFriendFilter, setFeedFriendFilter] = useState<string>("all");
+  const [followedUsers, setFollowedUsers] = useState<Array<{ id: string; username: string | null }>>([]);
   const [showBetaModal, setShowBetaModal] = useState(false);
   /** Log id whose review is expanded in-card (no modal). */
   const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
@@ -199,15 +202,26 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!token) {
+      setFollowedUsers([]);
+      return;
+    }
+    apiFetch<{ data: Array<{ id: string; username: string | null }> }>("/follows")
+      .then((res) => setFollowedUsers(res.data ?? []))
+      .catch(() => setFollowedUsers([]));
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
       setFeed([]);
       return;
     }
     setFeedLoading(true);
-    apiFetch<{ data: FeedEntry[] }>("/logs/feed")
+    const url = feedFriendFilter === "all" ? "/logs/feed" : `/logs/feed?userId=${encodeURIComponent(feedFriendFilter)}`;
+    apiFetch<{ data: FeedEntry[] }>(url)
       .then((res) => setFeed(res.data ?? []))
       .catch(() => setFeed([]))
       .finally(() => setFeedLoading(false));
-  }, [token]);
+  }, [token, feedFriendFilter]);
 
   useEffect(() => {
     if (!token) {
@@ -407,7 +421,7 @@ export function Dashboard() {
           <button
             type="button"
             onClick={toggleBadgesCollapsed}
-            className="flex min-w-0 items-center gap-2 rounded-md py-1 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
+            className="flex min-w-0 items-center gap-2 rounded-md py-1 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none"
             aria-expanded={!badgesCollapsed}
             aria-controls="dashboard-badges-content"
             id="dashboard-badges-heading"
@@ -432,68 +446,123 @@ export function Dashboard() {
                 </div>
               ) : (
                 <div className="flex min-w-0 flex-col gap-4 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50 p-4">
-                  {badgeProgress.nextBadges.length > 0 ? (
-                    <div className="flex min-w-0 flex-col gap-2">
-                      <p className="text-sm font-medium text-[var(--color-lightest)]">
-                        {t("dashboard.badgesNextBadge")}
-                      </p>
-                      <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-                        <span className="shrink-0 text-2xl" aria-hidden>
-                          {badgeProgress.nextBadges[0].badge.icon}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-[var(--color-lightest)]">
-                            {badgeProgress.nextBadges[0].badge.name}
-                          </p>
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)]">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
-                                style={{
-                                  width: `${Math.min(100, badgeProgress.nextBadges[0].progressPct)}%`,
-                                  minWidth: badgeProgress.nextBadges[0].current > 0 ? "4px" : 0,
-                                }}
-                              />
+                  {(() => {
+                    const perMediumForCategory = badgeProgress.perMedium.find(
+                      (p) => p.mediaType === selectedCategory
+                    );
+                    const primaryNext =
+                      perMediumForCategory?.nextBadge ?? badgeProgress.nextBadges[0] ?? null;
+                    const inProgressList = badgeProgress.perMedium.filter(
+                      (p) => p.nextBadge && p.nextBadge.current > 0
+                    );
+                    return (
+                      <>
+                        {primaryNext ? (
+                          <div className="flex min-w-0 flex-col gap-2">
+                            <p className="text-sm font-medium text-[var(--color-lightest)]">
+                              {perMediumForCategory?.nextBadge
+                                ? t("dashboard.badgesNextForCategory", {
+                                    category: t(`nav.${selectedCategory}`),
+                                  })
+                                : t("dashboard.badgesNextBadge")}
+                            </p>
+                            <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                              <span className="shrink-0 text-2xl" aria-hidden>
+                                {primaryNext.badge.icon}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium text-[var(--color-lightest)]">
+                                  {primaryNext.badge.name}
+                                </p>
+                                <div className="mt-1.5 flex items-center gap-2">
+                                  <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)]">
+                                    <div
+                                      className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
+                                      style={{
+                                        width: `${Math.min(100, primaryNext.progressPct)}%`,
+                                        minWidth: primaryNext.current > 0 ? "4px" : 0,
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="shrink-0 text-xs text-[var(--color-light)]">
+                                    {t("dashboard.badgesProgressLabel", {
+                                      current: String(primaryNext.current),
+                                      target: String(primaryNext.target),
+                                    })}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <span className="shrink-0 text-xs text-[var(--color-light)]">
-                              {t("dashboard.badgesProgressLabel", {
-                                current: String(badgeProgress.nextBadges[0].current),
-                                target: String(badgeProgress.nextBadges[0].target),
-                              })}
-                            </span>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-[var(--color-light)]">
-                      {t("dashboard.badgesNoNextBadge")}
-                    </p>
-                  )}
-                  {badgeProgress.earnedBadges.length > 0 && (
-                    <div className="flex min-w-0 flex-wrap gap-2">
-                      {badgeProgress.earnedBadges.slice(0, 8).map((b) => (
-                        <span
-                          key={b.id}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/60 px-2.5 py-1 text-xs text-[var(--color-lightest)]"
-                          title={b.name}
-                        >
-                          <span aria-hidden>{b.icon}</span>
-                          <span className="max-w-[100px] truncate sm:max-w-[140px]">{b.name}</span>
-                        </span>
-                      ))}
-                      {badgeProgress.earnedBadges.length > 8 && (
-                        <span className="text-xs text-[var(--color-light)]">
-                          +{badgeProgress.earnedBadges.length - 8}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {badgeProgress.earnedBadges.length === 0 && badgeProgress.nextBadges.length === 0 && (
-                    <p className="text-sm text-[var(--color-light)]">
-                      {t("dashboard.badgesWriteReviews")}
-                    </p>
-                  )}
+                        ) : (
+                          <p className="text-sm text-[var(--color-light)]">
+                            {t("dashboard.badgesNoNextBadge")}
+                          </p>
+                        )}
+                        {inProgressList.length > 0 && (
+                          <div className="flex min-w-0 flex-col gap-2">
+                            <p className="text-sm font-medium text-[var(--color-lightest)]">
+                              {t("dashboard.badgesInProgress")}
+                            </p>
+                            <ul className="flex min-w-0 flex-col gap-1.5">
+                              {inProgressList.map((p) => (
+                                <li
+                                  key={p.mediaType}
+                                  className="flex min-w-0 items-center gap-2 text-sm"
+                                >
+                                  <span className="shrink-0" aria-hidden>
+                                    {p.nextBadge!.badge.icon}
+                                  </span>
+                                  <span className="w-16 shrink-0 truncate text-[var(--color-light)]">
+                                    {t(`nav.${p.mediaType}`)}
+                                  </span>
+                                  <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)]">
+                                    <div
+                                      className="h-full rounded-full bg-[var(--color-mid)]/60 transition-all duration-300"
+                                      style={{
+                                        width: `${Math.min(100, p.nextBadge!.progressPct)}%`,
+                                        minWidth: "4px",
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="shrink-0 text-xs text-[var(--color-light)]">
+                                    {t("dashboard.badgesProgressLabel", {
+                                      current: String(p.nextBadge!.current),
+                                      target: String(p.nextBadge!.target),
+                                    })}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {badgeProgress.earnedBadges.length > 0 && (
+                          <div className="flex min-w-0 flex-wrap gap-2">
+                            {badgeProgress.earnedBadges.slice(0, 8).map((b) => (
+                              <span
+                                key={b.id}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/60 px-2.5 py-1 text-xs text-[var(--color-lightest)]"
+                                title={b.name}
+                              >
+                                <span aria-hidden>{b.icon}</span>
+                                <span className="max-w-[100px] truncate sm:max-w-[140px]">{b.name}</span>
+                              </span>
+                            ))}
+                            {badgeProgress.earnedBadges.length > 8 && (
+                              <span className="text-xs text-[var(--color-light)]">
+                                +{badgeProgress.earnedBadges.length - 8}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {badgeProgress.earnedBadges.length === 0 && !primaryNext && (
+                          <p className="text-sm text-[var(--color-light)]">
+                            {t("dashboard.badgesAddOrReview")}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -506,7 +575,7 @@ export function Dashboard() {
           <button
             type="button"
             onClick={toggleSocialCollapsed}
-            className="flex min-w-0 items-center gap-2 rounded-md py-1 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
+            className="flex min-w-0 items-center gap-2 rounded-md py-1 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none"
             aria-expanded={!socialCollapsed}
             aria-controls="dashboard-social-content"
             id="dashboard-social-heading"
@@ -520,6 +589,22 @@ export function Dashboard() {
           </button>
           {!socialCollapsed && (
           <div id="dashboard-social-content" role="region" aria-labelledby="dashboard-social-heading">
+          <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
+            <Select
+              value={feedFriendFilter}
+              onValueChange={setFeedFriendFilter}
+              options={[
+                { value: "all", label: t("social.filterAll") },
+                ...followedUsers.map((u) => ({
+                  value: u.id,
+                  label: u.username ?? u.id,
+                })),
+              ]}
+              aria-label={t("social.filterByFriend")}
+              className="min-w-0 max-w-[12rem]"
+              triggerClassName="min-w-0"
+            />
+          </div>
           {feedLoading ? (
             <div className="flex flex-col gap-2">
               {[1, 2, 3].map((i) => (
@@ -569,15 +654,16 @@ export function Dashboard() {
                           : isCompleted
                             ? "border-2 border-emerald-600"
                             : "border-2 border-[var(--color-mid)]";
+                  const isExpanded = expandedReviewLogId === log.id;
                   return (
                   <motion.li key={log.id} variants={staggerItem} className="list-none">
                     <motion.div
                       whileTap={tapScale}
                       transition={tapTransition}
-                      className={`flex min-w-0 flex-col overflow-hidden rounded-md bg-[var(--color-dark)] p-4 ${listBorderClass}`}
+                      className={`flex min-w-0 flex-col overflow-hidden rounded-md bg-[var(--color-dark)] p-4 ${!isExpanded ? "h-[205px] min-h-[205px] max-h-[200px]" : ""} ${listBorderClass}`}
                       style={paperShadow}
                     >
-                      <div className="flex min-w-0 gap-3">
+                      <div className="flex min-w-0 shrink-0 gap-3">
                         <Link
                           to={`/item/${log.mediaType}/${log.externalId}`}
                           className="flex min-w-0 shrink-0 items-start gap-3 overflow-hidden text-inherit no-underline hover:opacity-90"
@@ -607,7 +693,7 @@ export function Dashboard() {
                           </div>
                         </Link>
                       </div>
-                      <div className="mt-1 flex items-center gap-1.5">
+                      <div className="mt-1 flex shrink-0 items-center gap-1.5">
                         <Link
                           to={`/${feedUser.username ?? feedUser.id}`}
                           className="text-xs text-[var(--color-light)] hover:text-[var(--color-lightest)] hover:underline"
@@ -622,27 +708,28 @@ export function Dashboard() {
                           <User className="size-3.5" aria-hidden />
                         </Link>
                       </div>
-                      {log.review && (
-                        <div className="mt-3 flex flex-col gap-2 border-t border-[var(--color-darkest)] pt-3">
+                      {log.review ? (
+                        <div className={`mt-3 flex flex-col gap-2 overflow-hidden border-t border-[var(--color-darkest)] pt-3 ${!isExpanded ? "min-h-0 flex-1" : ""}`}>
                           {(() => {
                             const review = log.review;
-                            const isExpanded = expandedReviewLogId === log.id;
                             const truncated = review.length > REVIEW_PREVIEW_LENGTH;
                             const preview = truncated && !isExpanded
                               ? review.slice(0, REVIEW_PREVIEW_LENGTH)
                               : review;
                             return (
                               <>
-                                <p className="text-xs text-[var(--color-light)] whitespace-pre-wrap break-words">
-                                  {preview}
-                                  {truncated && !isExpanded && " ... "}
-                                </p>
+                                <div className={!isExpanded && truncated ? "line-clamp-3" : ""}>
+                                  <p className="text-xs text-[var(--color-light)] whitespace-pre-wrap break-words">
+                                    {preview}
+                                    {truncated && !isExpanded && " ... "}
+                                  </p>
+                                </div>
                                 {truncated && (
                                   <Button
                                     type="button"
                                     variant="link"
                                     size="sm"
-                                    className="w-fit h-auto p-0 text-xs text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300"
+                                    className="w-fit shrink-0 h-auto p-0 text-xs text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300"
                                     onClick={() => setExpandedReviewLogId(isExpanded ? null : log.id)}
                                   >
                                     {isExpanded ? t("social.viewLess") : t("social.viewMore")}
@@ -651,7 +738,7 @@ export function Dashboard() {
                               </>
                             );
                           })()}
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex shrink-0 flex-wrap items-center gap-2">
                             <ReactionButtons
                               logId={log.id}
                               likesCount={log.likesCount ?? 0}
@@ -677,6 +764,33 @@ export function Dashboard() {
                               }}
                             />
                           </div>
+                        </div>
+                      ) : (
+                        <div className="mt-3 flex shrink-0 flex-wrap items-center gap-2 border-t border-[var(--color-darkest)] pt-3">
+                          <ReactionButtons
+                              logId={log.id}
+                              likesCount={log.likesCount ?? 0}
+                              dislikesCount={log.dislikesCount ?? 0}
+                              userReaction={log.userReaction ?? null}
+                              disabled={!token}
+                              onReactionChange={(payload) => {
+                                setFeed((prev) =>
+                                  prev.map((e) =>
+                                    e.log.id === log.id
+                                      ? {
+                                          ...e,
+                                          log: {
+                                            ...e.log,
+                                            likesCount: payload.likesCount,
+                                            dislikesCount: payload.dislikesCount,
+                                            userReaction: payload.userReaction,
+                                          },
+                                        }
+                                      : e
+                                  )
+                                );
+                              }}
+                            />
                         </div>
                       )}
                     </motion.div>

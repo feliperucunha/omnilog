@@ -14,6 +14,7 @@ import type { MediaType } from "@logeverything/shared";
 import { IN_PROGRESS_STATUSES, MEDIA_TYPES, LOG_STATUS_OPTIONS } from "@logeverything/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
+import { showAchievementToasts } from "@/lib/achievementToast";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -86,7 +87,7 @@ export function CustomEntryForm({
     setLoading(true);
     try {
       const externalId = `custom-${crypto.randomUUID()}`;
-      await apiFetch("/logs", {
+      const created = await apiFetch<{ newBadges?: Array<{ id: string; name: string; icon: string }> }>("/logs", {
         method: "POST",
         body: JSON.stringify({
           mediaType,
@@ -102,6 +103,7 @@ export function CustomEntryForm({
           volume: showChapterVolume ? toNum(volume) : null,
         }),
       });
+      if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
       invalidateLogsAndItemsCache();
       toast.success(t("toast.logSaved"));
       const completion: LogCompleteState = {

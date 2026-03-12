@@ -515,7 +515,7 @@ export function Settings() {
           <button
             type="button"
             onClick={() => setAdvancedOpen((prev) => !prev)}
-            className="flex w-full items-center gap-2 px-4 py-3 text-left text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-darkest)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-inset"
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-darkest)]/50 focus:outline-none"
             aria-expanded={advancedOpen}
           >
             {advancedOpen ? (

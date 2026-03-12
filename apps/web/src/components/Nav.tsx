@@ -74,8 +74,8 @@ export function Nav() {
           to="/"
           className="flex h-14 min-w-0 items-center border-b border-[var(--color-mid)]/30 -ml-2 text-[var(--color-lightest)] no-underline"
         >
-          <Logo alt="OMNILOG" className="h-12 w-auto flex-shrink-0 md:h-14" />
-          <span className="-ml-3 truncate font-bold text-xl text-(--btn-gradient-end) dark:text-(--btn-gradient-start) md:-ml-4 md:text-2xl">OMNILOG</span>
+          <Logo alt={t("app.name")} className="h-12 w-auto flex-shrink-0 md:h-14" />
+          <span className="brand-title -ml-3 truncate font-bold text-xl text-(--btn-gradient-end) dark:text-(--btn-gradient-start) md:-ml-4 md:text-2xl">{t("app.name")}</span>
         </Link>
         <div className="flex flex-1 flex-col gap-1 overflow-y-auto p-2 min-h-0">
           {token ? (

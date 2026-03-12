@@ -14,6 +14,8 @@ import { cronRouter, runSubscriptionExpiry } from "./routes/cron.js";
 import { usersRouter } from "./routes/users.js";
 import { feedbackRouter } from "./routes/feedback.js";
 import { followsRouter } from "./routes/follows.js";
+import { prisma } from "./lib/prisma.js";
+import { runSeedBadges } from "./scripts/seedBadges.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -42,9 +44,12 @@ app.post(
 
 app.use(express.json());
 
+const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+// Default allows batch import: ~2 requests per row (search + create), so 500 rows ≈ 1000 requests
+const rateLimitMax = Number(process.env.RATE_LIMIT_MAX) || 2500;
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+  windowMs: rateLimitWindowMs,
+  max: rateLimitMax,
   message: { error: "Too many requests" },
 });
 app.use("/api/", limiter);
@@ -76,6 +81,14 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
+
+  // Ensure badge definitions exist (no manual seed command needed)
+  void prisma.badge
+    .count()
+    .then((n) => {
+      if (n === 0) return runSeedBadges().then(() => console.log("Badges seeded."));
+    })
+    .catch((e) => console.error("Badge seed check failed:", e));
 
   // Run subscription expiry in-process: on startup and every 24h (no external cron needed)
   void runSubscriptionExpiry().then((n) => {

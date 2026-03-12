@@ -111,6 +111,11 @@
   --font-display: "Hammersmith One", system-ui, sans-serif;
 }
 
+/** App title / wordmark – distinct display font */
+.brand-title {
+  font-family: var(--font-display);
+}
+
 /* Light theme and defaults */
 :root {
   --color-darkest: #0D1B2A;
