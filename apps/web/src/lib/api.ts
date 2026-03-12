@@ -1,3 +1,5 @@
+import { APP_VERSION } from "@dogument/shared";
+
 const rawApiUrl = import.meta.env.VITE_API_URL as string | undefined;
 let API_BASE = rawApiUrl ?? "/api";
 if (import.meta.env.DEV && API_BASE.startsWith("https://localhost")) {
@@ -5,6 +7,9 @@ if (import.meta.env.DEV && API_BASE.startsWith("https://localhost")) {
 }
 if (API_BASE.startsWith("http") && !API_BASE.endsWith("/api")) {
   API_BASE = API_BASE.replace(/\/?$/, "") + "/api";
+}
+export function getApiBase(): string {
+  return API_BASE;
 }
 /** Match cold-start wait (50s) so the first request is not aborted too early. */
 const DEFAULT_TIMEOUT_MS = 55_000;
@@ -42,9 +47,14 @@ import { getCached, setCached, invalidateByPrefix } from "./cache.js";
 /** Sentinel for cookie-based sessions (no token in localStorage). */
 const COOKIE_SESSION = "cookie";
 
+export const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
+
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem("dogument_token");
-  const headers: HeadersInit = { "Content-Type": "application/json" };
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    "X-App-Version": APP_VERSION,
+  };
   if (token && token !== COOKIE_SESSION) headers["Authorization"] = `Bearer ${token}`;
   return headers;
 }
@@ -156,6 +166,17 @@ async function fetchInternal<T>(
     const text = await res.text();
 
     if (res.status === 401) {
+      let code: string | undefined;
+      try {
+        const data = JSON.parse(text) as { code?: string };
+        code = data.code;
+      } catch {
+        /* ignore */
+      }
+      if (code === APP_VERSION_MISMATCH_CODE) {
+        window.dispatchEvent(new CustomEvent("app:version-mismatch"));
+        throw new Error(parseErrorResponse(text, "App version outdated. Please update the app."));
+      }
       const message = parseErrorResponse(text, "Session expired. Please sign in again.");
       if (!skipAuthRedirect) {
         localStorage.removeItem("dogument_token");
@@ -213,7 +234,7 @@ export async function apiFetchPublic<T>(path: string, options?: RequestInit): Pr
       ...options,
       credentials: "omit",
       signal: controller.signal,
-      headers: { "Content-Type": "application/json", ...options?.headers },
+      headers: { "Content-Type": "application/json", "X-App-Version": APP_VERSION, ...options?.headers },
     });
     clearTimeout(timeoutId);
     fireFirstApiResponseOnce();

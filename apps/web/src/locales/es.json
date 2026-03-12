@@ -530,6 +530,10 @@
     "exportFailed": "Error al exportar",
     "logLimitReached": "Has alcanzado el límite de 500 logs del plan Gratis. Pasa a Pro para logs ilimitados."
   },
+  "appVersion": {
+    "title": "Actualización necesaria",
+    "message": "Hay una nueva versión de la app. Actualiza desde Play Store o App Store para continuar."
+  },
   "coldStart": {
     "error": "Algo salió mal. Comprueba tu conexión e inténtalo de nuevo.",
     "timedOut": "Está tardando más de lo habitual. El servidor puede estar iniciándose."

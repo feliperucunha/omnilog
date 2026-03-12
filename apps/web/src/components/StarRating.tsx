@@ -81,8 +81,8 @@ export function StarRating({
             <Star
               className={cn(
                 sizeClasses[size],
-                "text-[var(--color-darkest)]",
-                "fill-[var(--color-darkest)]"
+                "fill-transparent",
+                "text-[var(--color-lightest)]"
               )}
               strokeWidth={1.5}
               aria-hidden

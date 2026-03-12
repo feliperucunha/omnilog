@@ -11,6 +11,8 @@ import { MeProvider } from "@/contexts/MeContext";
 import { VisibleMediaTypesProvider } from "@/contexts/VisibleMediaTypesContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ColdStartLoader } from "@/components/ColdStartLoader";
+import { AppVersionModal } from "@/components/AppVersionModal";
+import { AppVersionProvider } from "@/contexts/AppVersionContext";
 import App from "./App";
 import "./fonts.css";
 import "./index.css";
@@ -22,16 +24,24 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <ErrorBoundary>
           <BrowserRouter>
             <AuthProvider>
-              <MeProvider>
-                <VisibleMediaTypesProvider>
-                  <ThemeSync />
-                  <LocaleSync />
-                  <ColdStartLoader />
-                  <App />
-                </VisibleMediaTypesProvider>
-              </MeProvider>
-            <Toaster position="top-center" richColors duration={2500} />
-          </AuthProvider>
+              <AppVersionProvider>
+                <MeProvider>
+                  <VisibleMediaTypesProvider>
+                    <ThemeSync />
+                    <LocaleSync />
+                    <ColdStartLoader />
+                    <App />
+                    <AppVersionModal />
+                  </VisibleMediaTypesProvider>
+                </MeProvider>
+              </AppVersionProvider>
+              <Toaster
+                position="top-center"
+                richColors
+                duration={2500}
+                mobileOffset={{ top: "5rem" }}
+              />
+            </AuthProvider>
           </BrowserRouter>
         </ErrorBoundary>
       </LocaleProvider>

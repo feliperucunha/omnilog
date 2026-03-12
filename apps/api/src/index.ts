@@ -16,6 +16,9 @@ import { feedbackRouter } from "./routes/feedback.js";
 import { followsRouter } from "./routes/follows.js";
 import { prisma } from "./lib/prisma.js";
 import { runSeedBadges } from "./scripts/seedBadges.js";
+import { APP_VERSION } from "@dogument/shared";
+
+const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -44,6 +47,21 @@ app.post(
 
 app.use(express.json());
 
+/** Require X-App-Version to match API version for all /api routes except /api/health. Returns 401 when out of sync. */
+app.use("/api", (req, res, next) => {
+  if (req.path === "/health" || req.path === "/health/") {
+    return next();
+  }
+  const clientVersion = req.headers["x-app-version"];
+  if (clientVersion !== APP_VERSION) {
+    return res.status(401).json({
+      code: APP_VERSION_MISMATCH_CODE,
+      error: "App version outdated. Please update the app from the store.",
+    });
+  }
+  next();
+});
+
 const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
 // Default allows batch import: ~2 requests per row (search + create), so 500 rows ≈ 1000 requests
 const rateLimitMax = Number(process.env.RATE_LIMIT_MAX) || 2500;
@@ -67,7 +85,7 @@ app.use("/api/feedback", feedbackRouter);
 app.use("/api/follows", followsRouter);
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
+  res.json({ ok: true, version: APP_VERSION });
 });
 
 /** Global error handler: log and return 500 JSON. */

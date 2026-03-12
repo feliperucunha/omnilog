@@ -8,7 +8,8 @@
     "start": "node apps/api/dist/index.js",
     "start:api": "node apps/api/dist/index.js",
     "build:android": "pnpm --filter @dogument/web build:android",
-    "android": "pnpm --filter @dogument/android android"
+    "android": "pnpm --filter @dogument/android android",
+    "ios": "pnpm --filter @dogument/android ios"
   },
   "dependencies": {
     "turbo": "^2.3.0"

@@ -531,6 +531,10 @@
     "exportFailed": "Export failed",
     "logLimitReached": "You've reached the 500-log limit on the Free plan. Upgrade to Pro for unlimited logs."
   },
+  "appVersion": {
+    "title": "Update required",
+    "message": "A new version of the app is available. Please update from the Play Store or App Store to continue."
+  },
   "coldStart": {
     "error": "Something went wrong. Please check your connection and try again.",
     "timedOut": "Taking longer than usual. The server may be waking up."

@@ -16,6 +16,7 @@ export type {
   AuthLoginInput,
   AuthResponse,
 } from "./types.js";
+export { APP_VERSION } from "./version.js";
 export {
   MEDIA_TYPES,
   toMediaType,
