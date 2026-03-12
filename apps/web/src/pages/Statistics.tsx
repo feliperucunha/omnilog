@@ -254,6 +254,7 @@ export function Statistics() {
             <Button
               variant={genreGraphMode === "genre" ? "default" : "outline"}
               size="sm"
+              className="max-md:min-h-[44px]"
               onClick={() => setGenreGraphMode("genre")}
             >
               {t("dashboard.byGenre")}
@@ -261,6 +262,7 @@ export function Statistics() {
             <Button
               variant={genreGraphMode === "statusOverTime" ? "default" : "outline"}
               size="sm"
+              className="max-md:min-h-[44px]"
               onClick={() => setGenreGraphMode("statusOverTime")}
             >
               {t("dashboard.byStatusOverTime")}
@@ -345,7 +347,7 @@ export function Statistics() {
           <button
             type="button"
             onClick={() => setStatsCollapsed(!statsCollapsed)}
-            className="flex w-full items-center gap-2 rounded-lg text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)] focus:outline-none"
+            className="flex w-full items-center gap-2 rounded-lg py-2 max-md:min-h-[44px] max-md:py-3 text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)] focus:outline-none"
             aria-expanded={!statsCollapsed}
           >
             {statsCollapsed ? (
@@ -442,7 +444,7 @@ export function Statistics() {
           <button
             type="button"
             onClick={() => setRecentLogsCollapsed(!recentLogsCollapsed)}
-            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)] focus:outline-none"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-2 max-md:min-h-[44px] max-md:py-3 text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)] focus:outline-none"
             aria-expanded={!recentLogsCollapsed}
           >
             {recentLogsCollapsed ? (

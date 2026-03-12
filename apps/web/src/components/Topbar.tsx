@@ -66,7 +66,7 @@ export function Topbar() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex h-14 flex-shrink-0 items-center gap-3 sm:gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-3 py-2 sm:p-4"
+        "sticky top-0 z-30 flex min-h-14 flex-shrink-0 items-center gap-3 sm:gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] pt-[max(0.5rem,env(safe-area-inset-top))] px-3 pb-2 sm:p-4"
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -136,7 +136,7 @@ export function Topbar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 rounded-full border border-[var(--color-light)] bg-[var(--color-mid)]/30 p-0 text-lg font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/50 focus-visible:ring-0 focus-visible:ring-offset-0"
+                className="h-10 w-10 max-md:min-h-[44px] max-md:min-w-[44px] max-md:h-11 max-md:w-11 rounded-full border border-[var(--color-light)] bg-[var(--color-mid)]/30 p-0 text-lg font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/50 focus-visible:ring-0 focus-visible:ring-offset-0"
                 aria-label={t("nav.settings")}
               >
                 {initial}

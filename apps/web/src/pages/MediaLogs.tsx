@@ -367,7 +367,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProg
       {needsKeyBanner && !embedded && (
         <Link
           to="/settings?open=api-keys"
-          className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-3 text-left no-underline transition-colors text-[var(--color-warning-text)] hover:border-[var(--color-warning-hover-border)] hover:bg-[var(--color-warning-hover-bg)]"
+          className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-3 max-md:min-h-[44px] text-left no-underline transition-colors text-[var(--color-warning-text)] hover:border-[var(--color-warning-hover-border)] hover:bg-[var(--color-warning-hover-bg)]"
         >
           <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)]" aria-hidden />
           <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--color-warning-text)]">
@@ -754,7 +754,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, badgeProg
       {!readOnly && !embedded && (
       <form
         onSubmit={handleCategorySearchSubmit}
-        className="fixed bottom-20 left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-4 md:bottom-6 md:left-[calc(127.5px+50vw)]"
+        className="fixed left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-4 bottom-[max(5rem,calc(5rem+env(safe-area-inset-bottom)))] md:bottom-6 md:left-[calc(127.5px+50vw)]"
         aria-label={t("search.search")}
       >
         <div className="relative flex rounded-lg border-2 border-[var(--color-mid)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">

@@ -64,7 +64,7 @@ export function StickyCategoryStrip({
                 disabled={item.disabled}
                 onClick={() => !item.disabled && onSelect(item.value)}
                 className={cn(
-                  "flex shrink-0 flex-col items-center gap-1 border-b-2 pb-0.5 pt-0.5 text-sm transition-colors",
+                  "flex shrink-0 flex-col items-center justify-center gap-1 border-b-2 pb-0.5 pt-0.5 text-sm transition-colors max-md:min-h-[44px]",
                   "border-transparent whitespace-nowrap",
                   item.disabled && "cursor-not-allowed opacity-50",
                   selected

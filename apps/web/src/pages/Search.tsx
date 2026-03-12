@@ -617,7 +617,7 @@ export function Search() {
                   <button
                     type="button"
                     onClick={() => setDrawerItem({ mediaType, id: item.id })}
-                    className={`h-full w-full flex flex-row sm:flex-col text-left overflow-hidden rounded-lg border bg-[var(--color-dark)] text-inherit no-underline shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 ${listBorderClass} ${status == null ? "hover:border-black" : ""}`}
+                    className={`h-full w-full flex flex-row sm:flex-col text-left overflow-hidden rounded-lg border bg-[var(--color-dark)] text-inherit no-underline shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 max-md:min-h-[44px] ${listBorderClass} ${status == null ? "hover:border-black" : ""}`}
                   >
                     <div className="w-20 h-28 flex-shrink-0 overflow-hidden relative rounded-l-lg sm:w-full sm:h-auto sm:aspect-[2/3] sm:rounded-l-none sm:rounded-t-lg">
                       <ItemImage src={item.image} className="h-full w-full" />
@@ -726,7 +726,7 @@ export function Search() {
             role="dialog"
             aria-label={t("itemPage.back")}
           >
-            <div className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 min-w-0">
+            <div className="flex-1 overflow-x-hidden overflow-y-auto min-w-0 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] md:p-6">
               <ItemPageContent
                 mediaType={drawerItem.mediaType}
                 id={drawerItem.id}

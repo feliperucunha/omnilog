@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App theme (Material/AppCompat) -->
+    <color name="colorPrimary">#1B263B</color>
+    <color name="colorPrimaryDark">#0D1B2A</color>
+    <color name="colorAccent">#415A77</color>
+    <!-- Splash screen background (black) -->
+    <color name="splash_background">#000000</color>
+</resources>

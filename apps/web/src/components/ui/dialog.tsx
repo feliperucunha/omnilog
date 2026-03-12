@@ -34,8 +34,10 @@ const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         "fixed inset-0 z-50 grid w-full h-full min-h-[100dvh] max-h-[100dvh] translate-x-0 translate-y-0 gap-4 overflow-auto rounded-none border-0 bg-[var(--color-dark)] p-6 shadow-[var(--shadow-modal)] duration-200",
+        "max-md:pt-[max(1.5rem,env(safe-area-inset-top))] max-md:pb-[max(1.5rem,env(safe-area-inset-bottom))] max-md:pl-[max(1rem,env(safe-area-inset-left))] max-md:pr-[max(1rem,env(safe-area-inset-right))]",
+        "max-md:place-items-center max-md:content-center max-md:w-full",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-        "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:translate-x-[-50%] sm:translate-y-[-50%] sm:h-auto sm:min-h-0 sm:max-h-[90vh] sm:max-w-lg sm:rounded-lg sm:border sm:border-[var(--color-dark)]",
+        "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:translate-x-[-50%] sm:translate-y-[-50%] sm:h-auto sm:min-h-0 sm:max-h-[90vh] sm:max-w-lg sm:rounded-lg sm:border sm:border-[var(--color-dark)] sm:place-items-stretch sm:content-normal",
         className
       )}
       onEscapeKeyDown={onClose}

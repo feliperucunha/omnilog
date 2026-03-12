@@ -55,9 +55,45 @@ Register an account on the web app, then use Search to find media and add logs (
 - **Frontend** (e.g. Vercel, Netlify): Set `VITE_API_URL` to your deployed API base URL (e.g. `https://your-api.up.railway.app/api`). Build uses this at compile time.
 - **Backend** (e.g. Render): Set **Root Directory** to empty (repo root). **Build Command:** `pnpm install && pnpm run build --filter=@dogument/api...` **Start Command:** `node apps/api/dist/index.js`. Env: `DATABASE_URL` (Supabase; append `?pgbouncer=true` when using Transaction pooler port 6543), `JWT_SECRET` (min 32 chars), `WEB_ORIGIN` (deployed frontend URL). See `apps/api/.env.example`. Optional: use `render.yaml` (Blueprint) for the same config.
 
+## Android app (APK)
+
+The web app is wrapped with [Capacitor](https://capacitorjs.com/) so you can build an Android APK.
+
+1. **From repo root**, install dependencies and build the web app for Android:
+
+   ```bash
+   pnpm install
+   cd apps/web
+   pnpm run build:android
+   pnpm run cap:sync
+   ```
+
+2. **Set the API URL** for the app (required: the app has no dev proxy). When building, set `VITE_API_URL` to your deployed API (e.g. `https://your-api.onrender.com`). For example, create `apps/web/.env.production` or run:
+
+   ```bash
+   VITE_API_URL=https://your-api.onrender.com pnpm run build:android
+   pnpm run cap:sync
+   ```
+
+3. **Open Android Studio** and build the APK:
+
+   ```bash
+   pnpm run cap:open:android
+   ```
+
+   In Android Studio: **Build → Build Bundle(s) / APK(s) → Build APK(s)**. The APK is generated under `apps/web/android/app/build/outputs/apk/`.
+
+Or run the full flow in one go (build, sync, open Android Studio):
+
+```bash
+cd apps/web && pnpm run android
+```
+
+**Requirements:** Node 18+, Android Studio (for the Android SDK and emulator/device). The Android project lives in `apps/web/android/`.
+
 ## Stack
 
 - **Monorepo**: pnpm workspaces + Turborepo
 - **Shared**: `@dogument/shared` – TypeScript types
 - **API**: Express, Prisma (PostgreSQL / Supabase), JWT auth, Zod, proxy to TMDB / RAWG / Open Library / Jikan / BGG
-- **Web**: React 18, Vite, Tailwind CSS, React Router, Framer Motion, Sonner
+- **Web**: React 18, Vite, Tailwind CSS, React Router, Framer Motion, Sonner. **Mobile**: Capacitor (Android)

@@ -1,0 +1,19 @@
+{
+  "name": "@dogument/android",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "sync": "cap sync android",
+    "open": "cap open android",
+    "build": "pnpm --filter @dogument/web build:android && cap sync android",
+    "android": "pnpm --filter @dogument/web build:android && cap sync android && cap open android"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0"
+  },
+  "capacitor": {
+    "platforms": ["android"]
+  }
+}

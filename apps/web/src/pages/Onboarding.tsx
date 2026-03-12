@@ -82,7 +82,7 @@ export function Onboarding() {
                 setColorScheme("light");
               }}
               className={cn(
-                "flex-1 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors",
+                "flex-1 rounded-lg border-2 px-4 py-3 max-md:min-h-[44px] text-sm font-medium transition-colors",
                 theme === "light"
                   ? "border-[var(--color-mid)] bg-[var(--color-mid)]/30 text-[var(--color-lightest)]"
                   : "border-[var(--color-mid)]/50 bg-transparent text-[var(--color-light)] hover:border-[var(--color-mid)] hover:text-[var(--color-lightest)]"
@@ -97,7 +97,7 @@ export function Onboarding() {
                 setColorScheme("dark");
               }}
               className={cn(
-                "flex-1 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors",
+                "flex-1 rounded-lg border-2 px-4 py-3 max-md:min-h-[44px] text-sm font-medium transition-colors",
                 theme === "dark"
                   ? "border-[var(--color-mid)] bg-[var(--color-mid)]/30 text-[var(--color-lightest)]"
                   : "border-[var(--color-mid)]/50 bg-transparent text-[var(--color-light)] hover:border-[var(--color-mid)] hover:text-[var(--color-lightest)]"

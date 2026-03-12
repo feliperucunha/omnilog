@@ -349,16 +349,16 @@ export function Dashboard() {
   return (
     <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden">
       <Dialog open={showBetaModal} onOpenChange={(open) => !open && handleBetaModalClose()}>
-        <DialogContent onClose={handleBetaModalClose}>
-          <DialogHeader>
-            <DialogTitle className="text-[var(--color-lightest)]">
+        <DialogContent onClose={handleBetaModalClose} className="max-md:flex max-md:flex-col max-md:justify-center max-md:gap-6 max-md:px-8">
+          <DialogHeader className="max-md:space-y-2">
+            <DialogTitle className="text-[var(--color-lightest)] text-xl max-md:text-2xl">
               {t("dashboard.betaModalTitle")}
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-[var(--color-light)]">
+          <p className="text-sm text-[var(--color-light)] max-md:text-base max-md:leading-relaxed">
             {t("dashboard.betaModalMessage")}
           </p>
-          <Button onClick={handleBetaModalClose} className="w-fit">
+          <Button onClick={handleBetaModalClose} className="w-fit max-md:w-full max-md:min-h-[48px] max-md:text-base">
             {t("dashboard.betaModalGotIt")}
           </Button>
         </DialogContent>
@@ -381,7 +381,7 @@ export function Dashboard() {
                 <ToggleGroupItem
                   key={type}
                   value={type}
-                  className="rounded-md px-4 py-3 text-sm data-[state=on]:bg-gradient-to-br data-[state=on]:from-[var(--btn-gradient-start)] data-[state=on]:to-[var(--btn-gradient-end)] data-[state=on]:text-[var(--btn-text)] md:px-3 md:py-2"
+                  className="rounded-md px-4 py-3 text-sm max-md:min-h-[44px] data-[state=on]:bg-gradient-to-br data-[state=on]:from-[var(--btn-gradient-start)] data-[state=on]:to-[var(--btn-gradient-end)] data-[state=on]:text-[var(--btn-text)] md:px-3 md:py-2"
                   aria-label={`${t(`nav.${type}`)} (${byType[type] ?? 0})`}
                 >
                   {t(`nav.${type}`)} ({byType[type] ?? 0})
@@ -392,7 +392,7 @@ export function Dashboard() {
             {needsApiKeyBanner && (
             <Link
               to="/settings?open=api-keys"
-              className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-3 text-left no-underline transition-colors text-[var(--color-warning-text)] hover:border-[var(--color-warning-hover-border)] hover:bg-[var(--color-warning-hover-bg)]"
+              className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-3 max-md:min-h-[44px] text-left no-underline transition-colors text-[var(--color-warning-text)] hover:border-[var(--color-warning-hover-border)] hover:bg-[var(--color-warning-hover-bg)]"
             >
               <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)]" aria-hidden />
               <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--color-warning-text)]">
@@ -421,7 +421,7 @@ export function Dashboard() {
           <button
             type="button"
             onClick={toggleBadgesCollapsed}
-            className="flex min-w-0 items-center gap-2 rounded-md py-1 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none"
+            className="flex min-w-0 items-center gap-2 rounded-md py-1 max-md:min-h-[44px] max-md:py-3 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none"
             aria-expanded={!badgesCollapsed}
             aria-controls="dashboard-badges-content"
             id="dashboard-badges-heading"

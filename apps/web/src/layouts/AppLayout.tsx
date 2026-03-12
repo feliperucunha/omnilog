@@ -31,7 +31,7 @@ export function AppLayout() {
     <div className="flex min-h-screen">
       <Nav />
       <main
-        className="flex min-h-screen min-w-0 flex-1 flex-col pb-20 md:pb-6 md:pl-[255px]"
+        className="flex min-h-screen min-w-0 flex-1 flex-col pb-[max(6rem,calc(6rem+env(safe-area-inset-bottom)))] md:pb-6 md:pl-[255px]"
       >
         <PageTitleProvider>
           <AppLayoutContent />

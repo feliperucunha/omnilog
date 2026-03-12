@@ -18,7 +18,7 @@ export function AuthNavbar() {
   return (
     <header
       className={cn(
-        "flex h-14 flex-shrink-0 items-center justify-between gap-3 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4"
+        "flex min-h-14 flex-shrink-0 items-center justify-between gap-3 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] pt-[max(0.5rem,env(safe-area-inset-top))] px-4 pb-3"
       )}
     >
       <Link

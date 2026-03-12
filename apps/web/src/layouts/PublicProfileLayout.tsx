@@ -6,7 +6,7 @@ export function PublicProfileLayout() {
   const { t } = useLocale();
   return (
     <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden">
-      <header className="flex shrink-0 items-center border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4 py-3 md:px-6">
+      <header className="flex shrink-0 items-center border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-3 md:pt-3 md:px-6">
         <Link
           to="/"
           className="flex items-center text-[var(--color-lightest)] no-underline hover:opacity-90 transition-opacity"

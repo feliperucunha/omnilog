@@ -241,8 +241,8 @@ export function PublicProfile() {
                   onClick={() => setCategory(type as MediaType)}
                   className={
                     selectedCategory === type
-                      ? "btn-gradient flex-shrink-0 rounded-full px-4 py-2.5 text-sm font-medium text-[var(--btn-text)] transition-colors whitespace-nowrap"
-                      : "flex-shrink-0 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4 py-2.5 text-sm font-medium text-[var(--color-light)] transition-colors whitespace-nowrap"
+                      ? "btn-gradient flex-shrink-0 rounded-full px-4 py-2.5 max-md:min-h-[44px] text-sm font-medium text-[var(--btn-text)] transition-colors whitespace-nowrap"
+                      : "flex-shrink-0 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4 py-2.5 max-md:min-h-[44px] text-sm font-medium text-[var(--color-light)] transition-colors whitespace-nowrap"
                   }
                 >
                   {t(`nav.${type}`)} ({byType[type as MediaType] ?? 0})
@@ -260,7 +260,7 @@ export function PublicProfile() {
                 <ToggleGroupItem
                   key={type}
                   value={type}
-                  className="rounded-md px-4 py-3 text-sm data-[state=on]:bg-gradient-to-br data-[state=on]:from-[var(--btn-gradient-start)] data-[state=on]:to-[var(--btn-gradient-end)] data-[state=on]:text-[var(--btn-text)] md:px-3 md:py-2"
+                  className="rounded-md px-4 py-3 text-sm max-md:min-h-[44px] data-[state=on]:bg-gradient-to-br data-[state=on]:from-[var(--btn-gradient-start)] data-[state=on]:to-[var(--btn-gradient-end)] data-[state=on]:text-[var(--btn-text)] md:px-3 md:py-2"
                   aria-label={`${t(`nav.${type}`)} (${byType[type as MediaType] ?? 0})`}
                 >
                   {t(`nav.${type}`)} ({byType[type as MediaType] ?? 0})

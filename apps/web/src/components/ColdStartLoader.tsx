@@ -22,6 +22,14 @@ export function ColdStartLoader() {
   }, []);
 
   useEffect(() => {
+    if (state === "loading") return;
+    const w = window as Window & { Capacitor?: { isNativePlatform?: () => boolean } };
+    if (w.Capacitor?.isNativePlatform?.()) {
+      import("@capacitor/splash-screen").then(({ SplashScreen }) => SplashScreen.hide());
+    }
+  }, [state]);
+
+  useEffect(() => {
     if (state !== "loading") return;
     const tick = () => {
       const elapsed = Date.now() - startTimeRef.current;

@@ -36,7 +36,7 @@ function NavLinkItem({
       to={to}
       className={cn(
         "flex items-center rounded-lg text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/50",
-        iconOnly ? "flex-1 justify-center py-3" : "gap-2 px-3 py-2 text-sm font-medium",
+        iconOnly ? "flex-1 justify-center py-4" : "gap-2 px-3 py-2 text-sm font-medium",
         active && "bg-[var(--color-mid)]/50",
         className
       )}
@@ -108,7 +108,7 @@ export function Nav() {
       </aside>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 flex flex-1 items-stretch border-t border-[var(--color-mid)]/30 bg-[var(--color-dark)] md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 flex flex-1 items-stretch border-t border-[var(--color-mid)]/30 bg-[var(--color-dark)] pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden"
         aria-label="Main navigation"
       >
         {token ? (

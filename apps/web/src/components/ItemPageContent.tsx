@@ -492,7 +492,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
         <Button
           variant="ghost"
           size="sm"
-          className="w-fit bg-transparent cursor-pointer hover:bg-[var(--color-dark)]"
+          className="w-fit max-md:min-h-[44px] max-md:min-w-[44px] bg-transparent cursor-pointer hover:bg-[var(--color-dark)]"
           onClick={onBack}
         >
           <ArrowLeft size={20} />
