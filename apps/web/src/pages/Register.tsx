@@ -69,7 +69,7 @@ export function Register() {
           ...(country.trim().length === 2 && { country: country.trim().toUpperCase() }),
         }),
       });
-      login(data.token, { ...data.user, onboarded: data.user.onboarded ?? false });
+      await login(data.token, { ...data.user, onboarded: data.user.onboarded ?? false });
       toast.success(t("toast.accountCreated"));
       navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
     } catch (err) {

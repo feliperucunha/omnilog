@@ -76,6 +76,7 @@ export function Login() {
         method: "POST",
         body: JSON.stringify({ email: email.trim(), password }),
         skipAuthRedirect: true,
+        timeout: 25_000,
       });
       if (rememberMe) {
         void storage.setItem(
@@ -85,7 +86,7 @@ export function Login() {
       } else {
         void storage.removeItem(REMEMBER_LOGIN_KEY);
       }
-      login(data.token, { ...data.user, onboarded: data.user.onboarded ?? true });
+      await login(data.token, { ...data.user, onboarded: data.user.onboarded ?? true });
       toast.success(t("toast.welcomeBack"));
       navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
     } catch (err) {

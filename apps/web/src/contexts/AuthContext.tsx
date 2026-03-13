@@ -38,28 +38,44 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function isNative(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as Window & { Capacitor?: { isNativePlatform?: () => boolean } };
+  return Boolean(w?.Capacitor?.isNativePlatform?.());
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({ token: null, user: null, initializing: true });
+  /** On native, never block on "checking session" – start ready so the app shows immediately. Session restore runs in background. */
+  const [state, setState] = useState<AuthState>(() => ({
+    token: null,
+    user: null,
+    initializing: !isNative(),
+  }));
 
   /** Load from persistent storage first (Capacitor Preferences on native, localStorage on web). Then cookie /me if none. */
   useEffect(() => {
     let cancelled = false;
-    /** Safety: if storage or /me hangs (e.g. on Android), stop showing "checking session" after this. */
-    const INIT_TIMEOUT_MS = 25_000;
-    const timeoutId = setTimeout(() => {
-      if (cancelled) return;
-      setState((prev) => (prev.initializing ? { ...prev, initializing: false } : prev));
-    }, INIT_TIMEOUT_MS);
+    const native = isNative();
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (!native) {
+      /** Web: safety timeout if storage or /me hangs. */
+      timeoutId = setTimeout(() => {
+        if (cancelled) return;
+        setState((prev) => (prev.initializing ? { ...prev, initializing: false } : prev));
+      }, 25_000);
+    }
 
     (async () => {
       try {
-        const storageTimeoutMs = 5_000;
-        const [token, userJson] = await Promise.race([
-          Promise.all([storage.getItem(TOKEN_KEY), storage.getItem(USER_KEY)]),
-          new Promise<[string | null, string | null]>((_, reject) =>
-            setTimeout(() => reject(new Error("storage timeout")), storageTimeoutMs)
-          ),
-        ]).catch(() => [null, null] as [string | null, string | null]);
+        const [token, userJson] = native
+          ? await Promise.all([storage.getItem(TOKEN_KEY), storage.getItem(USER_KEY)])
+          : await Promise.race([
+              Promise.all([storage.getItem(TOKEN_KEY), storage.getItem(USER_KEY)]),
+              new Promise<[string | null, string | null]>((_, reject) =>
+                setTimeout(() => reject(new Error("storage timeout")), 5_000)
+              ),
+            ]).catch(() => [null, null] as [string | null, string | null]);
         if (cancelled) return;
         if (token && userJson && token !== COOKIE_SESSION) {
           try {
@@ -75,7 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // ignore
       }
       if (cancelled) return;
-      // No stored session — try cookie /me
+      // No stored session — try cookie /me (skip on native: /me with credentials can hang in Capacitor HTTP)
+      if (native) return;
       const attempt = (retryCount: number) => {
         apiFetch<{ user: User }>("/me", {
           skipAuthRedirect: true,
@@ -108,9 +125,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       attempt(1);
     })();
+
     return () => {
       cancelled = true;
-      clearTimeout(timeoutId);
+      if (timeoutId != null) clearTimeout(timeoutId);
     };
   }, []);
 
@@ -123,10 +141,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("auth:logout", handleLogout);
   }, []);
 
-  const login = useCallback((token: string, user: User) => {
+  const login = useCallback(async (token: string, user: User) => {
     if (token !== COOKIE_SESSION) {
-      void storage.setItem(TOKEN_KEY, token);
-      void storage.setItem(USER_KEY, JSON.stringify(user));
+      await Promise.all([
+        storage.setItem(TOKEN_KEY, token),
+        storage.setItem(USER_KEY, JSON.stringify(user)),
+      ]);
     }
     setState({ token, user, initializing: false });
   }, []);

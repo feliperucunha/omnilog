@@ -56,7 +56,7 @@ export function ResetPassword() {
         method: "POST",
         body: JSON.stringify({ token, password }),
       });
-      login(data.token, { ...data.user, onboarded: data.user.onboarded ?? true });
+      await login(data.token, { ...data.user, onboarded: data.user.onboarded ?? true });
       toast.success(t("resetPassword.success"));
       navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
     } catch (err) {
