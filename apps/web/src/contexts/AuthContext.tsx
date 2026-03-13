@@ -44,12 +44,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Load from persistent storage first (Capacitor Preferences on native, localStorage on web). Then cookie /me if none. */
   useEffect(() => {
     let cancelled = false;
+    /** Safety: if storage or /me hangs (e.g. on Android), stop showing "checking session" after this. */
+    const INIT_TIMEOUT_MS = 25_000;
+    const timeoutId = setTimeout(() => {
+      if (cancelled) return;
+      setState((prev) => (prev.initializing ? { ...prev, initializing: false } : prev));
+    }, INIT_TIMEOUT_MS);
+
     (async () => {
       try {
-        const [token, userJson] = await Promise.all([
-          storage.getItem(TOKEN_KEY),
-          storage.getItem(USER_KEY),
-        ]);
+        const storageTimeoutMs = 5_000;
+        const [token, userJson] = await Promise.race([
+          Promise.all([storage.getItem(TOKEN_KEY), storage.getItem(USER_KEY)]),
+          new Promise<[string | null, string | null]>((_, reject) =>
+            setTimeout(() => reject(new Error("storage timeout")), storageTimeoutMs)
+          ),
+        ]).catch(() => [null, null] as [string | null, string | null]);
         if (cancelled) return;
         if (token && userJson && token !== COOKIE_SESSION) {
           try {
@@ -100,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
     };
   }, []);
 
