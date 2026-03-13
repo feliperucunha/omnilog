@@ -52,7 +52,7 @@ export function Statistics() {
   const { me } = useMe();
   const { visibleTypes } = useVisibleMediaTypes();
   const { setPageTitle, setRightSlot } = usePageTitle() ?? {};
-  const isPro = me?.tier === "pro";
+  const isPro = me?.tier === "pro" || me?.tier === "admin";
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [statsGroup, setStatsGroup] = useState<StatsGroup>("category");

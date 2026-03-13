@@ -52,12 +52,28 @@ export function Settings() {
   const [selectedMediaTypes, setSelectedMediaTypes] = useState<Set<MediaType>>(new Set(MEDIA_TYPES));
   const [searchParams] = useSearchParams();
   const [advancedOpen, setAdvancedOpen] = useState(() => searchParams.get("open") === "api-keys");
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminUsers, setAdminUsers] = useState<
+    { id: string; email: string; username: string | null; loginCount: number; logsCount: number; lastLoginAt: string | null; createdAt: string }[]
+  >([]);
+  const [adminUsersLoading, setAdminUsersLoading] = useState(false);
+  const [adminUsersError, setAdminUsersError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(() => getShowCompleteModal());
 
   useEffect(() => {
     if (searchParams.get("open") === "api-keys") setAdvancedOpen(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (me?.tier !== "admin" || !adminOpen) return;
+    setAdminUsersLoading(true);
+    setAdminUsersError(null);
+    apiFetch<{ data: typeof adminUsers }>("/admin/users")
+      .then((res) => setAdminUsers(res.data ?? []))
+      .catch((err) => setAdminUsersError(err instanceof Error ? err.message : t("settings.adminUsersError")))
+      .finally(() => setAdminUsersLoading(false));
+  }, [me?.tier, adminOpen, t]);
 
   useEffect(() => {
     if (me?.apiKeys) {
@@ -217,6 +233,10 @@ export function Settings() {
                         {t("tiers.manageSubscription")}
                       </Link>
                     )
+                  ) : me.tier === "admin" ? (
+                    <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
+                      {t("tiers.admin")}
+                    </Link>
                   ) : (
                     <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
                       {t("settings.viewPlans")}
@@ -293,7 +313,7 @@ export function Settings() {
             <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
               {t("settings.publicProfileCustomization")}
             </h3>
-            {me?.tier === "pro" ? (
+            {me?.tier === "pro" || me?.tier === "admin" ? (
               <>
                 <p className="text-sm text-[var(--color-light)]">
                   {t("settings.visibleMediaTypesIntro")}
@@ -338,7 +358,7 @@ export function Settings() {
           <Card
             className={cn(
               "border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]",
-              me.tier !== "pro" && "opacity-75"
+              me.tier !== "pro" && me.tier !== "admin" && "opacity-75"
             )}
           >
             <div className="flex flex-col gap-4">
@@ -348,7 +368,7 @@ export function Settings() {
               <p className="text-sm text-[var(--color-light)]">
                 {t("tiers.proExportDesc")}
               </p>
-              {me.tier === "pro" ? (
+              {me.tier === "pro" || me.tier === "admin" ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -540,6 +560,73 @@ export function Settings() {
             </div>
           )}
         </div>
+
+        {me?.tier === "admin" && (
+          <div className="rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">
+            <button
+              type="button"
+              onClick={() => setAdminOpen((prev) => !prev)}
+              className="flex w-full items-center gap-2 px-4 py-3 max-md:min-h-[44px] text-left text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-darkest)]/50 focus:outline-none"
+              aria-expanded={adminOpen}
+            >
+              {adminOpen ? (
+                <ChevronDown className="h-5 w-5 shrink-0 text-[var(--color-light)]" aria-hidden />
+              ) : (
+                <ChevronRight className="h-5 w-5 shrink-0 text-[var(--color-light)]" aria-hidden />
+              )}
+              <span className="font-semibold">{t("settings.adminSection")}</span>
+            </button>
+            {adminOpen && (
+              <div className="border-t border-[var(--color-surface-border)] px-4 pb-4 pt-2">
+                <p className="mb-3 text-sm text-[var(--color-light)]">
+                  {t("settings.adminUsersIntro")}
+                </p>
+                {adminUsersLoading && (
+                  <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
+                )}
+                {adminUsersError && (
+                  <p className="text-sm text-red-400">{adminUsersError}</p>
+                )}
+                {!adminUsersLoading && !adminUsersError && adminUsers.length > 0 && (
+                  <div className="overflow-x-auto rounded-lg border border-[var(--color-mid)]/30">
+                    <table className="w-full min-w-[600px] text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50">
+                          <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">{t("settings.adminTableEmail")}</th>
+                          <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">{t("settings.adminTableUsername")}</th>
+                          <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">{t("settings.adminTableLogins")}</th>
+                          <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">{t("settings.adminTableLogs")}</th>
+                          <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">{t("settings.adminTableLastLogin")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminUsers.map((u) => (
+                          <tr key={u.id} className="border-b border-[var(--color-mid)]/20">
+                            <td className="px-3 py-2 text-[var(--color-lightest)]">{u.email}</td>
+                            <td className="px-3 py-2 text-[var(--color-light)]">{u.username ?? "—"}</td>
+                            <td className="px-3 py-2 text-[var(--color-light)]">{u.loginCount}</td>
+                            <td className="px-3 py-2 text-[var(--color-light)]">{u.logsCount}</td>
+                            <td className="px-3 py-2 text-[var(--color-light)]">
+                              {u.lastLoginAt
+                                ? new Date(u.lastLoginAt).toLocaleString(locale, {
+                                    dateStyle: "short",
+                                    timeStyle: "short",
+                                  })
+                                : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {!adminUsersLoading && !adminUsersError && adminUsers.length === 0 && adminOpen && (
+                  <p className="text-sm text-[var(--color-light)]">{t("settings.adminNoUsers")}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );

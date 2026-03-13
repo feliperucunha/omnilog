@@ -5,7 +5,7 @@ import { Share2, AlertTriangle, User, ChevronDown, ChevronRight } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
-import { apiFetch, apiFetchCached } from "@/lib/api";
+import { apiFetch, apiFetchCached, LOGS_INVALIDATED_EVENT } from "@/lib/api";
 import { FullPageLoader } from "@/components/FullPageLoader";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -227,6 +227,17 @@ export function Dashboard() {
     apiFetch<MilestoneProgressResponse>("/me/milestones/progress")
       .then(setMilestoneProgress)
       .catch(() => setMilestoneProgress(null));
+  }, [token]);
+
+  useEffect(() => {
+    const refetchMilestones = () => {
+      if (!token) return;
+      apiFetch<MilestoneProgressResponse>("/me/milestones/progress")
+        .then(setMilestoneProgress)
+        .catch(() => setMilestoneProgress(null));
+    };
+    window.addEventListener(LOGS_INVALIDATED_EVENT, refetchMilestones);
+    return () => window.removeEventListener(LOGS_INVALIDATED_EVENT, refetchMilestones);
   }, [token]);
 
   const handleShare = useCallback(async () => {

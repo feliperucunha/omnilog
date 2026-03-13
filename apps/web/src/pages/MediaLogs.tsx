@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Search, AlertTriangle, Plus, Download, Pencil } from "lucide-react";
@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react";
 import type { MediaType, Log } from "@dogument/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@dogument/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, apiFetchFile } from "@/lib/api";
+import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, apiFetchFile, LOGS_INVALIDATED_EVENT } from "@/lib/api";
 import { showAchievementToasts } from "@/lib/achievementToast";
 import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
@@ -123,6 +123,20 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       .catch(() => setMilestoneProgressFetched(null));
   }, [readOnly, milestoneProgressProp, mediaType, me]);
 
+  useEffect(() => {
+    if (readOnly || milestoneProgressProp != null || !me) return;
+    const refetch = () => {
+      apiFetch<{ perMedium: CategoryMilestoneProgress[] }>("/me/milestones/progress")
+        .then((res) => {
+          const forMedia = res.perMedium?.find((p) => p.mediaType === mediaType) ?? null;
+          setMilestoneProgressFetched(forMedia);
+        })
+        .catch(() => setMilestoneProgressFetched(null));
+    };
+    window.addEventListener(LOGS_INVALIDATED_EVENT, refetch);
+    return () => window.removeEventListener(LOGS_INVALIDATED_EVENT, refetch);
+  }, [readOnly, milestoneProgressProp, mediaType, me]);
+
   const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
   const CHAPTER_TYPES: MediaType[] = ["manga"];
   const VOLUME_TYPES: MediaType[] = ["comics"];
@@ -199,6 +213,10 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       .then((res) => setStatusCounts(res.data ?? null))
       .catch(() => setStatusCounts(null));
   }, [mediaType, publicUserId]);
+
+  useEffect(() => {
+    setCategorySearchQuery("");
+  }, [mediaType]);
 
   useEffect(() => {
     const useInitial = embedded && initialLogsProp !== undefined;
@@ -298,15 +316,23 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
 
   const label = t(`nav.${mediaType}`);
 
+  const filteredLogs = useMemo(() => {
+    const q = categorySearchQuery.trim().toLowerCase();
+    if (!q) return logs;
+    return logs.filter((log) => log.title.toLowerCase().includes(q));
+  }, [logs, categorySearchQuery]);
+
   const handleCategorySearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const q = categorySearchQuery.trim();
-    navigate("/search", { state: { mediaType, query: q || undefined } });
+    if (!embedded) {
+      const q = categorySearchQuery.trim();
+      navigate("/search", { state: { mediaType, query: q || undefined } });
+    }
   };
 
-  const isPro = me?.tier === "pro";
+  const hasProFeatures = me?.tier === "pro" || me?.tier === "admin";
   const handleExportCategory = async () => {
-    if (!isPro) {
+    if (!hasProFeatures) {
       setShowProModal(true);
       return;
     }
@@ -366,7 +392,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   return (
     <div className={`relative min-h-full min-w-0 overflow-hidden pb-24 md:pb-20 ${embedded ? "" : ""}`}>
       {!readOnly && (
-        <Dialog open={showProModal && !isPro} onOpenChange={setShowProModal}>
+        <Dialog open={showProModal && !hasProFeatures} onOpenChange={setShowProModal}>
           <DialogContent onClose={() => setShowProModal(false)}>
             <DialogHeader>
               <DialogTitle className="text-[var(--color-lightest)]">
@@ -432,7 +458,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
               size="icon"
               className={cn(
                 "shrink-0",
-                !isPro && "opacity-60 cursor-pointer"
+                !hasProFeatures && "opacity-60 cursor-pointer"
               )}
               onClick={handleExportCategory}
               disabled={exportingCategory}
@@ -517,6 +543,20 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       )}
 
       {!readOnly && (
+      <div className="flex min-w-0 flex-col gap-3 overflow-hidden">
+        {embedded && (
+          <div className="flex min-w-0 items-center gap-2">
+            <Search className="h-4 w-4 shrink-0 text-[var(--color-light)]" aria-hidden />
+            <Input
+              type="search"
+              placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
+              value={categorySearchQuery}
+              onChange={(e) => setCategorySearchQuery(e.target.value)}
+              className="max-w-xs border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-lightest)] placeholder:text-[var(--color-light)]"
+              aria-label={t("mediaLogs.searchTitlesLabel")}
+            />
+          </div>
+        )}
       <div className="flex min-w-0 flex-wrap items-center gap-3 overflow-hidden">
         {/* Mobile (< md): custom dropdowns, no labels */}
         <div className="grid w-full grid-cols-2 gap-2 md:hidden">
@@ -591,9 +631,10 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         </div>
         </div>
       </div>
+      </div>
       )}
 
-      {logs.length === 0 ? (
+      {filteredLogs.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -601,9 +642,11 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           className="flex flex-1 flex-col items-center justify-center min-h-[50vh] py-12"
         >
           <p className="text-center text-[var(--color-light)]">
-            {t("mediaLogs.noLogsFor", { label: label.toLowerCase() })}
+            {logs.length === 0
+              ? t("mediaLogs.noLogsFor", { label: label.toLowerCase() })
+              : t("mediaLogs.noTitlesMatchSearch")}
           </p>
-          {!readOnly && (
+          {!readOnly && logs.length === 0 && (
             <Link
               to="/search"
               state={{ mediaType }}
@@ -616,7 +659,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       ) : (
         <motion.div variants={staggerContainer} initial="initial" animate="animate" className="min-w-0 overflow-hidden">
           <div className="flex min-w-0 flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-            {logs.map((log) => {
+            {filteredLogs.map((log) => {
               const isDropped = log.status === "dropped";
               const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
               const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);

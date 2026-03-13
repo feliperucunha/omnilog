@@ -139,7 +139,16 @@
       "bgg": "1. Entra en boardgamegeek.com e inicia sesión (o crea una cuenta).\n2. Abre el enlace Applications de abajo.\n3. Haz clic para crear una nueva aplicación (ej.: \"Dogument\").\n4. Elige uso no comercial si es para uso personal; envía y espera la aprobación (puede tardar unos días).\n5. Una vez aprobada, abre tu aplicación y crea un Token.\n6. Copia el Bearer token y pégalo abajo.",
       "ludopedia": "1. Crea una cuenta en https://ludopedia.com.br/novousuario o inicia sesión en ludopedia.com.br.\n2. Abre Aplicativos (https://www.ludopedia.com.br/aplicativos) y crea una aplicación.\n3. Usa el flujo OAuth de Ludopedia para obtener un token de acceso (consulta la documentación de la API). La clave necesaria para Ominilog es el Access Token (ACCESS_TOKEN).\n4. El token es válido 60 días; pégalo abajo.",
       "comicvine": "1. Entra en comicvine.gamespot.com y crea una cuenta gratuita o inicia sesión.\n2. Abre el enlace de la documentación de la API de abajo.\n3. Solicita una clave de API (gratuita) en la página de Comic Vine API.\n4. Copia tu clave de API y pégala abajo."
-    }
+    },
+    "adminSection": "Admin",
+    "adminUsersIntro": "Todos los usuarios registrados y su actividad.",
+    "adminUsersError": "No se pudieron cargar los usuarios.",
+    "adminNoUsers": "Aún no hay usuarios.",
+    "adminTableEmail": "Correo",
+    "adminTableUsername": "Usuario",
+    "adminTableLogins": "Logins",
+    "adminTableLogs": "Logs",
+    "adminTableLastLogin": "Último acceso"
   },
   "common": {
     "required": "obligatorio",
@@ -301,7 +310,10 @@
     "addLog": "Añadir log",
     "addOne": "Añadir uno",
     "noLogsFor": "Aún no hay logs de {{label}}.",
+    "noTitlesMatchSearch": "Ningún título coincide con la búsqueda.",
     "searchAndAddOne": "Busca y añade uno",
+    "searchTitlesLabel": "Buscar títulos en esta categoría",
+    "searchTitlesPlaceholder": "Buscar {{category}}…",
     "couldntLoadLogs": "No se pudieron cargar los logs",
     "filterAll": "Todos",
     "sortLabel": "Ordenar:",

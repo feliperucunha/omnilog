@@ -140,7 +140,16 @@
       "bgg": "1. Go to boardgamegeek.com and log in (or create an account).\n2. Open the Applications link below.\n3. Click to create a new application (e.g. \"Dogument\").\n4. Choose non-commercial if it's for personal use; submit and wait for approval (can take a few days).\n5. Once approved, open your application and create a Token.\n6. Copy the Bearer token and paste it below.",
       "ludopedia": "1. Create an account at https://ludopedia.com.br/novousuario or log in at ludopedia.com.br.\n2. Open Aplicativos (https://www.ludopedia.com.br/aplicativos) and create an application.\n3. Use Ludopedia's OAuth flow to obtain an access token (see API documentation). The key required for Ominilog is the Access Token (ACCESS_TOKEN).\n4. The token is valid for 60 days; paste it below.",
       "comicvine": "1. Go to comicvine.gamespot.com and create a free account or log in.\n2. Open the API documentation link below.\n3. Request an API key (free) from the Comic Vine API page.\n4. Copy your API key and paste it below."
-    }
+    },
+    "adminSection": "Admin",
+    "adminUsersIntro": "All registered users and their activity.",
+    "adminUsersError": "Could not load users.",
+    "adminNoUsers": "No users yet.",
+    "adminTableEmail": "Email",
+    "adminTableUsername": "Username",
+    "adminTableLogins": "Logins",
+    "adminTableLogs": "Logs",
+    "adminTableLastLogin": "Last login"
   },
   "common": {
     "required": "required",
@@ -302,7 +311,10 @@
     "addLog": "Add log",
     "addOne": "Add one",
     "noLogsFor": "No logs for {{label}} yet.",
+    "noTitlesMatchSearch": "No titles match your search.",
     "searchAndAddOne": "Search and add one",
+    "searchTitlesLabel": "Search titles in this category",
+    "searchTitlesPlaceholder": "Search {{category}}…",
     "couldntLoadLogs": "Couldn't load logs",
     "filterAll": "All",
     "sortLabel": "Sort:",

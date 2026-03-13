@@ -403,7 +403,8 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
     where: { id: userId },
     select: { tier: true },
   });
-  if (user?.tier !== "pro") {
+  const hasProAccess = user?.tier === "pro" || user?.tier === "admin";
+  if (!hasProAccess) {
     res.json({ data: [] });
     return;
   }
@@ -446,7 +447,8 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
     where: { id: userId },
     select: { tier: true },
   });
-  if (user?.tier !== "pro") {
+  const hasProAccess = user?.tier === "pro" || user?.tier === "admin";
+  if (!hasProAccess) {
     const year = typeof req.query.year === "string" ? parseInt(req.query.year, 10) : new Date().getFullYear();
     const month = typeof req.query.month === "string" ? parseInt(req.query.month, 10) : new Date().getMonth() + 1;
     res.json({ year: Number.isFinite(year) ? year : new Date().getFullYear(), month: Number.isFinite(month) ? month : new Date().getMonth() + 1, dates: {} });
@@ -498,7 +500,8 @@ logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
     where: { id: userId },
     select: { tier: true },
   });
-  if (user?.tier !== "pro") {
+  const hasProAccess = user?.tier === "pro" || user?.tier === "admin";
+  if (!hasProAccess) {
     res.status(403).json({ error: "Export is available on Pro only", code: "PRO_REQUIRED" });
     return;
   }

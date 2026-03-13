@@ -14,6 +14,7 @@ import { cronRouter, runSubscriptionExpiry } from "./routes/cron.js";
 import { usersRouter } from "./routes/users.js";
 import { feedbackRouter } from "./routes/feedback.js";
 import { followsRouter } from "./routes/follows.js";
+import { adminRouter } from "./routes/admin.js";
 import { prisma } from "./lib/prisma.js";
 import { runSeedBadges } from "./scripts/seedBadges.js";
 import { runSeedMilestones } from "./scripts/seedMilestones.js";
@@ -86,6 +87,7 @@ app.use("/api/cron", cronRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/feedback", feedbackRouter);
 app.use("/api/follows", followsRouter);
+app.use("/api/admin", adminRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, version: APP_VERSION });

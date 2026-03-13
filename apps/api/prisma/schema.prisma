@@ -71,6 +71,8 @@ model User {
   currentStreak       Int      @default(0)
   lastReviewDate      DateTime?
   selectedBadgeIds    String?  // JSON array of up to 3 badge IDs for profile display
+  loginCount          Int      @default(0)  // number of times the user has logged in
+  lastLoginAt         DateTime?            // last login timestamp
   createdAt           DateTime @default(now())
   updatedAt      DateTime @updatedAt
   logs          Log[]

@@ -154,10 +154,17 @@ export function invalidateApiCache(prefix: string): void {
   invalidateByPrefix(prefix);
 }
 
+/** Custom event dispatched when logs/items cache is invalidated so Dashboard/MediaLogs can refetch milestone progress. */
+export const LOGS_INVALIDATED_EVENT = "dogument-logs-invalidated";
+
 /** Invalidate logs and items caches (use after any log mutation). */
 export function invalidateLogsAndItemsCache(): void {
   invalidateByPrefix("/logs");
   invalidateByPrefix("/items");
+  invalidateByPrefix("/me");
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(LOGS_INVALIDATED_EVENT));
+  }
 }
 
 export interface ApiFetchOptions extends RequestInit {

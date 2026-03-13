@@ -123,6 +123,11 @@ authRouter.post("/login", async (req, res) => {
     res.status(401).json({ error: "Invalid email/username or password" });
     return;
   }
+  const now = new Date();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { loginCount: { increment: 1 }, lastLoginAt: now },
+  });
   const token = jwt.sign(
     { userId: user.id, email: user.email },
     JWT_SECRET,
