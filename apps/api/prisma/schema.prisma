@@ -22,6 +22,8 @@ enum BadgeMedium {
   MANGA
   COMIC
   BOOK
+  GAME
+  BOARD_GAME
 }
 
 enum BadgeRarity {
@@ -128,6 +130,8 @@ model UserReviewStats {
   mangaReviews           Int      @default(0)
   comicReviews           Int      @default(0)
   bookReviews            Int      @default(0)
+  gameReviews            Int      @default(0)
+  boardGameReviews       Int      @default(0)
   totalReviews           Int      @default(0)
   distinctMediaReviewed  Int      @default(0)
   user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -16,6 +16,8 @@ import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
+import { LevelBadge } from "@/components/LevelBadge";
+import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
@@ -124,8 +126,14 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
   const CHAPTER_TYPES: MediaType[] = ["manga"];
   const VOLUME_TYPES: MediaType[] = ["comics"];
+  /** +1 button only for types that track progress (tv, anime, manga, comics). Not for games, boardgames, movies, books. */
   const hasProgressButton =
     EPISODE_TYPES.includes(mediaType) || CHAPTER_TYPES.includes(mediaType) || VOLUME_TYPES.includes(mediaType);
+  /** Hide +1 when item is already complete/read/watched/played. */
+  const showIncrementForLog = (log: Log) =>
+    hasProgressButton &&
+    log.status != null &&
+    !(COMPLETED_STATUSES as readonly string[]).includes(log.status);
 
   const getProgress = (log: Log): { field: "episode" | "chapter" | "volume"; value: number; labelKey: string } => {
     if (EPISODE_TYPES.includes(log.mediaType))
@@ -441,29 +449,34 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         )}
         </div>
         {!readOnly && milestoneProgress && (() => {
+          // Use a single scope (reviews or logs) for the whole row so current badge, bar, and next badge match
           const scope = milestoneProgress.reviews.next ? milestoneProgress.reviews : milestoneProgress.logs;
-          const currentBadge = milestoneProgress.reviews.earned.length > 0
-            ? milestoneProgress.reviews.earned[milestoneProgress.reviews.earned.length - 1]
-            : milestoneProgress.logs.earned.length > 0
-              ? milestoneProgress.logs.earned[milestoneProgress.logs.earned.length - 1]
-              : null;
+          const currentBadge =
+            scope.earned.length > 0 ? scope.earned[scope.earned.length - 1]! : null;
           const next = scope.next;
           const displayCurrent = next ? Math.min(scope.current, next.threshold) : scope.current;
           const displayPct = scope.progressPct;
+          const kind = scope === milestoneProgress.reviews ? "reviews" : "logs";
+          const categoryLabel = t(`nav.${mediaType}`);
+          const badgeUser = t("mediaLogs.badgePopupYou");
           return (
             <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
               {currentBadge && (
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)]/80 px-2.5 py-1 text-xs font-medium text-[var(--color-lightest)] sm:px-3 sm:py-1.5 sm:text-sm"
+                <LevelBadge
+                  icon={MEDIA_BADGE_ICONS[mediaType]}
+                  level={scope.earned.length}
                   title={currentBadge.label}
-                >
-                  <span aria-hidden>{currentBadge.icon}</span>
-                  <span className="max-w-[120px] truncate sm:max-w-[180px]">{currentBadge.label}</span>
-                </span>
+                  popupDetail={{
+                    user: badgeUser,
+                    categoryLabel,
+                    count: scope.current,
+                    kind,
+                  }}
+                />
               )}
               {next && (
-                <div className="flex min-w-0 flex-1 items-center gap-2 min-[400px]:min-w-0">
-                  <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)] max-w-[200px] sm:max-w-[240px]">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)] max-w-[280px] sm:max-w-[340px]">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
                       style={{
@@ -473,11 +486,19 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                     />
                   </div>
                   <span className="shrink-0 text-xs text-[var(--color-light)]" title={next.label}>
-                    {t("mediaLogs.badgeProgressReviews", {
-                      current: String(displayCurrent),
-                      target: String(next.threshold),
-                    })}
+                    {displayCurrent}/{next.threshold}
                   </span>
+                  <LevelBadge
+                    icon={MEDIA_BADGE_ICONS[mediaType]}
+                    level={scope.earned.length + 1}
+                    title={next.label}
+                    popupDetail={{
+                      user: badgeUser,
+                      categoryLabel,
+                      count: scope.current,
+                      kind,
+                    }}
+                  />
                 </div>
               )}
             </div>
@@ -702,10 +723,10 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                         )}
                       </div>
                     </div>
-                    {/* Right: +1 (primary) + edit */}
+                    {/* Right: +1 (primary) + edit — +1 only when progress type and not complete/read/watched */}
                     {!readOnly && (
                       <div className="flex flex-shrink-0 flex-col justify-center gap-2 border-l border-[var(--color-surface-border)] p-2">
-                        {hasProgressButton && (
+                        {showIncrementForLog(log) && (
                           <button
                             type="button"
                             onClick={(e) => {

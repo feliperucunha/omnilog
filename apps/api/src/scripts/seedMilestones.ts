@@ -6,8 +6,10 @@ const BADGE_MEDIA: { medium: BadgeMedium; label: string; icon: string }[] = [
   { medium: "TV_SHOW", label: "TV Show", icon: "📺" },
   { medium: "ANIME", label: "Anime", icon: "🌸" },
   { medium: "MANGA", label: "Manga", icon: "📖" },
-  { medium: "COMIC", label: "Comic", icon: "💬" },
+  { medium: "COMIC", label: "Comic", icon: "🦸" },
   { medium: "BOOK", label: "Book", icon: "📚" },
+  { medium: "GAME", label: "Game", icon: "🎮" },
+  { medium: "BOARD_GAME", label: "Board Game", icon: "🎲" },
 ];
 
 const REVIEW_TIERS = [

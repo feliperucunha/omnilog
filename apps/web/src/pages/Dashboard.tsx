@@ -39,7 +39,6 @@ interface FeedEntry {
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 const BETA_MODAL_STORAGE_KEY = "dogument.betaModalSeen";
 const SOCIAL_COLLAPSED_STORAGE_KEY = "dogument.dashboard.socialCollapsed";
-const BADGES_COLLAPSED_STORAGE_KEY = "dogument.dashboard.badgesCollapsed";
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** Base URL for share profile link (always prod so shared links work). */
 const PROFILE_SHARE_BASE_URL = "https://dogument-one.vercel.app";
@@ -89,7 +88,6 @@ export function Dashboard() {
   /** Log id whose review is expanded in-card (no modal). */
   const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
   const [socialCollapsed, setSocialCollapsed] = useState(false);
-  const [badgesCollapsed, setBadgesCollapsed] = useState(false);
   const [milestoneProgress, setMilestoneProgress] = useState<MilestoneProgressResponse | null>(null);
   const isMobile = useIsMobile();
   /** Initial logs for first paint (avoids second skeleton). Cleared when category changes so MediaLogs can show its skeleton. */
@@ -103,25 +101,13 @@ export function Dashboard() {
   /** Load collapsed prefs from persistent storage (Android/Capacitor). */
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      storage.getItem(SOCIAL_COLLAPSED_STORAGE_KEY),
-      storage.getItem(BADGES_COLLAPSED_STORAGE_KEY),
-    ]).then(([social, badges]) => {
+    storage.getItem(SOCIAL_COLLAPSED_STORAGE_KEY).then((social) => {
       if (cancelled) return;
       if (social === "true") setSocialCollapsed(true);
-      if (badges === "true") setBadgesCollapsed(true);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  const toggleBadgesCollapsed = useCallback(() => {
-    setBadgesCollapsed((prev) => {
-      const next = !prev;
-      void storage.setItem(BADGES_COLLAPSED_STORAGE_KEY, next ? "true" : "false");
-      return next;
-    });
   }, []);
 
   const toggleSocialCollapsed = useCallback(() => {
@@ -446,106 +432,6 @@ export function Dashboard() {
               initialLogsData?.mediaType === selectedCategory ? initialLogsData.nextCursor : undefined
             }
           />
-        </section>
-      )}
-
-      {token && (
-        <section aria-label={t("dashboard.badgesSectionTitle")} className="flex min-w-0 flex-col gap-4 overflow-hidden">
-          <button
-            type="button"
-            onClick={toggleBadgesCollapsed}
-            className="flex min-w-0 items-center gap-2 rounded-md py-1 max-md:min-h-[44px] max-md:py-3 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none"
-            aria-expanded={!badgesCollapsed}
-            aria-controls="dashboard-badges-content"
-            id="dashboard-badges-heading"
-          >
-            {badgesCollapsed ? (
-              <ChevronRight className="h-5 w-5 shrink-0" aria-hidden />
-            ) : (
-              <ChevronDown className="h-5 w-5 shrink-0" aria-hidden />
-            )}
-            <span className="min-w-0 truncate">{t("dashboard.badgesSectionTitle")}</span>
-            {milestoneProgress && (() => {
-              const pm = milestoneProgress.perMedium.find((p) => p.mediaType === selectedCategory);
-              const earnedCount = (pm ? pm.reviews.earned.length + pm.logs.earned.length : 0) +
-                milestoneProgress.global.reviews.earned.length + milestoneProgress.global.logs.earned.length;
-              return earnedCount > 0 ? (
-                <span className="shrink-0 text-sm font-normal text-[var(--color-light)]">
-                  {t("dashboard.badgesEarnedCount", { count: String(earnedCount) })}
-                </span>
-              ) : null;
-            })()}
-          </button>
-          {!badgesCollapsed && (
-            <div id="dashboard-badges-content" role="region" aria-labelledby="dashboard-badges-heading">
-              {!milestoneProgress ? (
-                <div className="min-h-[80px] flex items-center justify-center rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50">
-                  <span className="text-sm text-[var(--color-light)]">{t("common.loading")}</span>
-                </div>
-              ) : (
-                <div className="flex min-w-0 flex-col gap-4 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50 p-4">
-                  {(() => {
-                    const pm = milestoneProgress.perMedium.find((p) => p.mediaType === selectedCategory);
-                    const scope = pm?.reviews ?? milestoneProgress.global.reviews;
-                    const next = scope.next;
-                    const displayCurrent = Math.min(scope.current, next?.threshold ?? scope.current);
-                    const displayPct = scope.progressPct;
-                    return (
-                      <>
-                        {next ? (
-                          <div className="flex min-w-0 flex-col gap-2">
-                            <p className="text-sm font-medium text-[var(--color-lightest)]">
-                              {pm
-                                ? t("dashboard.badgesNextForCategory", {
-                                    category: t(`nav.${selectedCategory}`),
-                                  })
-                                : t("dashboard.badgesNextBadge")}
-                            </p>
-                            <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-                              <span className="shrink-0 text-2xl" aria-hidden>
-                                {next.icon}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium text-[var(--color-lightest)]">
-                                  {next.label}
-                                </p>
-                                <div className="mt-1.5 flex items-center gap-2">
-                                  <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)]">
-                                    <div
-                                      className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
-                                      style={{
-                                        width: `${displayPct}%`,
-                                        minWidth: displayCurrent > 0 ? "4px" : 0,
-                                      }}
-                                    />
-                                  </div>
-                                  <span className="shrink-0 text-xs text-[var(--color-light)]">
-                                    {t("dashboard.badgesProgressLabel", {
-                                      current: String(displayCurrent),
-                                      target: String(next.threshold),
-                                    })}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ) : scope.earned.length > 0 ? (
-                          <p className="text-sm text-[var(--color-light)]">
-                            {t("dashboard.badgesNoNextBadge")}
-                          </p>
-                        ) : null}
-                        {!next && scope.earned.length === 0 && (
-                          <p className="text-sm text-[var(--color-light)]">
-                            {t("dashboard.badgesAddOrReview")}
-                          </p>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-          )}
         </section>
       )}
 

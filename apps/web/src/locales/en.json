@@ -312,10 +312,18 @@
     "exportCategory": "Download this list as CSV",
     "exportCategorySuccess": "List downloaded",
     "badgeProgressReviews": "{{current}}/{{target}} reviews",
-    "badgeNextUp": "Next: {{name}}"
+    "badgeNextUp": "Next: {{name}}",
+    "badgePopupYou": "You",
+    "badgePopupYouHas": "You have {{amount}} {{kind}} in {{category}}",
+    "badgePopupUserHas": "{{user}} has {{amount}} {{kind}} in {{category}}",
+    "badgePopupReview": "review",
+    "badgePopupReviews": "reviews",
+    "badgePopupLog": "log",
+    "badgePopupLogs": "logs"
   },
   "itemPage": {
     "back": "Back",
+    "badgePopupUserEarnedIn": "{{user}} earned {{label}} in {{category}}",
     "logInToReview": "Log in to leave a review or add this to your favorites or pending list.",
     "logInLink": "Log in",
     "timeToBeat": "Time to beat",

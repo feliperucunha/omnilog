@@ -14,11 +14,13 @@ import { usePageTitle } from "@/contexts/PageTitleContext";
 import { ItemReviewForm } from "@/components/ItemReviewForm";
 import { ItemPageSkeleton } from "@/components/skeletons";
 import { Select } from "@/components/ui/select";
-import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
+import { LevelBadge } from "@/components/LevelBadge";
+import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
-import { formatTimeToFinish, formatTimeToBeatHours } from "@/lib/formatDuration";
+import { formatTimeToBeatHours } from "@/lib/formatDuration";
+import { getHeroImageUrl } from "@/lib/getHeroImageUrl";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
 
@@ -489,28 +491,55 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
       className="min-w-0 overflow-x-hidden"
     >
       <div className="flex min-w-0 flex-col gap-8">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-fit max-md:min-h-[44px] max-md:min-w-[44px] bg-transparent cursor-pointer hover:bg-[var(--color-dark)]"
-          onClick={onBack}
-        >
-          <ArrowLeft size={20} />
-          {t("itemPage.back")}
-        </Button>
-        <div className="flex min-w-0 flex-wrap items-start gap-6">
-          <div className="h-48 w-32 flex-shrink-0 rounded-xl shadow-[var(--shadow-card)] sm:h-64 sm:w-44">
-            <ItemImage src={item.image} className="h-full w-full rounded-xl" />
+        {/* Hero header: high-res image background with strong gradient for readable text */}
+        <header className="relative min-h-[min(38vh,280px)] w-full overflow-hidden rounded-xl sm:min-h-[min(42vh,360px)]">
+          {/* Background image (higher-res when possible) or fallback */}
+          <div
+            className="absolute inset-0 bg-[var(--color-darkest)] bg-cover bg-center bg-no-repeat"
+            style={
+              (() => {
+                const heroUrl = getHeroImageUrl(item.image);
+                return heroUrl ? { backgroundImage: `url(${heroUrl})` } : undefined;
+              })()
+            }
+          />
+          {/* Strong gradient: dark scrim from ~30% down so text always has contrast */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, transparent 20%, rgba(0,0,0,0.4) 50%, var(--color-darkest) 75%)",
+            }}
+          />
+          {/* Extra solid bar at bottom so title/meta sit on opaque background */}
+          <div
+            className="pointer-events-none absolute bottom-0 left-0 right-0 h-1/2 min-h-[140px]"
+            style={{
+              background: "linear-gradient(to bottom, transparent 0%, var(--color-darkest) 55%)",
+            }}
+          />
+          {/* Back button: top-left with slight tint for contrast */}
+          <div className="absolute left-0 top-0 z-10 p-2 sm:p-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="max-md:min-h-[44px] max-md:min-w-[44px] rounded-full bg-black/40 text-[var(--color-lightest)] backdrop-blur-sm hover:bg-black/55"
+              onClick={onBack}
+            >
+              <ArrowLeft size={20} />
+              {t("itemPage.back")}
+            </Button>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <p className="text-sm font-medium uppercase text-[var(--color-light)]">
+          {/* Title and meta: text-shadow for readability on any image */}
+          <div className="absolute bottom-0 left-0 right-0 z-10 flex flex-col gap-1.5 p-4 pb-6 sm:p-6 sm:pb-8 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
+            <p className="text-sm font-medium uppercase tracking-wide text-[var(--color-light)] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
               {label}
             </p>
-            <h1 className="text-xl font-bold text-[var(--color-lightest)] break-words sm:text-2xl">
+            <h1 className="text-xl font-bold text-[var(--color-lightest)] break-words sm:text-2xl md:text-3xl [text-shadow:0_2px_8px_rgba(0,0,0,0.95)]">
               {item.title}
             </h1>
             {(item.year || item.subtitle) && (
-              <p className="text-[var(--color-light)]">
+              <p className="text-sm text-[var(--color-light)] [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
                 {[item.year, item.subtitle].filter(Boolean).join(" · ")}
               </p>
             )}
@@ -526,13 +555,13 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                       })
                     : t("itemPage.timeToBeatHours", { hours: String(hours) });
                 return (
-                  <p className="text-[var(--color-light)]">
+                  <p className="text-sm text-[var(--color-light)] [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
                     {t("itemPage.timeToBeat")}: {value}
                   </p>
                 );
               })()}
             {meanGrade != null && (
-              <div className="mt-4 flex flex-wrap items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
                 <StarRating value={gradeToStars(meanGrade)} readOnly size="md" />
                 <span className="text-sm text-[var(--color-light)]">
                   ({reviewsTotal} review{reviewsTotal === 1 ? "" : "s"})
@@ -540,7 +569,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
               </div>
             )}
           </div>
-        </div>
+        </header>
 
         <ItemDetailsBlock item={item} mediaType={mediaType} t={t} />
 
@@ -631,69 +660,69 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                         style={paperShadow}
                       >
                         <div className="flex flex-col gap-4 p-4 sm:p-5">
-                          {/* Author + Pro */}
+                          {/* Author + all level badges */}
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-base font-semibold text-[var(--color-lightest)]">
+                            <span
+                              className={`text-base font-semibold ${r.isPro ? "pro-username-shine" : "text-[var(--color-lightest)]"}`}
+                            >
                               {r.reviewerUsername ?? r.userEmail}
                             </span>
-                            {r.isPro && (
-                              <span
-                                className="inline-flex rounded-full bg-[var(--btn-gradient-start)]/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-[var(--btn-gradient-start)]"
-                                title="Pro"
-                              >
-                                Pro
-                              </span>
-                            )}
+                            {(r.reviewerBadges?.length
+                              ? r.reviewerBadges
+                              : r.reviewerLevelIcon
+                                ? [{ icon: r.reviewerLevelIcon, level: r.reviewerLevel ?? 1, label: r.reviewerLevelLabel ?? "" }]
+                                : []
+                            ).map((badge) => (
+                              <LevelBadge
+                                key={`${badge.level}-${badge.icon}`}
+                                icon={MEDIA_BADGE_ICONS[mediaType]}
+                                level={badge.level}
+                                title={badge.label || undefined}
+                                popupDetail={{
+                                  user: r.reviewerUsername ?? r.userEmail ?? "—",
+                                  categoryLabel: t(`nav.${mediaType}`),
+                                  label: badge.label ?? undefined,
+                                  count: r.reviewerReviewsInCategory,
+                                  kind: "reviews",
+                                }}
+                              />
+                            ))}
                           </div>
 
-                          {/* Badges & meta: level, status, progress, duration */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            {(r.reviewerLevelLabel ?? r.reviewerLevelIcon) && (
-                              <span
-                                className="inline-flex items-center gap-1 rounded-md bg-[var(--color-darkest)] px-2 py-1 text-xs text-[var(--color-light)]"
-                                title={r.reviewerLevelLabel ?? undefined}
+                          {/* Rating + date; on mobile status/episode badges go on next line */}
+                          <div className="flex flex-col gap-2 border-b border-[var(--color-surface-border)]/60 pb-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                              {r.grade != null && (
+                                <StarRating value={gradeToStars(r.grade)} readOnly size="sm" />
+                              )}
+                              <time
+                                className="text-xs text-[var(--color-light)]"
+                                dateTime={r.createdAt}
                               >
-                                {r.reviewerLevelIcon && <span aria-hidden>{r.reviewerLevelIcon}</span>}
-                                {r.reviewerLevelLabel && <span>{r.reviewerLevelLabel}</span>}
-                              </span>
-                            )}
-                            {(r.status ?? r.listType) && (
-                              <span className="rounded-md bg-[var(--color-darkest)] px-2 py-1 text-xs text-[var(--color-light)]">
-                                {getStatusLabel(t, r.status ?? r.listType ?? null, mediaType)}
-                              </span>
-                            )}
-                            {(r.season != null || r.episode != null) && (
-                              <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
-                                S{r.season ?? "?"} · E{r.episode ?? "?"}
-                              </span>
-                            )}
-                            {(r.chapter != null || r.volume != null) && (
-                              <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
-                                Ch.{r.chapter ?? "?"} · Vol.{r.volume ?? "?"}
-                              </span>
-                            )}
-                            {r.startedAt && r.completedAt && (
-                              <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
-                                {t("dashboard.finishedIn", { duration: formatTimeToFinish(r.startedAt, r.completedAt) })}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Rating + date */}
-                          <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-surface-border)]/60 pb-4">
-                            {r.grade != null && (
-                              <StarRating value={gradeToStars(r.grade)} readOnly size="sm" />
-                            )}
-                            <time
-                              className="text-xs text-[var(--color-light)]"
-                              dateTime={r.createdAt}
-                            >
-                              {new Date(r.createdAt).toLocaleDateString(locale, {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              })}
-                            </time>
+                                {new Date(r.createdAt).toLocaleDateString(locale, {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </time>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {(r.status ?? r.listType) && (
+                                <span className="rounded-md bg-[var(--color-darkest)] px-2 py-1 text-xs text-[var(--color-light)]">
+                                  {getStatusLabel(t, r.status ?? r.listType ?? null, mediaType)}
+                                </span>
+                              )}
+                              {(r.season != null || r.episode != null) && (
+                                <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+                                  S{r.season ?? "?"} · E{r.episode ?? "?"}
+                                </span>
+                              )}
+                              {(r.chapter != null || r.volume != null) && (
+                                <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+                                  Ch.{r.chapter ?? "?"} · Vol.{r.volume ?? "?"}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           {/* Review body */}

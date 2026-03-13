@@ -6,7 +6,7 @@
 import type { BadgeMedium } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
-const APP_MEDIA_TYPES = ["movies", "tv", "anime", "manga", "comics", "books"] as const;
+const APP_MEDIA_TYPES = ["movies", "tv", "anime", "manga", "comics", "books", "games", "boardgames"] as const;
 const MEDIA_TO_BADGE: Record<string, BadgeMedium> = {
   movies: "MOVIE",
   tv: "TV_SHOW",
@@ -14,15 +14,19 @@ const MEDIA_TO_BADGE: Record<string, BadgeMedium> = {
   manga: "MANGA",
   comics: "COMIC",
   books: "BOOK",
+  games: "GAME",
+  boardgames: "BOARD_GAME",
 };
 
-const REVIEW_COLUMNS: Record<BadgeMedium, keyof { movieReviews: number; tvShowReviews: number; animeReviews: number; mangaReviews: number; comicReviews: number; bookReviews: number }> = {
+const REVIEW_COLUMNS: Record<BadgeMedium, keyof { movieReviews: number; tvShowReviews: number; animeReviews: number; mangaReviews: number; comicReviews: number; bookReviews: number; gameReviews: number; boardGameReviews: number }> = {
   MOVIE: "movieReviews",
   TV_SHOW: "tvShowReviews",
   ANIME: "animeReviews",
   MANGA: "mangaReviews",
   COMIC: "comicReviews",
   BOOK: "bookReviews",
+  GAME: "gameReviews",
+  BOARD_GAME: "boardGameReviews",
 };
 
 const LOG_KEYS: Record<BadgeMedium, string> = {
@@ -32,6 +36,8 @@ const LOG_KEYS: Record<BadgeMedium, string> = {
   MANGA: "mangaLogs",
   COMIC: "comicLogs",
   BOOK: "bookLogs",
+  GAME: "gameLogs",
+  BOARD_GAME: "boardGameLogs",
 };
 
 export interface MilestoneInfo {
@@ -73,6 +79,8 @@ async function getReviewStats(userId: string) {
       mangaReviews: 0,
       comicReviews: 0,
       bookReviews: 0,
+      gameReviews: 0,
+      boardGameReviews: 0,
       totalReviews: 0,
     };
   return {
@@ -82,6 +90,8 @@ async function getReviewStats(userId: string) {
     mangaReviews: row.mangaReviews,
     comicReviews: row.comicReviews,
     bookReviews: row.bookReviews,
+    gameReviews: row.gameReviews ?? 0,
+    boardGameReviews: row.boardGameReviews ?? 0,
     totalReviews: row.totalReviews,
   };
 }
@@ -99,6 +109,8 @@ async function getLogStats(userId: string): Promise<Record<string, number> & { t
     mangaLogs: 0,
     comicLogs: 0,
     bookLogs: 0,
+    gameLogs: 0,
+    boardGameLogs: 0,
     totalLogs: 0,
   };
   let total = 0;
@@ -244,18 +256,44 @@ export async function getMilestoneProgress(userId: string): Promise<MilestonePro
 export interface ReviewerMilestoneInfo {
   label: string;
   icon: string;
+  /** 1-based level (position in sorted milestones) for display as Roman numeral */
+  level: number;
+}
+
+export interface ReviewerMilestonesWithCount {
+  badges: ReviewerMilestoneInfo[];
+  /** Review count in this category (for tooltip: "X has N reviews in Y") */
+  count: number;
 }
 
 /**
  * Get the highest earned review milestone for a given medium for multiple users.
- * Used on item pages so the badge matches the dashboard (e.g. "First TV Show Review").
+ * Used when a single badge is needed (e.g. backward compat).
  */
 export async function getReviewerMilestoneForMediumBatch(
   userIds: string[],
   mediaType: string
 ): Promise<Map<string, ReviewerMilestoneInfo | null>> {
+  const allMap = await getAllReviewerMilestonesForMediumBatch(userIds, mediaType);
+  const map = new Map<string, ReviewerMilestoneInfo | null>();
+  for (const [userId, { badges }] of allMap) {
+    map.set(userId, badges.length > 0 ? badges[badges.length - 1]! : null);
+  }
+  return map;
+}
+
+/**
+ * Get all earned review milestones for a given medium for multiple users.
+ * Used on item pages so reviews can show every badge the reviewer has earned in that medium.
+ * Also returns each reviewer's review count in that category for tooltips.
+ */
+export async function getAllReviewerMilestonesForMediumBatch(
+  userIds: string[],
+  mediaType: string
+): Promise<Map<string, ReviewerMilestonesWithCount>> {
   const medium = MEDIA_TO_BADGE[mediaType];
-  if (!medium) return new Map(userIds.map((id) => [id, null]));
+  if (!medium)
+    return new Map(userIds.map((id) => [id, { badges: [], count: 0 }]));
 
   try {
     const [milestones, statsRows] = await Promise.all([
@@ -269,16 +307,20 @@ export async function getReviewerMilestoneForMediumBatch(
     ]);
     const countKey = REVIEW_COLUMNS[medium];
     const sorted = [...milestones].sort((a, b) => a.threshold - b.threshold);
-    const map = new Map<string, ReviewerMilestoneInfo | null>();
+    const map = new Map<string, ReviewerMilestonesWithCount>();
     for (const userId of userIds) {
       const row = statsRows.find((r) => r.userId === userId);
       const count = (row?.[countKey] as number) ?? 0;
       const earned = sorted.filter((m) => count >= m.threshold);
-      const highest = earned.length > 0 ? earned[earned.length - 1] : null;
-      map.set(userId, highest ? { label: highest.label, icon: highest.icon } : null);
+      const badges: ReviewerMilestoneInfo[] = earned.map((m) => ({
+        label: m.label,
+        icon: m.icon,
+        level: sorted.findIndex((mil) => mil.id === m.id) + 1,
+      }));
+      map.set(userId, { badges, count });
     }
     return map;
   } catch {
-    return new Map(userIds.map((id) => [id, null]));
+    return new Map(userIds.map((id) => [id, { badges: [], count: 0 }]));
   }
 }

@@ -135,6 +135,22 @@
   font-family: var(--font-display);
 }
 
+/** Pro username on review cards: signature green with subtle shine */
+@keyframes pro-username-shine {
+  0%, 100% {
+    text-shadow: 0 0 12px var(--btn-gradient-start);
+    opacity: 1;
+  }
+  50% {
+    text-shadow: 0 0 20px var(--btn-gradient-start);
+    opacity: 0.92;
+  }
+}
+.pro-username-shine {
+  color: var(--btn-gradient-start);
+  animation: pro-username-shine 2s ease-in-out infinite;
+}
+
 /* Light theme and defaults */
 :root {
   --color-darkest: #0D1B2A;

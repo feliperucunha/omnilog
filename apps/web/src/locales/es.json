@@ -311,10 +311,18 @@
     "exportCategory": "Descargar esta lista en CSV",
     "exportCategorySuccess": "Lista descargada",
     "badgeProgressReviews": "{{current}}/{{target}} reseñas",
-    "badgeNextUp": "Siguiente: {{name}}"
+    "badgeNextUp": "Siguiente: {{name}}",
+    "badgePopupYou": "Tú",
+    "badgePopupYouHas": "Tienes {{amount}} {{kind}} en {{category}}",
+    "badgePopupUserHas": "{{user}} tiene {{amount}} {{kind}} en {{category}}",
+    "badgePopupReview": "reseña",
+    "badgePopupReviews": "reseñas",
+    "badgePopupLog": "registro",
+    "badgePopupLogs": "registros"
   },
   "itemPage": {
     "back": "Volver",
+    "badgePopupUserEarnedIn": "{{user}} consiguió {{label}} en {{category}}",
     "logInToReview": "Inicia sesión para dejar una reseña o añadir a favoritos o pendientes.",
     "logInLink": "Iniciar sesión",
     "timeToBeat": "Tiempo para completar",

@@ -52,14 +52,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializing: !isNative(),
   }));
 
-  /** Load from persistent storage first (Capacitor Preferences on native, localStorage on web). Then cookie /me if none. */
+  /** Load from storage first (web: localStorage + cookie; native: Capacitor Preferences + localStorage fallback). Then cookie /me on web if none. */
   useEffect(() => {
     let cancelled = false;
     const native = isNative();
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     if (!native) {
-      /** Web: safety timeout if storage or /me hangs. */
+      /** Web: safety timeout if /me hangs (storage is sync-friendly). */
       timeoutId = setTimeout(() => {
         if (cancelled) return;
         setState((prev) => (prev.initializing ? { ...prev, initializing: false } : prev));
@@ -68,14 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
-        const [token, userJson] = native
-          ? await Promise.all([storage.getItem(TOKEN_KEY), storage.getItem(USER_KEY)])
-          : await Promise.race([
-              Promise.all([storage.getItem(TOKEN_KEY), storage.getItem(USER_KEY)]),
-              new Promise<[string | null, string | null]>((_, reject) =>
-                setTimeout(() => reject(new Error("storage timeout")), 5_000)
-              ),
-            ]).catch(() => [null, null] as [string | null, string | null]);
+        const [token, userJson] = await Promise.all([
+          storage.getItem(TOKEN_KEY),
+          storage.getItem(USER_KEY),
+        ]);
         if (cancelled) return;
         if (token && userJson && token !== COOKIE_SESSION) {
           try {
@@ -91,8 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // ignore
       }
       if (cancelled) return;
-      // No stored session — try cookie /me (skip on native: /me with credentials can hang in Capacitor HTTP)
-      if (native) return;
+      // No stored session — on native we're done; on web try cookie /me
+      if (native) {
+        setState((prev) => ({ ...prev, initializing: false }));
+        return;
+      }
       const attempt = (retryCount: number) => {
         apiFetch<{ user: User }>("/me", {
           skipAuthRedirect: true,

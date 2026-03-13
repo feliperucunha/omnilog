@@ -54,11 +54,6 @@ export function Settings() {
   const [advancedOpen, setAdvancedOpen] = useState(() => searchParams.get("open") === "api-keys");
   const [exporting, setExporting] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(() => getShowCompleteModal());
-  type EarnedBadge = { id: string; name: string; description: string; icon: string; medium: string | null; rarity: string; earnedAt: string };
-  const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);
-  const [selectedBadgeIds, setSelectedBadgeIds] = useState<string[]>([]);
-  const [profileBadgesLoading, setProfileBadgesLoading] = useState(true);
-  const [savingProfileBadges, setSavingProfileBadges] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("open") === "api-keys") setAdvancedOpen(true);
@@ -81,21 +76,6 @@ export function Settings() {
       setSelectedMediaTypes(new Set(me.visibleMediaTypes as MediaType[]));
     }
   }, [me?.visibleMediaTypes]);
-
-  useEffect(() => {
-    if (!token) return;
-    setProfileBadgesLoading(true);
-    Promise.all([
-      apiFetch<{ data: EarnedBadge[] }>("/me/badges"),
-      apiFetch<{ badgeIds: string[] }>("/settings/profile-badges"),
-    ])
-      .then(([badgesRes, profileRes]) => {
-        setEarnedBadges(badgesRes.data ?? []);
-        setSelectedBadgeIds(profileRes.badgeIds ?? []);
-      })
-      .catch(() => {})
-      .finally(() => setProfileBadgesLoading(false));
-  }, [token]);
 
   const handleSave = async (provider: ApiKeyProvider) => {
     const value =
@@ -170,28 +150,6 @@ export function Settings() {
         method: "PUT",
         body: JSON.stringify({ locale: newLocale }),
       }).catch(() => {});
-    }
-  };
-
-  const handleToggleProfileBadge = async (badgeId: string) => {
-    const next = selectedBadgeIds.includes(badgeId)
-      ? selectedBadgeIds.filter((id) => id !== badgeId)
-      : selectedBadgeIds.length >= 3
-        ? [...selectedBadgeIds.slice(1), badgeId]
-        : [...selectedBadgeIds, badgeId];
-    setSelectedBadgeIds(next);
-    setSavingProfileBadges(true);
-    try {
-      await apiFetch("/settings/profile-badges", {
-        method: "PUT",
-        body: JSON.stringify({ badgeIds: next }),
-      });
-      toast.success(t("settings.profileBadgesSaved"));
-    } catch (err) {
-      setSelectedBadgeIds(selectedBadgeIds);
-      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
-    } finally {
-      setSavingProfileBadges(false);
     }
   };
 
@@ -327,53 +285,6 @@ export function Settings() {
                 />
               </div>
             </div>
-          </div>
-        </Card>
-
-        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
-          <div className="flex flex-col gap-4">
-            <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
-              {t("settings.profileBadges")}
-            </h3>
-            <p className="text-sm text-[var(--color-light)]">
-              {t("settings.profileBadgesIntro")}
-            </p>
-            {profileBadgesLoading ? (
-              <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
-            ) : earnedBadges.length === 0 ? (
-              <p className="text-sm text-[var(--color-light)]">
-                {t("settings.profileBadgesNoBadges")}
-              </p>
-            ) : (
-              <>
-                <p className="text-xs text-[var(--color-light)]">
-                  {t("settings.profileBadgesSelected", { count: String(selectedBadgeIds.length) })}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {earnedBadges.map((b) => {
-                    const selected = selectedBadgeIds.includes(b.id);
-                    return (
-                      <button
-                        key={b.id}
-                        type="button"
-                        onClick={() => handleToggleProfileBadge(b.id)}
-                        disabled={savingProfileBadges}
-                        className={cn(
-                          "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition-colors",
-                          selected
-                            ? "border-[var(--btn-gradient-start)] bg-[var(--color-mid)]/30 text-[var(--color-lightest)]"
-                            : "border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 text-[var(--color-light)] hover:bg-[var(--color-darkest)]"
-                        )}
-                        title={b.description}
-                      >
-                        <span aria-hidden>{b.icon}</span>
-                        <span className="max-w-[180px] truncate">{b.name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
           </div>
         </Card>
 

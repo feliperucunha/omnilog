@@ -14,7 +14,7 @@ import { getBoardGameById } from "../services/bgg.js";
 import { getBoardGameByIdLudopedia } from "../services/ludopedia.js";
 import { getVolumeById } from "../services/comicvine.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
-import { getReviewerMilestoneForMediumBatch } from "../services/milestone.service.js";
+import { getAllReviewerMilestonesForMediumBatch } from "../services/milestone.service.js";
 
 export const itemsRouter = Router();
 itemsRouter.use(optionalAuthMiddleware);
@@ -224,21 +224,25 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
       : null;
 
   const logIds = logs.map((l) => l.id);
-  const [reactionMap, reviewerMilestones] = await Promise.all([
+  const [reactionMap, reviewerBadgesMap] = await Promise.all([
     getReactionsForLogs(logIds, currentUserId),
-    getReviewerMilestoneForMediumBatch(logs.map((l) => l.userId), mediaType),
+    getAllReviewerMilestonesForMediumBatch(logs.map((l) => l.userId), mediaType),
   ]);
 
   const reviews = logs.map((l) => {
     const stats = reactionMap.get(l.id);
-    const milestone = reviewerMilestones.get(l.userId);
+    const { badges, count: reviewerReviewsInCategory } = reviewerBadgesMap.get(l.userId) ?? { badges: [] as { label: string; icon: string; level: number }[], count: 0 };
+    const last = badges.length > 0 ? badges[badges.length - 1]! : null;
     return {
       id: l.id,
       userEmail: l.user.email,
       reviewerUsername: l.user.username ?? null,
       isPro: l.user.tier === "pro",
-      reviewerLevelLabel: milestone?.label,
-      reviewerLevelIcon: milestone?.icon,
+      reviewerBadges: badges,
+      reviewerLevel: last?.level ?? undefined,
+      reviewerLevelLabel: last?.label,
+      reviewerLevelIcon: last?.icon,
+      reviewerReviewsInCategory,
       grade: l.grade,
       review: l.review,
       listType: l.listType,
@@ -412,21 +416,25 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
       : null;
 
   const logIds = logs.map((l) => l.id);
-  const [reactionMap, reviewerMilestones] = await Promise.all([
+  const [reactionMap, reviewerBadgesMap] = await Promise.all([
     getReactionsForLogs(logIds, currentUserId),
-    getReviewerMilestoneForMediumBatch(logs.map((l) => l.userId), mediaType),
+    getAllReviewerMilestonesForMediumBatch(logs.map((l) => l.userId), mediaType),
   ]);
 
   const reviews = logs.map((l) => {
     const stats = reactionMap.get(l.id);
-    const milestone = reviewerMilestones.get(l.userId);
+    const { badges, count: reviewerReviewsInCategory } = reviewerBadgesMap.get(l.userId) ?? { badges: [] as { label: string; icon: string; level: number }[], count: 0 };
+    const last = badges.length > 0 ? badges[badges.length - 1]! : null;
     return {
       id: l.id,
       userEmail: l.user.email,
       reviewerUsername: l.user.username ?? null,
       isPro: l.user.tier === "pro",
-      reviewerLevelLabel: milestone?.label,
-      reviewerLevelIcon: milestone?.icon,
+      reviewerBadges: badges,
+      reviewerLevel: last?.level ?? undefined,
+      reviewerLevelLabel: last?.label,
+      reviewerLevelIcon: last?.icon,
+      reviewerReviewsInCategory,
       grade: l.grade,
       review: l.review,
       listType: l.listType,

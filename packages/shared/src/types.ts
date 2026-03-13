@@ -234,7 +234,11 @@ export interface ItemReview {
   reviewerUsername?: string | null;
   /** True when the review author is on the Pro tier */
   isPro?: boolean;
-  /** Reviewer level (1-based) for badge of honor on review pages */
+  /** All earned review badges for this medium (icon + level + label). Show all on review cards. */
+  reviewerBadges?: Array<{ level: number; label: string; icon: string }>;
+  /** Reviewer's review count in this category (for badge tooltip: "X has N reviews in Y"). */
+  reviewerReviewsInCategory?: number;
+  /** Reviewer level (1-based) for backward compat; equals last badge in reviewerBadges when present */
   reviewerLevel?: number;
   /** Label for reviewer level (e.g. "Critic", "Expert") */
   reviewerLevelLabel?: string;

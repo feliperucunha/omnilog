@@ -2,7 +2,7 @@ import type { BadgeConditionType, BadgeMedium } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
 /** App media types that count toward badge stats (maps to BadgeMedium). */
-const BADGE_MEDIA_TYPES = ["movies", "tv", "anime", "manga", "comics", "books"] as const;
+const BADGE_MEDIA_TYPES = ["movies", "tv", "anime", "manga", "comics", "books", "games", "boardgames"] as const;
 const APP_MEDIA_TYPES_LIST = [...BADGE_MEDIA_TYPES];
 const MEDIA_TO_BADGE: Record<string, BadgeMedium> = {
   movies: "MOVIE",
@@ -11,6 +11,8 @@ const MEDIA_TO_BADGE: Record<string, BadgeMedium> = {
   manga: "MANGA",
   comics: "COMIC",
   books: "BOOK",
+  games: "GAME",
+  boardgames: "BOARD_GAME",
 };
 
 /** Reverse: BadgeMedium -> app media type for API responses. */
@@ -21,6 +23,8 @@ export const BADGE_MEDIUM_TO_APP: Record<BadgeMedium, string> = {
   MANGA: "manga",
   COMIC: "comics",
   BOOK: "books",
+  GAME: "games",
+  BOARD_GAME: "boardgames",
 };
 
 type ReviewCountKey =
@@ -29,7 +33,9 @@ type ReviewCountKey =
   | "animeReviews"
   | "mangaReviews"
   | "comicReviews"
-  | "bookReviews";
+  | "bookReviews"
+  | "gameReviews"
+  | "boardGameReviews";
 
 function getStatsColumn(medium: BadgeMedium): ReviewCountKey {
   const map: Record<BadgeMedium, ReviewCountKey> = {
@@ -39,6 +45,8 @@ function getStatsColumn(medium: BadgeMedium): ReviewCountKey {
     MANGA: "mangaReviews",
     COMIC: "comicReviews",
     BOOK: "bookReviews",
+    GAME: "gameReviews",
+    BOARD_GAME: "boardGameReviews",
   };
   return map[medium];
 }
@@ -50,6 +58,8 @@ async function ensureReviewStats(userId: string): Promise<{
   mangaReviews: number;
   comicReviews: number;
   bookReviews: number;
+  gameReviews: number;
+  boardGameReviews: number;
   totalReviews: number;
   distinctMediaReviewed: number;
 }> {
@@ -59,7 +69,11 @@ async function ensureReviewStats(userId: string): Promise<{
       data: { userId },
     });
   }
-  return row;
+  return {
+    ...row,
+    gameReviews: row.gameReviews ?? 0,
+    boardGameReviews: row.boardGameReviews ?? 0,
+  };
 }
 
 /** Call when a new review is added (log created with review, or log updated from no review to having review). Returns badges newly granted. */
@@ -71,7 +85,7 @@ export async function handleReviewCreated(
 ): Promise<NewBadge[]> {
   if (!reviewText || reviewText.trim().length === 0) return [];
   const medium = MEDIA_TO_BADGE[mediaType];
-  if (!medium) return []; // boardgames, games don't count toward badge stats
+  if (!medium) return [];
 
   const stats = await ensureReviewStats(userId);
   const column = getStatsColumn(medium);
@@ -86,6 +100,8 @@ export async function handleReviewCreated(
     stats.mangaReviews,
     stats.comicReviews,
     stats.bookReviews,
+    stats.gameReviews,
+    stats.boardGameReviews,
   ].map((v, i) => (i === mediumIdx ? newValue : v));
   const distinctCount = distinctMedia.filter((v) => v > 0).length;
 
@@ -99,6 +115,8 @@ export async function handleReviewCreated(
       mangaReviews: medium === "MANGA" ? 1 : 0,
       comicReviews: medium === "COMIC" ? 1 : 0,
       bookReviews: medium === "BOOK" ? 1 : 0,
+      gameReviews: medium === "GAME" ? 1 : 0,
+      boardGameReviews: medium === "BOARD_GAME" ? 1 : 0,
       totalReviews: 1,
       distinctMediaReviewed: 1,
     },
@@ -109,6 +127,8 @@ export async function handleReviewCreated(
       mangaReviews: distinctMedia[3],
       comicReviews: distinctMedia[4],
       bookReviews: distinctMedia[5],
+      gameReviews: distinctMedia[6],
+      boardGameReviews: distinctMedia[7],
       totalReviews: stats.totalReviews + 1,
       distinctMediaReviewed: distinctCount,
     },
@@ -142,7 +162,7 @@ export async function handleReviewCreated(
  */
 export async function handleReviewRemoved(userId: string, mediaType: string): Promise<void> {
   const medium = MEDIA_TO_BADGE[mediaType];
-  if (!medium) return; // boardgames, games not in stats
+  if (!medium) return;
 
   const row = await prisma.userReviewStats.findUnique({ where: { userId } });
   if (!row) return; // no stats yet, nothing to decrement
@@ -159,7 +179,9 @@ export async function handleReviewRemoved(userId: string, mediaType: string): Pr
   const mangaReviews = column === "mangaReviews" ? newPerMedium : row.mangaReviews;
   const comicReviews = column === "comicReviews" ? newPerMedium : row.comicReviews;
   const bookReviews = column === "bookReviews" ? newPerMedium : row.bookReviews;
-  const distinctMediaReviewed = [movieReviews, tvShowReviews, animeReviews, mangaReviews, comicReviews, bookReviews].filter(
+  const gameReviews = column === "gameReviews" ? newPerMedium : (row.gameReviews ?? 0);
+  const boardGameReviews = column === "boardGameReviews" ? newPerMedium : (row.boardGameReviews ?? 0);
+  const distinctMediaReviewed = [movieReviews, tvShowReviews, animeReviews, mangaReviews, comicReviews, bookReviews, gameReviews, boardGameReviews].filter(
     (v) => v > 0
   ).length;
 
@@ -172,6 +194,8 @@ export async function handleReviewRemoved(userId: string, mediaType: string): Pr
       mangaReviews,
       comicReviews,
       bookReviews,
+      gameReviews,
+      boardGameReviews,
       totalReviews: newTotal,
       distinctMediaReviewed,
     },
@@ -195,6 +219,8 @@ const LOG_MEDIA_TO_BADGE: Record<string, BadgeMedium> = {
   manga: "MANGA",
   comics: "COMIC",
   books: "BOOK",
+  games: "GAME",
+  boardgames: "BOARD_GAME",
 };
 
 /** Check badge conditions against current stats and grant any newly earned badges. Call after review or log changes. */
@@ -219,6 +245,8 @@ export async function grantEarnedBadges(userId: string): Promise<NewBadge[]> {
     MANGA: reviewStats?.mangaReviews ?? 0,
     COMIC: reviewStats?.comicReviews ?? 0,
     BOOK: reviewStats?.bookReviews ?? 0,
+    GAME: reviewStats?.gameReviews ?? 0,
+    BOARD_GAME: reviewStats?.boardGameReviews ?? 0,
   };
   const totalReviews = reviewStats?.totalReviews ?? 0;
   const distinctMediaReviewed = reviewStats?.distinctMediaReviewed ?? 0;
@@ -231,6 +259,8 @@ export async function grantEarnedBadges(userId: string): Promise<NewBadge[]> {
     MANGA: 0,
     COMIC: 0,
     BOOK: 0,
+    GAME: 0,
+    BOARD_GAME: 0,
   };
   let totalLogs = 0;
   for (const r of logRows) {
