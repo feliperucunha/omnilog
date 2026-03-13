@@ -239,7 +239,6 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
   const canPreview =
     hasApiKeyForCategory && parseResult?.ok && parseResult.rows.length > 0 && !loadingPreview;
   const previewReady = !!(previewRow && previewResult);
-  const showStartImport = file && parseResult?.ok && previewReady && !confirming;
 
   useEffect(() => {
     if (!parseResult?.ok) previewLoadTriggeredRef.current = false;
