@@ -88,26 +88,27 @@ export async function runSeedMilestones(): Promise<void> {
   }
 
   for (const [threshold, label, icon] of GLOBAL_REVIEW_TIERS) {
-    await prisma.milestone.upsert({
-      where: {
-        metric_scope_medium_threshold: {
+    const existing = await prisma.milestone.findFirst({
+      where: { metric: "reviews", scope: "global", medium: null, threshold },
+    });
+    if (existing) {
+      await prisma.milestone.update({
+        where: { id: existing.id },
+        data: { label, icon, sortOrder: sortOrder++ },
+      });
+    } else {
+      await prisma.milestone.create({
+        data: {
           metric: "reviews",
           scope: "global",
-          medium: null as unknown as BadgeMedium,
+          medium: null,
           threshold,
+          label,
+          icon,
+          sortOrder: sortOrder++,
         },
-      },
-      create: {
-        metric: "reviews",
-        scope: "global",
-        medium: null as unknown as BadgeMedium,
-        threshold,
-        label,
-        icon,
-        sortOrder: sortOrder++,
-      },
-      update: { label, icon, sortOrder: sortOrder++ },
-    });
+      });
+    }
   }
 
   for (const { medium, label: mediumLabel, icon } of BADGE_MEDIA) {
@@ -138,26 +139,27 @@ export async function runSeedMilestones(): Promise<void> {
   }
 
   for (const [threshold, label, icon] of GLOBAL_LOG_TIERS) {
-    await prisma.milestone.upsert({
-      where: {
-        metric_scope_medium_threshold: {
+    const existing = await prisma.milestone.findFirst({
+      where: { metric: "logs", scope: "global", medium: null, threshold },
+    });
+    if (existing) {
+      await prisma.milestone.update({
+        where: { id: existing.id },
+        data: { label, icon, sortOrder: sortOrder++ },
+      });
+    } else {
+      await prisma.milestone.create({
+        data: {
           metric: "logs",
           scope: "global",
-          medium: null as unknown as BadgeMedium,
+          medium: null,
           threshold,
+          label,
+          icon,
+          sortOrder: sortOrder++,
         },
-      },
-      create: {
-        metric: "logs",
-        scope: "global",
-        medium: null as unknown as BadgeMedium,
-        threshold,
-        label,
-        icon,
-        sortOrder: sortOrder++,
-      },
-      update: { label, icon, sortOrder: sortOrder++ },
-    });
+      });
+    }
   }
 
   const count = await prisma.milestone.count();

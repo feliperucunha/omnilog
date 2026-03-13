@@ -22,6 +22,8 @@ import { APP_VERSION } from "@dogument/shared";
 const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
 
 const app = express();
+// When behind a proxy (e.g. Heroku), trust X-Forwarded-* so rate-limit and IP logging work correctly.
+app.set("trust proxy", 1);
 const PORT = process.env.PORT ?? 3001;
 const WEB_ORIGIN = process.env.WEB_ORIGIN ?? "http://localhost:5173";
 
