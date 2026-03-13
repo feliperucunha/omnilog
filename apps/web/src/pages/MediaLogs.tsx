@@ -510,7 +510,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           mediaType={mediaType}
           onSaved={(completion) => {
             setShowCustomEntry(false);
-            if (completion) handleSaved(completion);
+            handleSaved(completion);
           }}
           onCancel={() => setShowCustomEntry(false)}
         />

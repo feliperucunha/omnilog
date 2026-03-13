@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -89,6 +89,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
   const [failedReasons, setFailedReasons] = useState<Array<{ name: string; reason: string }>>([]);
   const [exampleOpen, setExampleOpen] = useState(false);
+  const previewLoadTriggeredRef = useRef(false);
 
   const exampleRows = useMemo(() => getExampleRows(mediaType), [mediaType]);
 
@@ -237,6 +238,20 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
 
   const canPreview =
     hasApiKeyForCategory && parseResult?.ok && parseResult.rows.length > 0 && !loadingPreview;
+  const previewReady = !!(previewRow && previewResult);
+  const showStartImport = file && parseResult?.ok && previewReady && !confirming;
+
+  useEffect(() => {
+    if (!parseResult?.ok) previewLoadTriggeredRef.current = false;
+  }, [parseResult?.ok]);
+
+  // Auto-load preview when file is parsed and we have API key
+  useEffect(() => {
+    if (!canPreview || loadingPreview || previewRow != null || confirming) return;
+    if (previewLoadTriggeredRef.current) return;
+    previewLoadTriggeredRef.current = true;
+    handleLoadPreview();
+  }, [canPreview, loadingPreview, previewRow, confirming, handleLoadPreview]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -391,12 +406,6 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
         )}
       </div>
 
-      {canPreview && !previewRow && (
-        <Button type="button" variant="secondary" size="sm" onClick={handleLoadPreview}>
-          {t("batchEntry.previewFirst")}
-        </Button>
-      )}
-
       {loadingPreview && (
         <div className="flex items-center gap-2 text-sm text-[var(--color-light)]">
           <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -404,7 +413,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
         </div>
       )}
 
-      {previewRow && previewResult && (
+      {previewRow && previewResult && !confirming && (
         <div className="rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-4">
           <p className="mb-3 text-xs font-medium text-[var(--color-light)]">
             {t("batchEntry.previewTitle")}
@@ -432,52 +441,37 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
               )}
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleConfirmAndAddAll}
-              disabled={confirming || !hasApiKeyForCategory}
-            >
-              {confirming ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                  <span className="ml-2">{t("batchEntry.adding")}</span>
-                </>
-              ) : (
-                t("batchEntry.confirmAndAddAll")
-              )}
-            </Button>
+        </div>
+      )}
+
+      {confirming && batchProgress && batchProgress.total > 0 && (
+        <div className="flex flex-col gap-2" role="progressbar" aria-valuenow={batchProgress.current} aria-valuemin={0} aria-valuemax={batchProgress.total} aria-label={t("batchEntry.addingProgress", { current: String(batchProgress.current), total: String(batchProgress.total) })}>
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--color-darkest)]">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-300"
+              style={{
+                width: `${Math.round((batchProgress.current / batchProgress.total) * 100)}%`,
+              }}
+            />
           </div>
-          {confirming && batchProgress && batchProgress.total > 0 && (
-            <div className="mt-4 flex flex-col gap-2" role="progressbar" aria-valuenow={batchProgress.current} aria-valuemin={0} aria-valuemax={batchProgress.total} aria-label={t("batchEntry.addingProgress", { current: String(batchProgress.current), total: String(batchProgress.total) })}>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--color-darkest)]">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-300"
-                  style={{
-                    width: `${Math.round((batchProgress.current / batchProgress.total) * 100)}%`,
-                  }}
-                />
-              </div>
-              <p className="text-center text-sm font-medium text-[var(--color-lightest)]">
-                {Math.round((batchProgress.current / batchProgress.total) * 100)}%
-              </p>
-            </div>
-          )}
-          {failedReasons.length > 0 && (
-            <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-              <p className="mb-2 text-sm font-medium text-red-400">
-                {t("batchEntry.failedReasonsTitle", { count: String(failedReasons.length) })}
-              </p>
-              <ul className="max-h-40 list-inside list-disc space-y-1 overflow-y-auto text-xs text-[var(--color-light)]">
-                {failedReasons.map(({ name, reason }, idx) => (
-                  <li key={`${idx}-${name}`}>
-                    <span className="font-medium text-[var(--color-lightest)]">{name}</span>: {reason}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <p className="text-center text-sm font-medium text-[var(--color-lightest)]">
+            {Math.round((batchProgress.current / batchProgress.total) * 100)}%
+          </p>
+        </div>
+      )}
+
+      {failedReasons.length > 0 && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+          <p className="mb-2 text-sm font-medium text-red-400">
+            {t("batchEntry.failedReasonsTitle", { count: String(failedReasons.length) })}
+          </p>
+          <ul className="max-h-40 list-inside list-disc space-y-1 overflow-y-auto text-xs text-[var(--color-light)]">
+            {failedReasons.map(({ name, reason }, idx) => (
+              <li key={`${idx}-${name}`}>
+                <span className="font-medium text-[var(--color-lightest)]">{name}</span>: {reason}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -491,19 +485,37 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
         >
           {t("common.cancel")}
         </Button>
-        <Button
-          type="button"
-          className="flex-1"
-          onClick={() => document.getElementById("batch-file-input")?.click()}
-          disabled={loadingParse || confirming || !hasApiKeyForCategory}
-        >
-          {loadingParse ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-          ) : (
-            <Upload className="size-4" aria-hidden />
-          )}
-          <span className="ml-2">{file ? file.name : t("batchEntry.chooseFile")}</span>
-        </Button>
+        {file && parseResult?.ok && (previewReady || confirming) ? (
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={handleConfirmAndAddAll}
+            disabled={!hasApiKeyForCategory || confirming}
+          >
+            {confirming ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                <span className="ml-2">{t("batchEntry.adding")}</span>
+              </>
+            ) : (
+              t("batchEntry.startImport")
+            )}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={() => document.getElementById("batch-file-input")?.click()}
+            disabled={loadingParse || confirming || !hasApiKeyForCategory}
+          >
+            {loadingParse ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <Upload className="size-4" aria-hidden />
+            )}
+            <span className="ml-2">{file ? file.name : t("batchEntry.chooseFile")}</span>
+          </Button>
+        )}
       </div>
     </div>
   );

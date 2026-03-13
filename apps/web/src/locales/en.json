@@ -435,6 +435,7 @@
     "matchingFirst": "Matching first row…",
     "previewTitle": "First row preview — does this match correctly?",
     "confirmAndAddAll": "Looks good, add all",
+    "startImport": "Start import",
     "adding": "Adding…",
     "addingProgress": "Adding {{current}} / {{total}}…",
     "addedCount": "{{count}} items added.",

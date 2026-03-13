@@ -434,6 +434,7 @@
     "matchingFirst": "Buscando primera fila…",
     "previewTitle": "Vista previa de la primera fila — ¿es correcta?",
     "confirmAndAddAll": "Confirmar y añadir todo",
+    "startImport": "Iniciar importación",
     "adding": "Añadiendo…",
     "addingProgress": "Añadiendo {{current}} / {{total}}…",
     "addedCount": "{{count}} elementos añadidos.",
