@@ -34,10 +34,16 @@ const STORAGE_KEY_STATS = "dogument.statistics.statsCollapsed";
 const STORAGE_KEY_RECENT = "dogument.statistics.recentLogsCollapsed";
 
 type StatsGroup = "category" | "month" | "year";
-type GenreGraphMode = "genre" | "statusOverTime";
+type GenreGraphMode = "genre" | "statusOverTime" | "byCategory";
 type StatusOverTimeGroup = "month" | "year";
 interface StatsEntry {
   period: string;
+  hours: number;
+}
+/** For categoryByMonth / categoryByYear API response */
+interface CategoryOverTimeEntry {
+  period: string;
+  mediaType: string;
   hours: number;
 }
 
@@ -58,6 +64,9 @@ export function Statistics() {
   const [statusOverTimeGroup, setStatusOverTimeGroup] = useState<StatusOverTimeGroup>("month");
   const [statusOverTimeStats, setStatusOverTimeStats] = useState<StatsEntry[]>([]);
   const [statusOverTimeLoading, setStatusOverTimeLoading] = useState(true);
+  const [categoryOverTimeGroup, setCategoryOverTimeGroup] = useState<StatusOverTimeGroup>("month");
+  const [categoryOverTimeStats, setCategoryOverTimeStats] = useState<CategoryOverTimeEntry[]>([]);
+  const [categoryOverTimeLoading, setCategoryOverTimeLoading] = useState(true);
   const [statsCollapsed, setStatsCollapsedState] = useState(false);
   const [recentLogsCollapsed, setRecentLogsCollapsedState] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
@@ -124,6 +133,18 @@ export function Statistics() {
     }
   }, []);
 
+  const fetchCategoryOverTimeStats = useCallback(async (group: "categoryByMonth" | "categoryByYear") => {
+    setCategoryOverTimeLoading(true);
+    try {
+      const res = await apiFetch<{ data: CategoryOverTimeEntry[] }>(`/logs/stats?group=${group}`);
+      setCategoryOverTimeStats(res.data ?? []);
+    } catch {
+      setCategoryOverTimeStats([]);
+    } finally {
+      setCategoryOverTimeLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isPro) fetchStats(statsGroup);
   }, [isPro, statsGroup, fetchStats]);
@@ -137,6 +158,12 @@ export function Statistics() {
       fetchStatusOverTimeStats(statusOverTimeGroup === "year" ? "completedByYear" : "completedByMonth");
     }
   }, [isPro, genreGraphMode, statusOverTimeGroup, fetchStatusOverTimeStats]);
+
+  useEffect(() => {
+    if (isPro && genreGraphMode === "byCategory") {
+      fetchCategoryOverTimeStats(categoryOverTimeGroup === "year" ? "categoryByYear" : "categoryByMonth");
+    }
+  }, [isPro, genreGraphMode, categoryOverTimeGroup, fetchCategoryOverTimeStats]);
 
   const fetchLogs = useCallback(() => {
     setLoading(true);
@@ -214,6 +241,17 @@ export function Statistics() {
     genreStats.length > 0 ? Math.max(...genreStats.map((s) => s.hours), 1) : 1;
   const maxStatusOverTimeCount =
     statusOverTimeStats.length > 0 ? Math.max(...statusOverTimeStats.map((s) => s.hours), 1) : 1;
+  const maxCategoryOverTimeCount =
+    categoryOverTimeStats.length > 0 ? Math.max(...categoryOverTimeStats.map((s) => s.hours), 1) : 1;
+  const categoryOverTimeByPeriod = categoryOverTimeStats.reduce<Record<string, CategoryOverTimeEntry[]>>(
+    (acc, entry) => {
+      if (!acc[entry.period]) acc[entry.period] = [];
+      acc[entry.period].push(entry);
+      return acc;
+    },
+    {}
+  );
+  const categoryOverTimePeriods = Object.keys(categoryOverTimeByPeriod).sort();
 
   if (isPro && loading && logs.length === 0) {
     return (
@@ -248,24 +286,19 @@ export function Statistics() {
         <section aria-label={t("dashboard.calendarTitle")} className="min-w-0 w-full">
           <DashboardCalendar isPro={isPro} />
         </section>
-        <Card className="min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-4" style={paperShadow}>
+        <Card className="min-w-0 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4" style={paperShadow}>
           <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
-            <Button
-              variant={genreGraphMode === "genre" ? "default" : "outline"}
-              size="sm"
-              className="max-md:min-h-[44px]"
-              onClick={() => setGenreGraphMode("genre")}
-            >
-              {t("dashboard.byGenre")}
-            </Button>
-            <Button
-              variant={genreGraphMode === "statusOverTime" ? "default" : "outline"}
-              size="sm"
-              className="max-md:min-h-[44px]"
-              onClick={() => setGenreGraphMode("statusOverTime")}
-            >
-              {t("dashboard.byStatusOverTime")}
-            </Button>
+            <Select
+              value={genreGraphMode}
+              onValueChange={(v) => setGenreGraphMode(v as GenreGraphMode)}
+              options={[
+                { value: "genre", label: t("dashboard.byGenre") },
+                { value: "statusOverTime", label: t("dashboard.byStatusOverTime") },
+                { value: "byCategory", label: t("dashboard.byCategory") },
+              ]}
+              aria-label={t("dashboard.byGenre")}
+              className="w-full max-w-[220px]"
+            />
             {genreGraphMode === "statusOverTime" && (
               <div className="ml-1 flex gap-1">
                 <Button
@@ -284,8 +317,26 @@ export function Statistics() {
                 </Button>
               </div>
             )}
+            {genreGraphMode === "byCategory" && (
+              <div className="ml-1 flex gap-1">
+                <Button
+                  variant={categoryOverTimeGroup === "month" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCategoryOverTimeGroup("month")}
+                >
+                  {t("dashboard.byMonth")}
+                </Button>
+                <Button
+                  variant={categoryOverTimeGroup === "year" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCategoryOverTimeGroup("year")}
+                >
+                  {t("dashboard.byYear")}
+                </Button>
+              </div>
+            )}
           </div>
-          {genreGraphMode === "genre" ? (
+          {genreGraphMode === "genre" && (
             genreStatsLoading ? (
               <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
             ) : genreStats.length === 0 ? (
@@ -312,31 +363,71 @@ export function Statistics() {
                 ))}
               </div>
             )
-          ) : statusOverTimeLoading ? (
-            <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
-          ) : statusOverTimeStats.length === 0 ? (
-            <p className="text-center text-sm text-[var(--color-light)]">
-              {t("dashboard.noStatusOverTimeYet")}
-            </p>
-          ) : (
-            <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-              {statusOverTimeStats.map(({ period, hours }) => (
-                <div key={period} className="flex min-w-0 items-center gap-3">
-                  <span className="w-14 shrink-0 truncate text-xs text-[var(--color-light)] sm:w-20">
-                    {statusOverTimeGroup === "year" ? period : period.slice(0, 7)}
-                  </span>
-                  <div className="h-6 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
-                    <div
-                      className="h-full rounded bg-[var(--color-mid)]"
-                      style={{ width: `${Math.max(5, (hours / maxStatusOverTimeCount) * 100)}%` }}
-                    />
+          )}
+          {genreGraphMode === "statusOverTime" && (
+            statusOverTimeLoading ? (
+              <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
+            ) : statusOverTimeStats.length === 0 ? (
+              <p className="text-center text-sm text-[var(--color-light)]">
+                {t("dashboard.noStatusOverTimeYet")}
+              </p>
+            ) : (
+              <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+                {statusOverTimeStats.map(({ period, hours }) => (
+                  <div key={period} className="flex min-w-0 items-center gap-3">
+                    <span className="w-14 shrink-0 truncate text-xs text-[var(--color-light)] sm:w-20">
+                      {statusOverTimeGroup === "year" ? period : period.slice(0, 7)}
+                    </span>
+                    <div className="h-6 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
+                      <div
+                        className="h-full rounded bg-[var(--color-mid)]"
+                        style={{ width: `${Math.max(5, (hours / maxStatusOverTimeCount) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="w-20 shrink-0 text-right text-xs text-[var(--color-lightest)]">
+                      {t("dashboard.completedCount", { count: String(Math.round(hours)) })}
+                    </span>
                   </div>
-                  <span className="w-20 shrink-0 text-right text-xs text-[var(--color-lightest)]">
-                    {t("dashboard.completedCount", { count: String(Math.round(hours)) })}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
+          )}
+          {genreGraphMode === "byCategory" && (
+            categoryOverTimeLoading ? (
+              <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
+            ) : categoryOverTimePeriods.length === 0 ? (
+              <p className="text-center text-sm text-[var(--color-light)]">
+                {t("dashboard.noStatsYet")}
+              </p>
+            ) : (
+              <div className="flex min-w-0 flex-col gap-3 overflow-hidden">
+                {categoryOverTimePeriods.map((period) => (
+                  <div key={period} className="flex min-w-0 flex-col gap-1.5">
+                    <span className="shrink-0 text-xs font-medium text-[var(--color-light)]">
+                      {categoryOverTimeGroup === "year" ? period : period.slice(0, 7)}
+                    </span>
+                    <div className="flex min-w-0 flex-col gap-1 pl-0">
+                      {(categoryOverTimeByPeriod[period] ?? []).map(({ mediaType, hours }) => (
+                        <div key={`${period}-${mediaType}`} className="flex min-w-0 items-center gap-3">
+                          <span className="min-w-0 max-w-[7rem] shrink-0 truncate text-xs text-[var(--color-light)]">
+                            {t(`nav.${mediaType}`)}
+                          </span>
+                          <div className="h-5 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
+                            <div
+                              className="h-full rounded bg-[var(--color-mid)]"
+                              style={{ width: `${Math.max(5, (hours / maxCategoryOverTimeCount) * 100)}%` }}
+                            />
+                          </div>
+                          <span className="w-10 shrink-0 text-right text-xs text-[var(--color-lightest)]">
+                            {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </Card>
       </div>
@@ -358,7 +449,7 @@ export function Statistics() {
           </button>
           {!statsCollapsed && (
             <>
-              <Card className="min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-4" style={paperShadow}>
+              <Card className="min-w-0 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4" style={paperShadow}>
                 <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
                   <div className="md:hidden w-full min-w-0">
                     <Select
@@ -456,7 +547,7 @@ export function Statistics() {
           {!recentLogsCollapsed && (
             <>
               {recent.length === 0 ? (
-                <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6" style={paperShadow}>
+                <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6" style={paperShadow}>
                   <p className="text-center text-[var(--color-light)]">
                     {t("dashboard.noLogsYet")}{" "}
                     <Link to="/search" className="text-[var(--color-lightest)] underline hover:no-underline">
@@ -477,7 +568,7 @@ export function Statistics() {
                         <motion.div whileTap={tapScale} transition={tapTransition}>
                           <Link
                             to={`/item/${log.mediaType}/${log.externalId}`}
-                            className="flex min-w-0 gap-3 overflow-hidden rounded-md border border-[var(--color-dark)] bg-[var(--color-dark)] p-4 text-inherit no-underline"
+                            className="flex min-w-0 gap-3 overflow-hidden rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 text-inherit no-underline"
                             style={paperShadow}
                           >
                             <ItemImage src={log.image} className="h-12 w-9 shrink-0 rounded" />

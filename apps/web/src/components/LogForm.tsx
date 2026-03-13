@@ -16,6 +16,7 @@ import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHE
 import { showAchievementToasts } from "@/lib/achievementToast";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
+import { Loader2 } from "lucide-react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
@@ -42,6 +43,8 @@ interface LogFormEditProps {
   episodesCount?: number | null;
   onSaved: (completion?: LogCompleteState) => void;
   onCancel: () => void;
+  /** Called when user confirms delete; modal will close after. */
+  onDelete?: (logId: string) => void | Promise<void>;
 }
 
 type LogFormProps = LogFormCreateProps | LogFormEditProps;
@@ -67,6 +70,7 @@ export function LogForm(props: LogFormProps) {
   const [chapter, setChapter] = useState<number | "">(isEdit ? (log!.chapter ?? "") : "");
   const [volume, setVolume] = useState<number | "">(isEdit ? (log!.volume ?? "") : "");
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   type ProgressOptions = {
     seasons?: number[];
@@ -330,34 +334,65 @@ export function LogForm(props: LogFormProps) {
                   className="min-h-[80px]"
                 />
               </div>
-              <div className="flex gap-4">
-                <motion.div
-                  whileTap={tapScale}
-                  transition={tapTransition}
-                  className="flex-1"
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={props.onCancel}
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-4">
+                  <motion.div
+                    whileTap={tapScale}
+                    transition={tapTransition}
+                    className="flex-1"
                   >
-                    {t("common.cancel")}
-                  </Button>
-                </motion.div>
-                <motion.div
-                  whileTap={tapScale}
-                  transition={tapTransition}
-                  className="flex-1"
-                >
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={loading}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={props.onCancel}
+                    >
+                      {t("common.cancel")}
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    whileTap={tapScale}
+                    transition={tapTransition}
+                    className="flex-1"
                   >
-                    {loading ? t("common.saving") : isEdit ? t("common.update") : t("common.save")}
-                  </Button>
-                </motion.div>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={loading}
+                    >
+                      {loading ? t("common.saving") : isEdit ? t("common.update") : t("common.save")}
+                    </Button>
+                  </motion.div>
+                </div>
+                {isEdit && "onDelete" in props && props.onDelete && (
+                  <div className="border-t border-[var(--color-surface-border)] pt-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full text-red-400 hover:bg-red-500/20 hover:text-red-400"
+                      onClick={async () => {
+                        if (!log || !confirm(t("common.deleteLogConfirm"))) return;
+                        setDeleting(true);
+                        try {
+                          await props.onDelete!(log.id);
+                          props.onCancel();
+                        } finally {
+                          setDeleting(false);
+                        }
+                      }}
+                      disabled={loading || deleting}
+                    >
+                      {deleting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                          {t("common.deleting")}
+                        </>
+                      ) : (
+                        t("common.delete")
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </form>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Share2, AlertTriangle, User, ChevronDown, ChevronRight } from "lucide-react";
@@ -17,16 +17,12 @@ import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, MEDIA_TYPES, type MediaType, toMediaType } from "@dogument/shared";
 import type { Log } from "@dogument/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import { MediaLogs } from "@/pages/MediaLogs";
 import { Select } from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
-import { GenreBadges } from "@/components/GenreBadges";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
@@ -41,11 +37,12 @@ interface FeedEntry {
 }
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
-/** Character count for review preview before "View more". ~2 lines on mobile. */
-const REVIEW_PREVIEW_LENGTH = 120;
 const BETA_MODAL_STORAGE_KEY = "dogument.betaModalSeen";
 const SOCIAL_COLLAPSED_STORAGE_KEY = "dogument.dashboard.socialCollapsed";
 const BADGES_COLLAPSED_STORAGE_KEY = "dogument.dashboard.badgesCollapsed";
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+/** Base URL for share profile link (always prod so shared links work). */
+const PROFILE_SHARE_BASE_URL = "https://dogument-one.vercel.app";
 
 /** Milestone progress from GET /me/milestones/progress */
 interface ScopeProgress {
@@ -91,6 +88,7 @@ export function Dashboard() {
   const [socialCollapsed, setSocialCollapsed] = useState(false);
   const [badgesCollapsed, setBadgesCollapsed] = useState(false);
   const [milestoneProgress, setMilestoneProgress] = useState<MilestoneProgressResponse | null>(null);
+  const isMobile = useIsMobile();
 
   /** Load collapsed prefs from persistent storage (Android/Capacitor). */
   useEffect(() => {
@@ -170,6 +168,8 @@ export function Dashboard() {
     setShowBetaModal(false);
   }, [me?.user?.id]);
 
+  const betaDrawerCloseRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     if (!token) {
       setFollowedUsers([]);
@@ -206,7 +206,7 @@ export function Dashboard() {
   const handleShare = useCallback(async () => {
     if (!me?.user?.id) return;
     const slug = me.user.username || me.user.id;
-    const base = `${window.location.origin}/${slug}`;
+    const base = `${PROFILE_SHARE_BASE_URL}/${slug}`;
     const url =
       visibleTypes.includes(selectedCategory) && selectedCategory
         ? `${base}?category=${selectedCategory}`
@@ -299,7 +299,7 @@ export function Dashboard() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
       >
-        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-4">
             <p className="font-medium text-[var(--color-lightest)]">
               {t("dashboard.couldntLoadLogs")}
@@ -316,23 +316,44 @@ export function Dashboard() {
     );
   }
 
+  const betaContent = (onClose: () => void) => (
+    <>
+      <DialogHeader className="max-md:space-y-2">
+        <DialogTitle className="text-[var(--color-lightest)] text-xl max-md:text-2xl">
+          {t("dashboard.betaModalTitle")}
+        </DialogTitle>
+      </DialogHeader>
+      <p className="text-sm text-[var(--color-light)] max-md:text-base max-md:leading-relaxed">
+        {t("dashboard.betaModalMessage")}
+      </p>
+      <Button onClick={onClose} className="w-fit max-md:w-full max-md:min-h-[48px] max-md:text-base">
+        {t("dashboard.betaModalGotIt")}
+      </Button>
+    </>
+  );
+
   return (
     <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden">
-      <Dialog open={showBetaModal} onOpenChange={(open) => !open && handleBetaModalClose()}>
-        <DialogContent onClose={handleBetaModalClose} className="max-md:flex max-md:flex-col max-md:justify-center max-md:gap-6 max-md:px-8">
-          <DialogHeader className="max-md:space-y-2">
-            <DialogTitle className="text-[var(--color-lightest)] text-xl max-md:text-2xl">
-              {t("dashboard.betaModalTitle")}
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-[var(--color-light)] max-md:text-base max-md:leading-relaxed">
-            {t("dashboard.betaModalMessage")}
-          </p>
-          <Button onClick={handleBetaModalClose} className="w-fit max-md:w-full max-md:min-h-[48px] max-md:text-base">
-            {t("dashboard.betaModalGotIt")}
-          </Button>
-        </DialogContent>
-      </Dialog>
+      {isMobile ? (
+        <Drawer open={showBetaModal} onOpenChange={(open) => !open && handleBetaModalClose()}>
+          <DrawerContent
+            onClose={handleBetaModalClose}
+            onReady={(requestClose) => {
+              betaDrawerCloseRef.current = requestClose;
+            }}
+            mobileHeight="30%"
+            className="flex flex-col justify-center gap-6 p-6 max-md:min-h-0 max-md:justify-start max-md:pt-6"
+          >
+            {betaContent(() => betaDrawerCloseRef.current?.() ?? handleBetaModalClose())}
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={showBetaModal} onOpenChange={(open) => !open && handleBetaModalClose()}>
+          <DialogContent onClose={handleBetaModalClose} className="flex flex-col gap-6 px-8 py-6 max-md:px-6">
+            {betaContent(handleBetaModalClose)}
+          </DialogContent>
+        </Dialog>
+      )}
       {visibleTypes.length > 0 && (
         <section
             aria-label={t("dashboard.category")}
@@ -471,25 +492,6 @@ export function Dashboard() {
                             {t("dashboard.badgesNoNextBadge")}
                           </p>
                         ) : null}
-                        {pm && (pm.reviews.earned.length > 0 || pm.logs.earned.length > 0) && (
-                          <div className="flex min-w-0 flex-wrap gap-2">
-                            {[...pm.reviews.earned, ...pm.logs.earned].slice(0, 8).map((m, i) => (
-                              <span
-                                key={`${m.threshold}-${m.label}-${i}`}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/60 px-2.5 py-1 text-xs text-[var(--color-lightest)]"
-                                title={m.label}
-                              >
-                                <span aria-hidden>{m.icon}</span>
-                                <span className="max-w-[100px] truncate sm:max-w-[140px]">{m.label}</span>
-                              </span>
-                            ))}
-                            {pm.reviews.earned.length + pm.logs.earned.length > 8 && (
-                              <span className="text-xs text-[var(--color-light)]">
-                                +{pm.reviews.earned.length + pm.logs.earned.length - 8}
-                              </span>
-                            )}
-                          </div>
-                        )}
                         {!next && scope.earned.length === 0 && (
                           <p className="text-sm text-[var(--color-light)]">
                             {t("dashboard.badgesAddOrReview")}
@@ -510,7 +512,7 @@ export function Dashboard() {
           <button
             type="button"
             onClick={toggleSocialCollapsed}
-            className="flex min-w-0 items-center gap-2 rounded-md py-1 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none"
+            className="flex min-w-0 items-center gap-2 rounded-md py-1 max-md:min-h-[44px] max-md:py-3 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none"
             aria-expanded={!socialCollapsed}
             aria-controls="dashboard-social-content"
             id="dashboard-social-heading"
@@ -521,11 +523,21 @@ export function Dashboard() {
               <ChevronDown className="h-5 w-5 shrink-0" aria-hidden />
             )}
             <span className="min-w-0 truncate">{t("social.sectionTitle")}</span>
+            {(() => {
+              const now = Date.now();
+              const newCount = feed.filter((e) => now - new Date(e.log.createdAt).getTime() < ONE_WEEK_MS).length;
+              return (
+                <span className="shrink-0 text-sm font-normal text-[var(--color-light)]">
+                  {t("social.newEntriesLastWeek", { count: String(newCount) })}
+                </span>
+              );
+            })()}
           </button>
           {!socialCollapsed && (
           <div id="dashboard-social-content" role="region" aria-labelledby="dashboard-social-heading">
-          <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
-            <Select
+            <div className="flex min-w-0 flex-col gap-4 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50 p-4">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <Select
               value={feedFriendFilter}
               onValueChange={setFeedFriendFilter}
               options={[
@@ -538,14 +550,14 @@ export function Dashboard() {
               aria-label={t("social.filterByFriend")}
               className="min-w-0 max-w-[12rem]"
               triggerClassName="min-w-0"
-            />
-          </div>
-          {feedLoading ? (
+                />
+              </div>
+              {feedLoading ? (
             <div className="flex flex-col gap-2">
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="flex min-w-0 gap-3 overflow-hidden rounded-md border border-[var(--color-dark)] bg-[var(--color-dark)] p-4 animate-pulse"
+                  className="flex min-w-0 gap-3 overflow-hidden rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 animate-pulse"
                 >
                   <div className="h-12 w-9 shrink-0 rounded bg-[var(--color-mid)]/30" />
                   <div className="flex-1 space-y-2">
@@ -556,7 +568,7 @@ export function Dashboard() {
               ))}
             </div>
           ) : feed.length === 0 ? (
-            <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-sm)]">
+            <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-sm)]">
               <p className="text-center text-[var(--color-light)]">
                 {t("social.emptyFeed")}
               </p>
@@ -581,86 +593,71 @@ export function Dashboard() {
                   const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);
                   const listBorderClass =
                     log.status == null
-                      ? "border border-[var(--color-dark)]"
+                      ? "border border-[var(--color-surface-border)]"
                       : isDropped
-                        ? "border-2 border-red-500"
+                        ? "border border-red-500"
                         : isInProgress
-                          ? "border-2 border-amber-400"
+                          ? "border border-amber-400"
                           : isCompleted
-                            ? "border-2 border-emerald-600"
-                            : "border-2 border-[var(--color-mid)]";
+                            ? "border border-emerald-600"
+                            : "border border-[var(--color-mid)]";
                   const isExpanded = expandedReviewLogId === log.id;
                   return (
                   <motion.li key={log.id} variants={staggerItem} className="list-none">
                     <motion.div
                       whileTap={tapScale}
                       transition={tapTransition}
-                      className={`flex min-w-0 flex-col overflow-hidden rounded-md bg-[var(--color-dark)] p-4 ${!isExpanded ? "h-[205px] min-h-[205px] max-h-[200px]" : ""} ${listBorderClass}`}
+                      className={`flex min-w-0 flex-row overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${!isExpanded ? "min-h-[160px] h-[160px]" : "min-h-[140px]"} ${listBorderClass}`}
                       style={paperShadow}
                     >
-                      <div className="flex min-w-0 shrink-0 gap-3">
+                      {/* Left: image full height */}
+                      <Link
+                        to={`/item/${log.mediaType}/${log.externalId}`}
+                        className="h-full min-h-full w-28 flex-shrink-0 overflow-hidden rounded-l-lg sm:w-32"
+                      >
+                        <ItemImage src={log.image} className="h-full w-full object-cover" />
+                      </Link>
+                      {/* Middle: title, meta, user, review */}
+                      <div className={`flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 sm:p-4 ${!isExpanded ? "min-h-0" : ""}`}>
                         <Link
                           to={`/item/${log.mediaType}/${log.externalId}`}
-                          className="flex min-w-0 shrink-0 items-start gap-3 overflow-hidden text-inherit no-underline hover:opacity-90"
+                          className="min-w-0 truncate font-semibold text-[var(--color-lightest)] no-underline hover:underline text-sm sm:text-base shrink-0"
                         >
-                          <ItemImage src={log.image} className="h-12 w-9 shrink-0 rounded" />
-                          <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden">
-                            <p className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
-                              {log.title}
-                            </p>
-                            {log.genres && log.genres.length > 0 && (
-                              <GenreBadges genres={log.genres} maxCount={1} />
-                            )}
-                            <div className="flex shrink-0 items-center gap-2 mt-0.5">
-                              {(() => {
-                                const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
-                                return duration ? (
-                                  <span className="whitespace-nowrap text-xs text-[var(--color-light)]">
-                                    {t("dashboard.finishedIn", { duration })}
-                                  </span>
-                                ) : null;
-                              })()}
-                              {log.grade != null ? (
-                                <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
-                              ) : (
-                                <span className="text-[var(--color-light)]">—</span>
-                              )}
-                            </div>
-                          </div>
+                          {log.title}
                         </Link>
-                      </div>
-                      <div className="mt-1 flex shrink-0 items-center gap-1.5">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-light)] shrink-0">
+                          {log.grade != null ? (
+                            <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+                          ) : (
+                            <span>—</span>
+                          )}
+                          {(() => {
+                            const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
+                            return duration ? (
+                              <span className="whitespace-nowrap">{t("dashboard.finishedIn", { duration })}</span>
+                            ) : null;
+                          })()}
+                        </div>
                         <Link
                           to={`/${feedUser.username ?? feedUser.id}`}
-                          className="text-xs text-[var(--color-light)] hover:text-[var(--color-lightest)] hover:underline"
+                          className="flex w-fit items-center gap-1.5 text-xs text-[var(--color-light)] hover:text-[var(--color-lightest)] hover:underline shrink-0"
                         >
+                          <User className="size-3.5 shrink-0" aria-hidden />
                           {feedUser.username ?? t("social.userWithoutUsername")} · {t(`nav.${log.mediaType}`)}
                         </Link>
-                        <Link
-                          to={`/${feedUser.username ?? feedUser.id}`}
-                          className="flex shrink-0 rounded p-1 text-[var(--color-light)] hover:bg-[var(--color-darkest)] hover:text-[var(--color-lightest)]"
-                          aria-label={t("social.viewProfile", { name: feedUser.username ?? feedUser.id })}
-                        >
-                          <User className="size-3.5" aria-hidden />
-                        </Link>
-                      </div>
-                      {log.review ? (
-                        <div className={`mt-3 flex flex-col gap-2 overflow-hidden border-t border-[var(--color-darkest)] pt-3 ${!isExpanded ? "min-h-0 flex-1" : ""}`}>
-                          {(() => {
-                            const review = log.review;
-                            const truncated = review.length > REVIEW_PREVIEW_LENGTH;
-                            const preview = truncated && !isExpanded
-                              ? review.slice(0, REVIEW_PREVIEW_LENGTH)
-                              : review;
-                            return (
-                              <>
-                                <div className={!isExpanded && truncated ? "line-clamp-3" : ""}>
-                                  <p className="text-xs text-[var(--color-light)] whitespace-pre-wrap break-words">
-                                    {preview}
-                                    {truncated && !isExpanded && " ... "}
-                                  </p>
-                                </div>
-                                {truncated && (
+                        {log.review ? (
+                          <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden min-w-0">
+                            {(() => {
+                              const review = log.review;
+                              return (
+                                <>
+                                  {isExpanded ? (
+                                    <div className="min-h-0 overflow-hidden shrink-0">
+                                      <p className="text-xs text-[var(--color-light)] whitespace-pre-wrap break-words">
+                                        {review}
+                                      </p>
+                                    </div>
+                                  ) : null}
                                   <Button
                                     type="button"
                                     variant="link"
@@ -668,13 +665,40 @@ export function Dashboard() {
                                     className="w-fit shrink-0 h-auto p-0 text-xs text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300"
                                     onClick={() => setExpandedReviewLogId(isExpanded ? null : log.id)}
                                   >
-                                    {isExpanded ? t("social.viewLess") : t("social.viewMore")}
+                                    {isExpanded ? t("social.viewLess") : t("social.viewReview")}
                                   </Button>
-                                )}
-                              </>
-                            );
-                          })()}
-                          <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                  <div className="flex shrink-0 flex-wrap items-center gap-2 pt-1 mt-auto">
+                                    <ReactionButtons
+                                      logId={log.id}
+                                      likesCount={log.likesCount ?? 0}
+                                      dislikesCount={log.dislikesCount ?? 0}
+                                      userReaction={log.userReaction ?? null}
+                                      disabled={!token}
+                                      onReactionChange={(payload) => {
+                                        setFeed((prev) =>
+                                          prev.map((e) =>
+                                            e.log.id === log.id
+                                              ? {
+                                                  ...e,
+                                                  log: {
+                                                    ...e.log,
+                                                    likesCount: payload.likesCount,
+                                                    dislikesCount: payload.dislikesCount,
+                                                    userReaction: payload.userReaction,
+                                                  },
+                                                }
+                                              : e
+                                          )
+                                        );
+                                      }}
+                                    />
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        ) : (
+                          <div className="flex shrink-0 flex-wrap items-center gap-2 pt-1 mt-auto">
                             <ReactionButtons
                               logId={log.id}
                               likesCount={log.likesCount ?? 0}
@@ -700,42 +724,16 @@ export function Dashboard() {
                               }}
                             />
                           </div>
-                        </div>
-                      ) : (
-                        <div className="mt-3 flex shrink-0 flex-wrap items-center gap-2 border-t border-[var(--color-darkest)] pt-3">
-                          <ReactionButtons
-                              logId={log.id}
-                              likesCount={log.likesCount ?? 0}
-                              dislikesCount={log.dislikesCount ?? 0}
-                              userReaction={log.userReaction ?? null}
-                              disabled={!token}
-                              onReactionChange={(payload) => {
-                                setFeed((prev) =>
-                                  prev.map((e) =>
-                                    e.log.id === log.id
-                                      ? {
-                                          ...e,
-                                          log: {
-                                            ...e.log,
-                                            likesCount: payload.likesCount,
-                                            dislikesCount: payload.dislikesCount,
-                                            userReaction: payload.userReaction,
-                                          },
-                                        }
-                                      : e
-                                  )
-                                );
-                              }}
-                            />
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </motion.div>
                   </motion.li>
                   );
                 })}
               </div>
             </motion.ul>
-          )}
+              )}
+            </div>
           </div>
           )}
         </section>

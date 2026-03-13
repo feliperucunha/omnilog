@@ -42,7 +42,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       onClick={onClose}
     >
       <motion.div
-        className="flex h-full w-full min-h-dvh-fallback flex-col overflow-hidden rounded-none bg-[var(--color-dark)] md:h-auto md:min-h-0 md:max-h-[90vh] md:w-full md:max-w-[380px] md:overflow-auto md:rounded-xl md:border md:border-[var(--color-dark)] md:shadow-[var(--shadow-modal)]"
+        className="flex h-full w-full min-h-dvh-fallback flex-col overflow-hidden rounded-none bg-[var(--color-dark)] md:h-auto md:min-h-0 md:max-h-[90vh] md:w-full md:max-w-[380px] md:overflow-auto md:rounded-xl md:border md:border-[var(--color-surface-border)] md:shadow-[var(--shadow-modal)]"
         style={{
           paddingTop: "env(safe-area-inset-top)",
           paddingBottom: "env(safe-area-inset-bottom)",

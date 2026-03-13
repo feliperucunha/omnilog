@@ -229,7 +229,7 @@ export function Settings() {
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
     >
       <div className="flex flex-col gap-8">
-        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <h2 className="text-base font-semibold text-[var(--color-lightest)] mb-1">
             {t("settings.general")}
           </h2>
@@ -330,7 +330,7 @@ export function Settings() {
           </div>
         </Card>
 
-        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
               {t("settings.profileBadges")}
@@ -377,7 +377,7 @@ export function Settings() {
           </div>
         </Card>
 
-        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
               {t("settings.publicProfileCustomization")}
@@ -426,7 +426,7 @@ export function Settings() {
         {me && (
           <Card
             className={cn(
-              "border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]",
+              "border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]",
               me.tier !== "pro" && "opacity-75"
             )}
           >
@@ -480,7 +480,7 @@ export function Settings() {
           </Card>
         )}
 
-        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
               {t("settings.boardGameProviderLabel")}
@@ -512,7 +512,7 @@ export function Settings() {
           </div>
         </Card>
 
-        <div className="rounded-md border border-[var(--color-dark)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">
+        <div className="rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">
           <button
             type="button"
             onClick={() => setAdvancedOpen((prev) => !prev)}
@@ -527,7 +527,7 @@ export function Settings() {
             <span className="font-semibold">{t("settings.apiKeys")}</span>
           </button>
           {advancedOpen && (
-            <div className="border-t border-[var(--color-dark)] px-4 pb-4 pt-2">
+            <div className="border-t border-[var(--color-surface-border)] px-4 pb-4 pt-2">
               <div className="mb-4 flex items-start gap-2">
                 <div className="flex-1 space-y-1">
                   <p className="text-sm text-[var(--color-light)]">
@@ -573,7 +573,7 @@ export function Settings() {
                   return (
                     <Card
                       key={provider}
-                      className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]"
+                      className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]"
                     >
                       <div className="flex flex-col gap-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">

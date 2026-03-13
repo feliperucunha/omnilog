@@ -32,20 +32,18 @@ export function MediaLogsSkeleton() {
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--color-dark)] bg-[var(--color-dark)] sm:min-h-[8.5rem]"
+            className="flex min-h-[140px] flex-row overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)] sm:min-h-[160px]"
           >
-            <div className="flex gap-3 p-3 flex-1 min-h-0 sm:gap-4 sm:p-4">
-              <Skeleton className="h-16 w-11 shrink-0 rounded-lg sm:h-20 sm:w-14" />
-                <div className="flex min-w-0 flex-1 flex-col gap-2">
-                  <Skeleton className="h-4 w-full max-w-[10rem] rounded" />
-                  <Skeleton className="h-3 w-20 rounded" />
-                  <Skeleton className="h-3 w-12 rounded" />
-                  <Skeleton className="h-3 w-14 rounded" />
-                </div>
+            <Skeleton className="h-full w-28 flex-shrink-0 rounded-l-lg sm:w-32" />
+            <div className="flex min-w-0 flex-1 flex-col gap-2 p-3 sm:p-4">
+              <Skeleton className="h-4 w-full max-w-[10rem] rounded" />
+              <Skeleton className="h-3 w-20 rounded" />
+              <Skeleton className="h-3 w-12 rounded" />
+              <Skeleton className="h-3 w-14 rounded" />
             </div>
-            <div className="flex border-t border-[var(--color-darkest)]">
-              <Skeleton className="h-9 flex-1 rounded-none" />
-              <Skeleton className="h-9 flex-1 rounded-none" />
+            <div className="flex w-12 flex-shrink-0 flex-col justify-center gap-2 border-l border-[var(--color-surface-border)] p-2">
+              <Skeleton className="h-9 w-9 rounded-full" />
+              <Skeleton className="h-9 w-9 rounded-full" />
             </div>
           </div>
         ))}

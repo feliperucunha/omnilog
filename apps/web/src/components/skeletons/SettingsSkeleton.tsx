@@ -6,7 +6,7 @@ export function SettingsSkeleton() {
     <div className="flex min-w-0 flex-col gap-8 overflow-hidden">
       <Skeleton className="h-9 w-32 rounded-md" />
 
-      <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+      <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
         <div className="flex flex-col gap-6">
           <div className="space-y-2">
             <Skeleton className="h-5 w-36 rounded" />
@@ -23,7 +23,7 @@ export function SettingsSkeleton() {
         </div>
       </Card>
 
-      <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+      <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
         <div className="flex flex-col gap-4">
           <Skeleton className="h-5 w-48 rounded" />
           <Skeleton className="h-4 w-full max-w-sm rounded" />
@@ -35,7 +35,7 @@ export function SettingsSkeleton() {
         </div>
       </Card>
 
-      <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+      <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
         <div className="flex flex-col gap-4">
           <Skeleton className="h-5 w-28 rounded" />
           <Skeleton className="h-4 w-full max-w-xs rounded" />
@@ -43,7 +43,7 @@ export function SettingsSkeleton() {
         </div>
       </Card>
 
-      <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+      <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
         <div className="flex flex-col gap-4">
           <Skeleton className="h-5 w-44 rounded" />
           <Skeleton className="h-4 w-full max-w-md rounded" />
@@ -51,7 +51,7 @@ export function SettingsSkeleton() {
         </div>
       </Card>
 
-      <div className="rounded-md border border-[var(--color-dark)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">
+      <div className="rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">
         <div className="flex items-center gap-2 px-4 py-3">
           <Skeleton className="h-5 w-5 shrink-0 rounded" />
           <Skeleton className="h-5 w-24 rounded" />

@@ -32,7 +32,7 @@ export function StatisticsSkeleton() {
             ))}
           </div>
         </section>
-        <Card className="min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-4" style={paperShadow}>
+        <Card className="min-w-0 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4" style={paperShadow}>
           <Skeleton className="h-4 w-20 rounded mb-3" />
           <div className="flex flex-col gap-2">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -53,7 +53,7 @@ export function StatisticsSkeleton() {
             <Skeleton className="h-4 w-4 shrink-0 rounded" />
             <Skeleton className="h-4 w-24 rounded" />
           </div>
-          <Card className="min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-4" style={paperShadow}>
+          <Card className="min-w-0 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4" style={paperShadow}>
             <div className="flex flex-col gap-4">
               <div className="hidden md:flex flex-wrap gap-2">
                 <Skeleton className="h-8 w-20 rounded-md" />
@@ -85,7 +85,7 @@ export function StatisticsSkeleton() {
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="flex min-w-0 gap-3 overflow-hidden rounded-md border border-[var(--color-dark)] bg-[var(--color-dark)] p-4"
+                className="flex min-w-0 gap-3 overflow-hidden rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
               >
                 <Skeleton className="h-12 w-9 shrink-0 rounded" />
                 <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">

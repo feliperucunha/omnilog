@@ -363,35 +363,24 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
             </div>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
+        <input
             type="file"
             accept=".csv,.xlsx,.xls"
             onChange={handleFileChange}
             className="hidden"
             id="batch-file-input"
           />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => document.getElementById("batch-file-input")?.click()}
-            disabled={loadingParse || !hasApiKeyForCategory}
-          >
-            {loadingParse ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <Upload className="size-4" aria-hidden />
+        {(file || parseResult?.ok) && (
+          <div className="flex items-center gap-2 text-sm text-[var(--color-light)]">
+            {file && <span className="truncate">{file.name}</span>}
+            {parseResult?.ok && (
+              <span className="flex items-center gap-1.5">
+                <FileSpreadsheet className="size-4 shrink-0" aria-hidden />
+                {parseResult.rows.length} {t("batchEntry.rows")}
+              </span>
             )}
-            <span className="ml-2">{file ? file.name : t("batchEntry.chooseFile")}</span>
-          </Button>
-          {parseResult?.ok && (
-            <span className="flex items-center gap-1.5 text-sm text-[var(--color-light)]">
-              <FileSpreadsheet className="size-4" aria-hidden />
-              {parseResult.rows.length} {t("batchEntry.rows")}
-            </span>
-          )}
-        </div>
+          </div>
+        )}
         {parseError && (
           <p className="text-sm text-red-400" role="alert">
             {parseError}
@@ -456,9 +445,6 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
                 t("batchEntry.confirmAndAddAll")
               )}
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={confirming}>
-              {t("common.cancel")}
-            </Button>
           </div>
           {confirming && batchProgress && batchProgress.total > 0 && (
             <div className="mt-4 flex flex-col gap-2" role="progressbar" aria-valuenow={batchProgress.current} aria-valuemin={0} aria-valuemax={batchProgress.total} aria-label={t("batchEntry.addingProgress", { current: String(batchProgress.current), total: String(batchProgress.total) })}>
@@ -492,13 +478,30 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
         </div>
       )}
 
-      {!parseResult?.ok && !loadingParse && (
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-            {t("common.cancel")}
-          </Button>
-        </div>
-      )}
+      <div className="flex gap-4">
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1"
+          onClick={onCancel}
+          disabled={loadingParse || confirming}
+        >
+          {t("common.cancel")}
+        </Button>
+        <Button
+          type="button"
+          className="flex-1"
+          onClick={() => document.getElementById("batch-file-input")?.click()}
+          disabled={loadingParse || confirming || !hasApiKeyForCategory}
+        >
+          {loadingParse ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+          ) : (
+            <Upload className="size-4" aria-hidden />
+          )}
+          <span className="ml-2">{file ? file.name : t("batchEntry.chooseFile")}</span>
+        </Button>
+      </div>
     </div>
   );
 }

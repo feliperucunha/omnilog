@@ -47,7 +47,7 @@ export function PublicProfileSkeleton() {
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--color-dark)] bg-[var(--color-dark)] sm:min-h-[8.5rem]"
+              className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)] sm:min-h-[8.5rem]"
             >
               <div className="flex gap-3 p-3 flex-1 min-h-0 sm:gap-4 sm:p-4">
                 <Skeleton className="h-16 w-11 shrink-0 rounded-lg sm:h-20 sm:w-14" />

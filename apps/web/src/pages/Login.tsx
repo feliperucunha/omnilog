@@ -114,7 +114,7 @@ export function Login() {
         variants={modalContentVariants}
         className="w-full max-w-[400px]"
       >
-        <Card className="w-full border-[var(--color-dark)] bg-[var(--color-dark)] shadow-[var(--shadow-modal)]">
+        <Card className="w-full border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-modal)]">
           <CardHeader className="flex flex-col items-center gap-4 text-center">
             <Logo alt="" className="h-24! w-auto sm:h-16" />
             <h1 className="flex flex-col gap-0.5 text-2xl -mt-6 font-bold text-[var(--color-lightest)]">

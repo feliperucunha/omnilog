@@ -166,7 +166,7 @@ export function PublicProfile() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
       >
-        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <p className="font-medium text-[var(--color-lightest)]">{error}</p>
           <Link to="/" className="mt-4 inline-block text-sm text-[var(--color-light)] underline hover:no-underline">
             {t("nav.dashboard")}

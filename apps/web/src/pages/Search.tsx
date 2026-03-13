@@ -520,7 +520,7 @@ export function Search() {
                 <motion.div
                   key={user.id}
                   variants={staggerItem}
-                  className="flex min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-[var(--color-dark)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-sm)]"
+                  className="flex min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-sm)]"
                 >
                   <Link
                     to={`/${user.username ?? user.id}`}
@@ -574,7 +574,7 @@ export function Search() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
         >
-          <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-sm)]">
+          <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-sm)]">
             <p className="text-center text-[var(--color-light)]">
               {t("search.noUsersFound")}
             </p>
@@ -592,14 +592,14 @@ export function Search() {
               const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
               const listBorderClass =
                 status == null
-                  ? "border-[var(--color-dark)]"
+                  ? "border border-[var(--color-surface-border)]"
                   : isDropped
-                    ? "border-2 border-red-500"
+                    ? "border border-red-500"
                     : isInProgress
-                      ? "border-2 border-amber-400"
+                      ? "border border-amber-400"
                       : isCompleted
-                        ? "border-2 border-emerald-600"
-                        : "border-2 border-[var(--color-mid)]";
+                        ? "border border-emerald-600"
+                        : "border border-[var(--color-mid)]";
               const badgeClass =
                 status == null
                   ? ""
@@ -702,7 +702,7 @@ export function Search() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
         >
-          <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-sm)]">
+          <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-sm)]">
             <p className="text-center text-[var(--color-light)]">
               {t("search.noResults")} {t("search.noResultsHint")}
             </p>

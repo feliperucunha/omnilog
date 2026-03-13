@@ -45,7 +45,7 @@ export function ReviewModal({ open, onClose, log, user }: ReviewModalProps) {
         <div className="flex min-w-0 flex-col gap-4 overflow-y-auto">
           <Link
             to={`/item/${log.mediaType}/${log.externalId}`}
-            className="flex min-w-0 gap-3 rounded-lg border border-[var(--color-dark)] bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline transition-colors hover:bg-[var(--color-mid)]/15"
+            className="flex min-w-0 gap-3 rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline transition-colors hover:bg-[var(--color-mid)]/15"
             onClick={onClose}
           >
             <ItemImage

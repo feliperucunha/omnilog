@@ -20,7 +20,7 @@ function ErrorFallback({ error, onRetry }: { error: Error; onRetry: () => void }
       className="flex min-h-[60vh] items-center justify-center p-6"
       style={{ minHeight: "60vh" }}
     >
-      <Card className="max-w-[400px] border-[var(--color-dark)] bg-[var(--color-dark)] shadow-[var(--shadow-lg)]">
+      <Card className="max-w-[400px] border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-lg)]">
         <CardHeader>
           <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
             {t("errorBoundary.title")}

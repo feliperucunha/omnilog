@@ -103,7 +103,7 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
 
   return (
     <Card
-      className="min-w-0 border-[var(--color-dark)] bg-[var(--color-dark)] p-5 sm:p-6 flex flex-col gap-5 overflow-hidden"
+      className="min-w-0 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-5 sm:p-6 flex flex-col gap-5 overflow-hidden"
       style={paperShadow}
     >
       {hasTagline && (
@@ -354,7 +354,7 @@ interface ReviewsResponse {
 }
 
 export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { showLogComplete } = useLogComplete();
   const [data, setData] = useState<ItemPageData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -451,7 +451,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
       >
-        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-4">
             <p className="text-[var(--color-light)]">{error}</p>
             <div className="flex gap-2">
@@ -560,7 +560,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
 
         {!token && (
           <Card
-            className="border-[var(--color-dark)] bg-[var(--color-dark)] p-4"
+            className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
             style={paperShadow}
           >
             <p className="text-center text-sm text-[var(--color-light)]">
@@ -600,7 +600,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
           </div>
           {reviewsLoading ? (
             <Card
-              className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6"
+              className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6"
               style={paperShadow}
             >
               <p className="text-center text-[var(--color-light)]">
@@ -609,7 +609,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             </Card>
           ) : reviews.length === 0 ? (
             <Card
-              className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6"
+              className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6"
               style={paperShadow}
             >
               <p className="text-center text-[var(--color-light)]">
@@ -627,102 +627,119 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                   {reviews.map((r: ItemReview) => (
                     <motion.div key={r.id} variants={staggerItem}>
                       <Card
-                        className="border-[var(--color-dark)] bg-[var(--color-dark)] p-4"
+                        className={`overflow-hidden border-[var(--color-surface-border)] bg-[var(--color-dark)] p-0 ${r.isPro ? "border-l-4 border-l-[var(--btn-gradient-start)]" : ""}`}
                         style={paperShadow}
                       >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-medium text-[var(--color-lightest)]">
-                            {r.reviewerUsername ?? r.userEmail}
-                          </span>
-                          {(r.reviewerLevelLabel ?? r.reviewerLevelIcon) && (
-                            <span
-                              className="inline-flex items-center gap-1 rounded bg-[var(--color-darkest)] px-1.5 py-0.5 text-xs text-[var(--color-light)]"
-                              title={r.reviewerLevelLabel ?? undefined}
-                            >
-                              {r.reviewerLevelIcon && <span aria-hidden>{r.reviewerLevelIcon}</span>}
-                              {r.reviewerLevelLabel && <span>{r.reviewerLevelLabel}</span>}
+                        <div className="flex flex-col gap-4 p-4 sm:p-5">
+                          {/* Author + Pro */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-base font-semibold text-[var(--color-lightest)]">
+                              {r.reviewerUsername ?? r.userEmail}
                             </span>
-                          )}
-                          {r.isPro && (
-                            <span
-                              className="rounded bg-[var(--btn-gradient-start)]/20 px-1.5 py-0.5 text-xs font-semibold text-[var(--btn-gradient-start)]"
-                              title="Pro"
-                            >
-                              Pro
-                            </span>
-                          )}
-                          {r.grade != null && (
-                            <StarRating value={gradeToStars(r.grade)} readOnly size="sm" />
-                          )}
-                          {(r.status ?? r.listType) && (
-                            <span
-                              className="rounded bg-[var(--color-darkest)] px-1.5 py-0.5 text-xs text-[var(--color-light)]"
-                            >
-                              {getStatusLabel(t, r.status ?? r.listType ?? null, mediaType)}
-                            </span>
-                          )}
-                          {(r.season != null || r.episode != null) && (
-                            <span className="text-xs text-[var(--color-light)]">
-                              S{r.season ?? "?"} E{r.episode ?? "?"}
-                            </span>
-                          )}
-                          {(r.chapter != null || r.volume != null) && (
-                            <span className="text-xs text-[var(--color-light)]">
-                              Ch.{r.chapter ?? "?"} Vol.{r.volume ?? "?"}
-                            </span>
-                          )}
-                          {(() => {
-                            const duration = r.startedAt && r.completedAt ? formatTimeToFinish(r.startedAt, r.completedAt) : "";
-                            return duration ? (
-                              <span className="text-xs text-[var(--color-light)]">
-                                {t("dashboard.finishedIn", { duration })}
+                            {r.isPro && (
+                              <span
+                                className="inline-flex rounded-full bg-[var(--btn-gradient-start)]/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-[var(--btn-gradient-start)]"
+                                title="Pro"
+                              >
+                                Pro
                               </span>
-                            ) : null;
-                          })()}
-                          <span className="text-sm text-[var(--color-light)]">
-                            {new Date(r.createdAt).toLocaleDateString()}
-                          </span>
-                          <ReactionButtons
-                            logId={r.id}
-                            likesCount={r.likesCount ?? 0}
-                            dislikesCount={r.dislikesCount ?? 0}
-                            userReaction={r.userReaction ?? null}
-                            disabled={!token}
-                            onReactionChange={(payload) => {
-                              setData((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      reviews: prev.reviews.map((rev) =>
-                                        rev.id === r.id
-                                          ? {
-                                              ...rev,
-                                              likesCount: payload.likesCount,
-                                              dislikesCount: payload.dislikesCount,
-                                              userReaction: payload.userReaction,
-                                            }
-                                          : rev
-                                      ),
-                                    }
-                                  : prev
-                              );
-                            }}
-                          />
+                            )}
+                          </div>
+
+                          {/* Badges & meta: level, status, progress, duration */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {(r.reviewerLevelLabel ?? r.reviewerLevelIcon) && (
+                              <span
+                                className="inline-flex items-center gap-1 rounded-md bg-[var(--color-darkest)] px-2 py-1 text-xs text-[var(--color-light)]"
+                                title={r.reviewerLevelLabel ?? undefined}
+                              >
+                                {r.reviewerLevelIcon && <span aria-hidden>{r.reviewerLevelIcon}</span>}
+                                {r.reviewerLevelLabel && <span>{r.reviewerLevelLabel}</span>}
+                              </span>
+                            )}
+                            {(r.status ?? r.listType) && (
+                              <span className="rounded-md bg-[var(--color-darkest)] px-2 py-1 text-xs text-[var(--color-light)]">
+                                {getStatusLabel(t, r.status ?? r.listType ?? null, mediaType)}
+                              </span>
+                            )}
+                            {(r.season != null || r.episode != null) && (
+                              <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+                                S{r.season ?? "?"} · E{r.episode ?? "?"}
+                              </span>
+                            )}
+                            {(r.chapter != null || r.volume != null) && (
+                              <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+                                Ch.{r.chapter ?? "?"} · Vol.{r.volume ?? "?"}
+                              </span>
+                            )}
+                            {r.startedAt && r.completedAt && (
+                              <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+                                {t("dashboard.finishedIn", { duration: formatTimeToFinish(r.startedAt, r.completedAt) })}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Rating + date */}
+                          <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-surface-border)]/60 pb-4">
+                            {r.grade != null && (
+                              <StarRating value={gradeToStars(r.grade)} readOnly size="sm" />
+                            )}
+                            <time
+                              className="text-xs text-[var(--color-light)]"
+                              dateTime={r.createdAt}
+                            >
+                              {new Date(r.createdAt).toLocaleDateString(locale, {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </time>
+                          </div>
+
+                          {/* Review body */}
+                          {r.review && (
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)] max-w-none">
+                              {r.review}
+                            </p>
+                          )}
+
+                          {/* Reactions */}
+                          <div className="flex items-center pt-2">
+                            <ReactionButtons
+                              logId={r.id}
+                              likesCount={r.likesCount ?? 0}
+                              dislikesCount={r.dislikesCount ?? 0}
+                              userReaction={r.userReaction ?? null}
+                              disabled={!token}
+                              onReactionChange={(payload) => {
+                                setData((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        reviews: prev.reviews.map((rev) =>
+                                          rev.id === r.id
+                                            ? {
+                                                ...rev,
+                                                likesCount: payload.likesCount,
+                                                dislikesCount: payload.dislikesCount,
+                                                userReaction: payload.userReaction,
+                                              }
+                                            : rev
+                                        ),
+                                      }
+                                    : prev
+                                );
+                              }}
+                            />
+                          </div>
                         </div>
-                        {r.review && (
-                          <p
-                            className="mt-2 whitespace-pre-wrap text-sm text-[var(--color-lightest)]"
-                          >
-                            {r.review}
-                          </p>
-                        )}
                       </Card>
                     </motion.div>
                   ))}
                 </div>
               </motion.div>
               {showPagination && (
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-dark)] pt-4">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-surface-border)] pt-4">
                   <p className="text-sm text-[var(--color-light)]">
                     {t("reviews.pageOf", { current: String(currentPage), total: String(totalPages), count: String(reviewsTotal) })}
                   </p>

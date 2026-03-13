@@ -8,7 +8,7 @@ export function SearchSkeleton() {
         {Array.from({ length: 8 }).map((_, i) => (
           <div
             key={i}
-            className="flex flex-row sm:flex-col gap-3 sm:gap-0 overflow-hidden rounded-lg border border-[var(--color-dark)] bg-[var(--color-dark)] min-h-0"
+            className="flex flex-row sm:flex-col gap-3 sm:gap-0 overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)] min-h-0"
           >
             <Skeleton
               className="w-20 h-28 flex-shrink-0 rounded-l-lg sm:w-full sm:h-auto sm:aspect-[2/3] sm:rounded-l-none sm:rounded-t-lg"

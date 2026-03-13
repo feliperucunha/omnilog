@@ -154,7 +154,7 @@ export function About() {
           {TEAM_MEMBERS.map((member) => (
             <Card
               key={member.roleKey}
-              className="overflow-hidden border-[var(--color-dark)] bg-[var(--color-dark)] p-0 flex flex-col"
+              className="overflow-hidden border-[var(--color-surface-border)] bg-[var(--color-dark)] p-0 flex flex-col"
               style={paperShadow}
             >
               <img
@@ -178,7 +178,7 @@ export function About() {
       {/* About the project + Support the project side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <Card
-          className="border-[var(--color-dark)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"
+          className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"
           style={paperShadow}
         >
           <h2 className="mb-3 text-lg font-semibold text-[var(--color-lightest)]">
@@ -192,7 +192,7 @@ export function About() {
           </p>
         </Card>
         <Card
-          className="border-[var(--color-dark)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"
+          className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"
           style={paperShadow}
         >
           <h2 className="mb-3 text-lg font-semibold text-[var(--color-lightest)]">
@@ -263,7 +263,7 @@ export function About() {
             : undefined
         }
         onClick={handleFeedbackClick}
-        className={`border-[var(--color-dark)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col relative ${
+        className={`border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col relative ${
           token && !inCooldown ? "cursor-pointer hover:bg-[var(--color-mid)]/10 transition-colors" : ""
         } ${inCooldown ? "pointer-events-none cursor-not-allowed opacity-90" : ""}`}
         style={paperShadow}

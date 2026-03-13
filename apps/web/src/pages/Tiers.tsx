@@ -139,7 +139,7 @@ export function Tiers() {
       </div>
 
       {token && me && (
-        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-md)]">
+        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-md)]">
           <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--color-light)]">
             <span>{t("tiers.currentPlan")}:</span>
             {isPro ? (
@@ -190,7 +190,7 @@ export function Tiers() {
 
       <div className="grid gap-6 sm:grid-cols-2">
         <Card
-          className="relative flex flex-col border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-card)]"
+          className="relative flex flex-col border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-card)]"
           style={{ boxShadow: "var(--shadow-card)" }}
         >
           <h2 className="text-lg font-semibold text-[var(--color-lightest)]">

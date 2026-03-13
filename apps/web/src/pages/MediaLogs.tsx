@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, AlertTriangle, Plus, Download } from "lucide-react";
+import { Search, AlertTriangle, Plus, Download, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -326,7 +326,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
       >
-        <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-4">
             <p className="font-medium text-[var(--color-lightest)]">
               {t("mediaLogs.couldntLoadLogs")}
@@ -589,20 +589,20 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
               const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);
               const listBorderClass =
                 log.status == null
-                  ? "border-[var(--color-dark)]"
+                  ? "border border-[var(--color-surface-border)]"
                   : isDropped
-                    ? "border-2 border-red-500"
+                    ? "border border-red-500"
                     : isInProgress
-                      ? "border-2 border-amber-400"
+                      ? "border border-amber-400"
                       : isCompleted
-                        ? "border-2 border-emerald-600"
-                        : "border-2 border-[var(--color-mid)]";
+                        ? "border border-emerald-600"
+                        : "border border-[var(--color-mid)]";
               const isReviewExpanded = embedded && expandedReviewLogId === log.id;
               return (
               <motion.div key={log.id} variants={staggerItem} className="min-h-0 sm:h-full">
                 <motion.div whileTap={tapScale} transition={tapTransition} className="h-full">
                   <Card
-                    className={`relative flex flex-col min-h-0 overflow-hidden bg-[var(--color-dark)] ${embedded && !isReviewExpanded ? "h-[193px] min-h-[193px] max-h-[193px] sm:h-[193px] sm:min-h-[193px] sm:max-h-[193px]" : embedded ? "" : "sm:min-h-[8.5rem]"} ${listBorderClass}`}
+                    className={`relative flex flex-row min-h-0 overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${embedded && !isReviewExpanded ? "h-[193px] min-h-[193px] max-h-[193px] sm:h-[193px] sm:min-h-[193px] sm:max-h-[193px]" : embedded ? "min-h-[160px]" : "min-h-[140px] sm:min-h-[160px]"} ${listBorderClass}`}
                     style={cardShadow}
                   >
                     {!readOnly && deletingId === log.id && (
@@ -610,125 +610,121 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                         <Loader2 className="h-8 w-8 animate-spin text-[var(--color-light)]" />
                       </div>
                     )}
-                    {!readOnly && hasProgressButton && (
-                      <div className="absolute top-15 md:top-16 right-2 z-[1]">
+                    {/* Left: image full height – flush with card edge, radius matches card (rounded-lg); click goes to item page */}
+                    <Link
+                      to={`/item/${log.mediaType}/${log.externalId}`}
+                      className="h-full min-h-full w-28 flex-shrink-0 overflow-hidden rounded-l-lg sm:w-32 block"
+                    >
+                      <ItemImage src={log.image} className="h-full w-full object-cover" />
+                    </Link>
+                    {/* Middle: title, grade, badge, episode, review */}
+                    <div className={`flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 sm:p-4 ${embedded && !isReviewExpanded ? "min-h-0" : ""}`}>
+                      <Link
+                        to={`/item/${log.mediaType}/${log.externalId}`}
+                        className="line-clamp-2 font-semibold text-[var(--color-lightest)] no-underline hover:underline text-sm sm:text-base"
+                      >
+                        {log.title}
+                      </Link>
+                      <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                        {log.grade != null ? (
+                          <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+                        ) : (
+                          <span className="text-[var(--color-light)]">—</span>
+                        )}
+                        <GenreBadges genres={log.genres} maxCount={1} />
+                        {(() => {
+                          const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
+                          return duration ? (
+                            <span className="text-[10px] sm:text-xs text-[var(--color-light)]">
+                              {t("dashboard.finishedIn", { duration })}
+                            </span>
+                          ) : null;
+                        })()}
+                      </div>
+                      {hasProgressButton && (() => {
+                        const p = getProgress(log);
+                        return (
+                          <span className="text-xs text-[var(--color-light)]">
+                            {t(p.labelKey)}: {p.value}
+                          </span>
+                        );
+                      })()}
+                      <div className={`flex flex-col items-start gap-1 min-h-0 ${embedded && !isReviewExpanded ? "flex-1 overflow-hidden" : ""}`}>
+                        {log.review ? (
+                          (() => {
+                            const review = log.review;
+                            const isExpanded = expandedReviewLogId === log.id;
+                            const truncated = review.length > REVIEW_PREVIEW_LENGTH;
+                            const preview = truncated && !isExpanded
+                              ? review.slice(0, REVIEW_PREVIEW_LENGTH)
+                              : review;
+                            const showClamp = embedded && truncated && !isExpanded;
+                            return (
+                              <>
+                                <div className={showClamp ? "line-clamp-2 w-full max-w-[240px]" : "w-full max-w-[240px]"}>
+                                  <p className="text-xs sm:text-sm text-[var(--color-light)] whitespace-pre-wrap break-words">
+                                    {preview}
+                                    {truncated && !isExpanded && " ... "}
+                                  </p>
+                                </div>
+                                {truncated && (
+                                  <Button
+                                    type="button"
+                                    variant="link"
+                                    size="sm"
+                                    className="shrink-0 h-auto p-0 text-xs text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setExpandedReviewLogId(isExpanded ? null : log.id);
+                                    }}
+                                  >
+                                    {isExpanded ? t("social.viewLess") : t("social.viewMore")}
+                                  </Button>
+                                )}
+                              </>
+                            );
+                          })()
+                        ) : (
+                          <span className="invisible text-xs sm:text-sm line-clamp-2">—</span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Right: +1 (primary) + edit */}
+                    {!readOnly && (
+                      <div className="flex flex-shrink-0 flex-col justify-center gap-2 border-l border-[var(--color-surface-border)] p-2">
+                        {hasProgressButton && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleIncrement(log);
+                            }}
+                            disabled={incrementingId === log.id || deletingId === log.id}
+                            aria-label={t("mediaLogs.addOne")}
+                            className="flex h-10 min-w-10 items-center justify-center gap-1 rounded-xl border-0 bg-[var(--color-darkest)] px-2.5 shadow-[var(--shadow-sm)] transition-[transform,box-shadow] hover:scale-[1.04] hover:shadow-[var(--shadow-md)] active:scale-[0.98] disabled:scale-100 disabled:opacity-50 [@media(hover:hover)]:hover:bg-[var(--btn-gradient-start)] [@media(hover:hover)]:hover:shadow-[0_0_0_2px_var(--btn-gradient-start)]"
+                          >
+                            {incrementingId === log.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-[var(--color-lightest)]" aria-hidden />
+                            ) : (
+                              <>
+                                <Plus className="h-4 w-4 shrink-0 text-[var(--color-lightest)]" aria-hidden />
+                                <span className="text-xs font-semibold tabular-nums text-[var(--color-lightest)]">1</span>
+                              </>
+                            )}
+                          </button>
+                        )}
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 rounded-md bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 hover:text-emerald-300 border border-emerald-500/40 transition-colors shrink-0"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleIncrement(log);
-                          }}
-                          disabled={incrementingId === log.id || deletingId === log.id}
-                          aria-label={t("mediaLogs.addOne")}
-                        >
-                          {incrementingId === log.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                          ) : (
-                            <Plus className="h-4 w-4" aria-hidden />
-                          )}
-                        </Button>
-                      </div>
-                    )}
-                    <div className="flex min-h-0 gap-3 p-3 flex-1 sm:gap-4 sm:p-4">
-                      <ItemImage src={log.image} className="h-16 w-11 flex-shrink-0 rounded-lg sm:h-20 sm:w-14" />
-                        <div className={`flex min-w-0 flex-1 flex-col gap-1 overflow-hidden ${embedded ? "min-h-0" : "min-h-[7rem] sm:min-h-[7.5rem]"}`}>
-                        <Link
-                          to={`/item/${log.mediaType}/${log.externalId}`}
-                          className="line-clamp-1 font-semibold text-[var(--color-lightest)] no-underline hover:underline text-sm sm:text-base"
-                        >
-                          {log.title}
-                        </Link>
-                        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                          <GenreBadges genres={log.genres} maxCount={1} />
-                          {(() => {
-                            const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
-                            return duration ? (
-                              <span className="text-[10px] sm:text-xs text-[var(--color-light)]">
-                                {t("dashboard.finishedIn", { duration })}
-                              </span>
-                            ) : null;
-                          })()}
-                          {log.grade != null ? (
-                            <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
-                          ) : (
-                            <span className="text-[var(--color-light)]">—</span>
-                          )}
-                        </div>
-                        {hasProgressButton && (() => {
-                          const p = getProgress(log);
-                          return (
-                            <div className="mt-1">
-                              <span className="text-xs text-[var(--color-light)]">
-                                {t(p.labelKey)}: {p.value}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                        <div className={`flex flex-col items-start gap-1 min-h-0 ${embedded && !isReviewExpanded ? "flex-1 overflow-hidden" : embedded ? "" : "min-h-[2.5rem]"}`}>
-                          {log.review ? (
-                            (() => {
-                              const review = log.review;
-                              const isExpanded = expandedReviewLogId === log.id;
-                              const truncated = review.length > REVIEW_PREVIEW_LENGTH;
-                              const preview = truncated && !isExpanded
-                                ? review.slice(0, REVIEW_PREVIEW_LENGTH)
-                                : review;
-                              const showClamp = embedded && truncated && !isExpanded;
-                              return (
-                                <>
-                                  <div className={showClamp ? "line-clamp-2 max-w-[210px]" : "max-w-[210px]"}>
-                                    <p className="text-xs sm:text-sm text-[var(--color-light)] whitespace-pre-wrap break-words">
-                                      {preview}
-                                      {truncated && !isExpanded && " ... "}
-                                    </p>
-                                  </div>
-                                  {truncated && (
-                                    <Button
-                                      type="button"
-                                      variant="link"
-                                      size="sm"
-                                      className="shrink-0 h-auto p-0 text-xs text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setExpandedReviewLogId(isExpanded ? null : log.id);
-                                      }}
-                                    >
-                                      {isExpanded ? t("social.viewLess") : t("social.viewMore")}
-                                    </Button>
-                                  )}
-                                </>
-                              );
-                            })()
-                          ) : (
-                            <span className="invisible text-xs sm:text-sm line-clamp-2">—</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {!readOnly && (
-                      <div className="flex shrink-0 border-t border-[var(--color-darkest)]">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="flex-1 hover:bg-[var(--color-mid)]/30"
+                          className="h-9 w-9 rounded-lg text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)] transition-colors"
                           onClick={() => setEditingLog(log)}
                           disabled={deletingId === log.id}
+                          aria-label={t("common.edit")}
                         >
-                          {t("common.edit")}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="flex-1 text-red-400 hover:bg-red-500/20 hover:text-red-400"
-                          onClick={() => handleDelete(log.id)}
-                          disabled={deletingId === log.id}
-                        >
-                          {t("common.delete")}
+                          <Pencil className="h-4 w-4" aria-hidden />
                         </Button>
                       </div>
                     )}
@@ -768,6 +764,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           episodesCount={editingLogEpisodesCount}
           onSaved={handleSaved}
           onCancel={() => setEditingLog(null)}
+          onDelete={editingLog ? (id) => handleDelete(id) : undefined}
         />
       )}
 

@@ -39,14 +39,14 @@ function getMonthKey(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function formatCalendarDayDate(dateKey: string): string {
+function formatCalendarDayDate(dateKey: string, locale: string): string {
   const [y, m, d] = dateKey.split("-").map(Number);
   const date = new Date(y, m - 1, d);
-  return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  return date.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
 
 export function DashboardCalendar({ isPro }: { isPro: boolean }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [data, setData] = useState<CalendarData | null>(null);
@@ -131,7 +131,7 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
   const daysInMonth = lastDay.getDate();
   const leadingBlanks = (startWeekday + 6) % 7;
 
-  const monthName = new Date(year, month - 1, 1).toLocaleDateString(undefined, {
+  const monthName = new Date(year, month - 1, 1).toLocaleDateString(locale, {
     month: "long",
     year: "numeric",
   });
@@ -259,7 +259,7 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
           >
             <DialogHeader>
               <DialogTitle className="text-[var(--color-lightest)]">
-                {selectedDate ? t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate) }) : ""}
+                {selectedDate ? t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) }) : ""}
               </DialogTitle>
             </DialogHeader>
             <div className="min-h-0 overflow-y-auto -mx-1 px-1">

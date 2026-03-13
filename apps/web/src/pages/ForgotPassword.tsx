@@ -51,7 +51,7 @@ export function ForgotPassword() {
         variants={modalContentVariants}
         className="w-full max-w-[400px]"
       >
-        <Card className="w-full border-[var(--color-dark)] bg-[var(--color-dark)] shadow-[var(--shadow-modal)]">
+        <Card className="w-full border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-modal)]">
           <CardHeader className="text-center">
             <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
               {t("forgotPassword.title")}

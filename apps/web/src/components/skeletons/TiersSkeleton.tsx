@@ -9,7 +9,7 @@ export function TiersSkeleton() {
         <Skeleton className="mx-auto mt-2 h-4 w-64 rounded md:w-80" />
       </div>
 
-      <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-md)]">
+      <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-md)]">
         <div className="flex flex-wrap items-center gap-2">
           <Skeleton className="h-4 w-20 rounded" />
           <Skeleton className="h-5 w-16 rounded" />
@@ -19,7 +19,7 @@ export function TiersSkeleton() {
 
       <div className="grid gap-6 sm:grid-cols-2">
         <Card
-          className="relative flex flex-col border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-card)]"
+          className="relative flex flex-col border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-card)]"
           style={{ boxShadow: "var(--shadow-card)" }}
         >
           <Skeleton className="h-6 w-24 rounded" />

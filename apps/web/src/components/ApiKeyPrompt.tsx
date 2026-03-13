@@ -68,7 +68,7 @@ export function ApiKeyPrompt({
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
     >
-      <Card className="border-[var(--color-dark)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+      <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
         <div className="flex flex-col gap-4">
           <CardHeader className="p-0">
             <h3 className="text-lg font-semibold text-[var(--color-lightest)]">

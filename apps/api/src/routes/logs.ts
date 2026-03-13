@@ -268,7 +268,7 @@ logsRouter.delete("/:id/reaction", async (req: AuthenticatedRequest, res) => {
   res.status(204).end();
 });
 
-/** GET /logs/stats?group=category|month|year|genre|completedByMonth|completedByYear - hours (or count for genre/completedBy*) per category/period/genre */
+/** GET /logs/stats?group=category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear - hours (or count) per category/period/genre; categoryBy* returns { period, mediaType, hours }[] */
 logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const groupParam = req.query.group as string;
@@ -283,9 +283,13 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
             ? "completedByYear"
             : groupParam === "completedByMonth"
               ? "completedByMonth"
-              : groupParam === "month"
-                ? "month"
-                : "month";
+              : groupParam === "categoryByYear"
+                ? "categoryByYear"
+                : groupParam === "categoryByMonth"
+                  ? "categoryByMonth"
+                  : groupParam === "month"
+                    ? "month"
+                    : "month";
 
   if (group === "genre") {
     const logs = await prisma.log.findMany({
@@ -325,6 +329,33 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     const entries = Object.entries(byPeriod)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([period, count]) => ({ period, hours: count }));
+    res.json({ group, data: entries });
+    return;
+  }
+
+  if (group === "categoryByMonth" || group === "categoryByYear") {
+    const logs = await prisma.log.findMany({
+      where: { userId, completedAt: { not: null } },
+      select: { completedAt: true, mediaType: true },
+    });
+    const byPeriodCategory: Record<string, Record<string, number>> = {};
+    for (const log of logs) {
+      const d = log.completedAt!;
+      const period =
+        group === "categoryByYear"
+          ? `${d.getUTCFullYear()}`
+          : `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+      const mt = log.mediaType as string;
+      if (!byPeriodCategory[period]) byPeriodCategory[period] = {};
+      byPeriodCategory[period][mt] = (byPeriodCategory[period][mt] ?? 0) + 1;
+    }
+    const entries: Array<{ period: string; mediaType: string; hours: number }> = [];
+    for (const [period, byCat] of Object.entries(byPeriodCategory)) {
+      for (const [mediaType, count] of Object.entries(byCat)) {
+        entries.push({ period, mediaType, hours: count });
+      }
+    }
+    entries.sort((a, b) => a.period.localeCompare(b.period) || a.mediaType.localeCompare(b.mediaType));
     res.json({ group, data: entries });
     return;
   }
