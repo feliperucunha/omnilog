@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
-import type { ItemDetail, ItemPageData, ItemReview, MediaType } from "@dogument/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, type ItemDetail, type ItemPageData, type ItemReview, type MediaType } from "@dogument/shared";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetchCached } from "@/lib/api";
@@ -653,17 +653,31 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                 animate="animate"
               >
                 <div className="flex flex-col gap-4">
-                  {reviews.map((r: ItemReview) => (
+                  {reviews.map((r: ItemReview) => {
+                    const isDropped = r.status === "dropped";
+                    const isInProgress = r.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(r.status);
+                    const isCompleted = r.status != null && (COMPLETED_STATUSES as readonly string[]).includes(r.status);
+                    const listBorderClass =
+                      r.status == null
+                        ? "border border-[var(--color-surface-border)]"
+                        : isDropped
+                          ? "border border-red-500"
+                          : isInProgress
+                            ? "border border-amber-400"
+                            : isCompleted
+                              ? "border border-emerald-600"
+                              : "border border-[var(--color-mid)]";
+                    return (
                     <motion.div key={r.id} variants={staggerItem}>
                       <Card
-                        className={`overflow-hidden border-[var(--color-surface-border)] bg-[var(--color-dark)] p-0 ${r.isPro ? "border-l-4 border-l-[var(--btn-gradient-start)]" : ""}`}
+                        className={`overflow-hidden bg-[var(--color-dark)] p-0 ${listBorderClass}`}
                         style={paperShadow}
                       >
                         <div className="flex flex-col gap-4 p-4 sm:p-5">
                           {/* Author + all level badges */}
                           <div className="flex flex-wrap items-center gap-2">
                             <span
-                              className={`text-base font-semibold ${r.isPro ? "pro-username-shine" : "text-[var(--color-lightest)]"}`}
+                              className={`text-base font-semibold ${r.isAdmin ? "admin-username-fire" : r.isPro ? "pro-username-shine" : "text-[var(--color-lightest)]"}`}
                             >
                               {r.reviewerUsername ?? r.userEmail}
                             </span>
@@ -764,7 +778,8 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                         </div>
                       </Card>
                     </motion.div>
-                  ))}
+                  );
+                  })}
                 </div>
               </motion.div>
               {showPagination && (

@@ -151,6 +151,21 @@
   animation: pro-username-shine 2s ease-in-out infinite;
 }
 
+/** Admin username on review cards: glowing fire (orange/amber) */
+@keyframes admin-username-fire {
+  0%, 100% {
+    text-shadow: 0 0 12px #f59e0b, 0 0 24px #ea580c;
+    color: #fbbf24;
+  }
+  50% {
+    text-shadow: 0 0 20px #f97316, 0 0 36px #ea580c;
+    color: #fcd34d;
+  }
+}
+.admin-username-fire {
+  animation: admin-username-fire 2s ease-in-out infinite;
+}
+
 /* Light theme and defaults */
 :root {
   --color-darkest: #0D1B2A;

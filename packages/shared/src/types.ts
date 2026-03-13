@@ -234,6 +234,8 @@ export interface ItemReview {
   reviewerUsername?: string | null;
   /** True when the review author is on the Pro tier */
   isPro?: boolean;
+  /** True when the review author is an Admin */
+  isAdmin?: boolean;
   /** All earned review badges for this medium (icon + level + label). Show all on review cards. */
   reviewerBadges?: Array<{ level: number; label: string; icon: string }>;
   /** Reviewer's review count in this category (for badge tooltip: "X has N reviews in Y"). */
