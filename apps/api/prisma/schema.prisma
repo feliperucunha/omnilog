@@ -65,8 +65,6 @@ model User {
   subscriptionEndsAt   DateTime?       // Pro access until this date; cron clears tier when past; null = endless (e.g. testing)
   country             String?  // ISO 3166-1 alpha-2 e.g. BR for pricing
   onboarded           Boolean  @default(false)
-  xpTotal             Int      @default(0)
-  level               Int      @default(1)
   currentStreak       Int      @default(0)
   lastReviewDate      DateTime?
   selectedBadgeIds    String?  // JSON array of up to 3 badge IDs for profile display
@@ -78,7 +76,6 @@ model User {
   followsFollowing  Follow[] @relation("FollowFollowing")
   followsFollowers  Follow[] @relation("FollowFollower")
   userBadges     UserBadge[]
-  userXpEntries  UserXp[]
   reviewStats    UserReviewStats?
 }
 
@@ -121,18 +118,6 @@ model Milestone {
 
   @@unique([metric, scope, medium, threshold])
   @@index([metric, scope])
-}
-
-model UserXp {
-  id          String   @id @default(cuid())
-  userId      String
-  actionType  String
-  xp          Int
-  referenceId String?
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
 }
 
 model UserReviewStats {

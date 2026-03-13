@@ -164,6 +164,16 @@ export async function runSeedMilestones(): Promise<void> {
   console.log(`Seeded ${count} milestones.`);
 }
 
+/** Log a clear message when the seed fails (e.g. Milestone table not created in Supabase). */
+function logSeedFailure(err: unknown): void {
+  const msg = err instanceof Error ? err.message : String(err);
+  const hint =
+    msg.includes("does not exist") || msg.includes("relation") || msg.includes("Milestone")
+      ? " Create the table by running apps/api/prisma/supabase-milestones.sql in Supabase SQL Editor, then restart the API."
+      : "";
+  console.error("Milestone seed failed:" + hint, err);
+}
+
 const isRunDirectly =
   typeof process !== "undefined" &&
   process.argv[1] != null &&
@@ -171,7 +181,7 @@ const isRunDirectly =
 if (isRunDirectly) {
   runSeedMilestones()
     .catch((e) => {
-      console.error(e);
+      logSeedFailure(e);
       process.exit(1);
     })
     .finally(() => prisma.$disconnect());

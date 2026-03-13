@@ -29,6 +29,7 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, UserCheck, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
+import * as storage from "@/lib/storage";
 import type { Log } from "@dogument/shared";
 
 const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
@@ -38,9 +39,11 @@ function getFreeSearchUsageKey(type: MediaType, boardProvider: BoardGameProvider
   return type === "boardgames" ? `boardgames-${boardProvider}` : type;
 }
 
-function loadFreeSearchUsageFromStorage(): Record<string, { used: number; limit: number }> {
+function loadFreeSearchUsageFromStorage(
+  getRaw: () => string | null
+): Record<string, { used: number; limit: number }> {
   try {
-    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(FREE_SEARCH_USAGE_STORAGE_KEY) : null;
+    const raw = getRaw();
     if (!raw) return {};
     const data = JSON.parse(raw) as Record<string, { used?: number; limit?: number }>;
     const out: Record<string, { used: number; limit: number }> = {};
@@ -50,15 +53,6 @@ function loadFreeSearchUsageFromStorage(): Record<string, { used: number; limit:
     return out;
   } catch {
     return {};
-  }
-}
-
-function saveFreeSearchUsageToStorage(usageKey: string, value: { used: number; limit: number }) {
-  try {
-    const prev = loadFreeSearchUsageFromStorage();
-    localStorage.setItem(FREE_SEARCH_USAGE_STORAGE_KEY, JSON.stringify({ ...prev, [usageKey]: value }));
-  } catch {
-    // ignore
   }
 }
 
@@ -118,7 +112,7 @@ export function Search() {
   } | null>(null);
   const [limitReachedByCategory, setLimitReachedByCategory] = useState<Partial<Record<MediaType, boolean>>>({});
   const [usageByCategory, setUsageByCategory] = useState<Partial<Record<MediaType, { used: number; limit: number }>>>(() => {
-    const stored = loadFreeSearchUsageFromStorage();
+    const stored = loadFreeSearchUsageFromStorage(() => storage.getItemSync(FREE_SEARCH_USAGE_STORAGE_KEY));
     const out: Partial<Record<MediaType, { used: number; limit: number }>> = {};
     for (const type of MEDIA_TYPES) {
       const key = getFreeSearchUsageKey(type as MediaType, type === "boardgames" ? "bgg" : "bgg");
@@ -126,6 +120,10 @@ export function Search() {
     }
     return out;
   });
+
+  useEffect(() => {
+    void storage.getItem(FREE_SEARCH_USAGE_STORAGE_KEY);
+  }, []);
   const [drawerItem, setDrawerItem] = useState<{ mediaType: MediaType; id: string } | null>(null);
   const [logsByExternalId, setLogsByExternalId] = useState<Map<string, string>>(new Map());
   const { token } = useAuth();
@@ -178,7 +176,7 @@ export function Search() {
   }, [stateQuery]);
 
   useEffect(() => {
-    const stored = loadFreeSearchUsageFromStorage();
+    const stored = loadFreeSearchUsageFromStorage(() => storage.getItemSync(FREE_SEARCH_USAGE_STORAGE_KEY));
     const boardProvider = me?.boardGameProvider ?? "bgg";
     setUsageByCategory((prev) => {
       const next = { ...prev };
@@ -224,7 +222,7 @@ export function Search() {
       const sort = sortOverride ?? sortBy;
       const boardProvider = me?.boardGameProvider ?? "bgg";
       const usageKey = getFreeSearchUsageKey(searchType, searchType === "boardgames" ? boardProvider : "bgg");
-      const stored = loadFreeSearchUsageFromStorage();
+      const stored = loadFreeSearchUsageFromStorage(() => storage.getItemSync(FREE_SEARCH_USAGE_STORAGE_KEY));
       const clientUsed = stored[usageKey]?.used ?? 0;
       setLoading(true);
       setResults([]);
@@ -244,7 +242,8 @@ export function Search() {
         }
         if (data.freeSearchUsed != null && data.freeSearchLimit != null) {
           const usage = { used: data.freeSearchUsed, limit: data.freeSearchLimit };
-          saveFreeSearchUsageToStorage(usageKey, usage);
+          const prev = loadFreeSearchUsageFromStorage(() => storage.getItemSync(FREE_SEARCH_USAGE_STORAGE_KEY));
+          void storage.setItem(FREE_SEARCH_USAGE_STORAGE_KEY, JSON.stringify({ ...prev, [usageKey]: usage }));
           setUsageByCategory((prev) => ({ ...prev, [searchType]: usage }));
         }
         if ("requiresApiKey" in data && data.requiresApiKey) {

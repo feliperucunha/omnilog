@@ -109,10 +109,17 @@ app.listen(PORT, () => {
     })
     .catch((e) => console.error("Badge seed check failed:", e));
 
-  // Idempotent upsert: ensures milestones exist (empty DB or new tiers). Run on every startup.
+  // Idempotent upsert: ensures milestones exist. If you use Supabase without Prisma migrate, run supabase-milestones.sql first.
   void runSeedMilestones()
     .then(() => console.log("Milestones synced."))
-    .catch((e) => console.error("Milestone seed failed:", e));
+    .catch((e) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      const hint =
+        msg.includes("does not exist") || msg.includes("relation")
+          ? " Run apps/api/prisma/supabase-milestones.sql in Supabase SQL Editor, then restart."
+          : "";
+      console.error("Milestone seed failed." + hint, e);
+    });
 
   // Run subscription expiry in-process: on startup and every 24h (no external cron needed)
   void runSubscriptionExpiry().then((n) => {

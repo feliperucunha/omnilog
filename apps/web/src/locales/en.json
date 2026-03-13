@@ -160,6 +160,7 @@
     "update": "Update",
     "saving": "Saving…",
     "loading": "Loading…",
+    "checkingSession": "Checking session…",
     "email": "Email",
     "password": "Password",
     "placeholderEmail": "you@example.com",

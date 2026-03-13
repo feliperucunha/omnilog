@@ -135,39 +135,150 @@ function buildScopeProgress(
   };
 }
 
+/** Build scope progress with no milestones (next: null, earned: []). Used when table is missing or empty. */
+function scopeProgressNoMilestones(current: number): ScopeProgress {
+  return {
+    current,
+    next: null,
+    progressPct: current > 0 ? 100 : 0,
+    earned: [],
+  };
+}
+
 /**
  * Get milestone progress for the current user. Used by dashboard and MediaLogs.
+ * Returns empty progress if Milestone table is missing (e.g. migration not run in Supabase).
  */
 export async function getMilestoneProgress(userId: string): Promise<MilestoneProgressResponse> {
-  const [reviewStats, logStats, allMilestones] = await Promise.all([
-    getReviewStats(userId),
-    getLogStats(userId),
-    prisma.milestone.findMany({ orderBy: [{ sortOrder: "asc" }, { threshold: "asc" }] }),
-  ]);
+  try {
+    const [reviewStats, logStats, allMilestones] = await Promise.all([
+      getReviewStats(userId),
+      getLogStats(userId),
+      prisma.milestone.findMany({ orderBy: [{ sortOrder: "asc" }, { threshold: "asc" }] }),
+    ]);
 
-  const byKey = (metric: string, scope: string, medium: BadgeMedium | null) =>
-    allMilestones.filter(
-      (m) =>
-        m.metric === metric &&
-        m.scope === scope &&
-        (medium === null ? m.medium === null : m.medium === medium)
-    );
+    if (allMilestones.length === 0) {
+      const reviewStats = await getReviewStats(userId);
+      const logStats = await getLogStats(userId);
+      const r = reviewStats as Record<string, number>;
+      const l = logStats as Record<string, number> & { totalLogs: number };
+      return {
+        perMedium: APP_MEDIA_TYPES.map((mediaType) => {
+          const medium = MEDIA_TO_BADGE[mediaType];
+          return {
+            mediaType,
+            reviews: scopeProgressNoMilestones(r[REVIEW_COLUMNS[medium]] ?? 0),
+            logs: scopeProgressNoMilestones(l[LOG_KEYS[medium]] ?? 0),
+          };
+        }),
+        global: {
+          reviews: scopeProgressNoMilestones(r.totalReviews ?? 0),
+          logs: scopeProgressNoMilestones(l.totalLogs ?? 0),
+        },
+      };
+    }
 
-  const perMedium: PerMediumProgress[] = APP_MEDIA_TYPES.map((mediaType) => {
-    const medium = MEDIA_TO_BADGE[mediaType];
-    const reviewCount = (reviewStats as Record<string, number>)[REVIEW_COLUMNS[medium]] ?? 0;
-    const logCount = (logStats as Record<string, number>)[LOG_KEYS[medium]] ?? 0;
-    return {
-      mediaType,
-      reviews: buildScopeProgress(reviewCount, byKey("reviews", "per_medium", medium)),
-      logs: buildScopeProgress(logCount, byKey("logs", "per_medium", medium)),
+    const byKey = (metric: string, scope: string, medium: BadgeMedium | null) =>
+      allMilestones.filter(
+        (m) =>
+          m.metric === metric &&
+          m.scope === scope &&
+          (medium === null ? m.medium === null : m.medium === medium)
+      );
+
+    const perMedium: PerMediumProgress[] = APP_MEDIA_TYPES.map((mediaType) => {
+      const medium = MEDIA_TO_BADGE[mediaType];
+      const reviewCount = (reviewStats as Record<string, number>)[REVIEW_COLUMNS[medium]] ?? 0;
+      const logCount = (logStats as Record<string, number>)[LOG_KEYS[medium]] ?? 0;
+      return {
+        mediaType,
+        reviews: buildScopeProgress(reviewCount, byKey("reviews", "per_medium", medium)),
+        logs: buildScopeProgress(logCount, byKey("logs", "per_medium", medium)),
+      };
+    });
+
+    const global = {
+      reviews: buildScopeProgress(reviewStats.totalReviews, byKey("reviews", "global", null)),
+      logs: buildScopeProgress(logStats.totalLogs, byKey("logs", "global", null)),
     };
-  });
 
-  const global = {
-    reviews: buildScopeProgress(reviewStats.totalReviews, byKey("reviews", "global", null)),
-    logs: buildScopeProgress(logStats.totalLogs, byKey("logs", "global", null)),
-  };
+    return { perMedium, global };
+  } catch (err) {
+    console.error("Milestone progress failed (is Milestone table created? run supabase-milestones.sql):", err);
+    try {
+      const reviewStats = await getReviewStats(userId);
+      const logStats = await getLogStats(userId);
+      const r = reviewStats as Record<string, number>;
+      const l = logStats as Record<string, number> & { totalLogs: number };
+      return {
+        perMedium: APP_MEDIA_TYPES.map((mediaType) => {
+          const medium = MEDIA_TO_BADGE[mediaType];
+          return {
+            mediaType,
+            reviews: scopeProgressNoMilestones(r[REVIEW_COLUMNS[medium]] ?? 0),
+            logs: scopeProgressNoMilestones(l[LOG_KEYS[medium]] ?? 0),
+          };
+        }),
+        global: {
+          reviews: scopeProgressNoMilestones(r.totalReviews ?? 0),
+          logs: scopeProgressNoMilestones(l.totalLogs ?? 0),
+        },
+      };
+    } catch (fallbackErr) {
+      console.error("Milestone fallback failed:", fallbackErr);
+      return {
+        perMedium: APP_MEDIA_TYPES.map((mediaType) => ({
+          mediaType,
+          reviews: scopeProgressNoMilestones(0),
+          logs: scopeProgressNoMilestones(0),
+        })),
+        global: {
+          reviews: scopeProgressNoMilestones(0),
+          logs: scopeProgressNoMilestones(0),
+        },
+      };
+    }
+  }
+}
 
-  return { perMedium, global };
+export interface ReviewerMilestoneInfo {
+  label: string;
+  icon: string;
+}
+
+/**
+ * Get the highest earned review milestone for a given medium for multiple users.
+ * Used on item pages so the badge matches the dashboard (e.g. "First TV Show Review").
+ */
+export async function getReviewerMilestoneForMediumBatch(
+  userIds: string[],
+  mediaType: string
+): Promise<Map<string, ReviewerMilestoneInfo | null>> {
+  const medium = MEDIA_TO_BADGE[mediaType];
+  if (!medium) return new Map(userIds.map((id) => [id, null]));
+
+  try {
+    const [milestones, statsRows] = await Promise.all([
+      prisma.milestone.findMany({
+        where: { metric: "reviews", scope: "per_medium", medium },
+        orderBy: { threshold: "asc" },
+      }),
+      prisma.userReviewStats.findMany({
+        where: { userId: { in: userIds } },
+      }),
+    ]);
+    const countKey = REVIEW_COLUMNS[medium];
+    const sorted = [...milestones].sort((a, b) => a.threshold - b.threshold);
+    const map = new Map<string, ReviewerMilestoneInfo | null>();
+    for (const userId of userIds) {
+      const row = statsRows.find((r) => r.userId === userId);
+      const count = (row?.[countKey] as number) ?? 0;
+      const earned = sorted.filter((m) => count >= m.threshold);
+      const highest = earned.length > 0 ? earned[earned.length - 1] : null;
+      map.set(userId, highest ? { label: highest.label, icon: highest.icon } : null);
+    }
+    return map;
+  } catch {
+    return new Map(userIds.map((id) => [id, null]));
+  }
 }

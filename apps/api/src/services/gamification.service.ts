@@ -1,16 +1,9 @@
-import type { BadgeMedium } from "@prisma/client";
+import type { BadgeConditionType, BadgeMedium } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-
-const XP_LOG_ITEM = 5;
-const XP_WRITE_REVIEW = 20;
-const XP_REVIEW_LONG_BONUS = 10;
-const XP_REVIEW_LIKE = 5;
-const XP_REVIEW_REPLY = 10;
-const REVIEW_LONG_WORDS = 150;
-const LEVEL_DIVISOR = 50;
 
 /** App media types that count toward badge stats (maps to BadgeMedium). */
 const BADGE_MEDIA_TYPES = ["movies", "tv", "anime", "manga", "comics", "books"] as const;
+const APP_MEDIA_TYPES_LIST = [...BADGE_MEDIA_TYPES];
 const MEDIA_TO_BADGE: Record<string, BadgeMedium> = {
   movies: "MOVIE",
   tv: "TV_SHOW",
@@ -48,27 +41,6 @@ function getStatsColumn(medium: BadgeMedium): ReviewCountKey {
     BOOK: "bookReviews",
   };
   return map[medium];
-}
-
-export async function grantXp(
-  userId: string,
-  actionType: string,
-  xp: number,
-  referenceId?: string | null
-): Promise<void> {
-  await prisma.userXp.create({
-    data: { userId, actionType, xp, referenceId: referenceId ?? null },
-  });
-  const sum = await prisma.userXp.aggregate({
-    where: { userId },
-    _sum: { xp: true },
-  });
-  const xpTotal = sum._sum.xp ?? 0;
-  const level = Math.max(1, Math.floor(Math.sqrt(xpTotal / LEVEL_DIVISOR)));
-  await prisma.user.update({
-    where: { id: userId },
-    data: { xpTotal, level },
-  });
 }
 
 async function ensureReviewStats(userId: string): Promise<{
@@ -161,7 +133,7 @@ export async function handleReviewCreated(
     data: { lastReviewDate: now, currentStreak: newStreak },
   });
 
-  return [];
+  return grantEarnedBadges(userId);
 }
 
 /**
@@ -209,12 +181,101 @@ export async function handleReviewRemoved(userId: string, mediaType: string): Pr
 /** Call when a log receives a like (reaction type=like). No longer grants XP or badges; kept for API compatibility. */
 export async function handleReviewLiked(_logId: string, _recipientUserId: string): Promise<void> {}
 
-/** Call when user adds a log (with or without review). Kept for API compatibility; no longer grants XP or badges. */
-export async function handleLogCreated(_userId: string): Promise<NewBadge[]> {
-  return [];
+/** Call when user adds a log (with or without review). Grants any newly earned badges (e.g. First Movie Log). */
+export async function handleLogCreated(userId: string): Promise<NewBadge[]> {
+  return grantEarnedBadges(userId);
 }
 
 export type NewBadge = { id: string; name: string; icon: string };
+
+const LOG_MEDIA_TO_BADGE: Record<string, BadgeMedium> = {
+  movies: "MOVIE",
+  tv: "TV_SHOW",
+  anime: "ANIME",
+  manga: "MANGA",
+  comics: "COMIC",
+  books: "BOOK",
+};
+
+/** Check badge conditions against current stats and grant any newly earned badges. Call after review or log changes. */
+export async function grantEarnedBadges(userId: string): Promise<NewBadge[]> {
+  const [allBadges, existingUserBadgeIds, reviewStats, logRows, user, likesReceived] = await Promise.all([
+    prisma.badge.findMany({ select: { id: true, name: true, icon: true, medium: true, conditionType: true, conditionValue: true } }),
+    prisma.userBadge.findMany({ where: { userId }, select: { badgeId: true } }).then((r) => new Set(r.map((x) => x.badgeId))),
+    prisma.userReviewStats.findUnique({ where: { userId } }),
+    prisma.log.groupBy({
+      by: ["mediaType"],
+      where: { userId, mediaType: { in: APP_MEDIA_TYPES_LIST } },
+      _count: { id: true },
+    }),
+    prisma.user.findUnique({ where: { id: userId }, select: { currentStreak: true } }),
+    prisma.logReaction.count({ where: { type: "like", log: { userId } } }),
+  ]);
+
+  const reviewCountByMedium: Record<BadgeMedium, number> = {
+    MOVIE: reviewStats?.movieReviews ?? 0,
+    TV_SHOW: reviewStats?.tvShowReviews ?? 0,
+    ANIME: reviewStats?.animeReviews ?? 0,
+    MANGA: reviewStats?.mangaReviews ?? 0,
+    COMIC: reviewStats?.comicReviews ?? 0,
+    BOOK: reviewStats?.bookReviews ?? 0,
+  };
+  const totalReviews = reviewStats?.totalReviews ?? 0;
+  const distinctMediaReviewed = reviewStats?.distinctMediaReviewed ?? 0;
+  const currentStreak = user?.currentStreak ?? 0;
+
+  const logCountByMedium: Record<BadgeMedium, number> = {
+    MOVIE: 0,
+    TV_SHOW: 0,
+    ANIME: 0,
+    MANGA: 0,
+    COMIC: 0,
+    BOOK: 0,
+  };
+  let totalLogs = 0;
+  for (const r of logRows) {
+    const medium = LOG_MEDIA_TO_BADGE[r.mediaType];
+    if (medium) {
+      logCountByMedium[medium] = r._count.id;
+      totalLogs += r._count.id;
+    }
+  }
+  const distinctMediaLogged = Object.values(logCountByMedium).filter((c) => c > 0).length;
+
+  const newBadges: NewBadge[] = [];
+  for (const badge of allBadges) {
+    if (existingUserBadgeIds.has(badge.id)) continue;
+    const cond = badge.conditionType as BadgeConditionType;
+    const value = badge.conditionValue;
+    let met = false;
+    if (cond === "REVIEW_COUNT_PER_MEDIA" && badge.medium) {
+      met = (reviewCountByMedium[badge.medium] ?? 0) >= value;
+    } else if (cond === "REVIEW_COUNT_GLOBAL") {
+      met = totalReviews >= value;
+    } else if (cond === "MEDIA_TYPES_REVIEWED") {
+      met = distinctMediaReviewed >= value;
+    } else if (cond === "REVIEW_LIKES") {
+      met = likesReceived >= value;
+    } else if (cond === "REVIEW_STREAK") {
+      met = currentStreak >= value;
+    } else if (cond === "LOG_COUNT_PER_MEDIA" && badge.medium) {
+      met = (logCountByMedium[badge.medium] ?? 0) >= value;
+    } else if (cond === "LOG_COUNT_GLOBAL") {
+      met = totalLogs >= value;
+    } else if (cond === "LOG_MEDIA_TYPES_LOGGED") {
+      met = distinctMediaLogged >= value;
+    } else if (cond === "FIRST_REVIEW") {
+      met = totalReviews >= 1;
+    }
+    if (!met) continue;
+    await prisma.userBadge.create({
+      data: { userId, badgeId: badge.id },
+    });
+    existingUserBadgeIds.add(badge.id);
+    newBadges.push({ id: badge.id, name: badge.name, icon: badge.icon });
+  }
+  return newBadges;
+}
 
 export async function setSelectedBadges(userId: string, badgeIds: string[]): Promise<void> {
   if (badgeIds.length > 3) badgeIds = badgeIds.slice(0, 3);

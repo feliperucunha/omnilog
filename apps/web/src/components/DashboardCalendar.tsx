@@ -287,9 +287,10 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
                           </p>
                           <p className="text-xs text-[var(--color-light)]">
                             {t(`nav.${log.mediaType}`)}
-                            {log.startedAt && log.completedAt && (
-                              <> · {t("dashboard.finishedIn", { duration: formatTimeToFinish(log.startedAt, log.completedAt) })}</>
-                            )}
+                            {(() => {
+                              const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
+                              return duration ? <> · {t("dashboard.finishedIn", { duration })}</> : null;
+                            })()}
                           </p>
                           {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
                             <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">

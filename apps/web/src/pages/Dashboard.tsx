@@ -31,6 +31,7 @@ import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
+import * as storage from "@/lib/storage";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 
@@ -45,24 +46,6 @@ const REVIEW_PREVIEW_LENGTH = 120;
 const BETA_MODAL_STORAGE_KEY = "dogument.betaModalSeen";
 const SOCIAL_COLLAPSED_STORAGE_KEY = "dogument.dashboard.socialCollapsed";
 const BADGES_COLLAPSED_STORAGE_KEY = "dogument.dashboard.badgesCollapsed";
-
-function getSocialCollapsedDefault(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(SOCIAL_COLLAPSED_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function getBadgesCollapsedDefault(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(BADGES_COLLAPSED_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
 
 /** Milestone progress from GET /me/milestones/progress */
 interface ScopeProgress {
@@ -81,22 +64,6 @@ interface MilestoneProgressResponse {
   global: { reviews: ScopeProgress; logs: ScopeProgress };
 }
 
-function getBetaModalSeen(userId: string): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    return localStorage.getItem(`${BETA_MODAL_STORAGE_KEY}.${userId}`) === "true";
-  } catch {
-    return true;
-  }
-}
-
-function setBetaModalSeen(userId: string): void {
-  try {
-    localStorage.setItem(`${BETA_MODAL_STORAGE_KEY}.${userId}`, "true");
-  } catch {
-    // ignore
-  }
-}
 
 export function Dashboard() {
   const { t } = useLocale();
@@ -121,18 +88,30 @@ export function Dashboard() {
   const [showBetaModal, setShowBetaModal] = useState(false);
   /** Log id whose review is expanded in-card (no modal). */
   const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
-  const [socialCollapsed, setSocialCollapsed] = useState(getSocialCollapsedDefault);
-  const [badgesCollapsed, setBadgesCollapsed] = useState(getBadgesCollapsedDefault);
+  const [socialCollapsed, setSocialCollapsed] = useState(false);
+  const [badgesCollapsed, setBadgesCollapsed] = useState(false);
   const [milestoneProgress, setMilestoneProgress] = useState<MilestoneProgressResponse | null>(null);
+
+  /** Load collapsed prefs from persistent storage (Android/Capacitor). */
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      storage.getItem(SOCIAL_COLLAPSED_STORAGE_KEY),
+      storage.getItem(BADGES_COLLAPSED_STORAGE_KEY),
+    ]).then(([social, badges]) => {
+      if (cancelled) return;
+      if (social === "true") setSocialCollapsed(true);
+      if (badges === "true") setBadgesCollapsed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const toggleBadgesCollapsed = useCallback(() => {
     setBadgesCollapsed((prev) => {
       const next = !prev;
-      try {
-        localStorage.setItem(BADGES_COLLAPSED_STORAGE_KEY, next ? "true" : "false");
-      } catch {
-        // ignore
-      }
+      void storage.setItem(BADGES_COLLAPSED_STORAGE_KEY, next ? "true" : "false");
       return next;
     });
   }, []);
@@ -140,11 +119,7 @@ export function Dashboard() {
   const toggleSocialCollapsed = useCallback(() => {
     setSocialCollapsed((prev) => {
       const next = !prev;
-      try {
-        localStorage.setItem(SOCIAL_COLLAPSED_STORAGE_KEY, next ? "true" : "false");
-      } catch {
-        // ignore
-      }
+      void storage.setItem(SOCIAL_COLLAPSED_STORAGE_KEY, next ? "true" : "false");
       return next;
     });
   }, []);
@@ -187,11 +162,11 @@ export function Dashboard() {
   }, [fetchCounts]);
 
   useEffect(() => {
-    if (me?.user?.id && !getBetaModalSeen(me.user.id)) setShowBetaModal(true);
+    if (me?.user?.id && storage.getItemSync(`${BETA_MODAL_STORAGE_KEY}.${me.user.id}`) !== "true") setShowBetaModal(true);
   }, [me?.user?.id]);
 
   const handleBetaModalClose = useCallback(() => {
-    if (me?.user?.id) setBetaModalSeen(me.user.id);
+    if (me?.user?.id) void storage.setItem(`${BETA_MODAL_STORAGE_KEY}.${me.user.id}`, "true");
     setShowBetaModal(false);
   }, [me?.user?.id]);
 
@@ -637,13 +612,14 @@ export function Dashboard() {
                               <GenreBadges genres={log.genres} maxCount={1} />
                             )}
                             <div className="flex shrink-0 items-center gap-2 mt-0.5">
-                              {log.startedAt && log.completedAt && (
-                                <span className="whitespace-nowrap text-xs text-[var(--color-light)]">
-                                  {t("dashboard.finishedIn", {
-                                    duration: formatTimeToFinish(log.startedAt, log.completedAt),
-                                  })}
-                                </span>
-                              )}
+                              {(() => {
+                                const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
+                                return duration ? (
+                                  <span className="whitespace-nowrap text-xs text-[var(--color-light)]">
+                                    {t("dashboard.finishedIn", { duration })}
+                                  </span>
+                                ) : null;
+                              })()}
                               {log.grade != null ? (
                                 <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                               ) : (

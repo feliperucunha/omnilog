@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -13,37 +13,43 @@ import { AuthNavbar } from "@/components/AuthNavbar";
 import { toast } from "sonner";
 import { apiFetch, ApiValidationError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import * as storage from "@/lib/storage";
 import type { AuthResponse } from "@dogument/shared";
 import { modalContentVariants } from "@/lib/animations";
 
 const REMEMBER_LOGIN_KEY = "dogument-remember-login";
 
-function getStoredRememberLogin(): { email: string; rememberMe: boolean } {
-  if (typeof window === "undefined") return { email: "", rememberMe: false };
-  try {
-    const raw = localStorage.getItem(REMEMBER_LOGIN_KEY);
-    if (!raw) return { email: "", rememberMe: false };
-    const data = JSON.parse(raw) as { email?: string } | null;
-    return {
-      email: typeof data?.email === "string" ? data.email : "",
-      rememberMe: !!data?.email,
-    };
-  } catch {
-    return { email: "", rememberMe: false };
-  }
-}
-
 type LoginFieldErrors = Partial<Record<"email" | "password", string>>;
 
 export function Login() {
   const { t } = useLocale();
-  const [email, setEmail] = useState(() => getStoredRememberLogin().email);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(() => getStoredRememberLogin().rememberMe);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  /** Load remember-me from persistent storage (works on Android/Capacitor). */
+  useEffect(() => {
+    let cancelled = false;
+    storage.getItem(REMEMBER_LOGIN_KEY).then((raw) => {
+      if (cancelled) return;
+      try {
+        if (!raw) return;
+        const data = JSON.parse(raw) as { email?: string } | null;
+        const parsedEmail = typeof data?.email === "string" ? data.email : "";
+        setEmail(parsedEmail);
+        setRememberMe(!!parsedEmail);
+      } catch {
+        // ignore
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const clearFieldError = (field: keyof LoginFieldErrors) => {
     setFieldErrors((prev) => {
@@ -72,20 +78,12 @@ export function Login() {
         skipAuthRedirect: true,
       });
       if (rememberMe) {
-        try {
-          localStorage.setItem(
-            REMEMBER_LOGIN_KEY,
-            JSON.stringify({ email: email.trim() })
-          );
-        } catch {
-          // ignore
-        }
+        void storage.setItem(
+          REMEMBER_LOGIN_KEY,
+          JSON.stringify({ email: email.trim() })
+        );
       } else {
-        try {
-          localStorage.removeItem(REMEMBER_LOGIN_KEY);
-        } catch {
-          // ignore
-        }
+        void storage.removeItem(REMEMBER_LOGIN_KEY);
       }
       login(data.token, { ...data.user, onboarded: data.user.onboarded ?? true });
       toast.success(t("toast.welcomeBack"));

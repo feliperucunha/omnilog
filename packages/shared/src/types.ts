@@ -228,7 +228,10 @@ export type ReactionType = "like" | "dislike";
 /** A review shown on the item page (from any user) */
 export interface ItemReview {
   id: string;
+  /** Display name: username when set, otherwise email (for backward compat). Prefer showing reviewerUsername. */
   userEmail: string;
+  /** Reviewer's username when set; use this for display instead of email when present. */
+  reviewerUsername?: string | null;
   /** True when the review author is on the Pro tier */
   isPro?: boolean;
   /** Reviewer level (1-based) for badge of honor on review pages */

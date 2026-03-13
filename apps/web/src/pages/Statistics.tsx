@@ -26,20 +26,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import * as storage from "@/lib/storage";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
 const STORAGE_KEY_STATS = "dogument.statistics.statsCollapsed";
 const STORAGE_KEY_RECENT = "dogument.statistics.recentLogsCollapsed";
-
-function getStoredCollapsed(key: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(key) === "true";
-  } catch {
-    return false;
-  }
-}
 
 type StatsGroup = "category" | "month" | "year";
 type GenreGraphMode = "genre" | "statusOverTime";
@@ -66,27 +58,34 @@ export function Statistics() {
   const [statusOverTimeGroup, setStatusOverTimeGroup] = useState<StatusOverTimeGroup>("month");
   const [statusOverTimeStats, setStatusOverTimeStats] = useState<StatsEntry[]>([]);
   const [statusOverTimeLoading, setStatusOverTimeLoading] = useState(true);
-  const [statsCollapsed, setStatsCollapsedState] = useState(() => getStoredCollapsed(STORAGE_KEY_STATS));
-  const [recentLogsCollapsed, setRecentLogsCollapsedState] = useState(() => getStoredCollapsed(STORAGE_KEY_RECENT));
+  const [statsCollapsed, setStatsCollapsedState] = useState(false);
+  const [recentLogsCollapsed, setRecentLogsCollapsedState] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      storage.getItem(STORAGE_KEY_STATS),
+      storage.getItem(STORAGE_KEY_RECENT),
+    ]).then(([statsVal, recentVal]) => {
+      if (cancelled) return;
+      if (statsVal === "true") setStatsCollapsedState(true);
+      if (recentVal === "true") setRecentLogsCollapsedState(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const setStatsCollapsed = useCallback((value: boolean) => {
     setStatsCollapsedState(value);
-    try {
-      localStorage.setItem(STORAGE_KEY_STATS, String(value));
-    } catch {
-      // ignore
-    }
+    void storage.setItem(STORAGE_KEY_STATS, String(value));
   }, []);
 
   const setRecentLogsCollapsed = useCallback((value: boolean) => {
     setRecentLogsCollapsedState(value);
-    try {
-      localStorage.setItem(STORAGE_KEY_RECENT, String(value));
-    } catch {
-      // ignore
-    }
+    void storage.setItem(STORAGE_KEY_RECENT, String(value));
   }, []);
 
   const fetchStats = useCallback(async (group: StatsGroup) => {
@@ -488,13 +487,14 @@ export function Statistics() {
                                   {log.title}
                                 </p>
                                 <div className="flex shrink-0 items-center gap-2">
-                                {log.startedAt && log.completedAt && (
-                                  <span className="whitespace-nowrap text-xs text-[var(--color-light)]">
-                                    {t("dashboard.finishedIn", {
-                                      duration: formatTimeToFinish(log.startedAt, log.completedAt),
-                                    })}
-                                  </span>
-                                )}
+                                {(() => {
+                                  const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
+                                  return duration ? (
+                                    <span className="whitespace-nowrap text-xs text-[var(--color-light)]">
+                                      {t("dashboard.finishedIn", { duration })}
+                                    </span>
+                                  ) : null;
+                                })()}
                                 {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
                                   <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
                                     {t("common.inProgress")}

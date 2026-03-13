@@ -10,6 +10,7 @@ import {
 import en from "@/locales/en.json";
 import ptBR from "@/locales/pt-BR.json";
 import es from "@/locales/es.json";
+import * as storage from "@/lib/storage";
 
 export type Locale = "en" | "pt-BR" | "es";
 
@@ -20,13 +21,7 @@ const messages: Record<Locale, Record<string, unknown>> = {
 };
 
 const STORAGE_KEY = "dogument-locale";
-
-function getInitialLocale(): Locale {
-  if (typeof document === "undefined") return "en";
-  const stored = localStorage.getItem(STORAGE_KEY) as Locale | null;
-  if (stored === "en" || stored === "pt-BR" || stored === "es") return stored;
-  return "en";
-}
+const VALID_LOCALES: Locale[] = ["en", "pt-BR", "es"];
 
 function getNested(obj: Record<string, unknown>, path: string): string | undefined {
   const parts = path.split(".");
@@ -56,11 +51,23 @@ interface LocaleContextValue {
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(getInitialLocale);
+  const [locale, setLocaleState] = useState<Locale>("en");
+
+  /** Load locale from persistent storage (works on Android/Capacitor). */
+  useEffect(() => {
+    let cancelled = false;
+    storage.getItem(STORAGE_KEY).then((stored) => {
+      if (cancelled) return;
+      if (stored && VALID_LOCALES.includes(stored as Locale)) setLocaleState(stored as Locale);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = locale === "pt-BR" ? "pt-BR" : locale;
-    localStorage.setItem(STORAGE_KEY, locale);
+    void storage.setItem(STORAGE_KEY, locale);
   }, [locale]);
 
   const setLocale = useCallback((next: Locale) => {

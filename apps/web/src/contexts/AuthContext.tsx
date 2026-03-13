@@ -6,12 +6,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
+import * as storage from "@/lib/storage";
 
 const TOKEN_KEY = "dogument_token";
 const USER_KEY = "dogument_user";
 
-/** Use this as token when session is cookie-based (no token in localStorage). */
+/** Use this as token when session is cookie-based (no token in storage). */
 export const COOKIE_SESSION = "cookie";
 
 interface User {
@@ -24,7 +25,7 @@ interface User {
 interface AuthState {
   token: string | null;
   user: User | null;
-  /** True while restoring session from cookie (/me) on load. */
+  /** True while restoring session from storage or cookie (/me) on load. */
   initializing: boolean;
 }
 
@@ -37,50 +38,72 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const loadStored = (): AuthState => {
-  try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const userJson = localStorage.getItem(USER_KEY);
-    if (token && userJson && token !== COOKIE_SESSION) {
-      const user = JSON.parse(userJson) as User;
-      if (user.onboarded === undefined) user.onboarded = true;
-      return { token, user, initializing: false };
-    }
-  } catch {
-    // ignore
-  }
-  return { token: null, user: null, initializing: true };
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>(loadStored);
+  const [state, setState] = useState<AuthState>({ token: null, user: null, initializing: true });
 
-  /** Restore session from httpOnly cookie by calling /me. */
+  /** Load from persistent storage first (Capacitor Preferences on native, localStorage on web). Then cookie /me if none. */
   useEffect(() => {
-    if (!state.initializing) return;
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiFetch<{ user: User }>("/me", {
-          skipAuthRedirect: true,
-        });
-        if (!cancelled && data?.user) {
-          setState({
-            token: COOKIE_SESSION,
-            user: { ...data.user, onboarded: data.user.onboarded ?? true },
-            initializing: false,
-          });
-          return;
+        const [token, userJson] = await Promise.all([
+          storage.getItem(TOKEN_KEY),
+          storage.getItem(USER_KEY),
+        ]);
+        if (cancelled) return;
+        if (token && userJson && token !== COOKIE_SESSION) {
+          try {
+            const user = JSON.parse(userJson) as User;
+            if (user.onboarded === undefined) user.onboarded = true;
+            setState({ token, user, initializing: false });
+            return;
+          } catch {
+            // invalid user json
+          }
         }
       } catch {
-        // /me returned 401 or error — not logged in
+        // ignore
       }
-      if (!cancelled) setState((prev) => ({ ...prev, initializing: false }));
+      if (cancelled) return;
+      // No stored session — try cookie /me
+      const attempt = (retryCount: number) => {
+        apiFetch<{ user: User }>("/me", {
+          skipAuthRedirect: true,
+          timeout: 60_000,
+        })
+          .then((data) => {
+            if (cancelled) return;
+            if (data?.user) {
+              setState({
+                token: COOKIE_SESSION,
+                user: { ...data.user, onboarded: data.user.onboarded ?? true },
+                initializing: false,
+              });
+            } else {
+              setState((prev) => ({ ...prev, initializing: false }));
+            }
+          })
+          .catch((e) => {
+            if (cancelled) return;
+            if (e instanceof ApiError && e.statusCode === 401) {
+              setState((prev) => ({ ...prev, initializing: false }));
+              return;
+            }
+            if (retryCount > 0) {
+              setTimeout(() => attempt(retryCount - 1), 2000);
+            } else {
+              setState((prev) => ({ ...prev, initializing: false }));
+            }
+          });
+      };
+      attempt(1);
     })();
     return () => {
       cancelled = true;
     };
-  }, [state.initializing]);
+  }, []);
+
+  /** Listen for 401 from api.ts so we clear state before redirect. */
 
   /** Listen for 401 from api.ts so we clear state before redirect. */
   useEffect(() => {
@@ -91,8 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback((token: string, user: User) => {
     if (token !== COOKIE_SESSION) {
-      localStorage.setItem(TOKEN_KEY, token);
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      void storage.setItem(TOKEN_KEY, token);
+      void storage.setItem(USER_KEY, JSON.stringify(user));
     }
     setState({ token, user, initializing: false });
   }, []);
@@ -106,21 +129,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore network errors; still clear local state
     }
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    await storage.removeItem(TOKEN_KEY);
+    await storage.removeItem(USER_KEY);
     setState({ token: null, user: null, initializing: false });
   }, []);
 
   const setToken = useCallback((token: string | null) => {
     setState((prev) => ({ ...prev, token }));
-    if (token && token !== COOKIE_SESSION) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
+    if (token && token !== COOKIE_SESSION) void storage.setItem(TOKEN_KEY, token);
+    else void storage.removeItem(TOKEN_KEY);
   }, []);
 
   const setUser = useCallback((user: User | null) => {
     setState((prev) => ({ ...prev, user }));
-    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
-    else localStorage.removeItem(USER_KEY);
+    if (user) void storage.setItem(USER_KEY, JSON.stringify(user));
+    else void storage.removeItem(USER_KEY);
   }, []);
 
   const value: AuthContextValue = {

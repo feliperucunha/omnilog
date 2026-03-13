@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
 
 export interface MeResponse {
   user: { id: string; username?: string; email: string; onboarded: boolean };
@@ -46,10 +46,12 @@ export function MeProvider({ children }: { children: ReactNode }) {
     try {
       const data = await apiFetch<MeResponse>("/me", { skipAuthRedirect: true });
       setMe(data);
-    } catch {
+    } catch (e) {
       setMe(null);
-      // 401 on /me (e.g. cookie not sent cross-origin) — clear auth so ProtectedRoute redirects to login
-      window.dispatchEvent(new CustomEvent("auth:logout"));
+      // Only clear session on 401 (expired/invalid). Timeout or network error should not log the user out.
+      if (e instanceof ApiError && e.statusCode === 401) {
+        window.dispatchEvent(new CustomEvent("auth:logout"));
+      }
     } finally {
       setLoading(false);
     }

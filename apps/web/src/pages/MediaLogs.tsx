@@ -644,11 +644,14 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                         </Link>
                         <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                           <GenreBadges genres={log.genres} maxCount={1} />
-                          {log.startedAt && log.completedAt && (
-                            <span className="text-[10px] sm:text-xs text-[var(--color-light)]">
-                              {t("dashboard.finishedIn", { duration: formatTimeToFinish(log.startedAt, log.completedAt) })}
-                            </span>
-                          )}
+                          {(() => {
+                            const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
+                            return duration ? (
+                              <span className="text-[10px] sm:text-xs text-[var(--color-light)]">
+                                {t("dashboard.finishedIn", { duration })}
+                              </span>
+                            ) : null;
+                          })()}
                           {log.grade != null ? (
                             <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                           ) : (

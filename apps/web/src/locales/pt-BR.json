@@ -159,6 +159,7 @@
     "update": "Atualizar",
     "saving": "Salvando…",
     "loading": "Carregando…",
+    "checkingSession": "Verificando sessão…",
     "email": "E-mail",
     "password": "Senha",
     "placeholderEmail": "voce@exemplo.com",

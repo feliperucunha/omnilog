@@ -44,13 +44,15 @@ function fireFirstApiErrorOnce(): void {
 
 import { getCached, setCached, invalidateByPrefix } from "./cache.js";
 
-/** Sentinel for cookie-based sessions (no token in localStorage). */
+import { getItemSync, removeItem } from "./storage.js";
+
+/** Sentinel for cookie-based sessions (no token in storage). */
 const COOKIE_SESSION = "cookie";
 
 export const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
 
 function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem("dogument_token");
+  const token = getItemSync("dogument_token");
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     "X-App-Version": APP_VERSION,
@@ -69,6 +71,17 @@ export const LOG_LIMIT_REACHED_CODE = "LOG_LIMIT_REACHED";
 
 /** Error code when the user's API key was rejected by the provider (401/403). */
 export const INVALID_API_KEY_CODE = "INVALID_API_KEY";
+
+/** Thrown when API returns 4xx/5xx. Use statusCode to treat 401 as session expired (logout). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 
 /** Thrown when API returns 400 with code INVALID_API_KEY. provider is the key to use with API_KEY_META. */
 export class InvalidApiKeyError extends Error {
@@ -175,16 +188,15 @@ async function fetchInternal<T>(
       }
       if (code === APP_VERSION_MISMATCH_CODE) {
         window.dispatchEvent(new CustomEvent("app:version-mismatch"));
-        throw new Error(parseErrorResponse(text, "App version outdated. Please update the app."));
+        throw new ApiError(parseErrorResponse(text, "App version outdated. Please update the app."), 401);
       }
       const message = parseErrorResponse(text, "Session expired. Please sign in again.");
       if (!skipAuthRedirect) {
-        localStorage.removeItem("dogument_token");
-        localStorage.removeItem("dogument_user");
+        void removeItem("dogument_token").then(() => removeItem("dogument_user"));
         dispatchLogout();
         window.location.href = "/login";
       }
-      throw new Error(message);
+      throw new ApiError(message, 401);
     }
 
     if (!res.ok) {
@@ -207,7 +219,7 @@ async function fetchInternal<T>(
         const fieldErrors = parseFieldErrors(text);
         if (fieldErrors) throw new ApiValidationError(message, fieldErrors);
       }
-      throw new Error(message);
+      throw new ApiError(message, res.status);
     }
 
     if (!text) return undefined as T;
@@ -215,9 +227,13 @@ async function fetchInternal<T>(
   } catch (err) {
     clearTimeout(timeoutId);
     if (err instanceof Error) {
-      if (err.name === "AbortError") throw new Error("Request took too long. Please try again.");
+      if (err.name === "AbortError") {
+        fireFirstApiErrorOnce();
+        throw new Error("Request took too long. Please try again.");
+      }
       throw err;
     }
+    fireFirstApiErrorOnce();
     throw new Error("Network error. Check your connection and try again.");
   }
 }

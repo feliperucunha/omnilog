@@ -14,7 +14,7 @@ import { getBoardGameById } from "../services/bgg.js";
 import { getBoardGameByIdLudopedia } from "../services/ludopedia.js";
 import { getVolumeById } from "../services/comicvine.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
-import { getReviewerLevelsBatch } from "../services/reviewerLevel.service.js";
+import { getReviewerMilestoneForMediumBatch } from "../services/milestone.service.js";
 
 export const itemsRouter = Router();
 itemsRouter.use(optionalAuthMiddleware);
@@ -200,17 +200,17 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
           (
             await prisma.log.findMany({
               where: { id: { in: orderedIds } },
-              include: { user: { select: { email: true, tier: true } } },
+              include: { user: { select: { email: true, username: true, tier: true } } },
             })
           ).map((l) => [l.id, l])
         );
         return orderedIds.map((id) => byId.get(id)).filter(Boolean) as Awaited<
-          ReturnType<typeof prisma.log.findMany<{ include: { user: { select: { email: true; tier: true } } } }>>
+          ReturnType<typeof prisma.log.findMany<{ include: { user: { select: { email: true; username: true; tier: true } } } }>>
         >;
       }
       return prisma.log.findMany({
         where: whereWithGrade,
-        include: { user: { select: { email: true, tier: true } } },
+        include: { user: { select: { email: true, username: true, tier: true } } },
         orderBy: { createdAt: sort === "oldest" ? "asc" : "desc" },
         skip,
         take: reviewsLimit,
@@ -224,21 +224,21 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
       : null;
 
   const logIds = logs.map((l) => l.id);
-  const [reactionMap, reviewerLevels] = await Promise.all([
+  const [reactionMap, reviewerMilestones] = await Promise.all([
     getReactionsForLogs(logIds, currentUserId),
-    getReviewerLevelsBatch(logs.map((l) => l.userId)),
+    getReviewerMilestoneForMediumBatch(logs.map((l) => l.userId), mediaType),
   ]);
 
   const reviews = logs.map((l) => {
     const stats = reactionMap.get(l.id);
-    const levelInfo = reviewerLevels.get(l.userId);
+    const milestone = reviewerMilestones.get(l.userId);
     return {
       id: l.id,
       userEmail: l.user.email,
+      reviewerUsername: l.user.username ?? null,
       isPro: l.user.tier === "pro",
-      reviewerLevel: levelInfo?.level,
-      reviewerLevelLabel: levelInfo?.label,
-      reviewerLevelIcon: levelInfo?.icon,
+      reviewerLevelLabel: milestone?.label,
+      reviewerLevelIcon: milestone?.icon,
       grade: l.grade,
       review: l.review,
       listType: l.listType,
@@ -388,17 +388,17 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
               (
                 await prisma.log.findMany({
                   where: { id: { in: orderedIds } },
-                  include: { user: { select: { email: true, tier: true } } },
+                  include: { user: { select: { email: true, username: true, tier: true } } },
                 })
               ).map((l) => [l.id, l])
             );
             return orderedIds.map((id) => byId.get(id)).filter(Boolean) as Awaited<
-              ReturnType<typeof prisma.log.findMany<{ include: { user: { select: { email: true; tier: true } } } }>>
+              ReturnType<typeof prisma.log.findMany<{ include: { user: { select: { email: true; username: true; tier: true } } } }>>
             >;
           }
           return prisma.log.findMany({
             where: whereWithGrade,
-            include: { user: { select: { email: true, tier: true } } },
+            include: { user: { select: { email: true, username: true, tier: true } } },
             orderBy: { createdAt: reviewsSort === "oldest" ? "asc" : "desc" },
             skip: reviewsSkip,
             take: reviewsLimit,
@@ -412,21 +412,21 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
       : null;
 
   const logIds = logs.map((l) => l.id);
-  const [reactionMap, reviewerLevels] = await Promise.all([
+  const [reactionMap, reviewerMilestones] = await Promise.all([
     getReactionsForLogs(logIds, currentUserId),
-    getReviewerLevelsBatch(logs.map((l) => l.userId)),
+    getReviewerMilestoneForMediumBatch(logs.map((l) => l.userId), mediaType),
   ]);
 
   const reviews = logs.map((l) => {
     const stats = reactionMap.get(l.id);
-    const levelInfo = reviewerLevels.get(l.userId);
+    const milestone = reviewerMilestones.get(l.userId);
     return {
       id: l.id,
       userEmail: l.user.email,
+      reviewerUsername: l.user.username ?? null,
       isPro: l.user.tier === "pro",
-      reviewerLevel: levelInfo?.level,
-      reviewerLevelLabel: levelInfo?.label,
-      reviewerLevelIcon: levelInfo?.icon,
+      reviewerLevelLabel: milestone?.label,
+      reviewerLevelIcon: milestone?.icon,
       grade: l.grade,
       review: l.review,
       listType: l.listType,

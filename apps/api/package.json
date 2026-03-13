@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "prisma generate && tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint src/",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
@@ -38,6 +40,8 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "tsx": "^4.19.2"
+    "@vitest/coverage-v8": "^2.1.6",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.6"
   }
 }

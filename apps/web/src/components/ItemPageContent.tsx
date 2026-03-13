@@ -632,7 +632,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-medium text-[var(--color-lightest)]">
-                            {r.userEmail}
+                            {r.reviewerUsername ?? r.userEmail}
                           </span>
                           {(r.reviewerLevelLabel ?? r.reviewerLevelIcon) && (
                             <span
@@ -671,11 +671,14 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                               Ch.{r.chapter ?? "?"} Vol.{r.volume ?? "?"}
                             </span>
                           )}
-                          {r.startedAt && r.completedAt && (
-                            <span className="text-xs text-[var(--color-light)]">
-                              {t("dashboard.finishedIn", { duration: formatTimeToFinish(r.startedAt, r.completedAt) })}
-                            </span>
-                          )}
+                          {(() => {
+                            const duration = r.startedAt && r.completedAt ? formatTimeToFinish(r.startedAt, r.completedAt) : "";
+                            return duration ? (
+                              <span className="text-xs text-[var(--color-light)]">
+                                {t("dashboard.finishedIn", { duration })}
+                              </span>
+                            ) : null;
+                          })()}
                           <span className="text-sm text-[var(--color-light)]">
                             {new Date(r.createdAt).toLocaleDateString()}
                           </span>

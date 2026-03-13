@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import * as storage from "@/lib/storage";
 
 type ColorScheme = "light" | "dark";
 
@@ -20,21 +21,31 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const STORAGE_KEY = "dogument-theme";
 
-function getInitialScheme(): ColorScheme {
+function getDefaultScheme(): ColorScheme {
   if (typeof document === "undefined") return "dark";
-  const stored = localStorage.getItem(STORAGE_KEY) as ColorScheme | null;
-  if (stored === "light" || stored === "dark") return stored;
   if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
   return "dark";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(getInitialScheme);
+  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(getDefaultScheme);
+
+  /** Load theme from persistent storage (works on Android/Capacitor). */
+  useEffect(() => {
+    let cancelled = false;
+    storage.getItem(STORAGE_KEY).then((stored) => {
+      if (cancelled) return;
+      if (stored === "light" || stored === "dark") setColorSchemeState(stored);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", colorScheme);
     document.documentElement.classList.toggle("dark", colorScheme === "dark");
-    localStorage.setItem(STORAGE_KEY, colorScheme);
+    void storage.setItem(STORAGE_KEY, colorScheme);
     const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (link) link.href = colorScheme === "dark" ? "/logo-dark.png" : "/logo.png";
   }, [colorScheme]);

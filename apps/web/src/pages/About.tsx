@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StarRating } from "@/components/StarRating";
 import { apiFetch } from "@/lib/api";
+import * as storage from "@/lib/storage";
 import { toast } from "sonner";
 
 const FEEDBACK_COOLDOWN_KEY = "dogument_feedback_cooldown";
@@ -57,13 +58,20 @@ export function About() {
   const [rating, setRating] = useState<number>(5);
   const [comments, setComments] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    const raw = localStorage.getItem(FEEDBACK_COOLDOWN_KEY);
-    const n = raw ? parseInt(raw, 10) : NaN;
-    return Number.isFinite(n) && n > Date.now() ? n : null;
-  });
+  const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    storage.getItem(FEEDBACK_COOLDOWN_KEY).then((raw) => {
+      if (cancelled) return;
+      const n = raw ? parseInt(raw, 10) : NaN;
+      if (Number.isFinite(n) && n > Date.now()) setCooldownEndsAt(n);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (cooldownEndsAt == null) return;
@@ -71,7 +79,7 @@ export function About() {
       const left = Math.max(0, Math.ceil((cooldownEndsAt - Date.now()) / 1000));
       setSecondsLeft(left);
       if (left <= 0) {
-        localStorage.removeItem(FEEDBACK_COOLDOWN_KEY);
+        void storage.removeItem(FEEDBACK_COOLDOWN_KEY);
         setCooldownEndsAt(null);
       }
     };
@@ -98,7 +106,7 @@ export function About() {
           body: JSON.stringify({ rating, comments: comments.trim() || undefined }),
         });
         const until = Date.now() + COOLDOWN_MS;
-        localStorage.setItem(FEEDBACK_COOLDOWN_KEY, String(until));
+        void storage.setItem(FEEDBACK_COOLDOWN_KEY, String(until));
         setCooldownEndsAt(until);
         setExpanded(false);
         setComments("");

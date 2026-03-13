@@ -15,7 +15,7 @@ export function formatTimeToFinish(startedAt: string, completedAt: string): stri
   const start = new Date(startedAt).getTime();
   const end = new Date(completedAt).getTime();
   const days = Math.round((end - start) / (24 * 60 * 60 * 1000));
-  if (days <= 0) return "Same day";
+  if (days <= 0) return "";
   if (days === 1) return "1 day";
   if (days < 7) return `${days} days`;
   const weeks = Math.round(days / 7);
