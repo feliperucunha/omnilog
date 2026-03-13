@@ -409,6 +409,7 @@
     "mediaType": "Type",
     "entryTitle": "Title",
     "entryTitlePlaceholder": "e.g. Movie or book title",
+    "entryTitlePlaceholderCategory": "e.g. {{category}} title",
     "entryTitleRequired": "Please enter a title",
     "imageUrl": "Image URL",
     "invalidImageUrl": "Please enter a valid image URL"

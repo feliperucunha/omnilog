@@ -15,7 +15,7 @@ export interface MeResponse {
   locale: "en" | "pt-BR" | "es";
   visibleMediaTypes: string[];
   boardGameProvider: "bgg" | "ludopedia";
-  tier: "free" | "pro";
+  tier: "free" | "pro" | "admin";
   subscriptionEndsAt: string | null;
   daysRemaining: number | null; // Pro subscription days left (null if not pro or no end date)
   country?: string; // ISO 3166-1 alpha-2 e.g. BR for pricing

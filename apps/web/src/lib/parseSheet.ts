@@ -3,8 +3,13 @@
  * Requires at least a "Name" column (case-insensitive). Optional: review/comment, rate/grade.
  */
 
-const MAX_ROWS = 100;
+const DEFAULT_MAX_ROWS = 100;
 const MAX_FILE_BYTES = 1 * 1024 * 1024; // 1MB
+
+export interface ParseSheetOptions {
+  /** Max data rows (excluding header). Omit or use a high value for no effective cap (e.g. admin). */
+  maxRows?: number;
+}
 
 // Column header aliases for EN, PT-BR, ES so imports work in all three languages
 const NAME_ALIASES = [
@@ -136,7 +141,7 @@ function parseCSV(csv: string): string[][] {
   return rows;
 }
 
-export function parseSheetFile(file: File): Promise<SheetParseResult> {
+export function parseSheetFile(file: File, options?: ParseSheetOptions): Promise<SheetParseResult> {
   if (file.size > MAX_FILE_BYTES) {
     return Promise.resolve({
       ok: false,
@@ -144,6 +149,7 @@ export function parseSheetFile(file: File): Promise<SheetParseResult> {
     });
   }
 
+  const maxRows = options?.maxRows ?? DEFAULT_MAX_ROWS;
   const ext = (file.name.split(".").pop() ?? "").toLowerCase();
 
   if (ext === "csv" || file.type === "text/csv") {
@@ -152,7 +158,7 @@ export function parseSheetFile(file: File): Promise<SheetParseResult> {
       reader.onload = () => {
         const text = (reader.result as string) ?? "";
         const rows = parseCSV(text);
-        resolve(parseSheetRows(rows));
+        resolve(parseSheetRows(rows, maxRows));
       };
       reader.onerror = () =>
         resolve({ ok: false, error: "Failed to read file." });
@@ -178,7 +184,7 @@ export function parseSheetFile(file: File): Promise<SheetParseResult> {
             defval: "",
             raw: false,
           }) as string[][];
-          resolve(parseSheetRows(json));
+          resolve(parseSheetRows(json, maxRows));
         } catch (e) {
           resolve({
             ok: false,
@@ -198,12 +204,12 @@ export function parseSheetFile(file: File): Promise<SheetParseResult> {
   });
 }
 
-function parseSheetRows(rows: string[][]): SheetParseResult {
+function parseSheetRows(rows: string[][], maxRows: number = DEFAULT_MAX_ROWS): SheetParseResult {
   if (rows.length === 0) {
     return { ok: false, error: "Sheet is empty." };
   }
-  if (rows.length > MAX_ROWS + 1) {
-    return { ok: false, error: `Too many rows. Maximum is ${MAX_ROWS} data rows.` };
+  if (Number.isFinite(maxRows) && rows.length > maxRows + 1) {
+    return { ok: false, error: `Too many rows. Maximum is ${maxRows} data rows.` };
   }
 
   const rawHeaders = rows[0].map((h) => String(h ?? "").trim());

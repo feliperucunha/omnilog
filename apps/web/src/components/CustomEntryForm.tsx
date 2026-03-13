@@ -157,7 +157,11 @@ export function CustomEntryForm({
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder={t("customEntry.entryTitlePlaceholder")}
+                  placeholder={
+                    initialMediaType != null
+                      ? t("customEntry.entryTitlePlaceholderCategory", { category: t(`nav.${mediaType}`) })
+                      : t("customEntry.entryTitlePlaceholder")
+                  }
                   className="bg-[var(--color-darkest)]"
                   required
                 />

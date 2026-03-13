@@ -13,6 +13,7 @@ datasource db {
 enum Tier {
   free
   pro
+  admin
 }
 
 enum BadgeMedium {

@@ -408,6 +408,7 @@
     "mediaType": "Tipo",
     "entryTitle": "Título",
     "entryTitlePlaceholder": "ej. Título de película o libro",
+    "entryTitlePlaceholderCategory": "ej. Título de {{category}}",
     "entryTitleRequired": "Introduce un título",
     "imageUrl": "URL de imagen",
     "invalidImageUrl": "Introduce una URL de imagen válida"

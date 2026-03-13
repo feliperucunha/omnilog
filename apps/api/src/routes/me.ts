@@ -87,7 +87,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
   }
 
   const boardGameProvider = user.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
-  const tier = user.tier === "pro" ? "pro" : "free";
+  const tier = user.tier === "admin" ? "admin" : user.tier === "pro" ? "pro" : "free";
   const subscriptionEndsAt = user.subscriptionEndsAt?.toISOString() ?? null;
   const daysRemaining =
     subscriptionEndsAt && tier === "pro"

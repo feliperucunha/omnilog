@@ -65,17 +65,19 @@ function getExampleRows(mediaType: MediaType): Array<{ name: string; status: str
 }
 
 interface BatchEntryTabProps {
+  /** When opened from a category tab (e.g. MediaLogs), preselect this category. */
+  initialMediaType?: MediaType;
   onDone: () => void;
   onCancel: () => void;
 }
 
-export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
+export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntryTabProps) {
   const { t } = useLocale();
   const { me } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
 
-  const [mediaType, setMediaType] = useState<MediaType>("movies");
-  const [defaultStatus, setDefaultStatus] = useState<string>(() => getDefaultCompletedStatus("movies"));
+  const [mediaType, setMediaType] = useState<MediaType>(initialMediaType ?? "movies");
+  const [defaultStatus, setDefaultStatus] = useState<string>(() => getDefaultCompletedStatus(initialMediaType ?? "movies"));
   const [file, setFile] = useState<File | null>(null);
   const [parseResult, setParseResult] = useState<SheetParseResult | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -120,7 +122,8 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
       if (!f) return;
       setLoadingParse(true);
       try {
-        const result = await parseSheetFile(f);
+        const maxRows = me?.tier === "admin" ? Number.POSITIVE_INFINITY : 100;
+        const result = await parseSheetFile(f, { maxRows });
         setParseResult(result);
         if (!result.ok) setParseError(result.error);
       } catch {
@@ -129,7 +132,7 @@ export function BatchEntryTab({ onDone, onCancel }: BatchEntryTabProps) {
         setLoadingParse(false);
       }
     },
-    [t]
+    [t, me?.tier]
   );
 
   const handleLoadPreview = useCallback(async () => {

@@ -61,7 +61,7 @@ const modalContent = (
           onCancel={onCancel}
         />
       ) : (
-        <BatchEntryTab onDone={onSaved} onCancel={onCancel} />
+        <BatchEntryTab initialMediaType={mediaType} onDone={onSaved} onCancel={onCancel} />
       )}
     </div>
   </>
