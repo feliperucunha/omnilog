@@ -53,6 +53,8 @@ export function Tiers() {
   const logCount = me?.logCount ?? 0;
   const daysRemaining = me?.daysRemaining ?? null;
   const isPro = tier === "pro";
+  const isAdmin = tier === "admin";
+  const hasUnlimitedLogs = isPro || isAdmin;
   const isBrazil = me?.country === "BR";
   const proPriceMonthlyLabel = isBrazil ? t("tiers.proPriceBrMonthly") : t("tiers.proPriceMonthly");
   const proPriceYearlyLabel = isBrazil ? t("tiers.proPriceBrYearly") : t("tiers.proPriceYearly");
@@ -142,7 +144,11 @@ export function Tiers() {
         <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-md)]">
           <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--color-light)]">
             <span>{t("tiers.currentPlan")}:</span>
-            {isPro ? (
+            {isAdmin ? (
+              <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-500">
+                {t("tiers.admin")}
+              </span>
+            ) : isPro ? (
               <span className="inline-flex items-center gap-1 rounded bg-[var(--btn-gradient-start)]/20 px-2 py-0.5 text-xs font-semibold text-[var(--btn-gradient-start)]">
                 <Sparkles className="h-3 w-3" aria-hidden />
                 {t("tiers.pro")}
@@ -152,18 +158,18 @@ export function Tiers() {
             )}
           </p>
           <p className="mt-1 text-sm text-[var(--color-light)]">
-            {isPro
+            {hasUnlimitedLogs
               ? t("tiers.usageUnlimited", { count: String(logCount) })
               : t("tiers.usage", { count: String(logCount), limit: String(FREE_LOG_LIMIT) })}
           </p>
-          {token && isPro && daysRemaining != null && (
+          {token && isPro && !isAdmin && daysRemaining != null && (
             <p className="mt-1 text-sm text-[var(--color-light)]">
               {daysRemaining === 1
                 ? t("tiers.daysLeftOne")
                 : t("tiers.daysLeft", { count: String(daysRemaining) })}
             </p>
           )}
-          {token && isPro && (
+          {token && isPro && !isAdmin && (
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -209,7 +215,7 @@ export function Tiers() {
               {t("tiers.freeLogsDesc")}
             </li>
           </ul>
-          {token && !isPro && (
+          {token && !hasUnlimitedLogs && (
             <p className="mt-4 text-xs text-[var(--color-light)]">
               {t("tiers.usage", { count: String(logCount), limit: String(FREE_LOG_LIMIT) })}
             </p>

@@ -77,7 +77,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
 
   const [mediaType, setMediaType] = useState<MediaType>(initialMediaType ?? "movies");
-  const [defaultStatus, setDefaultStatus] = useState<string>(() => getDefaultCompletedStatus(initialMediaType ?? "movies"));
+  const defaultStatus = getDefaultCompletedStatus(mediaType);
   const [file, setFile] = useState<File | null>(null);
   const [parseResult, setParseResult] = useState<SheetParseResult | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -244,7 +244,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
     if (reasons.length > 0) {
       toast.error(t("batchEntry.someFailed", { count: String(reasons.length) }));
     }
-  }, [parseResult, mediaType, boardGameProvider, defaultStatus, overrideExistingLogs, t, onDone]);
+  }, [parseResult, mediaType, boardGameProvider, overrideExistingLogs, t, onDone]);
 
   const canPreview =
     hasApiKeyForCategory && parseResult?.ok && parseResult.rows.length > 0 && !loadingPreview;
@@ -284,26 +284,6 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
           triggerClassName="w-full max-w-xs h-10"
           aria-label={t("batchEntry.category")}
         />
-      </div>
-
-      <div className="space-y-2">
-        <Label className="text-sm font-medium text-[var(--color-lightest)]">
-          {t("batchEntry.defaultStatus")}
-        </Label>
-        <Select
-          value={defaultStatus}
-          onValueChange={setDefaultStatus}
-          options={LOG_STATUS_OPTIONS[mediaType].map((value) => ({
-            value,
-            label: getStatusLabel(t, value, mediaType),
-          }))}
-          triggerClassName="w-full max-w-xs h-10"
-          aria-label={t("batchEntry.defaultStatus")}
-        />
-        <p className="text-xs text-[var(--color-light)]">
-          {t("batchEntry.allowedStatusesHint")}:{" "}
-          {LOG_STATUS_OPTIONS[mediaType].map((s) => getStatusLabel(t, s, mediaType)).join(", ")}
-        </p>
       </div>
 
       <div className="flex items-center gap-2">

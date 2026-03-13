@@ -499,6 +499,7 @@
   "tiers": {
     "title": "Planes",
     "subtitle": "Elige el plan que se adapte a cómo registras.",
+    "admin": "Admin",
     "free": "Gratis",
     "freePrice": "0 €",
     "freeLogs": "Hasta 500 logs",

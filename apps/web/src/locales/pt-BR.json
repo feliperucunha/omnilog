@@ -499,6 +499,7 @@
   "tiers": {
     "title": "Planos",
     "subtitle": "Escolha o plano que combina com a forma como você registra.",
+    "admin": "Admin",
     "free": "Grátis",
     "freePrice": "R$ 0",
     "freeLogs": "Até 500 logs",

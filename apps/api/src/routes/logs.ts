@@ -619,7 +619,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         where: { id: userId },
         select: { tier: true },
       });
-      const tier = user?.tier === "pro" ? "pro" : "free";
+      const tier = user?.tier === "admin" || user?.tier === "pro" ? "pro" : "free";
       if (tier === "free") {
         const count = await prisma.log.count({ where: { userId } });
         if (count >= FREE_LOG_LIMIT) {
@@ -696,7 +696,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         where: { id: userId },
         select: { tier: true },
       });
-      const tierForCreate = userForCreate?.tier === "pro" ? "pro" : "free";
+      const tierForCreate = userForCreate?.tier === "admin" || userForCreate?.tier === "pro" ? "pro" : "free";
       if (tierForCreate === "free") {
         const countBeforeCreate = await prisma.log.count({ where: { userId } });
         if (countBeforeCreate >= FREE_LOG_LIMIT) {

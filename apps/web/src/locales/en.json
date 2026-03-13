@@ -500,6 +500,7 @@
   "tiers": {
     "title": "Plans",
     "subtitle": "Choose the plan that fits how you log.",
+    "admin": "Admin",
     "free": "Free",
     "freePrice": "$0",
     "freeLogs": "Up to 500 logs",
