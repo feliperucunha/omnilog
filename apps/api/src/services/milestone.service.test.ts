@@ -30,9 +30,9 @@ const emptyReviewStats = {
   totalReviews: 0,
 };
 
-const emptyLogGroupBy = [];
+const emptyLogGroupBy: { mediaType: string; _count: { id: number } }[] = [];
 
-function logGroupByFromCounts(counts: Record<string, number>) {
+function logGroupByFromCounts(counts: Record<string, number>): { mediaType: string; _count: { id: number } }[] {
   const mediaTypes = ["movies", "tv", "anime", "manga", "comics", "books"];
   return mediaTypes
     .filter((m) => (counts[m] ?? 0) > 0)
