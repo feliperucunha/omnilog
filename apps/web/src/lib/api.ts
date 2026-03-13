@@ -1,4 +1,6 @@
 import { APP_VERSION } from "@dogument/shared";
+import type { LoadingErrorCode } from "./loadingErrorCodes.js";
+import { LoadingErrorCode as LoadingErrorCodeEnum } from "./loadingErrorCodes.js";
 
 const rawApiUrl = import.meta.env.VITE_API_URL as string | undefined;
 let API_BASE = rawApiUrl ?? "/api";
@@ -16,13 +18,13 @@ const DEFAULT_TIMEOUT_MS = 55_000;
 
 /** Called once when the first API response is received (cold-start UX). Set from app root. */
 let onFirstApiResponse: (() => void) | null = null;
-let onFirstApiError: (() => void) | null = null;
+let onFirstApiError: ((code: LoadingErrorCode) => void) | null = null;
 let firstApiOutcomeFired = false;
 
 export function setOnFirstApiResponse(callback: () => void): void {
   onFirstApiResponse = callback;
 }
-export function setOnFirstApiError(callback: () => void): void {
+export function setOnFirstApiError(callback: (code: LoadingErrorCode) => void): void {
   onFirstApiError = callback;
 }
 
@@ -34,12 +36,20 @@ function fireFirstApiResponseOnce(): void {
   onFirstApiError = null;
 }
 
-function fireFirstApiErrorOnce(): void {
+function fireFirstApiErrorOnce(code: LoadingErrorCode = LoadingErrorCodeEnum.UNKNOWN): void {
   if (firstApiOutcomeFired) return;
   firstApiOutcomeFired = true;
-  onFirstApiError?.();
+  onFirstApiError?.(code);
   onFirstApiResponse = null;
   onFirstApiError = null;
+}
+
+function statusToLoadingErrorCode(status: number): LoadingErrorCode {
+  if (status === 401) return LoadingErrorCodeEnum.UNAUTHORIZED;
+  if (status === 403) return LoadingErrorCodeEnum.FORBIDDEN;
+  if (status === 404) return LoadingErrorCodeEnum.NOT_FOUND;
+  if (status >= 500 && status < 600) return LoadingErrorCodeEnum.SERVER_ERROR;
+  return LoadingErrorCodeEnum.CLIENT_ERROR;
 }
 
 import { getCached, setCached, invalidateByPrefix } from "./cache.js";
@@ -187,9 +197,11 @@ async function fetchInternal<T>(
         /* ignore */
       }
       if (code === APP_VERSION_MISMATCH_CODE) {
+        fireFirstApiErrorOnce(LoadingErrorCodeEnum.VERSION_MISMATCH);
         window.dispatchEvent(new CustomEvent("app:version-mismatch"));
         throw new ApiError(parseErrorResponse(text, "App version outdated. Please update the app."), 401);
       }
+      fireFirstApiErrorOnce(LoadingErrorCodeEnum.UNAUTHORIZED);
       const message = parseErrorResponse(text, "Session expired. Please sign in again.");
       if (!skipAuthRedirect) {
         void removeItem("dogument_token").then(() => removeItem("dogument_user"));
@@ -200,6 +212,7 @@ async function fetchInternal<T>(
     }
 
     if (!res.ok) {
+      fireFirstApiErrorOnce(statusToLoadingErrorCode(res.status));
       const message = parseErrorResponse(
         text,
         res.status === 500 ? "Something went wrong. Please try again." : res.statusText || "Request failed"
@@ -228,12 +241,12 @@ async function fetchInternal<T>(
     clearTimeout(timeoutId);
     if (err instanceof Error) {
       if (err.name === "AbortError") {
-        fireFirstApiErrorOnce();
+        fireFirstApiErrorOnce(LoadingErrorCodeEnum.TIMEOUT);
         throw new Error("Request took too long. Please try again.");
       }
       throw err;
     }
-    fireFirstApiErrorOnce();
+    fireFirstApiErrorOnce(LoadingErrorCodeEnum.NETWORK);
     throw new Error("Network error. Check your connection and try again.");
   }
 }
@@ -256,6 +269,7 @@ export async function apiFetchPublic<T>(path: string, options?: RequestInit): Pr
     fireFirstApiResponseOnce();
     const text = await res.text();
     if (!res.ok) {
+      fireFirstApiErrorOnce(statusToLoadingErrorCode(res.status));
       const message = parseErrorResponse(text, res.status === 404 ? "Not found" : "Request failed");
       throw new Error(message);
     }
@@ -263,11 +277,14 @@ export async function apiFetchPublic<T>(path: string, options?: RequestInit): Pr
     return JSON.parse(text) as T;
   } catch (err) {
     clearTimeout(timeoutId);
-    fireFirstApiErrorOnce();
     if (err instanceof Error) {
-      if (err.name === "AbortError") throw new Error("Request took too long. Please try again.");
+      if (err.name === "AbortError") {
+        fireFirstApiErrorOnce(LoadingErrorCodeEnum.TIMEOUT);
+        throw new Error("Request took too long. Please try again.");
+      }
       throw err;
     }
+    fireFirstApiErrorOnce(LoadingErrorCodeEnum.NETWORK);
     throw new Error("Network error. Check your connection and try again.");
   }
 }

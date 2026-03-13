@@ -542,7 +542,17 @@
   },
   "coldStart": {
     "error": "Algo salió mal. Comprueba tu conexión e inténtalo de nuevo.",
-    "timedOut": "Está tardando más de lo habitual. El servidor puede estar iniciándose."
+    "timedOut": "Está tardando más de lo habitual. El servidor puede estar iniciándose.",
+    "errorCodeLabel": "Código de error",
+    "code_TIMEOUT": "La solicitud tardó demasiado. Inténtalo de nuevo.",
+    "code_NETWORK": "Error de conexión. Comprueba tu red e inténtalo de nuevo.",
+    "code_SERVER_ERROR": "El servidor tuvo un error. Inténtalo más tarde.",
+    "code_UNAUTHORIZED": "Sesión expirada o inválida. Inicia sesión de nuevo.",
+    "code_FORBIDDEN": "No tienes permiso para acceder.",
+    "code_NOT_FOUND": "El recurso solicitado no se encontró.",
+    "code_CLIENT_ERROR": "La solicitud no era válida. Inténtalo de nuevo.",
+    "code_VERSION_MISMATCH": "Actualiza la app a la última versión.",
+    "code_UNKNOWN": "Algo salió mal. Inténtalo de nuevo."
   },
   "errorBoundary": {
     "title": "Algo salió mal",

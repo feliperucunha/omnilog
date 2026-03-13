@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Wraps logo_splash (1536x1024) so it displays square: scale width to 1024/1536 to avoid vertical stretch on adaptive icon and splash. -->
+<!-- Logo scaled uniformly and centered so it stays proportional in adaptive icon and splash (no vertical stretch). -->
 <scale xmlns:android="http://schemas.android.com/apk/res/android"
     android:drawable="@drawable/logo_splash"
     android:scaleGravity="center"
-    android:scaleWidth="66.67%"
-    android:scaleHeight="100%"
+    android:scaleWidth="65%"
+    android:scaleHeight="65%"
     android:level="10000" />

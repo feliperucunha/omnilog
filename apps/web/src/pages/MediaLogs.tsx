@@ -625,7 +625,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                     {/* Left: image full height – flush with card edge, radius matches card (rounded-lg); click goes to item page */}
                     <Link
                       to={`/item/${log.mediaType}/${log.externalId}`}
-                      className="h-full min-h-full w-28 flex-shrink-0 overflow-hidden rounded-l-lg sm:w-32 block"
+                      className="h-full min-h-full w-28 flex-shrink-0 overflow-hidden sm:w-32 block"
                     >
                       <ItemImage src={log.image} className="h-full w-full object-cover" />
                     </Link>

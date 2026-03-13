@@ -542,7 +542,17 @@
   },
   "coldStart": {
     "error": "Algo deu errado. Verifique sua conexão e tente novamente.",
-    "timedOut": "Está demorando mais que o normal. O servidor pode estar acordando."
+    "timedOut": "Está demorando mais que o normal. O servidor pode estar acordando.",
+    "errorCodeLabel": "Código do erro",
+    "code_TIMEOUT": "A requisição demorou demais. Tente novamente.",
+    "code_NETWORK": "Falha na conexão. Verifique sua rede e tente novamente.",
+    "code_SERVER_ERROR": "O servidor teve um erro. Tente novamente mais tarde.",
+    "code_UNAUTHORIZED": "Sessão expirada ou inválida. Faça login novamente.",
+    "code_FORBIDDEN": "Você não tem permissão para acessar isso.",
+    "code_NOT_FOUND": "O recurso solicitado não foi encontrado.",
+    "code_CLIENT_ERROR": "A requisição era inválida. Tente novamente.",
+    "code_VERSION_MISMATCH": "Atualize o app para a versão mais recente.",
+    "code_UNKNOWN": "Algo deu errado. Tente novamente."
   },
   "errorBoundary": {
     "title": "Algo deu errado",

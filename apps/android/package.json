@@ -2,6 +2,9 @@
   "name": "@dogument/android",
   "version": "0.0.0",
   "private": true,
+  "dependencies": {
+    "@dogument/web": "workspace:*"
+  },
   "scripts": {
     "sync": "cap sync",
     "sync:android": "cap sync android",
