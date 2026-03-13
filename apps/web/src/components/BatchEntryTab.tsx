@@ -89,6 +89,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
   const [failedReasons, setFailedReasons] = useState<Array<{ name: string; reason: string }>>([]);
   const [exampleOpen, setExampleOpen] = useState(false);
+  const [overrideExistingLogs, setOverrideExistingLogs] = useState(false);
   const previewLoadTriggeredRef = useRef(false);
 
   const exampleRows = useMemo(() => getExampleRows(mediaType), [mediaType]);
@@ -183,6 +184,15 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
         const results = data?.results ?? [];
         const hit = results[0];
         if (hit) {
+          if (!overrideExistingLogs) {
+            const existingRes = await apiFetch<{ data: unknown[] }>(
+              `/logs?mediaType=${encodeURIComponent(mediaType)}&externalId=${encodeURIComponent(hit.id)}&limit=1`
+            );
+            if (existingRes?.data?.length) {
+              await new Promise((r) => setTimeout(r, DELAY_BETWEEN_REQUESTS_MS));
+              continue;
+            }
+          }
           const grade = row.grade ?? null;
           const status = resolveRowStatus(row, mediaType, defaultStatus);
           const res = await apiFetch<{ newBadges?: Array<{ id: string; name: string; icon: string }> }>("/logs", {
@@ -234,7 +244,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
     if (reasons.length > 0) {
       toast.error(t("batchEntry.someFailed", { count: String(reasons.length) }));
     }
-  }, [parseResult, mediaType, boardGameProvider, defaultStatus, t, onDone]);
+  }, [parseResult, mediaType, boardGameProvider, defaultStatus, overrideExistingLogs, t, onDone]);
 
   const canPreview =
     hasApiKeyForCategory && parseResult?.ok && parseResult.rows.length > 0 && !loadingPreview;
@@ -295,6 +305,23 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
           {LOG_STATUS_OPTIONS[mediaType].map((s) => getStatusLabel(t, s, mediaType)).join(", ")}
         </p>
       </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="batch-override-existing"
+          checked={overrideExistingLogs}
+          onChange={(e) => setOverrideExistingLogs(e.target.checked)}
+          className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-dark)] text-[var(--btn-gradient-start)] focus:ring-2 focus:ring-[var(--btn-gradient-start)]/50"
+          aria-describedby="batch-override-existing-desc"
+        />
+        <Label htmlFor="batch-override-existing" className="cursor-pointer text-sm font-normal text-[var(--color-lightest)]">
+          {t("batchEntry.overrideExistingLogs")}
+        </Label>
+      </div>
+      <p id="batch-override-existing-desc" className="text-xs text-[var(--color-light)]">
+        {t("batchEntry.overrideExistingLogsHint")}
+      </p>
 
       {!hasApiKeyForCategory && apiKeyRequiredMessage && (
         <div
@@ -427,6 +454,9 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
             <div className="min-w-0 flex-1">
               <p className="font-medium text-[var(--color-lightest)]">
                 {previewResult.title}
+              </p>
+              <p className="mt-1 text-xs text-[var(--color-light)]">
+                {getStatusLabel(t, resolveRowStatus(previewRow, mediaType, defaultStatus), mediaType)}
               </p>
               {previewRow.grade != null && (
                 <div className="mt-1">

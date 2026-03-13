@@ -419,6 +419,8 @@
     "category": "Categoría",
     "defaultStatus": "Estado por defecto",
     "allowedStatusesHint": "Estados permitidos para esta categoría",
+    "overrideExistingLogs": "Sobrescribir entradas existentes",
+    "overrideExistingLogsHint": "Si está desmarcado, las filas que ya están en tu lista se omiten. Si está marcado, las entradas existentes se actualizan con el nuevo estado, nota y reseña.",
     "uploadFile": "Subir hoja",
     "fileHint": "CSV o XLSX, máx. 100 filas y 1MB. Debe tener columna Nombre; opcionales Estado, Reseña y Nota (0–10).",
     "exampleFormatTitle": "Ejemplo de formato (mostrar tabla)",

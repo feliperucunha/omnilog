@@ -61,6 +61,11 @@ function normalizeHeader(h: string): string {
   return h.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+/** Trim and collapse multiple spaces so caps/whitespace in file don't break matching or display. */
+function normalizeCell(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
 export interface ParsedRow {
   name: string;
   review: string | null;
@@ -212,7 +217,7 @@ function parseSheetRows(rows: string[][], maxRows: number = DEFAULT_MAX_ROWS): S
     return { ok: false, error: `Too many rows. Maximum is ${maxRows} data rows.` };
   }
 
-  const rawHeaders = rows[0].map((h) => String(h ?? "").trim());
+  const rawHeaders = rows[0].map((h) => normalizeCell(String(h ?? "")));
   const nameIdx = findColumnIndex(rawHeaders, NAME_ALIASES);
   if (nameIdx < 0) {
     return {
@@ -230,14 +235,14 @@ function parseSheetRows(rows: string[][], maxRows: number = DEFAULT_MAX_ROWS): S
 
   for (let i = 0; i < dataRows.length; i++) {
     const row = dataRows[i];
-    const name = String(row[nameIdx] ?? "").trim();
+    const name = normalizeCell(String(row[nameIdx] ?? ""));
     if (!name) continue;
     const review =
-      reviewIdx >= 0 ? String(row[reviewIdx] ?? "").trim() || null : null;
+      reviewIdx >= 0 ? normalizeCell(String(row[reviewIdx] ?? "")) || null : null;
     const grade =
       gradeIdx >= 0 ? parseGrade(String(row[gradeIdx] ?? "")) : null;
     const status =
-      statusIdx >= 0 ? String(row[statusIdx] ?? "").trim() || null : null;
+      statusIdx >= 0 ? normalizeCell(String(row[statusIdx] ?? "")) || null : null;
     parsed.push({ name, review, grade, status });
   }
 

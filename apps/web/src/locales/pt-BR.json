@@ -419,6 +419,8 @@
     "category": "Categoria",
     "defaultStatus": "Status padrão",
     "allowedStatusesHint": "Status permitidos para esta categoria",
+    "overrideExistingLogs": "Sobrescrever logs existentes",
+    "overrideExistingLogsHint": "Se desmarcado, linhas que já existem na sua lista são ignoradas. Se marcado, entradas existentes são atualizadas com o novo status, nota e resenha.",
     "uploadFile": "Enviar planilha",
     "fileHint": "CSV ou XLSX, máx. 100 linhas e 1MB. Deve ter coluna Nome; opcionais Status, Resenha e Nota (0–10).",
     "exampleFormatTitle": "Exemplo de formato (mostrar tabela)",

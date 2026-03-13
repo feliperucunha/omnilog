@@ -420,6 +420,8 @@
     "category": "Category",
     "defaultStatus": "Default status",
     "allowedStatusesHint": "Allowed statuses for this category",
+    "overrideExistingLogs": "Override existing logs",
+    "overrideExistingLogsHint": "When unchecked, rows that already exist in your list are skipped. When checked, existing entries are updated with the new status, rate and review.",
     "uploadFile": "Upload sheet",
     "fileHint": "CSV or XLSX, max 100 rows and 1MB. Must have a Name column; optional Status, Review and Rate (0–10) columns.",
     "exampleFormatTitle": "Example format (show table)",
