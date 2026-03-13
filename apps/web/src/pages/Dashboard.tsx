@@ -437,49 +437,51 @@ export function Dashboard() {
 
       {token && (
         <section aria-label={t("social.sectionTitle")} className="flex min-w-0 flex-col gap-4 overflow-hidden">
-          <button
-            type="button"
-            onClick={toggleSocialCollapsed}
-            className="flex min-w-0 items-center gap-2 rounded-md py-1 max-md:min-h-[44px] max-md:py-3 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none"
-            aria-expanded={!socialCollapsed}
-            aria-controls="dashboard-social-content"
-            id="dashboard-social-heading"
-          >
-            {socialCollapsed ? (
-              <ChevronRight className="h-5 w-5 shrink-0" aria-hidden />
-            ) : (
-              <ChevronDown className="h-5 w-5 shrink-0" aria-hidden />
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={toggleSocialCollapsed}
+              className="flex min-w-0 items-center gap-2 rounded-md py-1 max-md:min-h-[44px] max-md:py-3 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none"
+              aria-expanded={!socialCollapsed}
+              aria-controls="dashboard-social-content"
+              id="dashboard-social-heading"
+            >
+              {socialCollapsed ? (
+                <ChevronRight className="h-5 w-5 shrink-0" aria-hidden />
+              ) : (
+                <ChevronDown className="h-5 w-5 shrink-0" aria-hidden />
+              )}
+              <span className="min-w-0 truncate">{t("social.sectionTitle")}</span>
+              {(() => {
+                const now = Date.now();
+                const newCount = feed.filter((e) => now - new Date(e.log.createdAt).getTime() < ONE_WEEK_MS).length;
+                return (
+                  <span className="shrink-0 text-sm font-normal text-[var(--color-light)]">
+                    {t("social.newEntriesLastWeek", { count: String(newCount) })}
+                  </span>
+                );
+              })()}
+            </button>
+            {!socialCollapsed && (
+              <Select
+                value={feedFriendFilter}
+                onValueChange={setFeedFriendFilter}
+                options={[
+                  { value: "all", label: t("social.filterAll") },
+                  ...followedUsers.map((u) => ({
+                    value: u.id,
+                    label: u.username ?? u.id,
+                  })),
+                ]}
+                aria-label={t("social.filterByFriend")}
+                className="min-w-0 max-w-[12rem] shrink-0"
+                triggerClassName="min-w-0"
+              />
             )}
-            <span className="min-w-0 truncate">{t("social.sectionTitle")}</span>
-            {(() => {
-              const now = Date.now();
-              const newCount = feed.filter((e) => now - new Date(e.log.createdAt).getTime() < ONE_WEEK_MS).length;
-              return (
-                <span className="shrink-0 text-sm font-normal text-[var(--color-light)]">
-                  {t("social.newEntriesLastWeek", { count: String(newCount) })}
-                </span>
-              );
-            })()}
-          </button>
+          </div>
           {!socialCollapsed && (
           <div id="dashboard-social-content" role="region" aria-labelledby="dashboard-social-heading">
             <div className="flex min-w-0 flex-col gap-4 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50 p-4">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <Select
-              value={feedFriendFilter}
-              onValueChange={setFeedFriendFilter}
-              options={[
-                { value: "all", label: t("social.filterAll") },
-                ...followedUsers.map((u) => ({
-                  value: u.id,
-                  label: u.username ?? u.id,
-                })),
-              ]}
-              aria-label={t("social.filterByFriend")}
-              className="min-w-0 max-w-[12rem]"
-              triggerClassName="min-w-0"
-                />
-              </div>
               {feedLoading ? (
             <div className="flex flex-col gap-2">
               {[1, 2, 3].map((i) => (
