@@ -70,9 +70,12 @@ interface MediaLogsProps {
   publicUserId?: string;
   /** When set (e.g. from Dashboard), show next milestone progress for this category. */
   milestoneProgress?: CategoryMilestoneProgress | null;
+  /** When set (e.g. from Dashboard), use as initial data so no skeleton is shown on first paint. */
+  initialLogs?: Log[];
+  initialNextCursor?: string | null;
 }
 
-export function MediaLogs({ mediaType, embedded = false, publicUserId, milestoneProgress: milestoneProgressProp }: MediaLogsProps) {
+export function MediaLogs({ mediaType, embedded = false, publicUserId, milestoneProgress: milestoneProgressProp, initialLogs: initialLogsProp, initialNextCursor: initialNextCursorProp }: MediaLogsProps) {
   const { t } = useLocale();
   const navigate = useNavigate();
   const { showLogComplete } = useLogComplete();
@@ -85,9 +88,10 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
     provider != null &&
     (mediaType === "boardgames" ? !hasBoardGameKey : me?.apiKeys && !me.apiKeys[provider]);
   const readOnly = !!publicUserId;
-  const [logs, setLogs] = useState<Log[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const hasInitialData = embedded && initialLogsProp !== undefined;
+  const [logs, setLogs] = useState<Log[]>(() => (hasInitialData && initialLogsProp) ? initialLogsProp : []);
+  const [nextCursor, setNextCursor] = useState<string | null>(() => (hasInitialData && initialNextCursorProp !== undefined) ? initialNextCursorProp : null);
+  const [loading, setLoading] = useState(!(hasInitialData && initialLogsProp !== undefined));
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingLog, setEditingLog] = useState<Log | null>(null);
@@ -189,12 +193,20 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   }, [mediaType, publicUserId]);
 
   useEffect(() => {
-    setLogs([]);
-    setNextCursor(null);
-    setError(null);
-    setLoading(true);
-    fetchLogsRef.current(true);
-  }, [mediaType, statusFilter, sortBy, publicUserId]);
+    const useInitial = embedded && initialLogsProp !== undefined;
+    if (useInitial) {
+      setLogs(initialLogsProp ?? []);
+      setNextCursor(initialNextCursorProp ?? null);
+      setError(null);
+      setLoading(false);
+    } else {
+      setLogs([]);
+      setNextCursor(null);
+      setError(null);
+      setLoading(true);
+      fetchLogsRef.current(true);
+    }
+  }, [mediaType, statusFilter, sortBy, publicUserId, embedded, initialLogsProp, initialNextCursorProp]);
 
   useEffect(() => {
     setStatusCounts(null);

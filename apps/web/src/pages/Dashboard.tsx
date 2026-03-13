@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchCached } from "@/lib/api";
-import { DashboardSkeleton } from "@/components/skeletons";
+import { FullPageLoader } from "@/components/FullPageLoader";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
@@ -62,10 +62,13 @@ interface MilestoneProgressResponse {
 }
 
 
+type LogsPayload = { data: Log[]; nextCursor: string | null } | Log[];
+const LOGS_PAGE_SIZE = 24;
+
 export function Dashboard() {
   const { t } = useLocale();
   const { token } = useAuth();
-  const { me } = useMe();
+  const { me, loading: meLoading } = useMe();
   const { visibleTypes } = useVisibleMediaTypes();
   const { setPageTitle, setRightSlot, setBelowNavbar } = usePageTitle() ?? {};
   const [searchParams, setSearchParams] = useSearchParams();
@@ -89,6 +92,13 @@ export function Dashboard() {
   const [badgesCollapsed, setBadgesCollapsed] = useState(false);
   const [milestoneProgress, setMilestoneProgress] = useState<MilestoneProgressResponse | null>(null);
   const isMobile = useIsMobile();
+  /** Initial logs for first paint (avoids second skeleton). Cleared when category changes so MediaLogs can show its skeleton. */
+  const [initialLogsData, setInitialLogsData] = useState<{
+    mediaType: MediaType;
+    logs: Log[];
+    nextCursor: string | null;
+  } | null>(null);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   /** Load collapsed prefs from persistent storage (Android/Capacitor). */
   useEffect(() => {
@@ -158,6 +168,36 @@ export function Dashboard() {
   useEffect(() => {
     fetchCounts();
   }, [fetchCounts]);
+
+  /** Fetch first page of logs for selected category so we can show content without a second skeleton. */
+  useEffect(() => {
+    if (!token || !me || counts === null || visibleTypes.length === 0) return;
+    const needInitial =
+      !initialLoadDone && (initialLogsData === null || initialLogsData.mediaType !== selectedCategory);
+    if (!needInitial) return;
+    const params = new URLSearchParams({
+      mediaType: selectedCategory,
+      sort: "date",
+      limit: String(LOGS_PAGE_SIZE),
+    });
+    let cancelled = false;
+    apiFetchCached<LogsPayload>(`/logs?${params.toString()}`, { ttlMs: 2 * 60 * 1000 })
+      .then((response) => {
+        if (cancelled) return;
+        const list = Array.isArray(response) ? response : response.data ?? [];
+        const cursor = Array.isArray(response) ? null : (response.nextCursor ?? null);
+        setInitialLogsData({ mediaType: selectedCategory, logs: list, nextCursor: cursor });
+        setInitialLoadDone(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setInitialLogsData({ mediaType: selectedCategory, logs: [], nextCursor: null });
+        setInitialLoadDone(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, me, counts, visibleTypes.length, selectedCategory, initialLoadDone, initialLogsData]);
 
   useEffect(() => {
     if (me?.user?.id && storage.getItemSync(`${BETA_MODAL_STORAGE_KEY}.${me.user.id}`) !== "true") setShowBetaModal(true);
@@ -280,16 +320,12 @@ export function Dashboard() {
       ? !hasBoardGameKey
       : me?.apiKeys && !me.apiKeys[apiKeyProvider]);
 
-  if (loading && counts === null) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.2 }}
-      >
-        <DashboardSkeleton />
-      </motion.div>
-    );
+  const showFullPageLoader =
+    meLoading ||
+    (loading && counts === null) ||
+    (!initialLoadDone && (initialLogsData === null || initialLogsData.mediaType !== selectedCategory));
+  if (showFullPageLoader) {
+    return <FullPageLoader />;
   }
 
   if (error && counts === null) {
@@ -402,6 +438,12 @@ export function Dashboard() {
             embedded
             milestoneProgress={
               milestoneProgress?.perMedium.find((p) => p.mediaType === selectedCategory) ?? null
+            }
+            initialLogs={
+              initialLogsData?.mediaType === selectedCategory ? initialLogsData.logs : undefined
+            }
+            initialNextCursor={
+              initialLogsData?.mediaType === selectedCategory ? initialLogsData.nextCursor : undefined
             }
           />
         </section>
