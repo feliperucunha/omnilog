@@ -273,7 +273,6 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
           onValueChange={(v) => {
             const type = v as MediaType;
             setMediaType(type);
-            setDefaultStatus(getDefaultCompletedStatus(type));
             setPreviewResult(null);
             setPreviewRow(null);
           }}
