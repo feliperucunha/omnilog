@@ -113,6 +113,8 @@
     "saving": "Guardando…",
     "visibleMediaTypesLabel": "Tipos de contenido en barra y búsqueda",
     "visibleMediaTypesIntro": "Elige qué tipos de contenido se muestran en la barra lateral y en la búsqueda. Desmarca para ocultar.",
+    "visibleMediaTypesOrderHint": "Arrastra las filas para cambiar el orden: la primera categoría marcada será la primera en inicio y búsqueda.",
+    "dragToReorder": "Arrastrar para reordenar",
     "publicProfileCustomization": "Personalización del perfil público",
     "publicProfileProOnlyIntro": "Elige qué categorías se muestran en tu perfil compartido y en la app. Pasa a Pro para personalizar.",
     "publicProfileUpgrade": "Ver planes",
@@ -403,6 +405,7 @@
   },
   "logComplete": {
     "logged": "Registrado",
+    "loggedWith": "Registrado con {{app}}",
     "viewItem": "Ver elemento",
     "backToDashboard": "Volver al inicio"
   },

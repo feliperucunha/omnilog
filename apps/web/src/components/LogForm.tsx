@@ -168,6 +168,7 @@ export function LogForm(props: LogFormProps) {
             status: status ?? undefined,
             mediaType: props.log.mediaType as MediaType,
             id: props.log.externalId,
+            review: review.trim() || null,
           };
           props.onSaved(completion);
         } else {
@@ -199,6 +200,7 @@ export function LogForm(props: LogFormProps) {
           status: status ?? undefined,
           mediaType: props.mediaType,
           id: props.externalId,
+          review: review.trim() || null,
         };
         props.onSaved(completion);
       }

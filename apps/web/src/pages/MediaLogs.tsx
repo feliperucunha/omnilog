@@ -486,7 +486,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           const categoryLabel = t(`nav.${mediaType}`);
           const badgeUser = t("mediaLogs.badgePopupYou");
           return (
-            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 ml-1 sm:gap-3">
               {currentBadge && (
                 <LevelBadge
                   icon={MEDIA_BADGE_ICONS[mediaType]}

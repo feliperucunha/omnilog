@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronRight, Download, HelpCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, GripVertical, HelpCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -50,6 +50,8 @@ export function Settings() {
   const [savingMediaTypes, setSavingMediaTypes] = useState(false);
   const [savingBoardGameProvider, setSavingBoardGameProvider] = useState(false);
   const [selectedMediaTypes, setSelectedMediaTypes] = useState<Set<MediaType>>(new Set(MEDIA_TYPES));
+  /** Order of categories: visible types first (this order), then hidden. Determines order on home and search. */
+  const [orderedMediaTypes, setOrderedMediaTypes] = useState<MediaType[]>(() => [...MEDIA_TYPES]);
   const [searchParams] = useSearchParams();
   const [advancedOpen, setAdvancedOpen] = useState(() => searchParams.get("open") === "api-keys");
   const [adminOpen, setAdminOpen] = useState(false);
@@ -60,6 +62,7 @@ export function Settings() {
   const [adminUsersError, setAdminUsersError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(() => getShowCompleteModal());
+  const [draggedMediaTypeIndex, setDraggedMediaTypeIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (searchParams.get("open") === "api-keys") setAdvancedOpen(true);
@@ -89,7 +92,10 @@ export function Settings() {
 
   useEffect(() => {
     if (me?.visibleMediaTypes?.length) {
-      setSelectedMediaTypes(new Set(me.visibleMediaTypes as MediaType[]));
+      const visible = me.visibleMediaTypes as MediaType[];
+      setSelectedMediaTypes(new Set(visible));
+      const rest = MEDIA_TYPES.filter((t) => !visible.includes(t));
+      setOrderedMediaTypes([...visible, ...rest]);
     }
   }, [me?.visibleMediaTypes]);
 
@@ -169,27 +175,41 @@ export function Settings() {
     }
   };
 
-  const handleToggleMediaType = async (type: MediaType) => {
-    const next = new Set(selectedMediaTypes);
-    if (next.has(type)) next.delete(type);
-    else next.add(type);
-    const typesArray = Array.from(next);
-    if (typesArray.length === 0) return;
-    setSelectedMediaTypes(next);
+  const saveVisibleMediaTypes = async (types: MediaType[]) => {
+    if (types.length === 0) return;
     setSavingMediaTypes(true);
     try {
       await apiFetch("/settings/visible-media-types", {
         method: "PUT",
-        body: JSON.stringify({ types: typesArray }),
+        body: JSON.stringify({ types }),
       });
       await refetchVisibleTypes();
       toast.success(t("toast.mediaTypesSaved"));
     } catch (err) {
-      setSelectedMediaTypes(selectedMediaTypes);
       toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
     } finally {
       setSavingMediaTypes(false);
     }
+  };
+
+  const handleToggleMediaType = async (type: MediaType) => {
+    const next = new Set(selectedMediaTypes);
+    if (next.has(type)) next.delete(type);
+    else next.add(type);
+    const typesArray = orderedMediaTypes.filter((t) => next.has(t));
+    if (typesArray.length === 0) return;
+    setSelectedMediaTypes(next);
+    await saveVisibleMediaTypes(typesArray);
+  };
+
+  const handleReorderMediaTypes = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    const next = [...orderedMediaTypes];
+    const [removed] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, removed);
+    setOrderedMediaTypes(next);
+    const typesToSave = next.filter((t) => selectedMediaTypes.has(t));
+    if (typesToSave.length > 0) saveVisibleMediaTypes(typesToSave);
   };
 
   if (loading && !me) {
@@ -318,28 +338,57 @@ export function Settings() {
                 <p className="text-sm text-[var(--color-light)]">
                   {t("settings.visibleMediaTypesIntro")}
                 </p>
-                <div className="flex flex-wrap gap-4">
-                  {MEDIA_TYPES.map((type) => (
-                    <label
+                <p className="text-sm text-[var(--color-light)]">
+                  {t("settings.visibleMediaTypesOrderHint")}
+                </p>
+                <ul className="flex flex-col gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1" aria-label={t("settings.visibleMediaTypesLabel")}>
+                  {orderedMediaTypes.map((type, index) => (
+                    <li
                       key={type}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+                        if (Number.isNaN(fromIndex) || fromIndex === index) return;
+                        handleReorderMediaTypes(fromIndex, index);
+                      }}
                       className={cn(
-                        "flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 transition-colors hover:bg-[var(--color-darkest)]/50",
-                        "focus-within:ring-2 focus-within:ring-[var(--color-mid)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--color-dark)]"
+                        "flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-[var(--color-darkest)]/80",
+                        "focus-within:ring-2 focus-within:ring-[var(--color-mid)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--color-dark)]",
+                        draggedMediaTypeIndex === index && "opacity-50"
                       )}
                     >
-                      <input
-                        type="checkbox"
-                        checked={selectedMediaTypes.has(type)}
-                        onChange={() => handleToggleMediaType(type)}
-                        disabled={savingMediaTypes}
-                        className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
-                      />
-                      <span className="text-sm text-[var(--color-lightest)]">
-                        {t(`nav.${type}`)}
+                      <span
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggedMediaTypeIndex(index);
+                          e.dataTransfer.setData("text/plain", String(index));
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragEnd={() => setDraggedMediaTypeIndex(null)}
+                        className="cursor-grab active:cursor-grabbing touch-none text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+                        aria-label={t("settings.dragToReorder")}
+                      >
+                        <GripVertical className="h-4 w-4" aria-hidden />
                       </span>
-                    </label>
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedMediaTypes.has(type)}
+                          onChange={() => handleToggleMediaType(type)}
+                          disabled={savingMediaTypes}
+                          className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                        />
+                        <span className="text-sm text-[var(--color-lightest)]">
+                          {t(`nav.${type}`)}
+                        </span>
+                      </label>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </>
             ) : (
               <>

@@ -142,7 +142,7 @@ export function Topbar() {
                 {initial}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56 max-h-[min(90vh,28rem)] overflow-y-auto">
               <div className="px-2 py-2">
                 <p className="text-xs font-medium text-[var(--color-light)]">{user.email}</p>
               </div>

@@ -7,15 +7,18 @@ import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { ItemImage } from "@/components/ItemImage";
 import { useLocale } from "@/contexts/LocaleContext";
 import { Logo } from "@/components/Logo";
+import { getHeroImageUrl } from "@/lib/getHeroImageUrl";
 import { overlayVariants, modalContentVariants } from "@/lib/animations";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@dogument/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 
 function statusColor(status: string | null | undefined): string {
-  if (!status) return "text-[var(--color-light)]";
-  if ((COMPLETED_STATUSES as readonly string[]).includes(status)) return "text-emerald-400";
-  if ((IN_PROGRESS_STATUSES as readonly string[]).includes(status)) return "text-amber-400";
-  return "text-red-400";
+  if (!status) return "bg-[var(--color-mid)]/40 text-[var(--color-light)]";
+  if ((COMPLETED_STATUSES as readonly string[]).includes(status))
+    return "bg-emerald-500/20 text-emerald-400 border border-emerald-400/30";
+  if ((IN_PROGRESS_STATUSES as readonly string[]).includes(status))
+    return "bg-amber-500/20 text-amber-400 border border-amber-400/30";
+  return "bg-red-500/20 text-red-400 border border-red-400/30";
 }
 
 interface LogCompleteModalProps {
@@ -25,13 +28,14 @@ interface LogCompleteModalProps {
 
 export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const { t } = useLocale();
-  const { image, title, grade, status } = state;
+  const { image, title, grade, status, review } = state;
   const stars = grade != null ? gradeToStars(grade) : 0;
   const statusLabel = status ? getStatusLabel(t, status, state.mediaType) : t("logComplete.logged");
+  const heroImageUrl = getHeroImageUrl(image) ?? image;
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex min-h-[100dvh] items-center justify-center bg-black/70 p-0 md:p-4"
+      className="fixed inset-0 z-50 flex min-h-[100dvh] min-h-dvh-fallback items-center justify-center bg-black/90 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] md:bg-transparent md:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="log-complete-title"
@@ -41,61 +45,97 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       variants={overlayVariants}
       onClick={onClose}
     >
-      <motion.div
-        className="flex h-full w-full min-h-dvh-fallback flex-col overflow-hidden rounded-none bg-[var(--color-dark)] md:h-auto md:min-h-0 md:max-h-[90vh] md:w-full md:max-w-[380px] md:overflow-auto md:rounded-xl md:border md:border-[var(--color-surface-border)] md:shadow-[var(--shadow-modal)]"
+      {/* Full-bleed blurred background: same image; on mobile stronger blur + dark scrim so app UI is hidden */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          paddingTop: "env(safe-area-inset-top)",
-          paddingBottom: "env(safe-area-inset-bottom)",
-          paddingLeft: "max(env(safe-area-inset-left), 1rem)",
-          paddingRight: "max(env(safe-area-inset-right), 1rem)",
+          backgroundImage: heroImageUrl ? `url(${heroImageUrl})` : undefined,
+          backgroundSize: "cover",
+          filter: "blur(10px)",
+          WebkitFilter: "blur(10px)",
+          transform: "scale(1.25)",
         }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-black/70 md:bg-black/55"
+        aria-hidden
+      />
+
+      {/* Rounded container: horizontal and vertical margin from wrapper; on mobile content is taller */}
+      <motion.article
+        className="relative flex max-h-full w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-dark)] shadow-[0_24px_80px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.08)] md:rounded-3xl"
         variants={modalContentVariants}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex flex-shrink-0 items-center justify-end pb-2 pt-1 md:pb-4 md:pt-0">
+        {/* Close: top-right inside card */}
+        <div className="absolute right-2 top-2 z-10 md:right-4 md:top-4">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-12 min-h-12 w-12 min-w-12 shrink-0 rounded-full text-[var(--color-light)] hover:bg-[var(--color-mid)]/30 hover:text-[var(--color-lightest)] active:bg-[var(--color-mid)]/40 md:h-11 md:min-h-0 md:w-11 md:min-w-0"
+            className="h-9 w-9 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white md:h-10 md:w-10 md:bg-[var(--color-mid)]/20 md:text-[var(--color-light)] md:hover:bg-[var(--color-mid)]/40 md:hover:text-[var(--color-lightest)]"
             onClick={onClose}
             aria-label={t("common.close")}
           >
-            <X className="h-6 w-6" />
+            <X className="h-5 w-5" />
           </Button>
-        </header>
+        </div>
 
-        {/* Mobile: container wraps image (same size); desktop: fixed size */}
-        <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center md:flex-initial md:justify-start md:pb-10 md:pt-0">
-          <div className="flex flex-col items-center justify-center md:mb-5">
-            <Logo alt="" className="mb-4 h-9 w-auto opacity-90 md:h-10" aria-hidden />
+        {/* Hero image: on mobile taller with fixed height; desktop keeps aspect */}
+        <div className="relative flex-shrink-0 overflow-hidden rounded-t-2xl md:rounded-t-3xl">
+          <div className="relative h-[40vh] w-full min-h-[160px] md:h-auto md:min-h-0 md:aspect-[2/3]">
             <ItemImage
-              src={image}
-              className="max-w-full rounded-xl shadow-lg md:max-w-none md:h-40 md:w-28 md:flex-none"
-              imgClassName="object-contain object-center max-h-[50vh] max-w-full md:max-h-full md:h-full md:w-full md:object-cover"
-              fitContent
+              src={heroImageUrl}
+              className="absolute inset-0 h-full w-full"
+              imgClassName="object-cover object-center"
+              fitContent={false}
               loading="eager"
               referrerPolicy="no-referrer"
             />
-          </div>
-          <div className="flex flex-shrink-0 flex-col items-center px-2 pb-6 pt-4 text-center md:px-0 md:pb-0 md:pt-0">
-            <p
-              className={`mb-2 text-sm font-medium uppercase tracking-wide ${statusColor(status)} md:mb-4`}
-              id="log-complete-status"
-            >
-              {statusLabel}
-            </p>
-            <h1 id="log-complete-title" className="mb-3 line-clamp-2 text-lg font-bold text-[var(--color-lightest)] md:text-xl">
-              {title}
-            </h1>
-            {grade != null && (
-              <div className="flex justify-center">
-                <StarRating value={stars} readOnly size="lg" />
-              </div>
-            )}
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(to top, var(--color-dark) 0%, transparent 40%, transparent 100%)",
+              }}
+            />
           </div>
         </div>
-      </motion.div>
+
+        {/* Content: scrollable on mobile so everything fits */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-3 md:px-6 md:pb-6 md:pt-5">
+          <span
+            className={`mb-2 inline-flex w-fit rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider md:mb-3 md:px-3 md:py-1 md:text-xs ${statusColor(status)}`}
+            id="log-complete-status"
+          >
+            {statusLabel}
+          </span>
+          <h1
+            id="log-complete-title"
+            className="mb-2 line-clamp-2 text-lg font-bold leading-tight text-[var(--color-lightest)] md:mb-4 md:line-clamp-3 md:text-[1.75rem]"
+          >
+            {title}
+          </h1>
+          {grade != null && (
+            <div className="mb-2 flex items-center gap-1 md:mb-3">
+              <StarRating value={stars} readOnly size="lg" />
+            </div>
+          )}
+          {review != null && review.trim() !== "" && (
+            <p className="mb-3 line-clamp-3 text-[11px] leading-snug text-[var(--color-light)] whitespace-pre-wrap md:mb-4 md:line-clamp-4 md:text-[0.8125rem] md:leading-relaxed">
+              {review.trim()}
+            </p>
+          )}
+
+          <div className="mt-auto flex shrink-0 items-center gap-1.5 pt-3 border-t border-[var(--color-mid)]/30 md:gap-2 md:pt-4">
+            <Logo alt="" className="h-7 w-auto shrink-0 opacity-90 md:h-8" aria-hidden />
+            <span className="text-xs font-medium text-[var(--color-light)] md:text-sm">
+              {t("logComplete.loggedWith", { app: t("app.name") })}
+            </span>
+          </div>
+        </div>
+      </motion.article>
     </motion.div>
   );
 }

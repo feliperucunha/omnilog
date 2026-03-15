@@ -29,6 +29,8 @@ export interface LogCompleteState {
   status?: string | null;
   mediaType?: MediaType;
   id?: string;
+  /** User's review/comment when available (for complete modal). */
+  review?: string | null;
 }
 
 interface ItemReviewFormProps {
@@ -198,6 +200,7 @@ export function ItemReviewForm({
             status: status ?? undefined,
             mediaType,
             id: externalId,
+            review: review.trim() || null,
           });
         }
       } else {
@@ -226,6 +229,7 @@ export function ItemReviewForm({
           status: status ?? undefined,
           mediaType,
           id: externalId,
+          review: review.trim() || null,
         });
       }
     } catch (err) {

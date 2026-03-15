@@ -582,7 +582,10 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             runtimeMinutes={item.runtimeMinutes ?? null}
             episodesCount={item.episodesCount ?? null}
             genres={item.genres ?? undefined}
-            onSaved={() => setReviewsPage(1)}
+            onSaved={() => {
+              setReviewsPage(1);
+              onBack();
+            }}
             onSavedComplete={(state) => showLogComplete(state)}
           />
         )}

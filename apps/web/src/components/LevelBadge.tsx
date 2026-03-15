@@ -6,6 +6,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+/** Rarity tiers by level (1–12), game-style: common → legendary. */
+const BADGE_RARITY = [
+  { name: "common", color: "#94a3b8", gradient: "linear-gradient(145deg, #94a3b8 0%, #64748b 100%)" },      // 1–2
+  { name: "uncommon", color: "#22c55e", gradient: "linear-gradient(145deg, #4ade80 0%, #16a34a 100%)" },     // 3–4
+  { name: "rare", color: "#3b82f6", gradient: "linear-gradient(145deg, #60a5fa 0%, #2563eb 100%)" },         // 5–6
+  { name: "epic", color: "#a855f7", gradient: "linear-gradient(145deg, #c084fc 0%, #7c3aed 100%)" },       // 7–8
+  { name: "legendary", color: "#eab308", gradient: "linear-gradient(145deg, #fde047 0%, #ca8a04 100%)" },  // 9–12
+] as const;
+
+function getRarityForLevel(level: number): (typeof BADGE_RARITY)[number] {
+  const index = level <= 2 ? 0 : level <= 4 ? 1 : level <= 6 ? 2 : level <= 8 ? 3 : 4;
+  return BADGE_RARITY[index];
+}
+
 export interface BadgePopupDetail {
   /** Display name (e.g. "You" for current user, or username for others) */
   user: string;
@@ -45,30 +59,32 @@ function BadgeInsignia({
   level: number;
   className?: string;
 }) {
+  const rarity = getRarityForLevel(level);
   return (
-    <span className={`inline-flex items-center gap-1.5 ${className}`}>
+    <span className={`inline-flex items-center gap-1.5 max-md:gap-2 ${className}`}>
       <span
-        className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full p-[3px] shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_1px_2px_rgba(0,0,0,0.3)]"
+        className="inline-flex h-6 w-6 max-md:h-8 max-md:w-8 flex-shrink-0 items-center justify-center rounded-full p-[3px] max-md:p-[4px] shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_1px_2px_rgba(0,0,0,0.3)]"
         style={{
-          background: "linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0.25) 100%)",
-          boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.2), 0 1px 3px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.2)",
+          background: "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(0,0,0,0.2) 100%)",
+          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 3px rgba(0,0,0,0.35), 0 0 0 2px ${rarity.color}`,
         }}
         aria-hidden
       >
         <span
-          className="flex h-full w-full items-center justify-center rounded-full text-[var(--color-lightest)]"
+          className="flex h-full w-full items-center justify-center rounded-full text-[var(--color-lightest)] text-[0.65rem] max-md:text-[0.8rem]"
           style={{
-            background: "linear-gradient(145deg, var(--btn-gradient-start) 0%, var(--btn-gradient-end) 100%)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)",
+            background: rarity.gradient,
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.2)",
             lineHeight: 1,
-            fontSize: "0.65rem",
           }}
         >
           {icon}
         </span>
       </span>
-      <span className="text-xs font-bold tabular-nums text-[var(--color-light)]">
+      <span
+        className="text-xs max-md:text-sm font-bold tabular-nums"
+        style={{ color: rarity.color }}
+      >
         {toRoman(level)}
       </span>
     </span>

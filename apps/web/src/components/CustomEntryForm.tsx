@@ -113,6 +113,7 @@ export function CustomEntryForm({
         status: status ?? undefined,
         mediaType,
         id: externalId,
+        review: review.trim() || null,
       };
       onSaved(completion);
     } catch (err) {

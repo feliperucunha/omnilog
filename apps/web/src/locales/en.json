@@ -114,6 +114,8 @@
     "saving": "Saving…",
     "visibleMediaTypesLabel": "Media types in sidebar and search",
     "visibleMediaTypesIntro": "Choose which media types appear in the sidebar and on the search page. Uncheck to hide a type.",
+    "visibleMediaTypesOrderHint": "Drag rows to set the order: the first checked category appears first on the home and search pages.",
+    "dragToReorder": "Drag to reorder",
     "publicProfileCustomization": "Public profile customization",
     "publicProfileProOnlyIntro": "Choose which categories appear on your shared profile and in the app. Upgrade to Pro to customize.",
     "publicProfileUpgrade": "View plans",
@@ -404,6 +406,7 @@
   },
   "logComplete": {
     "logged": "Logged",
+    "loggedWith": "Logged with {{app}}",
     "viewItem": "View item",
     "backToDashboard": "Back to home"
   },

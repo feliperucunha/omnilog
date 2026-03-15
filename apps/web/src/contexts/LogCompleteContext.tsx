@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { AnimatePresence } from "framer-motion";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { LogCompleteModal } from "@/components/LogCompleteModal";
 import * as storage from "@/lib/storage";
@@ -40,9 +41,11 @@ export function LogCompleteProvider({ children }: { children: ReactNode }) {
   return (
     <LogCompleteContext.Provider value={{ showLogComplete, closeLogComplete }}>
       {children}
-      {state != null && (
-        <LogCompleteModal state={state} onClose={closeLogComplete} />
-      )}
+      <AnimatePresence mode="wait">
+        {state != null && (
+          <LogCompleteModal key="log-complete" state={state} onClose={closeLogComplete} />
+        )}
+      </AnimatePresence>
     </LogCompleteContext.Provider>
   );
 }

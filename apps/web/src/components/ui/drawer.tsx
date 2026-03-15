@@ -36,6 +36,7 @@ const DrawerContent = React.forwardRef<
   const [isClosing, setIsClosing] = React.useState(false);
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /** Animated close: run slide-down then notify parent. Used for Close button and Escape. */
   const handleClose = React.useCallback(() => {
     if (isClosing) return;
     setIsClosing(true);
@@ -44,6 +45,15 @@ const DrawerContent = React.forwardRef<
       closeTimeoutRef.current = null;
     }, DRAWER_CLOSE_DURATION_MS);
   }, [isClosing, onClose]);
+
+  /** Close immediately so overlay and content unmount together. Used for overlay/outside click to avoid stuck layer on mobile. */
+  const closeImmediately = React.useCallback(() => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    onClose?.();
+  }, [onClose]);
 
   React.useEffect(() => {
     onReady?.(handleClose);
@@ -55,7 +65,7 @@ const DrawerContent = React.forwardRef<
   const heightClass = mobileHeight === "30%" ? "max-md:!h-[30%]" : "max-md:!h-[95%]";
   return (
     <DialogPortal>
-      <DialogOverlay onClick={handleClose} />
+      <DialogOverlay onClick={closeImmediately} onPointerDown={closeImmediately} />
       <DialogPrimitive.Content
         ref={ref}
         data-closing={isClosing ? "true" : undefined}
@@ -80,7 +90,16 @@ const DrawerContent = React.forwardRef<
             return;
           }
           e.preventDefault();
-          handleClose();
+          closeImmediately();
+        }}
+        onInteractOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest("[data-radix-select-content]") || target.closest("[data-dropdown-portal]")) {
+            e.preventDefault();
+            return;
+          }
+          e.preventDefault();
+          closeImmediately();
         }}
         {...props}
       >
