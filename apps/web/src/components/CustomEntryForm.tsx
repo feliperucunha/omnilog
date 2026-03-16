@@ -192,8 +192,8 @@ export function CustomEntryForm({
                   onValueChange={(v) => {
                     const next = v || null;
                     setStatus(next);
-                    if (next === "played" && showBoardGameFields) {
-                      setMatchesPlayed(1);
+                    if (showBoardGameFields) {
+                      setMatchesPlayed(next === "played" ? 1 : next === "plan to play" ? 0 : matchesPlayed);
                     }
                   }}
                   options={[

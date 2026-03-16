@@ -126,7 +126,9 @@ export function ItemReviewForm({
           setVolume(log.volume ?? "");
           setHoursToBeat(log.hoursToBeat != null ? log.hoursToBeat : "");
           setOwn(log.own ?? false);
-          const defaultMatches = log.status === "played" ? 1 : "";
+          const defaultMatches = showBoardGameFields
+            ? (log.status === "played" ? 1 : log.status === "plan to play" ? 0 : "")
+            : "";
           setMatchesPlayed(log.matchesPlayed != null ? log.matchesPlayed : defaultMatches);
         } else {
           setStars(null);
@@ -307,8 +309,8 @@ export function ItemReviewForm({
                 onValueChange={(v) => {
                   const next = v || null;
                   setStatus(next);
-                  if (next === "played" && showBoardGameFields) {
-                    setMatchesPlayed(1);
+                  if (showBoardGameFields) {
+                    setMatchesPlayed(next === "played" ? 1 : next === "plan to play" ? 0 : matchesPlayed);
                   }
                   if (next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && episodesCount != null && episodesCount > 0) {
                     setEpisode(episodesCount);
