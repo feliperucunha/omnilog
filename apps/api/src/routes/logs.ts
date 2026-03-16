@@ -369,15 +369,21 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       userId,
       completedAt: { not: null },
     },
-    select: { completedAt: true, contentHours: true, startedAt: true, mediaType: true },
+    select: { completedAt: true, contentHours: true, startedAt: true, mediaType: true, hoursToBeat: true, matchesPlayed: true },
   });
   const byKey: Record<string, number> = {};
   const MS_PER_HOUR = 60 * 60 * 1000;
   const FALLBACK_MAX_HOURS = 24; // cap derived hours (start→finish) so multi-day completions don't inflate stats
+  const mediaType = (log: { mediaType: unknown }) => log.mediaType as string;
   for (const log of logs) {
     if (log.completedAt == null) continue;
     let hours: number;
-    if (log.contentHours != null && log.contentHours > 0) {
+    if (mediaType(log) === "boardgames") {
+      // Boardgames: 1 hour per match
+      hours = (log.matchesPlayed ?? 0) * 1;
+    } else if (mediaType(log) === "games" && log.hoursToBeat != null && log.hoursToBeat > 0) {
+      hours = log.hoursToBeat;
+    } else if (log.contentHours != null && log.contentHours > 0) {
       hours = log.contentHours;
     } else if (log.startedAt != null) {
       const elapsedMs = log.completedAt.getTime() - log.startedAt.getTime();
