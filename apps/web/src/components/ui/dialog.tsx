@@ -26,10 +26,12 @@ const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
     onClose?: () => void;
+    /** Optional class for the overlay (e.g. z-[60] for stacking above another modal). */
+    overlayClassName?: string;
   }
->(({ className, children, onClose, ...props }, ref) => (
+>(({ className, children, onClose, overlayClassName, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay onClick={onClose} />
+    <DialogOverlay className={overlayClassName} onClick={onClose} />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(

@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +76,7 @@ export function LogForm(props: LogFormProps) {
   const [matchesPlayed, setMatchesPlayed] = useState<number | "">(isEdit ? (log!.matchesPlayed ?? "") : "");
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   type ProgressOptions = {
     seasons?: number[];
@@ -227,6 +230,7 @@ export function LogForm(props: LogFormProps) {
   };
 
   return (
+    <>
     <Dialog open modal={false} onOpenChange={(open) => !open && props.onCancel()}>
       <DialogContent onClose={props.onCancel}>
         <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
@@ -423,26 +427,10 @@ export function LogForm(props: LogFormProps) {
                       type="button"
                       variant="ghost"
                       className="w-full text-red-400 hover:bg-red-500/20 hover:text-red-400"
-                      onClick={async () => {
-                        if (!log || !confirm(t("common.deleteLogConfirm"))) return;
-                        setDeleting(true);
-                        try {
-                          await props.onDelete!(log.id);
-                          props.onCancel();
-                        } finally {
-                          setDeleting(false);
-                        }
-                      }}
+                      onClick={() => setConfirmDeleteOpen(true)}
                       disabled={loading || deleting}
                     >
-                      {deleting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                          {t("common.deleting")}
-                        </>
-                      ) : (
-                        t("common.delete")
-                      )}
+                      {t("common.delete")}
                     </Button>
                   </div>
                 )}
@@ -452,5 +440,58 @@ export function LogForm(props: LogFormProps) {
         </motion.div>
       </DialogContent>
     </Dialog>
+
+    {/* Confirm delete: in-app modal above the edit dialog */}
+    <Dialog open={confirmDeleteOpen} onOpenChange={(open) => !open && setConfirmDeleteOpen(false)}>
+      <DialogContent
+        className="z-[60] sm:max-w-sm"
+        overlayClassName="z-[60]"
+        onClose={() => setConfirmDeleteOpen(false)}
+      >
+        <DialogHeader>
+          <DialogTitle className="text-[var(--color-lightest)]">
+            {t("common.delete")}
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-[var(--color-light)]">
+          {t("common.deleteLogConfirm")}
+        </p>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setConfirmDeleteOpen(false)}
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={deleting}
+            onClick={async () => {
+              if (!log || !("onDelete" in props) || !props.onDelete) return;
+              setDeleting(true);
+              try {
+                await props.onDelete(log.id);
+                setConfirmDeleteOpen(false);
+                props.onCancel();
+              } finally {
+                setDeleting(false);
+              }
+            }}
+          >
+            {deleting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                {t("common.deleting")}
+              </>
+            ) : (
+              t("common.delete")
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }
