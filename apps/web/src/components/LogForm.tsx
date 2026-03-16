@@ -73,7 +73,9 @@ export function LogForm(props: LogFormProps) {
   const [chapter, setChapter] = useState<number | "">(isEdit ? (log!.chapter ?? "") : "");
   const [volume, setVolume] = useState<number | "">(isEdit ? (log!.volume ?? "") : "");
   const [own, setOwn] = useState(isEdit ? (log!.own ?? false) : false);
-  const [matchesPlayed, setMatchesPlayed] = useState<number | "">(isEdit ? (log!.matchesPlayed ?? "") : "");
+  const [matchesPlayed, setMatchesPlayed] = useState<number | "">(
+    isEdit ? (log!.matchesPlayed ?? (log!.status === "played" ? 1 : "")) : (mediaType === "boardgames" ? 1 : "")
+  );
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -118,7 +120,8 @@ export function LogForm(props: LogFormProps) {
       setChapter(log.chapter ?? "");
       setVolume(log.volume ?? "");
       setOwn(log.own ?? false);
-      setMatchesPlayed(log.matchesPlayed ?? "");
+      const defaultMatches = log.status === "played" ? 1 : "";
+      setMatchesPlayed(log.matchesPlayed ?? defaultMatches);
     }
   }, [isEdit, log?.id]);
 
@@ -253,6 +256,9 @@ export function LogForm(props: LogFormProps) {
                       onValueChange={(v) => {
                         const next = v || null;
                         setStatus(next);
+                        if (next === "played" && showBoardGameFields) {
+                          setMatchesPlayed(1);
+                        }
                         if (isEdit && next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && "episodesCount" in props && props.episodesCount != null && props.episodesCount > 0) {
                           setEpisode(props.episodesCount);
                         }

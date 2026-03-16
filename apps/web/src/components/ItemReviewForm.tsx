@@ -126,7 +126,8 @@ export function ItemReviewForm({
           setVolume(log.volume ?? "");
           setHoursToBeat(log.hoursToBeat != null ? log.hoursToBeat : "");
           setOwn(log.own ?? false);
-          setMatchesPlayed(log.matchesPlayed != null ? log.matchesPlayed : "");
+          const defaultMatches = log.status === "played" ? 1 : "";
+          setMatchesPlayed(log.matchesPlayed != null ? log.matchesPlayed : defaultMatches);
         } else {
           setStars(null);
           setReview("");
@@ -137,7 +138,7 @@ export function ItemReviewForm({
           setVolume("");
           setHoursToBeat("");
           setOwn(false);
-          setMatchesPlayed("");
+          setMatchesPlayed(showBoardGameFields ? 1 : "");
         }
       })
       .catch(() => {
@@ -281,6 +282,20 @@ export function ItemReviewForm({
         <h2 className="mb-4 text-xl font-semibold text-[var(--color-lightest)]">
           {myLog ? t("itemReviewForm.yourReview") : t("itemReviewForm.addReview")}
         </h2>
+        {showBoardGameFields && myLog && (myLog.own === true || (myLog.matchesPlayed != null && myLog.matchesPlayed > 0)) && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {myLog.own === true && (
+              <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+                {t("itemReviewForm.own")}
+              </span>
+            )}
+            {myLog.matchesPlayed != null && myLog.matchesPlayed > 0 && (
+              <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+                {t("itemReviewForm.matchesPlayed")}: {myLog.matchesPlayed}
+              </span>
+            )}
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
           <div className="flex flex-col gap-4">
             <div>
@@ -292,6 +307,9 @@ export function ItemReviewForm({
                 onValueChange={(v) => {
                   const next = v || null;
                   setStatus(next);
+                  if (next === "played" && showBoardGameFields) {
+                    setMatchesPlayed(1);
+                  }
                   if (next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && episodesCount != null && episodesCount > 0) {
                     setEpisode(episodesCount);
                   }

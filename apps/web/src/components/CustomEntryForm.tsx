@@ -189,7 +189,13 @@ export function CustomEntryForm({
                 </Label>
                 <Select
                   value={status ?? ""}
-                  onValueChange={(v) => setStatus(v || null)}
+                  onValueChange={(v) => {
+                    const next = v || null;
+                    setStatus(next);
+                    if (next === "played" && showBoardGameFields) {
+                      setMatchesPlayed(1);
+                    }
+                  }}
                   options={[
                     { value: "", label: "—" },
                     ...statusOptions.map((value) => ({

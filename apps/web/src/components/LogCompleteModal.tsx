@@ -69,13 +69,13 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
         variants={modalContentVariants}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close: top-right inside card */}
+        {/* Close: top-right inside card — strong contrast on any background */}
         <div className="absolute right-2 top-2 z-10 md:right-4 md:top-4">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-9 w-9 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white md:h-10 md:w-10 md:bg-[var(--color-mid)]/20 md:text-[var(--color-light)] md:hover:bg-[var(--color-mid)]/40 md:hover:text-[var(--color-lightest)]"
+            className="h-9 w-9 rounded-full bg-black/75 text-white shadow-lg ring-1 ring-white/20 hover:bg-black/90 hover:text-white hover:ring-white/30 md:h-10 md:w-10"
             onClick={onClose}
             aria-label={t("common.close")}
           >
