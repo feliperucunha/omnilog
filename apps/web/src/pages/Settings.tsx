@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronDown, ChevronRight, Download, GripVertical, HelpCircle } from "lucide-react";
@@ -21,6 +21,14 @@ import * as storage from "@/lib/storage";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@dogument/shared";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/useMediaQuery";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type KeysStatus = { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
 
@@ -61,8 +69,12 @@ export function Settings() {
   const [adminUsersLoading, setAdminUsersLoading] = useState(false);
   const [adminUsersError, setAdminUsersError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportSelectedCategories, setExportSelectedCategories] = useState<Set<MediaType>>(() => new Set(MEDIA_TYPES));
   const [showCompleteModal, setShowCompleteModal] = useState(() => getShowCompleteModal());
   const [draggedMediaTypeIndex, setDraggedMediaTypeIndex] = useState<number | null>(null);
+  const exportDrawerCloseRef = useRef<(() => void) | null>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (searchParams.get("open") === "api-keys") setAdvancedOpen(true);
@@ -211,6 +223,107 @@ export function Settings() {
     const typesToSave = next.filter((t) => selectedMediaTypes.has(t));
     if (typesToSave.length > 0) saveVisibleMediaTypes(typesToSave);
   };
+
+  const handleExportDownload = useCallback(
+    async (onClose: () => void) => {
+      const selected = Array.from(exportSelectedCategories);
+      if (selected.length === 0) {
+        toast.error(t("settings.exportSelectAtLeastOne"));
+        return;
+      }
+      setExporting(true);
+      try {
+        for (let i = 0; i < selected.length; i++) {
+          const mt = selected[i];
+          const { blob, filename } = await apiFetchFile(`/logs/export?mediaType=${encodeURIComponent(mt)}`);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(url);
+          if (i < selected.length - 1) await new Promise((r) => setTimeout(r, 300));
+        }
+        toast.success(t("tiers.exportSuccess"));
+        onClose();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : t("tiers.exportFailed"));
+      } finally {
+        setExporting(false);
+      }
+    },
+    [exportSelectedCategories, t]
+  );
+
+  const exportModalContent = useCallback(
+    (onClose: () => void) => (
+      <>
+        <DialogHeader>
+          <DialogTitle>{t("settings.exportModalTitle")}</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-[var(--color-light)]">{t("settings.exportModalDesc")}</p>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              type="button"
+              className="text-[var(--color-accent)] underline hover:no-underline"
+              onClick={() => setExportSelectedCategories(new Set(MEDIA_TYPES))}
+            >
+              {t("settings.exportSelectAll")}
+            </button>
+            <span className="text-[var(--color-mid)]">·</span>
+            <button
+              type="button"
+              className="text-[var(--color-accent)] underline hover:no-underline"
+              onClick={() => setExportSelectedCategories(new Set())}
+            >
+              {t("settings.exportDeselectAll")}
+            </button>
+          </div>
+          <div className="flex flex-col gap-2 max-h-48 overflow-y-auto rounded border border-[var(--color-mid)]/30 p-2">
+            {MEDIA_TYPES.map((mt) => (
+              <label
+                key={mt}
+                className={cn(
+                  "flex items-center gap-2 rounded px-2 py-1.5 cursor-pointer hover:bg-[var(--color-mid)]/10",
+                  exportSelectedCategories.has(mt) && "bg-[var(--color-mid)]/10"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={exportSelectedCategories.has(mt)}
+                  onChange={(e) => {
+                    const next = new Set(exportSelectedCategories);
+                    if (e.target.checked) next.add(mt);
+                    else next.delete(mt);
+                    setExportSelectedCategories(next);
+                  }}
+                  className="h-4 w-4 rounded border-[var(--color-mid)]"
+                  aria-label={t(`nav.${mt}`)}
+                />
+                <span className="text-sm text-[var(--color-lightest)]">{t(`nav.${mt}`)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end pt-2">
+          <Button type="button" variant="outline" onClick={onClose} disabled={exporting}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            type="button"
+            className="gap-2"
+            disabled={exporting || exportSelectedCategories.size === 0}
+            onClick={() => handleExportDownload(onClose)}
+          >
+            <Download className="h-4 w-4" aria-hidden />
+            {exporting ? t("common.saving") : t("settings.exportDownload")}
+          </Button>
+        </div>
+      </>
+    ),
+    [t, exporting, exportSelectedCategories, handleExportDownload]
+  );
 
   if (loading && !me) {
     return <SettingsSkeleton />;
@@ -422,27 +535,10 @@ export function Settings() {
                   type="button"
                   variant="outline"
                   className="w-fit gap-2"
-                  disabled={exporting}
-                  onClick={async () => {
-                    setExporting(true);
-                    try {
-                      const { blob, filename } = await apiFetchFile("/logs/export");
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = filename;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                      toast.success(t("tiers.exportSuccess"));
-                    } catch (err) {
-                      toast.error(err instanceof Error ? err.message : t("tiers.exportFailed"));
-                    } finally {
-                      setExporting(false);
-                    }
-                  }}
+                  onClick={() => setExportModalOpen(true)}
                 >
                   <Download className="h-4 w-4" aria-hidden />
-                  {exporting ? t("common.saving") : t("tiers.exportLogs")}
+                  {t("tiers.exportLogs")}
                 </Button>
               ) : (
                 <Button
@@ -458,6 +554,31 @@ export function Settings() {
               )}
             </div>
           </Card>
+        )}
+
+        {me && (me.tier === "pro" || me.tier === "admin") && (
+          <>
+            {isMobile ? (
+              <Drawer open={exportModalOpen} onOpenChange={(open) => !open && setExportModalOpen(false)}>
+                <DrawerContent
+                  onClose={() => setExportModalOpen(false)}
+                  onReady={(requestClose) => {
+                    exportDrawerCloseRef.current = requestClose;
+                  }}
+                  mobileHeight="95%"
+                  className="flex flex-col gap-4 p-6"
+                >
+                  {exportModalContent(() => exportDrawerCloseRef.current?.() ?? setExportModalOpen(false))}
+                </DrawerContent>
+              </Drawer>
+            ) : (
+              <Dialog open={exportModalOpen} onOpenChange={(open) => !open && setExportModalOpen(false)}>
+                <DialogContent onClose={() => setExportModalOpen(false)} className="flex flex-col gap-4 px-6 py-6 sm:max-w-md">
+                  {exportModalContent(() => setExportModalOpen(false))}
+                </DialogContent>
+              </Dialog>
+            )}
+          </>
         )}
 
         <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">

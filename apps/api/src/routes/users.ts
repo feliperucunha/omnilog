@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { LOG_STATUS_OPTIONS } from "@dogument/shared";
 import { serializeLog } from "../lib/serializeLog.js";
+import { getMilestoneProgress } from "../services/milestone.service.js";
 
 /** Public (no auth) read-only profile and logs for sharing. */
 
@@ -82,6 +83,18 @@ usersRouter.get("/:identifier", async (req: Request<{ identifier: string }>, res
       medium: b.medium,
     })),
   });
+});
+
+/** GET /users/:identifier/milestones/progress - Public milestone progress (earned badges, next). No auth. Same shape as GET /me/milestones/progress. */
+usersRouter.get("/:identifier/milestones/progress", async (req: Request<{ identifier: string }>, res: Response) => {
+  const { identifier } = req.params;
+  const user = await getUserByIdentifier(identifier);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const data = await getMilestoneProgress(user.id);
+  res.json(data);
 });
 
 /** GET /users/:identifier/logs/stats?group=category|month|year - Public stats. No auth. */
@@ -194,13 +207,20 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
   }
   const mediaType = req.query.mediaType as MediaType | undefined;
   const status = req.query.status as string | undefined;
-  const sort = (req.query.sort as string) === "grade" ? "grade" : "date";
+  const sortParam = req.query.sort as string;
+  const validSorts = ["dateAsc", "dateDesc", "gradeAsc", "gradeDesc"] as const;
+  const boardgameSorts = ["matchesPlayedAsc", "matchesPlayedDesc"] as const;
+  const gameSorts = ["timeToBeatAsc", "timeToBeatDesc"] as const;
+  let sort = validSorts.includes(sortParam as (typeof validSorts)[number]) ? sortParam : "dateAsc";
+  if (mediaType === "boardgames" && boardgameSorts.includes(sortParam as (typeof boardgameSorts)[number])) sort = sortParam;
+  else if (mediaType === "games" && gameSorts.includes(sortParam as (typeof gameSorts)[number])) sort = sortParam;
+  const ownFilter = req.query.own === "true";
   const limitParam = req.query.limit != null ? parseInt(String(req.query.limit), 10) : NaN;
   const usePagination = Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= PAGINATION_LIMIT_MAX;
   const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
   const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
-  const where = { userId: user.id } as { userId: string; mediaType?: string; status?: string };
+  const where = { userId: user.id } as { userId: string; mediaType?: string; status?: string; own?: boolean };
   if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
   if (status != null && status !== "") {
     if (mediaType && MEDIA_TYPES.includes(mediaType)) {
@@ -210,11 +230,24 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
       where.status = status;
     }
   }
+  if (mediaType === "boardgames" && ownFilter) where.own = true;
 
   const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =
-    sort === "grade"
-      ? [{ grade: "desc" }, { updatedAt: "desc" }]
-      : { updatedAt: "desc" };
+    sort === "matchesPlayedDesc"
+      ? [{ matchesPlayed: "desc" }, { updatedAt: "desc" }]
+      : sort === "matchesPlayedAsc"
+        ? [{ matchesPlayed: "asc" }, { updatedAt: "desc" }]
+        : sort === "timeToBeatDesc"
+          ? [{ hoursToBeat: "desc" }, { updatedAt: "desc" }]
+          : sort === "timeToBeatAsc"
+            ? [{ hoursToBeat: "asc" }, { updatedAt: "desc" }]
+            : sort === "gradeDesc"
+              ? [{ grade: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }]
+              : sort === "gradeAsc"
+                ? [{ grade: { sort: "asc", nulls: "last" } }, { updatedAt: "asc" }]
+                : sort === "dateDesc"
+                  ? { updatedAt: "desc" }
+                  : { updatedAt: "asc" };
 
   if (usePagination && takeSize != null) {
     const take = takeSize + 1;

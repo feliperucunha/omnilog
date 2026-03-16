@@ -72,6 +72,7 @@ export function LogForm(props: LogFormProps) {
   const [episode, setEpisode] = useState<number | "">(isEdit ? (log!.episode ?? "") : "");
   const [chapter, setChapter] = useState<number | "">(isEdit ? (log!.chapter ?? "") : "");
   const [volume, setVolume] = useState<number | "">(isEdit ? (log!.volume ?? "") : "");
+  const [hoursToBeat, setHoursToBeat] = useState<number | "">(isEdit ? (log!.hoursToBeat ?? "") : "");
   const [own, setOwn] = useState(isEdit ? (log!.own ?? false) : false);
   const [matchesPlayed, setMatchesPlayed] = useState<number | "">(
     isEdit
@@ -96,6 +97,7 @@ export function LogForm(props: LogFormProps) {
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
   const showBoardGameFields = mediaType === "boardgames";
+  const showHoursToBeat = mediaType === "games";
 
   useEffect(() => {
     if (!isEdit || !log) return;
@@ -121,6 +123,7 @@ export function LogForm(props: LogFormProps) {
       setEpisode(log.episode ?? "");
       setChapter(log.chapter ?? "");
       setVolume(log.volume ?? "");
+      setHoursToBeat(log.hoursToBeat ?? "");
       setOwn(log.own ?? false);
       const defaultMatches = showBoardGameFields
         ? (log.status === "played" ? 1 : log.status === "plan to play" ? 0 : "")
@@ -154,6 +157,7 @@ export function LogForm(props: LogFormProps) {
           chapter: toNum(chapter),
           volume: toNum(volume),
         };
+        if (showHoursToBeat) payload.hoursToBeat = toNum(hoursToBeat);
         if (showBoardGameFields) {
           payload.own = own;
           payload.matchesPlayed = toNum(matchesPlayed);
@@ -168,6 +172,7 @@ export function LogForm(props: LogFormProps) {
           episodeForPayload === (props.log.episode ?? null) &&
           toNum(chapter) === (props.log.chapter ?? null) &&
           toNum(volume) === (props.log.volume ?? null) &&
+          (!showHoursToBeat || toNum(hoursToBeat) === (props.log.hoursToBeat ?? null)) &&
           (!showBoardGameFields ||
             (own === (props.log.own ?? false) && toNum(matchesPlayed) === (props.log.matchesPlayed ?? null)));
         if (noChange) {
@@ -210,6 +215,7 @@ export function LogForm(props: LogFormProps) {
               grade,
               review,
               status: status ?? null,
+              ...(showHoursToBeat && { hoursToBeat: toNum(hoursToBeat) }),
               ...(showBoardGameFields && { own, matchesPlayed: toNum(matchesPlayed) }),
             }),
           }
@@ -347,6 +353,28 @@ export function LogForm(props: LogFormProps) {
                     </div>
                   )}
                 </>
+              )}
+              {showHoursToBeat && (
+                <div className="space-y-2">
+                  <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.hoursToBeat")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    placeholder="—"
+                    value={hoursToBeat === "" ? "" : hoursToBeat}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const v = e.target.value;
+                      if (v === "") setHoursToBeat("");
+                      else {
+                        const n = parseFloat(v);
+                        if (Number.isFinite(n)) setHoursToBeat(n);
+                      }
+                    }}
+                    className="w-full max-w-[8rem]"
+                    aria-label={t("itemReviewForm.hoursToBeat")}
+                  />
+                </div>
               )}
               {showBoardGameFields && (
                 <>

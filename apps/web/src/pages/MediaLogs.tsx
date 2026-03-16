@@ -101,7 +101,10 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [statusCounts, setStatusCounts] = useState<{ total: number; byStatus: Record<string, number> } | null>(null);
-  const [sortBy, setSortBy] = useState<"date" | "grade">("date");
+  const [ownedFilter, setOwnedFilter] = useState<"" | "owned">("");
+  const [sortBy, setSortBy] = useState<
+    "dateAsc" | "dateDesc" | "gradeAsc" | "gradeDesc" | "matchesPlayedAsc" | "matchesPlayedDesc" | "timeToBeatAsc" | "timeToBeatDesc"
+  >("dateAsc");
   const [showCustomEntry, setShowCustomEntry] = useState(false);
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const [incrementingId, setIncrementingId] = useState<string | null>(null);
@@ -173,6 +176,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         limit: String(LOGS_PAGE_SIZE),
       });
       if (statusFilter) params.set("status", statusFilter);
+      if (mediaType === "boardgames" && ownedFilter === "owned") params.set("own", "true");
       if (!reset && nextCursor) params.set("cursor", nextCursor);
       const path = publicUserId
         ? `/users/${publicUserId}/logs?${params.toString()}`
@@ -199,7 +203,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           setLoadingMore(false);
         });
     },
-    [mediaType, statusFilter, sortBy, nextCursor, loadingMore, t, publicUserId]
+    [mediaType, statusFilter, ownedFilter, sortBy, nextCursor, loadingMore, t, publicUserId]
   );
 
   const fetchStatusCounts = useCallback(() => {
@@ -216,10 +220,18 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
 
   useEffect(() => {
     setCategorySearchQuery("");
+    if (mediaType !== "boardgames") {
+      setOwnedFilter("");
+      setSortBy((prev) => (prev === "matchesPlayedAsc" || prev === "matchesPlayedDesc" ? "dateAsc" : prev));
+    }
+    if (mediaType !== "games") {
+      setSortBy((prev) => (prev === "timeToBeatAsc" || prev === "timeToBeatDesc" ? "dateAsc" : prev));
+    }
   }, [mediaType]);
 
   useEffect(() => {
-    const useInitial = embedded && initialLogsProp !== undefined;
+    const defaultsMatch = sortBy === "dateAsc" && statusFilter === "" && ownedFilter === "";
+    const useInitial = embedded && initialLogsProp !== undefined && defaultsMatch;
     if (useInitial) {
       setLogs(initialLogsProp ?? []);
       setNextCursor(initialNextCursorProp ?? null);
@@ -232,7 +244,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       setLoading(true);
       fetchLogsRef.current(true);
     }
-  }, [mediaType, statusFilter, sortBy, publicUserId, embedded, initialLogsProp, initialNextCursorProp]);
+  }, [mediaType, statusFilter, ownedFilter, sortBy, publicUserId, embedded, initialLogsProp, initialNextCursorProp]);
 
   useEffect(() => {
     setStatusCounts(null);
@@ -542,9 +554,8 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         />
       )}
 
-      {!readOnly && (
       <div className="flex min-w-0 flex-col gap-3 overflow-hidden">
-        {embedded && (
+        {(embedded || readOnly) && (
           <div className="flex min-w-0 items-center gap-2">
             <Search className="h-4 w-4 shrink-0 text-[var(--color-light)]" aria-hidden />
             <Input
@@ -559,7 +570,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         )}
       <div className="flex min-w-0 flex-wrap items-center gap-3 overflow-hidden">
         {/* Mobile (< md): custom dropdowns, no labels */}
-        <div className="grid w-full grid-cols-2 gap-2 md:hidden">
+        <div className={cn("grid w-full gap-2 md:hidden", mediaType === "boardgames" ? "grid-cols-3" : "grid-cols-2")}>
           <Select
             value={statusFilter}
             onValueChange={setStatusFilter}
@@ -574,19 +585,36 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
             className="min-w-0 w-full"
             triggerClassName="w-full max-w-none min-w-0"
           />
+          {mediaType === "boardgames" && (
+            <Select
+              value={ownedFilter}
+              onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
+              options={[
+                { value: "", label: t("mediaLogs.filterAll") },
+                { value: "owned", label: t("mediaLogs.filterOwned") },
+              ]}
+              aria-label={t("itemReviewForm.own")}
+              className="min-w-0 w-full"
+              triggerClassName="w-full max-w-none min-w-0"
+            />
+          )}
           <Select
             value={sortBy}
-            onValueChange={(v) => setSortBy(v as "date" | "grade")}
+            onValueChange={(v) => setSortBy(v as typeof sortBy)}
             options={[
-              { value: "date", label: t("mediaLogs.sortByDate") },
-              { value: "grade", label: t("mediaLogs.sortByGrade") },
+              { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
+              { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
+              { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
+              { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
+              ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
+              ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
             ]}
             aria-label={t("mediaLogs.sortLabel")}
             className="min-w-0 w-full"
             triggerClassName="w-full max-w-none min-w-0"
           />
         </div>
-        {/* Desktop (md+): buttons with labels */}
+        {/* Desktop (md+): status buttons; sort = dropdown for games/boardgames, buttons for others */}
         <div className="hidden md:flex min-w-0 flex-wrap items-center gap-3">
         <span className="shrink-0 text-sm text-[var(--color-light)]">{t("itemReviewForm.status")}:</span>
         <div className="flex min-w-0 flex-wrap gap-2">
@@ -609,30 +637,36 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
               {statusCounts != null ? `${getStatusLabel(t, statusValue, mediaType)} (${statusCounts.byStatus[statusValue] ?? 0})` : getStatusLabel(t, statusValue, mediaType)}
             </Button>
           ))}
+          {mediaType === "boardgames" && (
+            <Button
+              type="button"
+              variant={ownedFilter === "owned" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setOwnedFilter((prev) => (prev === "owned" ? "" : "owned"))}
+            >
+              {t("mediaLogs.filterOwned")}
+            </Button>
+          )}
         </div>
         <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
-        <div className="flex min-w-0 flex-wrap gap-2">
-          <Button
-            type="button"
-            variant={sortBy === "date" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSortBy("date")}
-          >
-            {t("mediaLogs.sortByDate")}
-          </Button>
-          <Button
-            type="button"
-            variant={sortBy === "grade" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSortBy("grade")}
-          >
-            {t("mediaLogs.sortByGrade")}
-          </Button>
-        </div>
+        <Select
+          value={sortBy}
+          onValueChange={(v) => setSortBy(v as typeof sortBy)}
+          options={[
+            { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
+            { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
+            { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
+            { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
+            ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
+            ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
+          ]}
+          aria-label={t("mediaLogs.sortLabel")}
+          className="min-w-0 w-[11rem]"
+          triggerClassName="w-full min-w-0"
+        />
         </div>
       </div>
       </div>
-      )}
 
       {filteredLogs.length === 0 ? (
         <motion.div

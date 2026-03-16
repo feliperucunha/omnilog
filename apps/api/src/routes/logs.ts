@@ -136,13 +136,20 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const mediaType = req.query.mediaType as MediaType | undefined;
   const externalId = req.query.externalId as string | undefined;
   const status = req.query.status as string | undefined;
-  const sort = (req.query.sort as string) === "grade" ? "grade" : "date";
+  const sortParam = req.query.sort as string;
+  const validSorts = ["dateAsc", "dateDesc", "gradeAsc", "gradeDesc"] as const;
+  const boardgameSorts = ["matchesPlayedAsc", "matchesPlayedDesc"] as const;
+  const gameSorts = ["timeToBeatAsc", "timeToBeatDesc"] as const;
+  let sort = validSorts.includes(sortParam as (typeof validSorts)[number]) ? sortParam : "dateAsc";
+  if (mediaType === "boardgames" && boardgameSorts.includes(sortParam as (typeof boardgameSorts)[number])) sort = sortParam;
+  else if (mediaType === "games" && gameSorts.includes(sortParam as (typeof gameSorts)[number])) sort = sortParam;
+  const ownFilter = req.query.own === "true";
   const limitParam = req.query.limit != null ? parseInt(String(req.query.limit), 10) : NaN;
   const usePagination = Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= PAGINATION_LIMIT_MAX;
   const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
   const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
-  const where = { userId } as { userId: string; mediaType?: string; externalId?: string; status?: string };
+  const where = { userId } as { userId: string; mediaType?: string; externalId?: string; status?: string; own?: boolean };
   if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
   if (externalId) {
     const safe = sanitizeText(externalId, EXTERNAL_ID_MAX_LENGTH);
@@ -156,11 +163,24 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       where.status = status;
     }
   }
+  if (mediaType === "boardgames" && ownFilter) where.own = true;
 
   const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =
-    sort === "grade"
-      ? [{ grade: "desc" }, { updatedAt: "desc" }]
-      : { updatedAt: "desc" };
+    sort === "matchesPlayedDesc"
+      ? [{ matchesPlayed: "desc" }, { updatedAt: "desc" }]
+      : sort === "matchesPlayedAsc"
+        ? [{ matchesPlayed: "asc" }, { updatedAt: "desc" }]
+        : sort === "timeToBeatDesc"
+          ? [{ hoursToBeat: "desc" }, { updatedAt: "desc" }]
+          : sort === "timeToBeatAsc"
+            ? [{ hoursToBeat: "asc" }, { updatedAt: "desc" }]
+            : sort === "gradeDesc"
+              ? [{ grade: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }]
+              : sort === "gradeAsc"
+                ? [{ grade: { sort: "asc", nulls: "last" } }, { updatedAt: "asc" }]
+                : sort === "dateDesc"
+                  ? { updatedAt: "desc" }
+                  : { updatedAt: "asc" };
 
   if (usePagination && takeSize != null) {
     const take = takeSize + 1;
@@ -503,7 +523,50 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
   res.json({ year, month, dates });
 });
 
-/** GET /logs/export - Pro only; returns user logs as CSV. Optional ?mediaType= for single category. */
+/** Column keys for CSV export. When single category, only relevant columns; when all, include mediaType. */
+const EXPORT_COLUMNS_ALL: readonly string[] = [
+  "mediaType", "externalId", "title", "grade", "status", "season", "episode", "chapter", "volume",
+  "startedAt", "completedAt", "contentHours", "hoursToBeat", "own", "matchesPlayed", "review", "createdAt", "updatedAt",
+];
+const EXPORT_COLUMNS_BY_MEDIA: Record<MediaType, readonly string[]> = {
+  movies: ["externalId", "title", "grade", "status", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+  tv: ["externalId", "title", "grade", "status", "season", "episode", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+  anime: ["externalId", "title", "grade", "status", "season", "episode", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+  books: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+  manga: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+  comics: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+  games: ["externalId", "title", "grade", "status", "contentHours", "hoursToBeat", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+  boardgames: ["externalId", "title", "grade", "status", "own", "matchesPlayed", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+};
+
+function getExportValue(
+  log: { mediaType: string; externalId: string; title: string; grade: number | null; status: string | null; season: number | null; episode: number | null; chapter: number | null; volume: number | null; startedAt: Date | null; completedAt: Date | null; contentHours: number | null; hoursToBeat: number | null; own: boolean | null; matchesPlayed: number | null; review: string | null; createdAt: Date; updatedAt: Date },
+  key: string
+): string | number | null | undefined {
+  switch (key) {
+    case "mediaType": return log.mediaType;
+    case "externalId": return log.externalId;
+    case "title": return log.title;
+    case "grade": return log.grade;
+    case "status": return log.status;
+    case "season": return log.season;
+    case "episode": return log.episode;
+    case "chapter": return log.chapter;
+    case "volume": return log.volume;
+    case "startedAt": return log.startedAt?.toISOString() ?? null;
+    case "completedAt": return log.completedAt?.toISOString() ?? null;
+    case "contentHours": return log.contentHours;
+    case "hoursToBeat": return log.hoursToBeat;
+    case "own": return log.own == null ? null : log.own ? "true" : "false";
+    case "matchesPlayed": return log.matchesPlayed;
+    case "review": return log.review;
+    case "createdAt": return log.createdAt.toISOString();
+    case "updatedAt": return log.updatedAt.toISOString();
+    default: return undefined;
+  }
+}
+
+/** GET /logs/export - Pro only; returns user logs as CSV. Optional ?mediaType= for single category (then only relevant columns). */
 logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const user = await prisma.user.findUnique({
@@ -528,37 +591,20 @@ logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
     where,
     orderBy: { updatedAt: "desc" },
   });
-  const header =
-    "mediaType,externalId,title,grade,status,season,episode,chapter,volume,startedAt,completedAt,contentHours,hoursToBeat,review,createdAt,updatedAt\n";
+  const columns = mediaTypeFilter ? EXPORT_COLUMNS_BY_MEDIA[mediaTypeFilter] : EXPORT_COLUMNS_ALL;
+  const header = (columns as readonly string[]).join(",") + "\n";
   const escape = (v: string | number | null | undefined): string => {
     if (v == null) return "";
     const s = String(v);
     if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
-  const rows = logs.map(
-    (l) =>
-      [
-        escape(l.mediaType),
-        escape(l.externalId),
-        escape(l.title),
-        escape(l.grade),
-        escape(l.status),
-        escape(l.season),
-        escape(l.episode),
-        escape(l.chapter),
-        escape(l.volume),
-        escape(l.startedAt?.toISOString()),
-        escape(l.completedAt?.toISOString()),
-        escape(l.contentHours),
-        escape(l.hoursToBeat),
-        escape(l.review),
-        escape(l.createdAt?.toISOString()),
-        escape(l.updatedAt?.toISOString()),
-      ].join(",")
+  const rows = logs.map((l) =>
+    (columns as readonly string[]).map((key) => escape(getExportValue(l, key))).join(",")
   );
   const csv = header + rows.join("\n");
-  const filename = mediaTypeFilter ? `logs-${mediaTypeFilter}.csv` : "logs-export.csv";
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const filename = mediaTypeFilter ? `logs-${mediaTypeFilter}-${dateStr}.csv` : `logs-export-${dateStr}.csv`;
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.send(csv);

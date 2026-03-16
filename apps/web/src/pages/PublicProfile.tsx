@@ -11,7 +11,18 @@ import { useMe } from "@/contexts/MeContext";
 import { MEDIA_TYPES, type MediaType, toMediaType } from "@dogument/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { MediaLogs } from "@/pages/MediaLogs";
+import { LevelBadge } from "@/components/LevelBadge";
+import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
 import { toast } from "sonner";
+
+/** Per-medium milestone progress (same shape as API). */
+interface PublicMilestoneProgress {
+  perMedium: Array<{
+    mediaType: string;
+    reviews: { current: number; earned: Array<{ threshold: number; label: string; icon: string }> };
+    logs: { current: number; earned: Array<{ threshold: number; label: string; icon: string }> };
+  }>;
+}
 
 const RESERVED_PATHS = new Set([
   "login",
@@ -63,6 +74,7 @@ export function PublicProfile() {
   const [error, setError] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [publicMilestoneProgress, setPublicMilestoneProgress] = useState<PublicMilestoneProgress | null>(null);
   const isOwnProfile = !!me?.user?.id && !!profile?.id && me.user.id === profile.id;
 
   const visibleTypes = profile?.visibleMediaTypes ?? [];
@@ -107,6 +119,13 @@ export function PublicProfile() {
       .then((res) => setFollowing(res.following))
       .catch(() => {});
   }, [token, profile?.id, isOwnProfile]);
+
+  useEffect(() => {
+    if (!userId || !profile) return;
+    apiFetchPublic<PublicMilestoneProgress>(`/users/${userId}/milestones/progress`)
+      .then(setPublicMilestoneProgress)
+      .catch(() => setPublicMilestoneProgress(null));
+  }, [userId, profile?.id]);
 
   const handleFollowClick = useCallback(async () => {
     if (!profile?.id || followLoading) return;
@@ -219,6 +238,54 @@ export function PublicProfile() {
           </Button>
         </div>
       </div>
+
+      {publicMilestoneProgress && visibleTypes.length > 0 && (() => {
+        const hasAnyEarned = visibleTypes.some((type) => {
+          const pm = publicMilestoneProgress.perMedium.find((p) => p.mediaType === type);
+          return (pm?.reviews.earned.length ?? 0) > 0 || (pm?.logs.earned.length ?? 0) > 0;
+        });
+        if (!hasAnyEarned) return null;
+        return (
+          <section
+            aria-label={t("dashboard.badgesSectionTitle")}
+            className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
+          >
+            <h2 className="text-lg font-semibold text-[var(--color-lightest)]">
+              {t("dashboard.badgesSectionTitle")}
+            </h2>
+            <div className="flex min-w-0 flex-wrap gap-4">
+              {visibleTypes.map((type) => {
+                const pm = publicMilestoneProgress.perMedium.find((p) => p.mediaType === type);
+                const reviews = pm?.reviews ?? { current: 0, earned: [] };
+                const logs = pm?.logs ?? { current: 0, earned: [] };
+                const scope = reviews.earned.length > 0 ? reviews : logs;
+                const kind = scope === reviews ? "reviews" : "logs";
+                const categoryLabel = t(`nav.${type}`);
+                const displayName = profile?.username ?? profile?.id ?? "";
+                if (scope.earned.length === 0) return null;
+                const latest = scope.earned[scope.earned.length - 1]!;
+                const level = scope.earned.length;
+                return (
+                  <div key={type} className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="shrink-0 text-sm text-[var(--color-light)]">{categoryLabel}:</span>
+                    <LevelBadge
+                      icon={MEDIA_BADGE_ICONS[type as MediaType]}
+                      level={level}
+                      title={latest.label}
+                      popupDetail={{
+                        user: displayName,
+                        categoryLabel,
+                        count: scope === reviews ? reviews.current : logs.current,
+                        kind,
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
 
       {visibleTypes.length > 0 && (
         <section
