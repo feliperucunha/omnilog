@@ -61,11 +61,14 @@ export function CustomEntryForm({
   const [episode, setEpisode] = useState<number | "">("");
   const [chapter, setChapter] = useState<number | "">("");
   const [volume, setVolume] = useState<number | "">("");
+  const [own, setOwn] = useState(false);
+  const [matchesPlayed, setMatchesPlayed] = useState<number | "">("");
   const [loading, setLoading] = useState(false);
 
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
+  const showBoardGameFields = mediaType === "boardgames";
   const showMediaTypeSelector = initialMediaType == null;
 
   const toNum = (v: number | ""): number | null => (v === "" ? null : v);
@@ -101,6 +104,7 @@ export function CustomEntryForm({
           episode: showSeasonEpisode ? toNum(episode) : null,
           chapter: showChapterVolume ? toNum(chapter) : null,
           volume: showChapterVolume ? toNum(volume) : null,
+          ...(showBoardGameFields && { own, matchesPlayed: toNum(matchesPlayed) }),
         }),
       });
       if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
@@ -253,6 +257,43 @@ export function CustomEntryForm({
                     />
                   </div>
                 </div>
+              )}
+              {showBoardGameFields && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="custom-entry-own"
+                      checked={own}
+                      onChange={(e) => setOwn(e.target.checked)}
+                      className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                      aria-describedby="custom-entry-own-desc"
+                    />
+                    <Label htmlFor="custom-entry-own" id="custom-entry-own-desc" className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]">
+                      {t("itemReviewForm.own")}
+                    </Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.matchesPlayed")}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="0"
+                      value={matchesPlayed === "" ? "" : matchesPlayed}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "") setMatchesPlayed("");
+                        else {
+                          const n = parseInt(v, 10);
+                          if (Number.isInteger(n) && n >= 0) setMatchesPlayed(n);
+                        }
+                      }}
+                      className="w-full max-w-[8rem] bg-[var(--color-darkest)]"
+                      aria-label={t("itemReviewForm.matchesPlayed")}
+                    />
+                  </div>
+                </>
               )}
               <div>
                 <Label className="mb-1 block text-sm font-medium text-[var(--color-lightest)]">

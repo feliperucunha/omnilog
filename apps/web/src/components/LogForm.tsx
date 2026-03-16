@@ -5,6 +5,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -69,6 +70,8 @@ export function LogForm(props: LogFormProps) {
   const [episode, setEpisode] = useState<number | "">(isEdit ? (log!.episode ?? "") : "");
   const [chapter, setChapter] = useState<number | "">(isEdit ? (log!.chapter ?? "") : "");
   const [volume, setVolume] = useState<number | "">(isEdit ? (log!.volume ?? "") : "");
+  const [own, setOwn] = useState(isEdit ? (log!.own ?? false) : false);
+  const [matchesPlayed, setMatchesPlayed] = useState<number | "">(isEdit ? (log!.matchesPlayed ?? "") : "");
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -85,6 +88,7 @@ export function LogForm(props: LogFormProps) {
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
+  const showBoardGameFields = mediaType === "boardgames";
 
   useEffect(() => {
     if (!isEdit || !log) return;
@@ -110,6 +114,8 @@ export function LogForm(props: LogFormProps) {
       setEpisode(log.episode ?? "");
       setChapter(log.chapter ?? "");
       setVolume(log.volume ?? "");
+      setOwn(log.own ?? false);
+      setMatchesPlayed(log.matchesPlayed ?? "");
     }
   }, [isEdit, log?.id]);
 
@@ -129,7 +135,7 @@ export function LogForm(props: LogFormProps) {
           isCompleted && showSeasonEpisode && episodesCount != null && episodesCount > 0
             ? episodesCount
             : toNum(episode);
-        const payload = {
+        const payload: Record<string, unknown> = {
           grade,
           review: review.trim() || null,
           status: status || null,
@@ -138,6 +144,10 @@ export function LogForm(props: LogFormProps) {
           chapter: toNum(chapter),
           volume: toNum(volume),
         };
+        if (showBoardGameFields) {
+          payload.own = own;
+          payload.matchesPlayed = toNum(matchesPlayed);
+        }
         const currentStatus = props.log.status ?? props.log.listType ?? null;
         const statusChanged = (status ?? null) !== currentStatus;
         const noChange =
@@ -147,7 +157,9 @@ export function LogForm(props: LogFormProps) {
           toNum(season) === (props.log.season ?? null) &&
           episodeForPayload === (props.log.episode ?? null) &&
           toNum(chapter) === (props.log.chapter ?? null) &&
-          toNum(volume) === (props.log.volume ?? null);
+          toNum(volume) === (props.log.volume ?? null) &&
+          (!showBoardGameFields ||
+            (own === (props.log.own ?? false) && toNum(matchesPlayed) === (props.log.matchesPlayed ?? null)));
         if (noChange) {
           setLoading(false);
           props.onCancel();
@@ -169,6 +181,7 @@ export function LogForm(props: LogFormProps) {
             mediaType: props.log.mediaType as MediaType,
             id: props.log.externalId,
             review: review.trim() || null,
+            ...(showBoardGameFields && { own, matchesPlayed: toNum(matchesPlayed) }),
           };
           props.onSaved(completion);
         } else {
@@ -187,6 +200,7 @@ export function LogForm(props: LogFormProps) {
               grade,
               review,
               status: status ?? null,
+              ...(showBoardGameFields && { own, matchesPlayed: toNum(matchesPlayed) }),
             }),
           }
         );
@@ -318,6 +332,43 @@ export function LogForm(props: LogFormProps) {
                       </div>
                     </div>
                   )}
+                </>
+              )}
+              {showBoardGameFields && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="log-form-own"
+                      checked={own}
+                      onChange={(e) => setOwn(e.target.checked)}
+                      className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                      aria-describedby="log-form-own-desc"
+                    />
+                    <Label htmlFor="log-form-own" id="log-form-own-desc" className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]">
+                      {t("itemReviewForm.own")}
+                    </Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.matchesPlayed")}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="0"
+                      value={matchesPlayed === "" ? "" : matchesPlayed}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        const v = e.target.value;
+                        if (v === "") setMatchesPlayed("");
+                        else {
+                          const n = parseInt(v, 10);
+                          if (Number.isInteger(n) && n >= 0) setMatchesPlayed(n);
+                        }
+                      }}
+                      className="w-full max-w-[8rem]"
+                      aria-label={t("itemReviewForm.matchesPlayed")}
+                    />
+                  </div>
                 </>
               )}
               <div>

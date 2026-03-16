@@ -578,6 +578,16 @@ export function Dashboard() {
                               <span className="whitespace-nowrap">{t("dashboard.finishedIn", { duration })}</span>
                             ) : null;
                           })()}
+                          {log.mediaType === "boardgames" && (log.own === true || (log.matchesPlayed != null && log.matchesPlayed > 0)) && (
+                            <>
+                              {log.own === true && (
+                                <span className="whitespace-nowrap">{t("itemReviewForm.own")}</span>
+                              )}
+                              {log.matchesPlayed != null && log.matchesPlayed > 0 && (
+                                <span className="whitespace-nowrap">{t("itemReviewForm.matchesPlayed")}: {log.matchesPlayed}</span>
+                              )}
+                            </>
+                          )}
                         </div>
                         <Link
                           to={`/${feedUser.username ?? feedUser.id}`}

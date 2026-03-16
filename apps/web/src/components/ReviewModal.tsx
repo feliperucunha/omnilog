@@ -72,6 +72,16 @@ export function ReviewModal({ open, onClose, log, user }: ReviewModalProps) {
               </Link>
             </p>
           )}
+          {log.mediaType === "boardgames" && (log.own != null || (log.matchesPlayed != null && log.matchesPlayed > 0)) && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--color-light)]">
+              {log.own != null && (
+                <span>{t("itemReviewForm.own")}: {log.own ? t("common.yes") : t("common.no")}</span>
+              )}
+              {log.matchesPlayed != null && log.matchesPlayed > 0 && (
+                <span>{t("itemReviewForm.matchesPlayed")}: {log.matchesPlayed}</span>
+              )}
+            </div>
+          )}
           <div className="min-w-0">
             <p className="whitespace-pre-wrap text-sm text-[var(--color-light)]">
               {log.review ?? ""}

@@ -185,6 +185,8 @@ model Log {
   chapter      Int?     // anime, manga, comics
   volume       Int?     // anime, manga, comics
   boardGameSource String?  // "bgg" | "ludopedia" when mediaType = boardgames; which API this externalId came from
+  own            Boolean? // boardgames only: user owns a physical/digital copy
+  matchesPlayed  Int?     // boardgames only: number of matches/sessions played
   genres         String?  // JSON array of genre names (for stats and badges)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

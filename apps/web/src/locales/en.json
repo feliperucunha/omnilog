@@ -181,7 +181,9 @@
     "placeholderPasswordRegister": "At least 8 characters, letters and numbers",
     "placeholderUsername": "Letters, numbers, underscore, hyphen",
     "close": "Close",
-    "inProgress": "In progress"
+    "inProgress": "In progress",
+    "yes": "Yes",
+    "no": "No"
   },
   "apiKeyBanner": {
     "categoryMessage": "{{category}} key missing",
@@ -384,6 +386,8 @@
     "chapter": "Chapter",
     "volume": "Volume",
     "hoursToBeat": "Hours to beat",
+    "own": "Own",
+    "matchesPlayed": "Matches played",
     "grade": "Grade (0–10)",
     "rating": "Rating",
     "reviewPlaceholder": "Your thoughts...",

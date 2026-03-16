@@ -716,6 +716,16 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                             </span>
                           ) : null;
                         })()}
+                        {mediaType === "boardgames" && (log.own === true || (log.matchesPlayed != null && log.matchesPlayed > 0)) && (
+                          <>
+                            {log.own === true && (
+                              <span className="text-[10px] sm:text-xs text-[var(--color-light)]">{t("itemReviewForm.own")}</span>
+                            )}
+                            {log.matchesPlayed != null && log.matchesPlayed > 0 && (
+                              <span className="text-[10px] sm:text-xs text-[var(--color-light)]">{t("itemReviewForm.matchesPlayed")}: {log.matchesPlayed}</span>
+                            )}
+                          </>
+                        )}
                       </div>
                       {hasProgressButton && (() => {
                         const p = getProgress(log);

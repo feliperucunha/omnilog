@@ -180,7 +180,9 @@
     "placeholderPasswordRegister": "Mínimo 8 caracteres, letras e números",
     "placeholderUsername": "Letras, números, underscore, hífen",
     "close": "Fechar",
-    "inProgress": "Em progresso"
+    "inProgress": "Em progresso",
+    "yes": "Sim",
+    "no": "Não"
   },
   "apiKeyBanner": {
     "categoryMessage": "Chave de {{category}} ausente",
@@ -383,6 +385,8 @@
     "chapter": "Capítulo",
     "volume": "Volume",
     "hoursToBeat": "Horas para zerar",
+    "own": "Tenho",
+    "matchesPlayed": "Partidas jogadas",
     "grade": "Nota (0–10)",
     "rating": "Avaliação",
     "reviewPlaceholder": "Seus pensamentos...",

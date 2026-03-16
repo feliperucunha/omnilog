@@ -45,6 +45,8 @@ const createLogSchema = z.object({
   hoursToBeat: optionalFloat,
   genres: genresSchema,
   boardGameSource: z.enum(["bgg", "ludopedia"]).nullable().optional(),
+  own: z.boolean().nullable().optional(),
+  matchesPlayed: z.number().int().min(0).nullable().optional(),
 });
 
 const updateLogSchema = z.object({
@@ -60,6 +62,8 @@ const updateLogSchema = z.object({
   contentHours: optionalFloat,
   hoursToBeat: optionalFloat,
   genres: genresSchema,
+  own: z.boolean().nullable().optional(),
+  matchesPlayed: z.number().int().min(0).nullable().optional(),
 });
 
 function validateStatus(mediaType: MediaType, status: string | null | undefined): boolean {
@@ -578,6 +582,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     hoursToBeat,
     genres: genresInput,
     boardGameSource: bodyBoardGameSource,
+    own: bodyOwn,
+    matchesPlayed: bodyMatchesPlayed,
   } = parsed.data;
   const genresJson =
     genresInput && genresInput.length > 0
@@ -654,6 +660,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         chapter: number | null;
         volume: number | null;
         genres?: string | null;
+        own?: boolean | null;
+        matchesPlayed?: number | null;
       } = {
         title: sanitizedTitle,
         grade: grade ?? null,
@@ -669,6 +677,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       };
       if (image !== undefined) updateData.image = sanitizedImage ?? null;
       if (genresJson !== undefined) updateData.genres = genresJson;
+      if (bodyOwn !== undefined) updateData.own = bodyOwn ?? null;
+      if (bodyMatchesPlayed !== undefined) updateData.matchesPlayed = bodyMatchesPlayed ?? null;
       if (isInProgress(status) && existing.startedAt == null) updateData.startedAt = now;
       if (isCompleted(status)) updateData.completedAt = now;
       log = await prisma.log.update({
@@ -732,6 +742,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           volume: volume ?? null,
           genres: genresJson,
           boardGameSource,
+          own: mediaType === "boardgames" ? (bodyOwn ?? null) : null,
+          matchesPlayed: mediaType === "boardgames" ? (bodyMatchesPlayed ?? null) : null,
         },
       });
       const newBadges: Array<{ id: string; name: string; icon: string }> = [];
@@ -793,6 +805,8 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     chapter?: number | null;
     volume?: number | null;
     genres?: string | null;
+    own?: boolean | null;
+    matchesPlayed?: number | null;
   } = {};
   if (parsed.data.image !== undefined) data.image = sanitizeUrl(parsed.data.image) ?? null;
   if (parsed.data.grade !== undefined) data.grade = parsed.data.grade;
@@ -813,6 +827,8 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
   if (parsed.data.genres !== undefined) {
     data.genres = parsed.data.genres && parsed.data.genres.length > 0 ? JSON.stringify(parsed.data.genres.slice(0, 20)) : null;
   }
+  if (parsed.data.own !== undefined) data.own = parsed.data.own ?? null;
+  if (parsed.data.matchesPlayed !== undefined) data.matchesPlayed = parsed.data.matchesPlayed ?? null;
   if (isInProgress(parsed.data.status)) data.grade = null;
   const updated = await prisma.log.update({
     where: { id: log.id },

@@ -28,7 +28,8 @@ interface LogCompleteModalProps {
 
 export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const { t } = useLocale();
-  const { image, title, grade, status, review } = state;
+  const { image, title, grade, status, review, own, matchesPlayed, mediaType } = state;
+  const showBoardGameMeta = mediaType === "boardgames";
   const stars = grade != null ? gradeToStars(grade) : 0;
   const statusLabel = status ? getStatusLabel(t, status, state.mediaType) : t("logComplete.logged");
   const heroImageUrl = getHeroImageUrl(image) ?? image;
@@ -120,6 +121,16 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
           {grade != null && (
             <div className="mb-2 flex items-center gap-1 md:mb-3">
               <StarRating value={stars} readOnly size="lg" />
+            </div>
+          )}
+          {showBoardGameMeta && (own != null || (matchesPlayed != null && matchesPlayed > 0)) && (
+            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-light)] md:mb-3">
+              {own != null && (
+                <span>{t("itemReviewForm.own")}: {own ? t("common.yes") : t("common.no")}</span>
+              )}
+              {matchesPlayed != null && matchesPlayed > 0 && (
+                <span>{t("itemReviewForm.matchesPlayed")}: {matchesPlayed}</span>
+              )}
             </div>
           )}
           {review != null && review.trim() !== "" && (

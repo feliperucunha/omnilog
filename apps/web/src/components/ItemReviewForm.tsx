@@ -31,6 +31,10 @@ export interface LogCompleteState {
   id?: string;
   /** User's review/comment when available (for complete modal). */
   review?: string | null;
+  /** Boardgames only: user owns a copy. */
+  own?: boolean | null;
+  /** Boardgames only: number of matches/sessions played. */
+  matchesPlayed?: number | null;
 }
 
 interface ItemReviewFormProps {
@@ -71,6 +75,8 @@ export function ItemReviewForm({
   const [chapter, setChapter] = useState<number | "">("");
   const [volume, setVolume] = useState<number | "">("");
   const [hoursToBeat, setHoursToBeat] = useState<number | "">("");
+  const [own, setOwn] = useState(false);
+  const [matchesPlayed, setMatchesPlayed] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
 
   type ProgressOptions = {
@@ -87,6 +93,7 @@ export function ItemReviewForm({
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
   const showHoursToBeat = mediaType === "games";
+  const showBoardGameFields = mediaType === "boardgames";
 
   useEffect(() => {
     if (!showSeasonEpisode && !showChapterVolume) return;
@@ -118,6 +125,8 @@ export function ItemReviewForm({
           setChapter(log.chapter ?? "");
           setVolume(log.volume ?? "");
           setHoursToBeat(log.hoursToBeat != null ? log.hoursToBeat : "");
+          setOwn(log.own ?? false);
+          setMatchesPlayed(log.matchesPlayed != null ? log.matchesPlayed : "");
         } else {
           setStars(null);
           setReview("");
@@ -127,6 +136,8 @@ export function ItemReviewForm({
           setChapter("");
           setVolume("");
           setHoursToBeat("");
+          setOwn(false);
+          setMatchesPlayed("");
         }
       })
       .catch(() => {
@@ -166,6 +177,10 @@ export function ItemReviewForm({
         contentHours,
       };
       if (showHoursToBeat) payload.hoursToBeat = toNum(hoursToBeat);
+      if (showBoardGameFields) {
+        payload.own = own;
+        payload.matchesPlayed = toNum(matchesPlayed);
+      }
       if (genreList.length > 0) payload.genres = genreList;
       if (myLog) {
         const currentStatus = myLog.status ?? myLog.listType ?? null;
@@ -178,7 +193,9 @@ export function ItemReviewForm({
           episodeForPayload === (myLog.episode ?? null) &&
           toNum(chapter) === (myLog.chapter ?? null) &&
           toNum(volume) === (myLog.volume ?? null) &&
-          (!showHoursToBeat || toNum(hoursToBeat) === (myLog.hoursToBeat ?? null));
+          (!showHoursToBeat || toNum(hoursToBeat) === (myLog.hoursToBeat ?? null)) &&
+          (!showBoardGameFields ||
+            (own === (myLog.own ?? false) && toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)));
         if (noChange) {
           setSaving(false);
           return;
@@ -201,6 +218,7 @@ export function ItemReviewForm({
             mediaType,
             id: externalId,
             review: review.trim() || null,
+            ...(showBoardGameFields && { own, matchesPlayed: toNum(matchesPlayed) }),
           });
         }
       } else {
@@ -230,6 +248,7 @@ export function ItemReviewForm({
           mediaType,
           id: externalId,
           review: review.trim() || null,
+          ...(showBoardGameFields && { own, matchesPlayed: toNum(matchesPlayed) }),
         });
       }
     } catch (err) {
@@ -378,6 +397,46 @@ export function ItemReviewForm({
                   aria-label={t("itemReviewForm.hoursToBeat")}
                 />
               </div>
+            )}
+
+            {showBoardGameFields && (
+              <>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="item-review-own"
+                    checked={own}
+                    onChange={(e) => setOwn(e.target.checked)}
+                    className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                    aria-describedby="item-review-own-desc"
+                  />
+                  <Label htmlFor="item-review-own" id="item-review-own-desc" className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]">
+                    {t("itemReviewForm.own")}
+                  </Label>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm text-[var(--color-lightest)]">
+                    {t("itemReviewForm.matchesPlayed")}
+                  </Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="0"
+                    value={matchesPlayed === "" ? "" : matchesPlayed}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "") setMatchesPlayed("");
+                      else {
+                        const n = parseInt(v, 10);
+                        if (Number.isInteger(n) && n >= 0) setMatchesPlayed(n);
+                      }
+                    }}
+                    className="w-full max-w-[8rem]"
+                    aria-label={t("itemReviewForm.matchesPlayed")}
+                  />
+                </div>
+              </>
             )}
 
             <div>
