@@ -2,27 +2,46 @@ PODS:
   - Capacitor (7.6.0):
     - CapacitorCordova
   - CapacitorCordova (7.6.0)
+  - CapacitorFilesystem (7.1.8):
+    - Capacitor
+    - IONFilesystemLib (~> 1.1.1)
+  - CapacitorShare (7.0.4):
+    - Capacitor
   - CapacitorSplashScreen (7.0.5):
     - Capacitor
+  - IONFilesystemLib (1.1.2)
 
 DEPENDENCIES:
   - "Capacitor (from `../../../../node_modules/.pnpm/@capacitor+ios@7.6.0_@capacitor+core@7.6.0/node_modules/@capacitor/ios`)"
   - "CapacitorCordova (from `../../../../node_modules/.pnpm/@capacitor+ios@7.6.0_@capacitor+core@7.6.0/node_modules/@capacitor/ios`)"
+  - "CapacitorFilesystem (from `../../../../node_modules/.pnpm/@capacitor+filesystem@7.1.8_@capacitor+core@7.6.0/node_modules/@capacitor/filesystem`)"
+  - "CapacitorShare (from `../../../../node_modules/.pnpm/@capacitor+share@7.0.4_@capacitor+core@7.6.0/node_modules/@capacitor/share`)"
   - "CapacitorSplashScreen (from `../../../../node_modules/.pnpm/@capacitor+splash-screen@7.0.5_@capacitor+core@7.6.0/node_modules/@capacitor/splash-screen`)"
+
+SPEC REPOS:
+  trunk:
+    - IONFilesystemLib
 
 EXTERNAL SOURCES:
   Capacitor:
     :path: "../../../../node_modules/.pnpm/@capacitor+ios@7.6.0_@capacitor+core@7.6.0/node_modules/@capacitor/ios"
   CapacitorCordova:
     :path: "../../../../node_modules/.pnpm/@capacitor+ios@7.6.0_@capacitor+core@7.6.0/node_modules/@capacitor/ios"
+  CapacitorFilesystem:
+    :path: "../../../../node_modules/.pnpm/@capacitor+filesystem@7.1.8_@capacitor+core@7.6.0/node_modules/@capacitor/filesystem"
+  CapacitorShare:
+    :path: "../../../../node_modules/.pnpm/@capacitor+share@7.0.4_@capacitor+core@7.6.0/node_modules/@capacitor/share"
   CapacitorSplashScreen:
     :path: "../../../../node_modules/.pnpm/@capacitor+splash-screen@7.0.5_@capacitor+core@7.6.0/node_modules/@capacitor/splash-screen"
 
 SPEC CHECKSUMS:
   Capacitor: 6e644e9e3369368ac601c77a0fad57f34b78aaa6
   CapacitorCordova: f163aa2e84b79efc54d6a75b305bc7e05fb80c5d
+  CapacitorFilesystem: c63fc54df41e5a6761785a7f3c49dc696c22e296
+  CapacitorShare: 25f7fc5dd0e4edbde5d6801c6de5d14a8b450a41
   CapacitorSplashScreen: 409eeaaeac603d264f209c0fcb718aa22fe1f7bb
+  IONFilesystemLib: 21a63377696b2d8fab5632ecfb7d2ac67bddb68a
 
-PODFILE CHECKSUM: 414da30b7570835740dbecc57994f9d658607a61
+PODFILE CHECKSUM: 303f0d8ab2f56a5c6ae9611ed5411af0eae62fae
 
 COCOAPODS: 1.16.2

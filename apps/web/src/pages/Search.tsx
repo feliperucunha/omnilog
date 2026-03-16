@@ -96,7 +96,10 @@ export function Search() {
   const defaultType = (effectiveVisibleTypes[0] ?? "movies") as MediaType;
   const [searchFilter, setSearchFilter] = useState<SearchFilter>(stateMediaType ?? defaultType);
   const mediaType = searchFilter === USERS_SEARCH_TYPE ? defaultType : searchFilter;
-  const [sortBy, setSortBy] = useState<string>("relevance");
+  const initialSortMediaType = (stateMediaType ?? defaultType) as MediaType;
+  const [sortBy, setSortBy] = useState<string>(
+    () => SEARCH_SORT_OPTIONS[initialSortMediaType][0].value
+  );
   const [loadingFollowId, setLoadingFollowId] = useState<string | null>(null);
   const [query, setQuery] = useState(stateQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -158,6 +161,13 @@ export function Search() {
     if (stateMediaType) setSearchFilter(stateMediaType);
   }, [stateMediaType]);
 
+  // When there's no nav state, keep the selected category in sync with the first option from settings order (e.g. after me/visibleTypes loads).
+  useEffect(() => {
+    if (stateMediaType != null) return;
+    const first = (effectiveVisibleTypes[0] ?? "movies") as SearchFilter;
+    setSearchFilter(first);
+  }, [stateMediaType, effectiveVisibleTypes[0]]);
+
   useEffect(() => {
     if (
       searchFilter !== USERS_SEARCH_TYPE &&
@@ -168,8 +178,10 @@ export function Search() {
   }, [effectiveVisibleTypes, searchFilter]);
 
   useEffect(() => {
-    setSortBy("relevance");
-  }, [mediaType]);
+    if (searchFilter !== USERS_SEARCH_TYPE) {
+      setSortBy(SEARCH_SORT_OPTIONS[searchFilter][0].value);
+    }
+  }, [searchFilter]);
 
   useEffect(() => {
     if (stateQuery) setQuery(stateQuery);

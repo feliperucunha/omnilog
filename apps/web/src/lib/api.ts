@@ -340,6 +340,44 @@ export async function apiFetchFile(
 }
 
 /**
+ * Trigger a file download.
+ * - Web: same as before — object URL + programmatic anchor click (file downloads to the user's machine).
+ * - Native (Android/iOS): write to app cache and open the share sheet so the user can save the file.
+ */
+export async function downloadFile(blob: Blob, filename: string): Promise<void> {
+  const w = typeof window !== "undefined" ? (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }) : null;
+  const isNative = Boolean(w?.Capacitor?.isNativePlatform?.());
+
+  // Web: original behavior — no Capacitor or isNativePlatform() is false in the browser
+  if (!isNative) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
+
+  // Native only: Filesystem + Share (Capacitor plugins are dynamically imported so they are not loaded on web)
+  const { Filesystem, Directory, Encoding } = await import("@capacitor/filesystem");
+  const { Share } = await import("@capacitor/share");
+  const text = await blob.text();
+  const path = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  await Filesystem.writeFile({
+    path,
+    data: text,
+    directory: Directory.Cache,
+    encoding: Encoding.UTF8,
+  });
+  const { uri } = await Filesystem.getUri({ directory: Directory.Cache, path });
+  await Share.share({
+    url: uri,
+    dialogTitle: filename,
+  });
+}
+
+/**
  * Fetch from API with client cache for GET requests. Use for reads that benefit from caching.
  * Pass ttlMs to control how long the response is cached (default 2 minutes).
  * Mutations should call invalidateLogsAndItemsCache() so subsequent cached reads are fresh.

@@ -14,6 +14,12 @@ importers:
 
   apps/android:
     dependencies:
+      '@capacitor/filesystem':
+        specifier: ^7.0.0
+        version: 7.1.8(@capacitor/core@7.6.0)
+      '@capacitor/share':
+        specifier: ^7.0.0
+        version: 7.0.4(@capacitor/core@7.6.0)
       '@dogument/web':
         specifier: workspace:*
         version: link:../web
@@ -112,7 +118,13 @@ importers:
       '@capacitor/core':
         specifier: ^7.0.0
         version: 7.6.0
+      '@capacitor/filesystem':
+        specifier: ^7.0.0
+        version: 7.1.8(@capacitor/core@7.6.0)
       '@capacitor/preferences':
+        specifier: ^7.0.0
+        version: 7.0.4(@capacitor/core@7.6.0)
+      '@capacitor/share':
         specifier: ^7.0.0
         version: 7.0.4(@capacitor/core@7.6.0)
       '@capacitor/splash-screen':
@@ -318,6 +330,11 @@ packages:
   '@capacitor/core@7.6.0':
     resolution: {integrity: sha512-K6LEvgxW6Nd6uNWHj3U512hUtB4kln71TvVgdvwJRFMLySpUrWwb/A8Q7c3QGogvPvgOjN1U65onkyRTihPGwA==}
 
+  '@capacitor/filesystem@7.1.8':
+    resolution: {integrity: sha512-Qpw/2SE4/CzqAUvGgSM9hw/uXQ5qoOaF4wxbToXwpAaKPS+tzletS1h5ti3jjLmGcqizTs2sEXMtcsARW/Ceew==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
+
   '@capacitor/ios@7.6.0':
     resolution: {integrity: sha512-oL9t2tw3mbAPjwtON2tFeiR81uUlvZqWyVXlsr+b34I6K3xtGM6C8KGur5rJm1wndAuNKvtG/y7RrVKzns5X2A==}
     peerDependencies:
@@ -328,10 +345,18 @@ packages:
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
 
+  '@capacitor/share@7.0.4':
+    resolution: {integrity: sha512-wNXxmXUcChrtbZ5jQv8scFIbIGKo3rk6B7qpWySxfUhYJP5NANgAqQ9Z69m0k/zYsucdh66SBU7XW1ykd9aUug==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
+
   '@capacitor/splash-screen@7.0.5':
     resolution: {integrity: sha512-bPG2SamFL7VT5I3XsgsGgJhkiyxq3OXCOVKEDupSieVdtEiG7j2vLbSD0xL+91zteF/qLuxsjbugGy5LD8mS2A==}
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
+
+  '@capacitor/synapse@1.0.4':
+    resolution: {integrity: sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw==}
 
   '@esbuild/aix-ppc64@0.21.5':
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
@@ -2950,6 +2975,11 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
+  '@capacitor/filesystem@7.1.8(@capacitor/core@7.6.0)':
+    dependencies:
+      '@capacitor/core': 7.6.0
+      '@capacitor/synapse': 1.0.4
+
   '@capacitor/ios@7.6.0(@capacitor/core@7.6.0)':
     dependencies:
       '@capacitor/core': 7.6.0
@@ -2958,9 +2988,15 @@ snapshots:
     dependencies:
       '@capacitor/core': 7.6.0
 
+  '@capacitor/share@7.0.4(@capacitor/core@7.6.0)':
+    dependencies:
+      '@capacitor/core': 7.6.0
+
   '@capacitor/splash-screen@7.0.5(@capacitor/core@7.6.0)':
     dependencies:
       '@capacitor/core': 7.6.0
+
+  '@capacitor/synapse@1.0.4': {}
 
   '@esbuild/aix-ppc64@0.21.5':
     optional: true

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { ImageOff } from "lucide-react";
 
 interface ItemImageProps {
@@ -17,8 +18,9 @@ interface ItemImageProps {
 }
 
 /**
- * Renders an item image or a consistent placeholder (icon) when no image.
+ * Renders an item image or a consistent placeholder (icon) when no image or on load error.
  * Use on search results, logs, dashboard, item page, log complete, and forms.
+ * On Android WebView, failed image loads show the placeholder instead of a black area.
  */
 export function ItemImage({
   src,
@@ -29,7 +31,11 @@ export function ItemImage({
   loading,
   referrerPolicy,
 }: ItemImageProps) {
-  const hasImage = src != null && String(src).trim() !== "";
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    setError(false);
+  }, [src]);
+  const hasImage = !error && src != null && String(src).trim() !== "";
   const rootClass = [
     "flex-shrink-0 overflow-hidden bg-[var(--color-darkest)]",
     fitContent && "w-fit min-h-[2rem] min-w-[2rem]",
@@ -49,6 +55,7 @@ export function ItemImage({
           className={`${imgSizeClass} ${imgClassName}`.trim()}
           loading={loading}
           referrerPolicy={referrerPolicy}
+          onError={() => setError(true)}
         />
       ) : (
         <div

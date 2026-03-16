@@ -2,9 +2,6 @@
   "name": "@dogument/android",
   "version": "0.0.0",
   "private": true,
-  "dependencies": {
-    "@dogument/web": "workspace:*"
-  },
   "scripts": {
     "sync": "cap sync",
     "sync:android": "cap sync android",
@@ -20,6 +17,11 @@
     "@capacitor/android": "^7.0.0",
     "@capacitor/ios": "^7.0.0",
     "@capacitor/splash-screen": "^7.0.0"
+  },
+  "dependencies": {
+    "@dogument/web": "workspace:*",
+    "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/share": "^7.0.0"
   },
   "capacitor": {
     "platforms": ["android", "ios"]

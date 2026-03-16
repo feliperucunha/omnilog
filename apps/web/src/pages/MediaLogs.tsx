@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react";
 import type { MediaType, Log } from "@dogument/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@dogument/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, apiFetchFile, LOGS_INVALIDATED_EVENT } from "@/lib/api";
+import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, apiFetchFile, downloadFile, LOGS_INVALIDATED_EVENT } from "@/lib/api";
 import { showAchievementToasts } from "@/lib/achievementToast";
 import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
@@ -351,12 +351,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
     setExportingCategory(true);
     try {
       const { blob, filename } = await apiFetchFile(`/logs/export?mediaType=${encodeURIComponent(mediaType)}`);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadFile(blob, filename);
       toast.success(t("mediaLogs.exportCategorySuccess"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("tiers.exportFailed"));

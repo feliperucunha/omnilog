@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronDown, ChevronRight, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { apiFetch, apiFetchCached, apiFetchFile } from "@/lib/api";
+import { apiFetch, apiFetchCached, apiFetchFile, downloadFile } from "@/lib/api";
 import { StatisticsSkeleton } from "@/components/skeletons";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
@@ -182,15 +182,7 @@ export function Statistics() {
     }
     setExporting(true);
     apiFetchFile("/logs/export")
-      .then(({ blob, filename }) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success(t("tiers.exportSuccess"));
-      })
+      .then(({ blob, filename }) => downloadFile(blob, filename).then(() => toast.success(t("tiers.exportSuccess"))))
       .catch((err) => toast.error(err instanceof Error ? err.message : t("tiers.exportFailed")))
       .finally(() => setExporting(false));
   }, [isPro, t]);

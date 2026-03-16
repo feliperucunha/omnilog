@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SettingsSkeleton } from "@/components/skeletons";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import { apiFetch, invalidateApiCache, apiFetchFile } from "@/lib/api";
+import { apiFetch, invalidateApiCache, apiFetchFile, downloadFile } from "@/lib/api";
 import { toast } from "sonner";
 import { API_KEY_META, type ApiKeyProvider } from "@/lib/apiKeyMeta";
 import { useLocale, LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
@@ -236,12 +236,7 @@ export function Settings() {
         for (let i = 0; i < selected.length; i++) {
           const mt = selected[i];
           const { blob, filename } = await apiFetchFile(`/logs/export?mediaType=${encodeURIComponent(mt)}`);
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = filename;
-          a.click();
-          URL.revokeObjectURL(url);
+          await downloadFile(blob, filename);
           if (i < selected.length - 1) await new Promise((r) => setTimeout(r, 300));
         }
         toast.success(t("tiers.exportSuccess"));

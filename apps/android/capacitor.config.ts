@@ -11,6 +11,8 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: true,
+    // Fix viewport/safe area on real devices (Android 15+ edge-to-edge); avoids modal content being cut off.
+    adjustMarginsForEdgeToEdge: true,
   },
   // Use native HTTP so API requests bypass WebView CORS (Android sends Origin: http://localhost).
   plugins: {

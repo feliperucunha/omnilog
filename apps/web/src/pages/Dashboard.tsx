@@ -186,7 +186,11 @@ export function Dashboard() {
   }, [token, me, counts, visibleTypes.length, selectedCategory, initialLoadDone, initialLogsData]);
 
   useEffect(() => {
-    if (me?.user?.id && storage.getItemSync(`${BETA_MODAL_STORAGE_KEY}.${me.user.id}`) !== "true") setShowBetaModal(true);
+    if (!me?.user?.id) return;
+    const key = `${BETA_MODAL_STORAGE_KEY}.${me.user.id}`;
+    storage.getItem(key).then((value) => {
+      if (value !== "true") setShowBetaModal(true);
+    });
   }, [me?.user?.id]);
 
   const handleBetaModalClose = useCallback(() => {
