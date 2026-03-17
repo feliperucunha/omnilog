@@ -43,6 +43,10 @@ interface CustomEntryFormProps {
   onCancel: () => void;
   /** When true, render only the form (no Dialog). Used inside CustomBatchEntryModal. */
   embedded?: boolean;
+  /** When true (and embedded), omit the button row so parent can put it in DrawerFooter. */
+  buttonsInFooter?: boolean;
+  /** Form id when buttonsInFooter, so footer submit button can use form="". */
+  formId?: string;
 }
 
 export function CustomEntryForm({
@@ -50,6 +54,8 @@ export function CustomEntryForm({
   onSaved,
   onCancel,
   embedded = false,
+  buttonsInFooter = false,
+  formId: formIdProp,
 }: CustomEntryFormProps) {
   const { t } = useLocale();
   const [mediaType, setMediaType] = useState<MediaType>(initialMediaType ?? "movies");
@@ -140,7 +146,7 @@ export function CustomEntryForm({
           {t("customEntry.dialogTitle")}
         </h3>
       )}
-      <form onSubmit={handleSubmit}>
+      <form id={embedded && buttonsInFooter ? formIdProp : undefined} onSubmit={handleSubmit}>
             <div className="flex flex-col gap-4">
               {showMediaTypeSelector && (
                 <div className="space-y-2">
@@ -322,27 +328,29 @@ export function CustomEntryForm({
                   className="min-h-[80px] bg-[var(--color-darkest)]"
                 />
               </div>
-              <div className="flex gap-4">
-                <motion.div whileTap={tapScale} transition={tapTransition} className="flex-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={onCancel}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                </motion.div>
-                <motion.div whileTap={tapScale} transition={tapTransition} className="flex-1">
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={loading}
-                  >
-                    {loading ? t("common.saving") : t("common.save")}
-                  </Button>
-                </motion.div>
-              </div>
+              {!(embedded && buttonsInFooter) && (
+                <div className="flex gap-4">
+                  <motion.div whileTap={tapScale} transition={tapTransition} className="flex-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={onCancel}
+                    >
+                      {t("common.cancel")}
+                    </Button>
+                  </motion.div>
+                  <motion.div whileTap={tapScale} transition={tapTransition} className="flex-1">
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={loading}
+                    >
+                      {loading ? t("common.saving") : t("common.save")}
+                    </Button>
+                  </motion.div>
+                </div>
+              )}
             </div>
           </form>
     </>

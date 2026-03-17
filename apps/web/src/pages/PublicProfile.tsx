@@ -9,20 +9,16 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { MEDIA_TYPES, type MediaType, toMediaType } from "@dogument/shared";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { MediaLogs } from "@/pages/MediaLogs";
+import { MediaLogs, type MediaLogsSort, type CategoryMilestoneProgress } from "@/pages/MediaLogs";
+import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 
-/** Per-medium milestone progress (same shape as API). */
+/** Per-medium milestone progress (same shape as GET /me/milestones/progress). */
 interface PublicMilestoneProgress {
-  perMedium: Array<{
-    mediaType: string;
-    reviews: { current: number; earned: Array<{ threshold: number; label: string; icon: string }> };
-    logs: { current: number; earned: Array<{ threshold: number; label: string; icon: string }> };
-  }>;
+  perMedium: CategoryMilestoneProgress[];
 }
 
 const RESERVED_PATHS = new Set([
@@ -158,10 +154,28 @@ export function PublicProfile() {
   const setCategory = useCallback(
     (type: MediaType) => {
       setSelectedCategory(type);
-      setSearchParams({ category: type }, { replace: true });
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("category", type);
+        return next;
+      }, { replace: true });
     },
     [setSearchParams]
   );
+
+  const VALID_SORTS: MediaLogsSort[] = [
+    "dateAsc", "dateDesc", "gradeAsc", "gradeDesc",
+    "matchesPlayedAsc", "matchesPlayedDesc", "timeToBeatAsc", "timeToBeatDesc",
+  ];
+  const statusParam = searchParams.get("status") ?? "";
+  const sortParamRaw = searchParams.get("sort") ?? "dateAsc";
+  const sortParam = VALID_SORTS.includes(sortParamRaw as MediaLogsSort) ? (sortParamRaw as MediaLogsSort) : "dateAsc";
+  const qParam = searchParams.get("q") ?? "";
+  const ownParam = searchParams.get("own") === "true" ? "owned" : "";
+  const initialFilters =
+    statusParam || sortParam !== "dateAsc" || qParam || ownParam
+      ? { status: statusParam, sort: sortParam, search: qParam, own: ownParam as "" | "owned" }
+      : undefined;
 
   const byType = Object.fromEntries(
     MEDIA_TYPES.map((type) => [type, counts?.[type] ?? 0])
@@ -203,7 +217,25 @@ export function PublicProfile() {
   const selectedBadges = profile?.selectedBadges ?? [];
 
   return (
-    <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden">
+    <>
+      {/* Category strip right below the navbar, full-bleed, sticky at top of scroll area */}
+      {visibleTypes.length > 0 && (
+        <div className="sticky top-0 z-20 shrink-0 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
+          <StickyCategoryStrip
+            items={visibleTypes.map((type) => ({
+              value: type,
+              label: t(`nav.${type}`),
+              count: byType[type as MediaType] ?? 0,
+            }))}
+            selectedValue={selectedCategory}
+            onSelect={(v) => setCategory(v as MediaType)}
+            mobileOnly={false}
+            bare
+            aria-label={t("dashboard.category")}
+          />
+        </div>
+      )}
+      <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden px-4 md:px-6 pt-4 md:pt-6 pb-4 md:pb-6">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="text-xl font-bold text-[var(--color-lightest)] sm:text-2xl">{title}</h1>
@@ -293,52 +325,15 @@ export function PublicProfile() {
           aria-label={t("dashboard.category")}
           className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
         >
-          <div className="flex min-w-0 w-full shrink-0 justify-center overflow-hidden">
-            <div
-              className="scrollbar-hide flex md:hidden min-w-0 flex-1 overflow-x-auto overflow-y-hidden gap-2 py-1 scroll-smooth touch-pan-x"
-              role="tablist"
-              aria-label={t("dashboard.category")}
-            >
-              {visibleTypes.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  role="tab"
-                  aria-selected={selectedCategory === type}
-                  aria-label={`${t(`nav.${type}`)} (${byType[type as MediaType] ?? 0})`}
-                  onClick={() => setCategory(type as MediaType)}
-                  className={
-                    selectedCategory === type
-                      ? "btn-gradient flex-shrink-0 rounded-full px-4 py-2.5 max-md:min-h-[44px] text-sm font-medium text-[var(--btn-text)] transition-colors whitespace-nowrap"
-                      : "flex-shrink-0 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4 py-2.5 max-md:min-h-[44px] text-sm font-medium text-[var(--color-light)] transition-colors whitespace-nowrap"
-                  }
-                >
-                  {t(`nav.${type}`)} ({byType[type as MediaType] ?? 0})
-                </button>
-              ))}
-            </div>
-            <ToggleGroup
-              type="single"
-              value={selectedCategory}
-              onValueChange={(v) => v && setCategory(v as MediaType)}
-              className="hidden md:inline-flex flex-wrap justify-center gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-2 md:w-fit"
-              aria-label={t("dashboard.category")}
-            >
-              {visibleTypes.map((type) => (
-                <ToggleGroupItem
-                  key={type}
-                  value={type}
-                  className="rounded-md px-4 py-3 text-sm max-md:min-h-[44px] data-[state=on]:bg-gradient-to-br data-[state=on]:from-[var(--btn-gradient-start)] data-[state=on]:to-[var(--btn-gradient-end)] data-[state=on]:text-[var(--btn-text)] md:px-3 md:py-2"
-                  aria-label={`${t(`nav.${type}`)} (${byType[type as MediaType] ?? 0})`}
-                >
-                  {t(`nav.${type}`)} ({byType[type as MediaType] ?? 0})
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </div>
-          <MediaLogs mediaType={selectedCategory} embedded publicUserId={userId} />
+          <MediaLogs
+            mediaType={selectedCategory}
+            embedded
+            publicUserId={userId}
+            initialFilters={initialFilters}
+          />
         </section>
       )}
-    </div>
+      </div>
+    </>
   );
 }

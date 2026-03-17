@@ -5,8 +5,8 @@ import { Logo } from "@/components/Logo";
 export function PublicProfileLayout() {
   const { t } = useLocale();
   return (
-    <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden">
-      <header className="flex shrink-0 items-center border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-3 md:pt-3 md:px-6">
+    <div className="flex h-dvh min-h-dvh min-w-0 flex-col overflow-hidden">
+      <header className="z-30 flex shrink-0 items-center border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-3 md:pt-3 md:px-6">
         <Link
           to="/"
           className="flex items-center text-[var(--color-lightest)] no-underline hover:opacity-90 transition-opacity"
@@ -17,7 +17,7 @@ export function PublicProfileLayout() {
           </span>
         </Link>
       </header>
-      <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6">
+      <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
         <Outlet />
       </main>
     </div>

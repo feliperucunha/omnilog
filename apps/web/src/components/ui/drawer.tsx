@@ -27,7 +27,7 @@ const DrawerFooter = React.forwardRef<HTMLDivElement, React.ComponentProps<"div"
     <div
       ref={ref}
       className={cn(
-        "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--color-surface-border)] bg-[var(--color-dark)] pt-4 max-md:pb-0",
+        "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--color-surface-border)] bg-[var(--color-dark)] pt-4 pb-6",
         className
       )}
       {...props}
@@ -40,8 +40,8 @@ type DrawerContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.
   onClose?: () => void;
   /** On mobile: height of the drawer. Desktop keeps centered modal. */
   mobileHeight?: "95%" | "30%";
-  /** Called with the animated close function so parents can use it for Cancel/close buttons. */
-  onReady?: (requestClose: () => void) => void;
+  /** Called with (animatedClose, closeImmediately). Use closeImmediately for X/close button so overlay and drawer close together. */
+  onReady?: (requestClose: () => void, requestCloseImmediately?: () => void) => void;
 };
 
 function isDrawerFooter(child: React.ReactNode): boolean {
@@ -75,13 +75,16 @@ const DrawerContent = React.forwardRef<
   }, [onClose]);
 
   React.useEffect(() => {
-    onReady?.(handleClose);
+    onReady?.(handleClose, closeImmediately);
     return () => {
       if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     };
-  }, [handleClose, onReady]);
+  }, [handleClose, closeImmediately, onReady]);
 
-  const heightClass = mobileHeight === "30%" ? "max-md:!h-[30%]" : "max-md:!h-[95%]";
+  const heightClass =
+    mobileHeight === "30%"
+      ? "max-md:!h-[30%] max-md:!min-h-[30%]"
+      : "max-md:!h-[95dvh] max-md:!min-h-[95dvh]";
   return (
     <DialogPortal>
       <DialogOverlay onClick={closeImmediately} onPointerDown={closeImmediately} />
@@ -89,7 +92,7 @@ const DrawerContent = React.forwardRef<
         ref={ref}
         data-closing={isClosing ? "true" : undefined}
         className={cn(
-          "drawer-panel z-50 flex flex-col overflow-hidden bg-[var(--color-dark)]",
+          "drawer-panel z-50 flex min-h-0 flex-col overflow-hidden bg-[var(--color-dark)]",
           "max-md:shadow-[0_-8px_40px_rgba(0,0,0,0.5),0_-2px_16px_rgba(0,0,0,0.4)] md:shadow-[var(--shadow-modal)]",
           "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:w-full max-md:rounded-t-2xl max-md:border-t max-md:border-[var(--color-surface-border)] max-md:pt-[env(safe-area-inset-top)] max-md:pb-[env(safe-area-inset-bottom)]",
           heightClass,
@@ -122,23 +125,23 @@ const DrawerContent = React.forwardRef<
         }}
         {...props}
       >
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {(() => {
-            const childArray = React.Children.toArray(children);
-            const footerIndex = childArray.findIndex((c) => isDrawerFooter(c));
-            const hasFooter = footerIndex >= 0;
-            const footer = hasFooter ? childArray[footerIndex] : null;
-            const contentChildren = hasFooter ? childArray.filter((_, i) => i !== footerIndex) : childArray;
-            return (
-              <>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                  {contentChildren}
-                </div>
-                {footer}
-              </>
-            );
-          })()}
-        </div>
+        {(() => {
+          const childArray = React.Children.toArray(children);
+          const footerIndex = childArray.findIndex((c) => isDrawerFooter(c));
+          const hasFooter = footerIndex >= 0;
+          const footer = hasFooter ? childArray[footerIndex] : null;
+          const contentChildren = hasFooter ? childArray.filter((_, i) => i !== footerIndex) : childArray;
+          return (
+            <>
+              {/* Scrollable body: takes all remaining space; only this area scrolls */}
+              <div className="min-h-0 flex-1 basis-0 overflow-x-hidden overflow-y-auto overscroll-contain">
+                {contentChildren}
+              </div>
+              {/* Fixed footer: always at bottom, same position, never scrolls */}
+              {footer}
+            </>
+          );
+        })()}
       </DialogPrimitive.Content>
     </DialogPortal>
   );

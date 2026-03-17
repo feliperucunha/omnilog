@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -70,9 +70,12 @@ interface BatchEntryTabProps {
   initialMediaType?: MediaType;
   onDone: () => void;
   onCancel: () => void;
+  /** When true, buttons are not rendered here; parent should use onFooterChange to put them in DrawerFooter. */
+  renderFooterOutside?: boolean;
+  onFooterChange?: (footer: ReactNode) => void;
 }
 
-export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntryTabProps) {
+export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooterOutside = false, onFooterChange }: BatchEntryTabProps) {
   const { t } = useLocale();
   const { me } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
@@ -262,6 +265,73 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
     previewLoadTriggeredRef.current = true;
     handleLoadPreview();
   }, [canPreview, loadingPreview, previewRow, confirming, handleLoadPreview]);
+
+  const batchFooterContent = useMemo(
+    () => (
+      <div className="flex gap-4">
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1"
+          onClick={onCancel}
+          disabled={loadingParse || confirming}
+        >
+          {t("common.cancel")}
+        </Button>
+        {file && parseResult?.ok && (previewReady || confirming) ? (
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={handleConfirmAndAddAll}
+            disabled={!hasApiKeyForCategory || confirming}
+          >
+            {confirming ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                <span className="ml-2">{t("batchEntry.adding")}</span>
+              </>
+            ) : (
+              t("batchEntry.startImport")
+            )}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={() => document.getElementById("batch-file-input")?.click()}
+            disabled={loadingParse || confirming || !hasApiKeyForCategory}
+          >
+            {loadingParse ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <Upload className="size-4" aria-hidden />
+            )}
+            <span className="ml-2">{file ? file.name : t("batchEntry.chooseFile")}</span>
+          </Button>
+        )}
+      </div>
+    ),
+    [
+      file,
+      parseResult?.ok,
+      previewReady,
+      confirming,
+      hasApiKeyForCategory,
+      loadingParse,
+      t,
+      onCancel,
+      handleConfirmAndAddAll,
+    ]
+  );
+
+  useEffect(() => {
+    if (renderFooterOutside && onFooterChange) {
+      onFooterChange(batchFooterContent);
+      return () => {
+        onFooterChange?.(null);
+      };
+    }
+  }, [renderFooterOutside, onFooterChange, batchFooterContent]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -484,48 +554,8 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
         </div>
       )}
 
-      <div className="flex gap-4">
-        <Button
-          type="button"
-          variant="outline"
-          className="flex-1"
-          onClick={onCancel}
-          disabled={loadingParse || confirming}
-        >
-          {t("common.cancel")}
-        </Button>
-        {file && parseResult?.ok && (previewReady || confirming) ? (
-          <Button
-            type="button"
-            className="flex-1"
-            onClick={handleConfirmAndAddAll}
-            disabled={!hasApiKeyForCategory || confirming}
-          >
-            {confirming ? (
-              <>
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-                <span className="ml-2">{t("batchEntry.adding")}</span>
-              </>
-            ) : (
-              t("batchEntry.startImport")
-            )}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            className="flex-1"
-            onClick={() => document.getElementById("batch-file-input")?.click()}
-            disabled={loadingParse || confirming || !hasApiKeyForCategory}
-          >
-            {loadingParse ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <Upload className="size-4" aria-hidden />
-            )}
-            <span className="ml-2">{file ? file.name : t("batchEntry.chooseFile")}</span>
-          </Button>
-        )}
-      </div>
+      {!renderFooterOutside && batchFooterContent}
     </div>
   );
 }
+

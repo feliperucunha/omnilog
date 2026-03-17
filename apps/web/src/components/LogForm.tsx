@@ -6,6 +6,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -83,6 +85,7 @@ export function LogForm(props: LogFormProps) {
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   type ProgressOptions = {
     seasons?: number[];
@@ -247,18 +250,18 @@ export function LogForm(props: LogFormProps) {
     }
   };
 
-  return (
-    <>
-    <Dialog open modal={false} onOpenChange={(open) => !open && props.onCancel()}>
-      <DialogContent onClose={props.onCancel}>
-        <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
-          <div className="mb-4 flex gap-4">
-            <ItemImage src={image} className="h-20 w-14 rounded" />
-            <h3 className="line-clamp-2 text-lg font-semibold text-[var(--color-lightest)]">
-              {title}
-            </h3>
-          </div>
-          <form onSubmit={handleSubmit}>
+  const formId = "log-form-drawer";
+  const includeButtonsInForm = !isMobile;
+
+  const formContent = (
+    <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
+      <div className="mb-4 flex gap-4">
+        <ItemImage src={image} className="h-20 w-14 rounded" />
+        <h3 className="line-clamp-2 text-lg font-semibold text-[var(--color-lightest)]">
+          {title}
+        </h3>
+      </div>
+      <form id={isMobile ? formId : undefined} onSubmit={handleSubmit}>
             <div className="flex flex-col gap-4">
               {isEdit && (
                 <>
@@ -434,107 +437,163 @@ export function LogForm(props: LogFormProps) {
                   className="min-h-[80px]"
                 />
               </div>
-              <div className="flex flex-col gap-3">
-                <div className="flex gap-4">
-                  <motion.div
-                    whileTap={tapScale}
-                    transition={tapTransition}
-                    className="flex-1"
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={props.onCancel}
+              {includeButtonsInForm && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-4">
+                    <motion.div
+                      whileTap={tapScale}
+                      transition={tapTransition}
+                      className="flex-1"
                     >
-                      {t("common.cancel")}
-                    </Button>
-                  </motion.div>
-                  <motion.div
-                    whileTap={tapScale}
-                    transition={tapTransition}
-                    className="flex-1"
-                  >
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={loading}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={props.onCancel}
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                    </motion.div>
+                    <motion.div
+                      whileTap={tapScale}
+                      transition={tapTransition}
+                      className="flex-1"
                     >
-                      {loading ? t("common.saving") : isEdit ? t("common.update") : t("common.save")}
-                    </Button>
-                  </motion.div>
-                </div>
-                {isEdit && "onDelete" in props && props.onDelete && (
-                  <div className="border-t border-[var(--color-surface-border)] pt-3">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full text-red-400 hover:bg-red-500/20 hover:text-red-400"
-                      onClick={() => setConfirmDeleteOpen(true)}
-                      disabled={loading || deleting}
-                    >
-                      {t("common.delete")}
-                    </Button>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={loading}
+                      >
+                        {loading ? t("common.saving") : isEdit ? t("common.update") : t("common.save")}
+                      </Button>
+                    </motion.div>
                   </div>
-                )}
-              </div>
+                  {isEdit && "onDelete" in props && props.onDelete && (
+                    <div className="border-t border-[var(--color-surface-border)] pt-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="w-full text-red-400 hover:bg-red-500/20 hover:text-red-400"
+                        onClick={() => setConfirmDeleteOpen(true)}
+                        disabled={loading || deleting}
+                      >
+                        {t("common.delete")}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </form>
-        </motion.div>
-      </DialogContent>
-    </Dialog>
+    </motion.div>
+  );
 
-    {/* Confirm delete: in-app modal above the edit dialog */}
-    <Dialog open={confirmDeleteOpen} onOpenChange={(open) => !open && setConfirmDeleteOpen(false)}>
-      <DialogContent
-        className="z-[60] sm:max-w-sm"
-        overlayClassName="z-[60]"
-        onClose={() => setConfirmDeleteOpen(false)}
-      >
-        <DialogHeader>
-          <DialogTitle className="text-[var(--color-lightest)]">
-            {t("common.delete")}
-          </DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-[var(--color-light)]">
-          {t("common.deleteLogConfirm")}
-        </p>
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setConfirmDeleteOpen(false)}
+  const drawerFooterContent = (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-4">
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1"
+          onClick={props.onCancel}
+        >
+          {t("common.cancel")}
+        </Button>
+        <Button
+          type="submit"
+          form={formId}
+          className="flex-1"
+          disabled={loading}
+        >
+          {loading ? t("common.saving") : isEdit ? t("common.update") : t("common.save")}
+        </Button>
+      </div>
+      {isEdit && "onDelete" in props && props.onDelete && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full text-red-400 hover:bg-red-500/20 hover:text-red-400"
+          onClick={() => setConfirmDeleteOpen(true)}
+          disabled={loading || deleting}
+        >
+          {t("common.delete")}
+        </Button>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      {isMobile ? (
+        <Drawer open modal={false} onOpenChange={(open) => !open && props.onCancel()}>
+          <DrawerContent
+            onClose={props.onCancel}
+            mobileHeight="95%"
+            className="flex max-h-[85dvh] w-full max-w-lg flex-col p-4 sm:p-6"
           >
-            {t("common.cancel")}
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={deleting}
-            onClick={async () => {
-              if (!log || !("onDelete" in props) || !props.onDelete) return;
-              setDeleting(true);
-              try {
-                await props.onDelete(log.id);
-                setConfirmDeleteOpen(false);
-                props.onCancel();
-              } finally {
-                setDeleting(false);
-              }
-            }}
-          >
-            {deleting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                {t("common.deleting")}
-              </>
-            ) : (
-              t("common.delete")
-            )}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  </>
+            <div className="mt-6">{formContent}</div>
+            <DrawerFooter>{drawerFooterContent}</DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open modal={false} onOpenChange={(open) => !open && props.onCancel()}>
+          <DialogContent onClose={props.onCancel}>
+            {formContent}
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Confirm delete: in-app modal above the edit dialog */}
+      <Dialog open={confirmDeleteOpen} onOpenChange={(open) => !open && setConfirmDeleteOpen(false)}>
+        <DialogContent
+          className="z-[60] sm:max-w-sm"
+          overlayClassName="z-[60]"
+          onClose={() => setConfirmDeleteOpen(false)}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-[var(--color-lightest)]">
+              {t("common.delete")}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-[var(--color-light)]">
+            {t("common.deleteLogConfirm")}
+          </p>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setConfirmDeleteOpen(false)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting}
+              onClick={async () => {
+                if (!log || !("onDelete" in props) || !props.onDelete) return;
+                setDeleting(true);
+                try {
+                  await props.onDelete(log.id);
+                  setConfirmDeleteOpen(false);
+                  props.onCancel();
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  {t("common.deleting")}
+                </>
+              ) : (
+                t("common.delete")
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

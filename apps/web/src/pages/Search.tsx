@@ -378,7 +378,7 @@ export function Search() {
         }}
         showCount={false}
         mobileOnly
-        stickyTop="top-14"
+        bare
         aria-label={t("dashboard.category")}
       />
     );

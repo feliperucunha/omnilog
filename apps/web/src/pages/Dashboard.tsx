@@ -21,7 +21,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/useMediaQuery";
-import { MediaLogs } from "@/pages/MediaLogs";
+import { MediaLogs, type SharedFilters } from "@/pages/MediaLogs";
 import { Select } from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
@@ -98,6 +98,13 @@ export function Dashboard() {
     nextCursor: string | null;
   } | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  /** Current filters from MediaLogs (for share URL). */
+  const shareFiltersRef = useRef<SharedFilters>({
+    status: "",
+    sort: "dateAsc",
+    search: "",
+    own: "",
+  });
 
   /** Load collapsed prefs from persistent storage (Android/Capacitor). */
   useEffect(() => {
@@ -249,10 +256,17 @@ export function Dashboard() {
     if (!me?.user?.id) return;
     const slug = me.user.username || me.user.id;
     const base = `${PROFILE_SHARE_BASE_URL}/${slug}`;
-    const url =
-      visibleTypes.includes(selectedCategory) && selectedCategory
-        ? `${base}?category=${selectedCategory}`
-        : base;
+    const params = new URLSearchParams();
+    if (visibleTypes.includes(selectedCategory) && selectedCategory) {
+      params.set("category", selectedCategory);
+      const f = shareFiltersRef.current;
+      if (f.status) params.set("status", f.status);
+      if (f.sort && f.sort !== "dateAsc") params.set("sort", f.sort);
+      if (f.search.trim()) params.set("q", f.search.trim());
+      if (f.own === "owned") params.set("own", "true");
+    }
+    const query = params.toString();
+    const url = query ? `${base}?${query}` : base;
     try {
       await navigator.clipboard.writeText(url);
       toast.success(t("dashboard.linkCopied"));
@@ -301,8 +315,8 @@ export function Dashboard() {
         }))}
         selectedValue={selectedCategory}
         onSelect={(v) => setCategory(v as MediaType)}
-        mobileOnly
-        stickyTop="top-14"
+        mobileOnly={false}
+        bare
         aria-label={t("dashboard.category")}
       />
     );
@@ -401,8 +415,8 @@ export function Dashboard() {
             aria-label={t("dashboard.category")}
             className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
           >
-            {/* Desktop: toggle group */}
-            <div className="flex min-w-0 w-full shrink-0 justify-center overflow-hidden">
+            {/* Category toggle: mobile only; desktop uses strip below navbar */}
+            <div className="flex min-w-0 w-full shrink-0 justify-center overflow-hidden md:hidden">
             <ToggleGroup
               type="single"
               value={selectedCategory}
@@ -451,6 +465,9 @@ export function Dashboard() {
             initialNextCursor={
               initialLogsData?.mediaType === selectedCategory ? initialLogsData.nextCursor : undefined
             }
+            onFiltersChange={(f) => {
+              shareFiltersRef.current = f;
+            }}
           />
         </section>
       )}

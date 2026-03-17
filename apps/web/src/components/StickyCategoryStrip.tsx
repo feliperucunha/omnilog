@@ -18,6 +18,8 @@ interface StickyCategoryStripProps {
   mobileOnly?: boolean;
   /** Sticky offset from top (e.g. "top-14" to sit below navbar). Omit for non-sticky or top-0. */
   stickyTop?: string;
+  /** When true, omit outer border and background (e.g. when wrapped in a sticky container that has them). */
+  bare?: boolean;
   "aria-label"?: string;
   className?: string;
 }
@@ -33,25 +35,27 @@ export function StickyCategoryStrip({
   showCount = items.some((i) => i.count != null),
   mobileOnly = true,
   stickyTop = "top-14",
+  bare = false,
   "aria-label": ariaLabel,
   className,
 }: StickyCategoryStripProps) {
   const strip = (
     <div
       className={cn(
-        "flex shrink-0 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]",
-        stickyTop && `sticky z-20 ${stickyTop}`,
+        "flex shrink-0",
+        !bare && "border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]",
+        stickyTop && `sticky z-20 self-start ${stickyTop}`,
         mobileOnly && "md:hidden",
         className
       )}
     >
       {/* Scrollable row – edge-to-edge, no horizontal padding */}
       <div
-        className="scrollbar-hide flex min-w-0 overflow-x-auto overflow-y-hidden scroll-smooth py-2.5 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]"
+        className="scrollbar-hide flex min-w-0 overflow-x-auto overflow-y-hidden scroll-smooth min-h-[3rem] [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]"
         role="tablist"
         aria-label={ariaLabel}
       >
-        <div className="flex min-w-max gap-6 pl-3 pr-3">
+        <div className="flex min-w-max items-stretch gap-6 pl-3 pr-3">
           {items.map((item) => {
             const selected = selectedValue === item.value;
             const label = showCount && item.count != null ? `${item.label} (${item.count})` : item.label;
@@ -64,7 +68,7 @@ export function StickyCategoryStrip({
                 disabled={item.disabled}
                 onClick={() => !item.disabled && onSelect(item.value)}
                 className={cn(
-                  "flex shrink-0 flex-col items-center justify-center gap-1 border-b-2 pb-0.5 pt-0.5 text-sm transition-colors max-md:min-h-[44px]",
+                  "flex h-full shrink-0 flex-col items-center justify-start border-b-2 pt-3 text-sm transition-colors max-md:min-h-[44px]",
                   "border-transparent whitespace-nowrap",
                   item.disabled && "cursor-not-allowed opacity-50",
                   selected

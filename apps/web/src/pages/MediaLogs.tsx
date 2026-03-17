@@ -65,6 +65,23 @@ export interface CategoryMilestoneProgress {
   };
 }
 
+export type MediaLogsSort =
+  | "dateAsc"
+  | "dateDesc"
+  | "gradeAsc"
+  | "gradeDesc"
+  | "matchesPlayedAsc"
+  | "matchesPlayedDesc"
+  | "timeToBeatAsc"
+  | "timeToBeatDesc";
+
+export interface SharedFilters {
+  status: string;
+  sort: MediaLogsSort;
+  search: string;
+  own: "" | "owned";
+}
+
 interface MediaLogsProps {
   mediaType: MediaType;
   /** When true, rendered inside Dashboard: no watermark background. */
@@ -76,9 +93,15 @@ interface MediaLogsProps {
   /** When set (e.g. from Dashboard), use as initial data so no skeleton is shown on first paint. */
   initialLogs?: Log[];
   initialNextCursor?: string | null;
+  /** Initial filter values (e.g. from shared profile URL). */
+  initialFilters?: Partial<SharedFilters>;
+  /** When embedded, called when filters change so parent can include them in share URL. */
+  onFiltersChange?: (filters: SharedFilters) => void;
 }
 
-export function MediaLogs({ mediaType, embedded = false, publicUserId, milestoneProgress: milestoneProgressProp, initialLogs: initialLogsProp, initialNextCursor: initialNextCursorProp }: MediaLogsProps) {
+const DEFAULT_SORT: MediaLogsSort = "dateAsc";
+
+export function MediaLogs({ mediaType, embedded = false, publicUserId, milestoneProgress: milestoneProgressProp, initialLogs: initialLogsProp, initialNextCursor: initialNextCursorProp, initialFilters, onFiltersChange }: MediaLogsProps) {
   const { t } = useLocale();
   const navigate = useNavigate();
   const { showLogComplete } = useLogComplete();
@@ -100,14 +123,12 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   const [editingLog, setEditingLog] = useState<Log | null>(null);
   const [editingLogEpisodesCount, setEditingLogEpisodesCount] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>(() => initialFilters?.status ?? "");
   const [statusCounts, setStatusCounts] = useState<{ total: number; byStatus: Record<string, number> } | null>(null);
-  const [ownedFilter, setOwnedFilter] = useState<"" | "owned">("");
-  const [sortBy, setSortBy] = useState<
-    "dateAsc" | "dateDesc" | "gradeAsc" | "gradeDesc" | "matchesPlayedAsc" | "matchesPlayedDesc" | "timeToBeatAsc" | "timeToBeatDesc"
-  >("dateAsc");
+  const [ownedFilter, setOwnedFilter] = useState<"" | "owned">(() => initialFilters?.own ?? "");
+  const [sortBy, setSortBy] = useState<MediaLogsSort>(() => (initialFilters?.sort as MediaLogsSort) ?? DEFAULT_SORT);
   const [showCustomEntry, setShowCustomEntry] = useState(false);
-  const [categorySearchQuery, setCategorySearchQuery] = useState("");
+  const [categorySearchQuery, setCategorySearchQuery] = useState(() => initialFilters?.search ?? "");
   const [incrementingId, setIncrementingId] = useState<string | null>(null);
   const [exportingCategory, setExportingCategory] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
@@ -118,6 +139,17 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(() => !embedded);
 
   const milestoneProgress = milestoneProgressProp ?? (readOnly ? null : milestoneProgressFetched);
+
+  useEffect(() => {
+    if (embedded && onFiltersChange) {
+      onFiltersChange({
+        status: statusFilter,
+        sort: sortBy,
+        search: categorySearchQuery,
+        own: ownedFilter,
+      });
+    }
+  }, [embedded, onFiltersChange, statusFilter, sortBy, categorySearchQuery, ownedFilter]);
 
   useEffect(() => {
     if (readOnly || milestoneProgressProp != null || !me) return;
@@ -449,109 +481,151 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           </span>
         </Link>
       )}
-      <div className="flex min-w-0 flex-col gap-2 sm:gap-3">
-        <div className={cn(
-          "flex min-w-0 flex-wrap items-center gap-2 overflow-hidden",
-          embedded ? "justify-end" : "justify-between"
-        )}>
-          {!embedded && (
-            <h1 className="min-w-0 truncate text-2xl font-bold text-[var(--color-lightest)]">
-              {label}
-            </h1>
-          )}
+      {/* Desktop (embedded): row 1 = filters + search (always); row 2 = experience bar + action buttons (only when !readOnly) */}
+      {embedded && (
+        <div className="hidden md:flex flex-col gap-3 min-w-0">
+          <div className="flex justify-between items-center gap-4 flex-wrap">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <span className="shrink-0 text-sm text-[var(--color-light)]">{t("itemReviewForm.status")}:</span>
+              <Select
+                value={statusFilter}
+                onValueChange={setStatusFilter}
+                options={[
+                  { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
+                  ...statusOptions.map((s) => ({
+                    value: s,
+                    label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
+                  })),
+                ]}
+                aria-label={t("itemReviewForm.status")}
+                className="min-w-0 w-[11rem]"
+                triggerClassName="w-full min-w-0"
+              />
+              {mediaType === "boardgames" && (
+                <Select
+                  value={ownedFilter}
+                  onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
+                  options={[
+                    { value: "", label: t("mediaLogs.filterAll") },
+                    { value: "owned", label: t("mediaLogs.filterOwned") },
+                  ]}
+                  aria-label={t("itemReviewForm.own")}
+                  className="min-w-0 w-[8rem]"
+                  triggerClassName="w-full min-w-0"
+                />
+              )}
+              <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
+              <Select
+                value={sortBy}
+                onValueChange={(v) => setSortBy(v as typeof sortBy)}
+                options={[
+                  { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
+                  { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
+                  { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
+                  { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
+                  ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
+                  ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
+                ]}
+                aria-label={t("mediaLogs.sortLabel")}
+                className="min-w-0 w-[11rem]"
+                triggerClassName="w-full min-w-0"
+              />
+            </div>
+            <div className="relative min-w-0 w-full max-w-xs shrink-0">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
+              <Input
+                type="search"
+                placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
+                value={categorySearchQuery}
+                onChange={(e) => setCategorySearchQuery(e.target.value)}
+                className={cn(
+                  "w-full border-[var(--color-mid)] bg-[var(--color-darkest)] pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)]",
+                  categorySearchQuery.trim() !== "" ? "pr-9" : ""
+                )}
+                aria-label={t("mediaLogs.searchTitlesLabel")}
+              />
+              {categorySearchQuery.trim() !== "" && (
+                <button
+                  type="button"
+                  onClick={() => setCategorySearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+                  aria-label={t("search.clearSearch")}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
           {!readOnly && (
-          <div className="flex min-w-0 flex-shrink-0 flex-wrap items-center gap-3">
-            <motion.div whileTap={tapScale} transition={tapTransition}>
+          <div className="flex justify-between items-center gap-4 flex-wrap min-w-0">
+            {milestoneProgress && (() => {
+              const scope = milestoneProgress.reviews.next ? milestoneProgress.reviews : milestoneProgress.logs;
+              const currentBadge = scope.earned.length > 0 ? scope.earned[scope.earned.length - 1]! : null;
+              const next = scope.next;
+              const displayCurrent = next ? Math.min(scope.current, next.threshold) : scope.current;
+              const displayPct = scope.progressPct;
+              const kind = scope === milestoneProgress.reviews ? "reviews" : "logs";
+              const categoryLabel = t(`nav.${mediaType}`);
+              const badgeUser = t("mediaLogs.badgePopupYou");
+              return (
+                <div className="flex min-w-0 flex-1 items-center gap-2 ml-1 max-w-[400px]">
+                  {currentBadge && (
+                    <LevelBadge
+                      icon={MEDIA_BADGE_ICONS[mediaType]}
+                      level={scope.earned.length}
+                      title={currentBadge.label}
+                      popupDetail={{ user: badgeUser, categoryLabel, count: scope.current, kind }}
+                    />
+                  )}
+                  {next && (
+                    <div className="flex min-w-0 flex-1 items-center gap-2 min-w-[120px]">
+                      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)]">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
+                          style={{ width: `${displayPct}%`, minWidth: displayCurrent > 0 ? "4px" : 0 }}
+                        />
+                      </div>
+                      <span className="shrink-0 text-xs text-[var(--color-light)]" title={next.label}>
+                        {displayCurrent}/{next.threshold}
+                      </span>
+                      <LevelBadge
+                        icon={MEDIA_BADGE_ICONS[mediaType]}
+                        level={scope.earned.length + 1}
+                        title={next.label}
+                        popupDetail={{ user: badgeUser, categoryLabel, count: scope.current, kind }}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            <div className="flex min-w-0 flex-shrink-0 flex-wrap items-center gap-3">
+              <motion.div whileTap={tapScale} transition={tapTransition}>
+                <Button type="button" variant="outline" onClick={() => setShowCustomEntry(true)}>
+                  <span className="inline-flex items-center gap-2">
+                    <Plus className="size-4 shrink-0" aria-hidden />
+                    {t("customEntry.addCustomBatchEntry")}
+                  </span>
+                </Button>
+              </motion.div>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowCustomEntry(true)}
+                size="icon"
+                className={cn("shrink-0", !hasProFeatures && "opacity-60 cursor-pointer")}
+                onClick={handleExportCategory}
+                disabled={exportingCategory}
+                title={t("mediaLogs.exportCategory")}
+                aria-label={t("mediaLogs.exportCategory")}
               >
-                <span className="inline-flex items-center gap-2">
-                  <Plus className="size-4 shrink-0" aria-hidden />
-                  {t("customEntry.addCustomBatchEntry")}
-                </span>
+                {exportingCategory ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Download className="size-4" aria-hidden />}
               </Button>
-            </motion.div>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className={cn(
-                "shrink-0",
-                !hasProFeatures && "opacity-60 cursor-pointer"
-              )}
-              onClick={handleExportCategory}
-              disabled={exportingCategory}
-              title={t("mediaLogs.exportCategory")}
-              aria-label={t("mediaLogs.exportCategory")}
-            >
-              {exportingCategory ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <Download className="size-4" aria-hidden />
-              )}
-            </Button>
-          </div>
-        )}
-        </div>
-        {!readOnly && milestoneProgress && (() => {
-          // Use a single scope (reviews or logs) for the whole row so current badge, bar, and next badge match
-          const scope = milestoneProgress.reviews.next ? milestoneProgress.reviews : milestoneProgress.logs;
-          const currentBadge =
-            scope.earned.length > 0 ? scope.earned[scope.earned.length - 1]! : null;
-          const next = scope.next;
-          const displayCurrent = next ? Math.min(scope.current, next.threshold) : scope.current;
-          const displayPct = scope.progressPct;
-          const kind = scope === milestoneProgress.reviews ? "reviews" : "logs";
-          const categoryLabel = t(`nav.${mediaType}`);
-          const badgeUser = t("mediaLogs.badgePopupYou");
-          return (
-            <div className="flex min-w-0 flex-wrap items-center gap-2 ml-1 sm:gap-3">
-              {currentBadge && (
-                <LevelBadge
-                  icon={MEDIA_BADGE_ICONS[mediaType]}
-                  level={scope.earned.length}
-                  title={currentBadge.label}
-                  popupDetail={{
-                    user: badgeUser,
-                    categoryLabel,
-                    count: scope.current,
-                    kind,
-                  }}
-                />
-              )}
-              {next && (
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)] max-w-[280px] sm:max-w-[340px]">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
-                      style={{
-                        width: `${displayPct}%`,
-                        minWidth: displayCurrent > 0 ? "4px" : 0,
-                      }}
-                    />
-                  </div>
-                  <span className="shrink-0 text-xs text-[var(--color-light)]" title={next.label}>
-                    {displayCurrent}/{next.threshold}
-                  </span>
-                  <LevelBadge
-                    icon={MEDIA_BADGE_ICONS[mediaType]}
-                    level={scope.earned.length + 1}
-                    title={next.label}
-                    popupDetail={{
-                      user: badgeUser,
-                      categoryLabel,
-                      count: scope.current,
-                      kind,
-                    }}
-                  />
-                </div>
-              )}
             </div>
-          );
-        })()}
-      </div>
+          </div>
+          )}
+        </div>
+      )}
+
       {!readOnly && showCustomEntry && (
         <CustomBatchEntryModal
           mediaType={mediaType}
@@ -563,33 +637,9 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         />
       )}
 
-      <div className="flex min-w-0 flex-col gap-3 overflow-hidden">
-        {(embedded || readOnly) && (
-          <div className="relative flex min-w-0 max-w-xs items-center gap-2">
-            <Search className="h-4 w-4 shrink-0 text-[var(--color-light)]" aria-hidden />
-            <Input
-              type="search"
-              placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
-              value={categorySearchQuery}
-              onChange={(e) => setCategorySearchQuery(e.target.value)}
-              className={cn(
-                "border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-lightest)] placeholder:text-[var(--color-light)]",
-                categorySearchQuery.trim() !== "" ? "pr-9" : ""
-              )}
-              aria-label={t("mediaLogs.searchTitlesLabel")}
-            />
-            {categorySearchQuery.trim() !== "" && (
-              <button
-                type="button"
-                onClick={() => setCategorySearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
-                aria-label={t("search.clearSearch")}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        )}
+      {/* Mobile when embedded: wrapper shows filters, header (buttons+bar), search. Desktop when embedded uses the block above. When not embedded wrapper is always visible. */}
+      <div className={cn("flex min-w-0 flex-col gap-3", embedded && "md:hidden")}>
+      {/* 1. Filters row */}
       <div className="flex min-w-0 flex-wrap items-center gap-3 overflow-hidden">
         {/* Mobile (< md): custom dropdowns, no labels */}
         <div className={cn("grid w-full gap-2 md:hidden", mediaType === "boardgames" ? "grid-cols-3" : "grid-cols-2")}>
@@ -636,40 +686,36 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
             triggerClassName="w-full max-w-none min-w-0"
           />
         </div>
-        {/* Desktop (md+): status buttons; sort = dropdown for games/boardgames, buttons for others */}
+        {/* Desktop (md+): status and sort dropdowns */}
         <div className="hidden md:flex min-w-0 flex-wrap items-center gap-3">
         <span className="shrink-0 text-sm text-[var(--color-light)]">{t("itemReviewForm.status")}:</span>
-        <div className="flex min-w-0 flex-wrap gap-2">
-          <Button
-            type="button"
-            variant={statusFilter === "" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFilter("")}
-          >
-            {statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll")}
-          </Button>
-          {statusOptions.map((statusValue) => (
-            <Button
-              key={statusValue}
-              type="button"
-              variant={statusFilter === statusValue ? "default" : "outline"}
-              size="sm"
-              onClick={() => setStatusFilter(statusValue)}
-            >
-              {statusCounts != null ? `${getStatusLabel(t, statusValue, mediaType)} (${statusCounts.byStatus[statusValue] ?? 0})` : getStatusLabel(t, statusValue, mediaType)}
-            </Button>
-          ))}
-          {mediaType === "boardgames" && (
-            <Button
-              type="button"
-              variant={ownedFilter === "owned" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setOwnedFilter((prev) => (prev === "owned" ? "" : "owned"))}
-            >
-              {t("mediaLogs.filterOwned")}
-            </Button>
-          )}
-        </div>
+        <Select
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          options={[
+            { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
+            ...statusOptions.map((s) => ({
+              value: s,
+              label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
+            })),
+          ]}
+          aria-label={t("itemReviewForm.status")}
+          className="min-w-0 w-[11rem]"
+          triggerClassName="w-full min-w-0"
+        />
+        {mediaType === "boardgames" && (
+          <Select
+            value={ownedFilter}
+            onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
+            options={[
+              { value: "", label: t("mediaLogs.filterAll") },
+              { value: "owned", label: t("mediaLogs.filterOwned") },
+            ]}
+            aria-label={t("itemReviewForm.own")}
+            className="min-w-0 w-[8rem]"
+            triggerClassName="w-full min-w-0"
+          />
+        )}
         <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
         <Select
           value={sortBy}
@@ -688,6 +734,138 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         />
         </div>
       </div>
+
+      {/* 2. Header: left = title + experience bar; right = action buttons; bar shorter on mobile to fit one line */}
+      <div className="flex min-w-0 flex-nowrap items-center justify-between gap-2 overflow-hidden max-md:gap-1.5 sm:flex-wrap sm:gap-3">
+        {/* Left: title (when !embedded) + experience bar + badges */}
+        <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden max-md:gap-1.5 sm:gap-3">
+          {!embedded && (
+            <h1 className="min-w-0 shrink-0 truncate text-2xl font-bold text-[var(--color-lightest)]">
+              {label}
+            </h1>
+          )}
+          {!readOnly && milestoneProgress && (() => {
+            const scope = milestoneProgress.reviews.next ? milestoneProgress.reviews : milestoneProgress.logs;
+            const currentBadge = scope.earned.length > 0 ? scope.earned[scope.earned.length - 1]! : null;
+            const next = scope.next;
+            const displayCurrent = next ? Math.min(scope.current, next.threshold) : scope.current;
+            const displayPct = scope.progressPct;
+            const kind = scope === milestoneProgress.reviews ? "reviews" : "logs";
+            const categoryLabel = t(`nav.${mediaType}`);
+            const badgeUser = t("mediaLogs.badgePopupYou");
+            return (
+              <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-visible max-md:min-w-[64px] max-md:gap-1 sm:gap-2">
+                {currentBadge && (
+                  <LevelBadge
+                    icon={MEDIA_BADGE_ICONS[mediaType]}
+                    level={scope.earned.length}
+                    title={currentBadge.label}
+                    className="max-md:scale-75"
+                    popupDetail={{ user: badgeUser, categoryLabel, count: scope.current, kind }}
+                  />
+                )}
+                {next && (
+                  <div className="flex min-w-0 items-center gap-1 sm:gap-2 sm:min-w-[80px]">
+                    <div className="h-1 min-w-[32px] flex-1 overflow-hidden rounded-full bg-[var(--color-darkest)] max-w-[90px] sm:h-1.5 sm:min-w-[48px] sm:max-w-[280px] md:h-2 md:max-w-[340px]">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] transition-all duration-500"
+                        style={{
+                          width: `${displayPct}%`,
+                          minWidth: displayCurrent > 0 ? "4px" : 0,
+                        }}
+                      />
+                    </div>
+                    <span className="shrink-0 text-[9px] text-[var(--color-light)] sm:text-[10px] md:text-xs" title={next.label}>
+                      {displayCurrent}/{next.threshold}
+                    </span>
+                    <LevelBadge
+                      icon={MEDIA_BADGE_ICONS[mediaType]}
+                      level={scope.earned.length + 1}
+                      title={next.label}
+                      className="max-md:scale-75"
+                      popupDetail={{
+                        user: badgeUser,
+                        categoryLabel,
+                        count: scope.current,
+                        kind,
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+        {/* Right: action buttons */}
+        {!readOnly && (
+          <div className="flex shrink-0 items-center gap-3 max-md:gap-1.5">
+            <motion.div whileTap={tapScale} transition={tapTransition}>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0 md:h-9 md:w-auto md:px-4 md:py-2"
+                onClick={() => setShowCustomEntry(true)}
+                title={t("customEntry.addCustomBatchEntry")}
+                aria-label={t("customEntry.addCustomBatchEntry")}
+              >
+                <Plus className="size-4 shrink-0" aria-hidden />
+                <span className="hidden md:inline-flex md:items-center md:gap-2">
+                  {t("customEntry.addCustomBatchEntry")}
+                </span>
+              </Button>
+            </motion.div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className={cn(
+                "h-8 w-8 shrink-0 md:h-9 md:w-9",
+                !hasProFeatures && "opacity-60 cursor-pointer"
+              )}
+              onClick={handleExportCategory}
+              disabled={exportingCategory}
+              title={t("mediaLogs.exportCategory")}
+              aria-label={t("mediaLogs.exportCategory")}
+            >
+              {exportingCategory ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Download className="size-4" aria-hidden />
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* 3. Search */}
+      {(embedded || readOnly) && (
+        <div className="relative min-w-0 max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
+          <Input
+            type="search"
+            placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
+            value={categorySearchQuery}
+            onChange={(e) => setCategorySearchQuery(e.target.value)}
+            className={cn(
+              "w-full border-[var(--color-mid)] bg-[var(--color-darkest)] pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)]",
+              categorySearchQuery.trim() !== "" ? "pr-9" : ""
+            )}
+            aria-label={t("mediaLogs.searchTitlesLabel")}
+          />
+          {categorySearchQuery.trim() !== "" && (
+            <button
+              type="button"
+              onClick={() => setCategorySearchQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+              aria-label={t("search.clearSearch")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
+
       </div>
 
       {filteredLogs.length === 0 ? (

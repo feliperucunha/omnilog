@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import { IN_PROGRESS_STATUSES, type Log } from "@dogument/shared";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
@@ -51,6 +51,7 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
   const { t, locale } = useLocale();
   const isMobile = useIsMobile();
   const drawerCloseRef = useRef<(() => void) | null>(null);
+  const drawerCloseImmediatelyRef = useRef<(() => void) | null>(null);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [data, setData] = useState<CalendarData | null>(null);
@@ -260,45 +261,34 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
           <Drawer open onOpenChange={(open) => !open && setSelectedDate(null)}>
             <DrawerContent
               mobileHeight="95%"
-              className="flex flex-col p-0 max-md:pt-[env(safe-area-inset-top)]"
+              className="flex flex-col p-4 sm:p-6"
               onClose={() => setSelectedDate(null)}
-              onReady={(requestClose) => {
+              onReady={(requestClose, requestCloseImmediately) => {
                 drawerCloseRef.current = requestClose;
+                drawerCloseImmediatelyRef.current = requestCloseImmediately ?? null;
               }}
             >
-              <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-2 border-b border-[var(--color-surface-border)] bg-[var(--color-dark)] px-4 py-3">
-                <h2 className="min-w-0 truncate text-lg font-semibold text-[var(--color-lightest)]">
+              <div className="mt-6">
+                <h2 className="mb-4 min-w-0 truncate text-lg font-semibold text-[var(--color-lightest)]">
                   {t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) })}
                 </h2>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 rounded-full"
-                  onClick={() => drawerCloseRef.current?.()}
-                  aria-label={t("common.close")}
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-              {dayLogsLoading ? (
-                <div className="py-8 flex justify-center">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
-                </div>
-              ) : dayLogs.length === 0 ? (
-                <p className="py-6 text-center text-sm text-[var(--color-light)]">
-                  {t("dashboard.calendarNoActivity")}
-                </p>
-              ) : (
-                <ul className="list-none m-0 p-0 flex flex-col gap-2">
-                  {dayLogs.map((log) => (
-                    <li key={log.id}>
-                      <Link
-                        to={`/item/${log.mediaType}/${log.externalId}`}
-                        className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
-                        onClick={() => drawerCloseRef.current?.()}
-                      >
+                {dayLogsLoading ? (
+                  <div className="py-8 flex justify-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
+                  </div>
+                ) : dayLogs.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-[var(--color-light)]">
+                    {t("dashboard.calendarNoActivity")}
+                  </p>
+                ) : (
+                  <ul className="list-none m-0 p-0 flex flex-col gap-2">
+                    {dayLogs.map((log) => (
+                      <li key={log.id}>
+                        <Link
+                          to={`/item/${log.mediaType}/${log.externalId}`}
+                          className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
+                          onClick={() => setSelectedDate(null)}
+                        >
                         <ItemImage src={log.image} className="h-14 w-10 shrink-0 rounded object-cover" />
                         <div className="min-w-0 flex-1 flex flex-col gap-0.5 justify-center">
                           <p className="truncate font-medium text-[var(--color-lightest)] text-sm">
@@ -319,12 +309,17 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
                             <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                           ) : null}
                         </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
+              <DrawerFooter>
+                <Button type="button" variant="outline" className="w-full max-md:min-h-[48px]" onClick={() => setSelectedDate(null)}>
+                  {t("common.close")}
+                </Button>
+              </DrawerFooter>
             </DrawerContent>
           </Drawer>
         ) : (
