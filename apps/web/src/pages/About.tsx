@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, Github } from "lucide-react";
+import { Heart, Github, ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -47,6 +47,56 @@ const TEAM_MEMBERS = [
   { roleKey: "about.teamRoleDesigner", nameKey: "about.teamNameDesigner", image: "/designer.jpeg" },
   { roleKey: "about.teamRoleQA", nameKey: "about.teamNameQA", image: "/qa.jpeg" },
 ] as const;
+
+function ErrorCodesCollapsible({ t }: { t: (key: string) => string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card
+      className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"
+      style={paperShadow}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] rounded-md"
+        aria-expanded={open}
+      >
+        <h2 className="text-lg font-semibold text-[var(--color-lightest)]">
+          {t("errorCodes.docsTitle")}
+        </h2>
+        <ChevronDown
+          className={`h-5 w-5 shrink-0 text-[var(--color-light)] transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <p className="mt-2 mb-4 text-[var(--color-light)] text-sm sm:text-base">
+              {t("errorCodes.docsIntro")}
+            </p>
+            <dl className="space-y-2 text-sm">
+              {ALL_ERROR_CODES.map((code) => (
+                <div key={code} className="flex gap-2">
+                  <dt className="font-mono font-semibold text-[var(--color-lightest)] shrink-0 w-10">
+                    {code}
+                  </dt>
+                  <dd className="text-[var(--color-light)]">{t(getErrorDocKey(code))}</dd>
+                </div>
+              ))}
+            </dl>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+}
 
 export function About() {
   const { t } = useLocale();
@@ -330,28 +380,8 @@ export function About() {
         </AnimatePresence>
       </Card>
 
-      {/* Error code reference */}
-      <Card
-        className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"
-        style={paperShadow}
-      >
-        <h2 className="mb-2 text-lg font-semibold text-[var(--color-lightest)]">
-          {t("errorCodes.docsTitle")}
-        </h2>
-        <p className="mb-4 text-[var(--color-light)] text-sm sm:text-base">
-          {t("errorCodes.docsIntro")}
-        </p>
-        <dl className="space-y-2 text-sm">
-          {ALL_ERROR_CODES.map((code) => (
-            <div key={code} className="flex gap-2">
-              <dt className="font-mono font-semibold text-[var(--color-lightest)] shrink-0 w-10">
-                {code}
-              </dt>
-              <dd className="text-[var(--color-light)]">{t(getErrorDocKey(code))}</dd>
-            </div>
-          ))}
-        </dl>
-      </Card>
+      {/* Error code reference (collapsible, collapsed by default) */}
+      <ErrorCodesCollapsible t={t} />
     </motion.div>
   );
 }
