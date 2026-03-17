@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
 import { AuthNavbar } from "@/components/AuthNavbar";
 import { toast } from "sonner";
+import { showErrorToast } from "@/lib/errorToast";
 import { apiFetch, ApiValidationError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import * as storage from "@/lib/storage";
@@ -66,7 +67,7 @@ export function Login() {
     if (!password) errors.password = t("login.password") + " is required";
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      toast.error(t("toast.emailPasswordRequired"));
+      showErrorToast(t, "E001");
       return;
     }
     setFieldErrors({});
@@ -99,7 +100,7 @@ export function Login() {
       } else {
         setFieldErrors({ email: msg, password: msg });
       }
-      toast.error(msg);
+      showErrorToast(t, "E002", { originalError: err });
     } finally {
       setLoading(false);
     }

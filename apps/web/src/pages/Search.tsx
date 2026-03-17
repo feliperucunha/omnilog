@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { MEDIA_TYPES, SEARCH_SORT_OPTIONS, type MediaType, type SearchResult } from "@dogument/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@dogument/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { apiFetch, apiFetchCached, invalidateApiCache } from "@/lib/api";
 import { SearchSkeleton } from "@/components/skeletons";
@@ -26,7 +27,7 @@ import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import type { BoardGameProvider } from "@dogument/shared";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Link } from "react-router-dom";
-import { AlertTriangle, UserCheck, X } from "lucide-react";
+import { AlertTriangle, Search as SearchIcon, UserCheck, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import * as storage from "@/lib/storage";
@@ -222,9 +223,9 @@ export function Search() {
           const params = new URLSearchParams({ q: q.trim() });
           const data = await apiFetch<{ users: UserSearchResult[] }>(`/search/users?${params.toString()}`);
           setUserResults(data.users ?? []);
-        } catch {
+        } catch (err) {
           setUserResults([]);
-          toast.error(t("toast.searchFailed"));
+          showErrorToast(t, "E016", { originalError: err });
         } finally {
           setLoading(false);
         }
@@ -273,7 +274,7 @@ export function Search() {
       } catch (err) {
         setResults([]);
         setRequiresApiKey(null);
-        toast.error(err instanceof Error ? err.message : t("toast.searchFailed"));
+        showErrorToast(t, "E016", { originalError: err });
       } finally {
         setLoading(false);
       }
@@ -345,8 +346,8 @@ export function Search() {
           );
           toast.success(t("social.followSuccess"));
         }
-      } catch {
-        toast.error(t("common.tryAgain"));
+      } catch (err) {
+        showErrorToast(t, "E017", { originalError: err });
       } finally {
         setLoadingFollowId(null);
       }
@@ -422,18 +423,34 @@ export function Search() {
             transition={{ type: "spring", stiffness: 300, damping: 35 }}
             className={hasSearched ? "flex flex-col gap-4 w-full" : "flex flex-col gap-4"}
           >
-            <Input
-              className="w-full"
-              placeholder={
-                searchFilter === USERS_SEARCH_TYPE
-                  ? t("search.usersPlaceholder")
-                  : t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })
-              }
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              autoFocus={!hasSearched}
-              aria-label={t("search.search")}
-            />
+            <div className="relative w-full">
+              <SearchIcon
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]"
+                aria-hidden
+              />
+              <Input
+                className="w-full pl-10 pr-10"
+                placeholder={
+                  searchFilter === USERS_SEARCH_TYPE
+                    ? t("search.usersPlaceholder")
+                    : t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })
+                }
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                autoFocus={!hasSearched}
+                aria-label={t("search.search")}
+              />
+              {query.trim() !== "" && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+                  aria-label={t("search.clearSearch")}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             {/* Desktop: category buttons */}
             <div className="hidden md:flex flex-wrap gap-2 mt-2 items-center justify-center">
               {[...effectiveVisibleTypes, USERS_SEARCH_TYPE].map((filter) => {

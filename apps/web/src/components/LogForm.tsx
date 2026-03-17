@@ -17,6 +17,7 @@ import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@d
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { showAchievementToasts } from "@/lib/achievementToast";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
 import { Loader2 } from "lucide-react";
@@ -235,8 +236,12 @@ export function LogForm(props: LogFormProps) {
         props.onSaved(completion);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("toast.failedToSave");
-      toast.error(message === LOG_LIMIT_REACHED_CODE ? t("tiers.logLimitReached") : message);
+      const message = err instanceof Error ? err.message : "";
+      if (message === LOG_LIMIT_REACHED_CODE) {
+        showErrorToast(t, "E011");
+      } else {
+        showErrorToast(t, "E013", { originalError: err });
+      }
     } finally {
       setLoading(false);
     }

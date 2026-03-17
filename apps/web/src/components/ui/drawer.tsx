@@ -21,6 +21,21 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = "DrawerOverlay";
 
+/** Use inside DrawerContent to pin action buttons at the bottom; the rest of the content scrolls. */
+const DrawerFooter = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--color-surface-border)] bg-[var(--color-dark)] pt-4 max-md:pb-0",
+        className
+      )}
+      {...props}
+    />
+  )
+);
+DrawerFooter.displayName = "DrawerFooter";
+
 type DrawerContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   onClose?: () => void;
   /** On mobile: height of the drawer. Desktop keeps centered modal. */
@@ -28,6 +43,10 @@ type DrawerContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.
   /** Called with the animated close function so parents can use it for Cancel/close buttons. */
   onReady?: (requestClose: () => void) => void;
 };
+
+function isDrawerFooter(child: React.ReactNode): boolean {
+  return React.isValidElement(child) && child.type === DrawerFooter;
+}
 
 const DrawerContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
@@ -103,7 +122,23 @@ const DrawerContent = React.forwardRef<
         }}
         {...props}
       >
-        {children}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {(() => {
+            const childArray = React.Children.toArray(children);
+            const footerIndex = childArray.findIndex((c) => isDrawerFooter(c));
+            const hasFooter = footerIndex >= 0;
+            const footer = hasFooter ? childArray[footerIndex] : null;
+            const contentChildren = hasFooter ? childArray.filter((_, i) => i !== footerIndex) : childArray;
+            return (
+              <>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  {contentChildren}
+                </div>
+                {footer}
+              </>
+            );
+          })()}
+        </div>
       </DialogPrimitive.Content>
     </DialogPortal>
   );
@@ -111,4 +146,4 @@ const DrawerContent = React.forwardRef<
 DrawerContent.displayName = "DrawerContent";
 
 export const Drawer = Dialog;
-export { DrawerContent };
+export { DrawerContent, DrawerFooter };

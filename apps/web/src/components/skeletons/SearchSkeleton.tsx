@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function SearchSkeleton() {
   return (
     <div className="flex flex-col gap-4 min-w-0">
-      {/* Results grid: mobile = row cards (small poster left), desktop = column cards (poster top) */}
+      {/* Results grid: mobile = row cards (poster left), desktop = column cards (poster top) - same as Search result cards */}
       <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
         {Array.from({ length: 8 }).map((_, i) => (
           <div

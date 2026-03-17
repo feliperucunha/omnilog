@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
@@ -15,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { IN_PROGRESS_STATUSES, type Log } from "@dogument/shared";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
@@ -47,6 +49,8 @@ function formatCalendarDayDate(dateKey: string, locale: string): string {
 
 export function DashboardCalendar({ isPro }: { isPro: boolean }) {
   const { t, locale } = useLocale();
+  const isMobile = useIsMobile();
+  const drawerCloseRef = useRef<(() => void) | null>(null);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [data, setData] = useState<CalendarData | null>(null);
@@ -251,18 +255,33 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
         )}
       </Card>
 
-      {isPro && (
-        <Dialog open={!!selectedDate} onOpenChange={(open) => !open && setSelectedDate(null)}>
-          <DialogContent
-            className="max-h-[85vh] flex flex-col max-w-md"
-            onClose={() => setSelectedDate(null)}
-          >
-            <DialogHeader>
-              <DialogTitle className="text-[var(--color-lightest)]">
-                {selectedDate ? t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) }) : ""}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="min-h-0 overflow-y-auto -mx-1 px-1">
+      {isPro && selectedDate && (
+        isMobile ? (
+          <Drawer open onOpenChange={(open) => !open && setSelectedDate(null)}>
+            <DrawerContent
+              mobileHeight="95%"
+              className="flex flex-col p-0 max-md:pt-[env(safe-area-inset-top)]"
+              onClose={() => setSelectedDate(null)}
+              onReady={(requestClose) => {
+                drawerCloseRef.current = requestClose;
+              }}
+            >
+              <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-2 border-b border-[var(--color-surface-border)] bg-[var(--color-dark)] px-4 py-3">
+                <h2 className="min-w-0 truncate text-lg font-semibold text-[var(--color-lightest)]">
+                  {t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) })}
+                </h2>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 rounded-full"
+                  onClick={() => drawerCloseRef.current?.()}
+                  aria-label={t("common.close")}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
               {dayLogsLoading ? (
                 <div className="py-8 flex justify-center">
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
@@ -278,7 +297,7 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
                       <Link
                         to={`/item/${log.mediaType}/${log.externalId}`}
                         className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
-                        onClick={() => setSelectedDate(null)}
+                        onClick={() => drawerCloseRef.current?.()}
                       >
                         <ItemImage src={log.image} className="h-14 w-10 shrink-0 rounded object-cover" />
                         <div className="min-w-0 flex-1 flex flex-col gap-0.5 justify-center">
@@ -305,9 +324,67 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
                   ))}
                 </ul>
               )}
-            </div>
-          </DialogContent>
-        </Dialog>
+              </div>
+            </DrawerContent>
+          </Drawer>
+        ) : (
+          <Dialog open onOpenChange={(open) => !open && setSelectedDate(null)}>
+            <DialogContent
+              className="max-h-[85vh] flex flex-col max-w-md"
+              onClose={() => setSelectedDate(null)}
+            >
+              <DialogHeader>
+                <DialogTitle className="text-[var(--color-lightest)]">
+                  {t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) })}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="min-h-0 overflow-y-auto -mx-1 px-1">
+                {dayLogsLoading ? (
+                  <div className="py-8 flex justify-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
+                  </div>
+                ) : dayLogs.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-[var(--color-light)]">
+                    {t("dashboard.calendarNoActivity")}
+                  </p>
+                ) : (
+                  <ul className="list-none m-0 p-0 flex flex-col gap-2">
+                    {dayLogs.map((log) => (
+                      <li key={log.id}>
+                        <Link
+                          to={`/item/${log.mediaType}/${log.externalId}`}
+                          className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
+                          onClick={() => setSelectedDate(null)}
+                        >
+                          <ItemImage src={log.image} className="h-14 w-10 shrink-0 rounded object-cover" />
+                          <div className="min-w-0 flex-1 flex flex-col gap-0.5 justify-center">
+                            <p className="truncate font-medium text-[var(--color-lightest)] text-sm">
+                              {log.title}
+                            </p>
+                            <p className="text-xs text-[var(--color-light)]">
+                              {t(`nav.${log.mediaType}`)}
+                              {(() => {
+                                const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
+                                return duration ? <> · {t("dashboard.finishedIn", { duration })}</> : null;
+                              })()}
+                            </p>
+                            {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
+                              <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                                {t("common.inProgress")}
+                              </span>
+                            ) : log.grade != null ? (
+                              <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+                            ) : null}
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )
       )}
     </>
   );

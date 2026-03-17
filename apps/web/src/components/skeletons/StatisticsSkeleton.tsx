@@ -6,13 +6,7 @@ const paperShadow = { boxShadow: "var(--shadow-sm)" };
 export function StatisticsSkeleton() {
   return (
     <div className="relative flex min-w-0 flex-col gap-10 overflow-x-hidden">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <Skeleton className="h-8 w-36 rounded-md sm:h-9 sm:w-40" />
-        <Skeleton className="h-9 w-28 rounded-md shrink-0" />
-      </div>
-
-      <div className="flex flex-col gap-12">
-      {/* First row: Calendar + By genre */}
+      {/* First row: Calendar + By genre / status / category card */}
       <div className="grid min-w-0 grid-cols-1 gap-6 overflow-hidden md:grid-cols-2 md:gap-8">
         <section className="min-w-0 w-full overflow-hidden rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
           <div className="border-b border-[var(--color-mid)]/30 px-4 py-3 flex items-center justify-between">
@@ -33,7 +27,13 @@ export function StatisticsSkeleton() {
           </div>
         </section>
         <Card className="min-w-0 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4" style={paperShadow}>
-          <Skeleton className="h-4 w-20 rounded mb-3" />
+          <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
+            <Skeleton className="h-9 w-full max-w-[220px] rounded-md" />
+            <div className="ml-1 flex gap-1">
+              <Skeleton className="h-8 w-20 rounded-md" />
+              <Skeleton className="h-8 w-16 rounded-md" />
+            </div>
+          </div>
           <div className="flex flex-col gap-2">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3">
@@ -46,13 +46,17 @@ export function StatisticsSkeleton() {
         </Card>
       </div>
 
-      {/* Second row: Time consumed + Recent logs */}
+      {/* Second row: Time consumed (Stats) + Recent logs */}
       <div className="grid min-w-0 grid-cols-1 gap-10 overflow-hidden md:grid-cols-2 md:gap-10">
         <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-lg py-2 max-md:min-h-[44px] max-md:py-3 text-left"
+            aria-disabled
+          >
             <Skeleton className="h-4 w-4 shrink-0 rounded" />
             <Skeleton className="h-4 w-24 rounded" />
-          </div>
+          </button>
           <Card className="min-w-0 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4" style={paperShadow}>
             <div className="flex flex-col gap-4">
               <div className="hidden md:flex flex-wrap gap-2">
@@ -96,7 +100,6 @@ export function StatisticsSkeleton() {
             ))}
           </div>
         </div>
-      </div>
       </div>
     </div>
   );

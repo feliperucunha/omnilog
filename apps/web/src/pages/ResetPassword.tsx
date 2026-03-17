@@ -8,6 +8,7 @@ import { PasswordInput } from "@/components/PasswordInput";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { showErrorToast } from "@/lib/errorToast";
 import { apiFetch, ApiValidationError } from "@/lib/api";
 import type { AuthResponse } from "@dogument/shared";
 import { modalContentVariants } from "@/lib/animations";
@@ -47,7 +48,7 @@ export function ResetPassword() {
     }
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      toast.error(errors.password ?? errors.confirmPassword);
+      showErrorToast(t, "E005");
       return;
     }
     setLoading(true);
@@ -72,7 +73,7 @@ export function ResetPassword() {
         setFieldErrors({ password: message, confirmPassword: message });
       }
       setError(message);
-      toast.error(message);
+      showErrorToast(t, "E004", { originalError: err });
     } finally {
       setLoading(false);
     }

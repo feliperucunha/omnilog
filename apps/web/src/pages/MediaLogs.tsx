@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, AlertTriangle, Plus, Download, Pencil } from "lucide-react";
+import { Search, AlertTriangle, Plus, Download, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { MediaLogsSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -113,6 +114,8 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   /** Log id whose review is expanded in-card (no modal). */
   const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
   const [milestoneProgressFetched, setMilestoneProgressFetched] = useState<CategoryMilestoneProgress | null>(null);
+  /** When embedded (home): start with Load more button; after first click, switch to infinite scroll. When not embedded, use infinite scroll from the start. */
+  const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(() => !embedded);
 
   const milestoneProgress = milestoneProgressProp ?? (readOnly ? null : milestoneProgressFetched);
 
@@ -246,6 +249,11 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
     }
   }, [mediaType, statusFilter, ownedFilter, sortBy, publicUserId, embedded, initialLogsProp, initialNextCursorProp]);
 
+  /** When embedded, start with Load more again when category or filters change. */
+  useEffect(() => {
+    if (embedded) setInfiniteScrollEnabled(false);
+  }, [embedded, mediaType, statusFilter, ownedFilter, sortBy]);
+
   useEffect(() => {
     setStatusCounts(null);
     fetchStatusCounts();
@@ -255,6 +263,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   const fetchLogsRef = useRef(fetchLogs);
   fetchLogsRef.current = fetchLogs;
   useEffect(() => {
+    if (!infiniteScrollEnabled) return;
     const el = loadMoreRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -266,7 +275,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [infiniteScrollEnabled]);
 
   useEffect(() => {
     if (!editingLog) {
@@ -292,7 +301,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       fetchStatusCounts();
       toast.success(t("toast.logDeleted"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.deleteFailed"));
+      showErrorToast(t, "E014", { originalError: err });
     } finally {
       setDeletingId(null);
     }
@@ -320,7 +329,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       setLogs((prev) => prev.map((l) => (l.id === log.id ? updated : l)));
       toast.success(t("toast.logUpdated"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
+      showErrorToast(t, "E008", { originalError: err });
     } finally {
       setIncrementingId(null);
     }
@@ -354,7 +363,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       await downloadFile(blob, filename);
       toast.success(t("mediaLogs.exportCategorySuccess"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("tiers.exportFailed"));
+      showErrorToast(t, "E010", { originalError: err });
     } finally {
       setExportingCategory(false);
     }
@@ -441,10 +450,15 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         </Link>
       )}
       <div className="flex min-w-0 flex-col gap-2 sm:gap-3">
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 overflow-hidden">
-          <h1 className="min-w-0 truncate text-2xl font-bold text-[var(--color-lightest)]">
-            {label}
-          </h1>
+        <div className={cn(
+          "flex min-w-0 flex-wrap items-center gap-2 overflow-hidden",
+          embedded ? "justify-end" : "justify-between"
+        )}>
+          {!embedded && (
+            <h1 className="min-w-0 truncate text-2xl font-bold text-[var(--color-lightest)]">
+              {label}
+            </h1>
+          )}
           {!readOnly && (
           <div className="flex min-w-0 flex-shrink-0 flex-wrap items-center gap-3">
             <motion.div whileTap={tapScale} transition={tapTransition}>
@@ -551,16 +565,29 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
 
       <div className="flex min-w-0 flex-col gap-3 overflow-hidden">
         {(embedded || readOnly) && (
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="relative flex min-w-0 max-w-xs items-center gap-2">
             <Search className="h-4 w-4 shrink-0 text-[var(--color-light)]" aria-hidden />
             <Input
               type="search"
               placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
               value={categorySearchQuery}
               onChange={(e) => setCategorySearchQuery(e.target.value)}
-              className="max-w-xs border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-lightest)] placeholder:text-[var(--color-light)]"
+              className={cn(
+                "border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-lightest)] placeholder:text-[var(--color-light)]",
+                categorySearchQuery.trim() !== "" ? "pr-9" : ""
+              )}
               aria-label={t("mediaLogs.searchTitlesLabel")}
             />
+            {categorySearchQuery.trim() !== "" && (
+              <button
+                type="button"
+                onClick={() => setCategorySearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+                aria-label={t("search.clearSearch")}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         )}
       <div className="flex min-w-0 flex-wrap items-center gap-3 overflow-hidden">
@@ -855,7 +882,20 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
               <div className="flex flex-col items-center gap-2 py-4">
                 {loadingMore ? (
                   <Loader2 className="h-8 w-8 animate-spin text-[var(--color-light)]" aria-hidden />
-                ) : (
+                ) : embedded && !infiniteScrollEnabled ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      fetchLogs(false);
+                      setInfiniteScrollEnabled(true);
+                    }}
+                    aria-label={t("mediaLogs.loadMore")}
+                  >
+                    {t("mediaLogs.loadMore")}
+                  </Button>
+                ) : !embedded ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -865,7 +905,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                   >
                     {t("mediaLogs.loadMore")}
                   </Button>
-                )}
+                ) : null}
               </div>
             </>
           )}
@@ -901,9 +941,22 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
             placeholder={t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })}
             value={categorySearchQuery}
             onChange={(e) => setCategorySearchQuery(e.target.value)}
-            className="h-11 min-w-0 flex-1 border-0 bg-transparent pl-10 pr-4 text-[var(--color-lightest)] placeholder:text-[var(--color-light)] focus-visible:ring-0 focus-visible:ring-offset-0"
+            className={cn(
+              "h-11 min-w-0 flex-1 border-0 bg-transparent pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)] focus-visible:ring-0 focus-visible:ring-offset-0",
+              categorySearchQuery.trim() !== "" ? "pr-10" : "pr-4"
+            )}
             aria-label={t("search.search")}
           />
+          {categorySearchQuery.trim() !== "" && (
+            <button
+              type="button"
+              onClick={() => setCategorySearchQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+              aria-label={t("search.clearSearch")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </form>
       )}

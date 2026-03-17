@@ -22,6 +22,7 @@ function NavLinkItem({
   icon,
   active,
   iconOnly,
+  bottomBar,
   className,
 }: {
   to: string;
@@ -29,21 +30,41 @@ function NavLinkItem({
   icon: React.ReactNode;
   active?: boolean;
   iconOnly?: boolean;
+  /** Mobile bottom bar: icon + text stacked. */
+  bottomBar?: boolean;
   className?: string;
 }) {
   return (
     <NavLink
       to={to}
       className={cn(
-        "flex items-center rounded-lg text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/50",
-        iconOnly ? "flex-1 justify-center py-4" : "gap-2 px-3 py-2 text-sm font-medium",
+        "flex rounded-lg text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/50",
+        bottomBar
+          ? "flex-1 flex-col items-center justify-center gap-0.5 py-2 px-1 min-w-0"
+          : iconOnly
+            ? "flex-1 justify-center py-4 items-center"
+            : "items-center gap-3 px-3 py-2.5 text-sm font-medium",
         active && "bg-[var(--color-mid)]/50",
         className
       )}
       aria-label={label}
     >
-      {icon}
-      {!iconOnly && <span className="min-w-0 flex-1 truncate">{label}</span>}
+      <span
+        className={cn(
+          bottomBar && "shrink-0 flex items-center justify-center",
+          !bottomBar && !iconOnly && "flex h-5 w-5 shrink-0 items-center justify-center"
+        )}
+      >
+        {icon}
+      </span>
+      {(bottomBar || !iconOnly) && (
+        <span className={cn(
+          "min-w-0 truncate text-center",
+          bottomBar ? "text-[10px] font-medium leading-tight" : "min-w-0 flex-1 text-left"
+        )}>
+          {label}
+        </span>
+      )}
     </NavLink>
   );
 }
@@ -62,7 +83,7 @@ export function Nav() {
     { to: "/about", labelKey: "nav.about", icon: <Info size={iconSize} /> },
   ];
 
-  /** Mobile bottom bar: same as nav but without About (icon-only). */
+  /** Mobile bottom bar: same as nav but without About; icon + text per item. */
   const bottomBarItems = navItems.filter((item) => item.to !== "/about");
 
   return (
@@ -72,12 +93,12 @@ export function Nav() {
       >
         <Link
           to="/"
-          className="flex h-14 min-w-0 items-center border-b border-[var(--color-mid)]/30 -ml-2 text-[var(--color-lightest)] no-underline"
+          className="flex h-14 min-w-0 items-center gap-3 border-b border-[var(--color-mid)]/30 px-4 text-[var(--color-lightest)] no-underline"
         >
-          <Logo alt={t("app.name")} className="h-12 w-auto flex-shrink-0 md:h-14" />
-          <span className="brand-title -ml-3 truncate font-bold text-xl text-(--btn-gradient-end) dark:text-(--btn-gradient-start) md:-ml-4 md:text-2xl">{t("app.name")}</span>
+          <Logo alt={t("app.name")} className="h-8 w-auto flex-shrink-0 md:h-9" />
+          <span className="brand-title truncate font-bold text-lg text-[var(--btn-gradient-end)] dark:text-[var(--btn-gradient-start)] md:text-xl">{t("app.name")}</span>
         </Link>
-        <div className="flex flex-1 flex-col gap-1 overflow-y-auto p-2 min-h-0">
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3 min-h-0" aria-label="Main navigation">
           {token ? (
             <>
               {navItems.map((item) => (
@@ -104,7 +125,7 @@ export function Nav() {
               <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} />
             </>
           )}
-        </div>
+        </nav>
       </aside>
 
       <nav
@@ -119,16 +140,16 @@ export function Nav() {
               label={t(item.labelKey)}
               icon={item.icon}
               active={location.pathname === item.to}
-              iconOnly
+              bottomBar
             />
           ))
         ) : (
           <>
-            <NavLinkItem to="/search" label={t("nav.search")} icon={<Search size={iconSize} />} active={location.pathname === "/search"} iconOnly />
-            <NavLinkItem to="/tiers" label={t("nav.plans")} icon={<CreditCard size={iconSize} />} active={location.pathname === "/tiers"} iconOnly />
-            <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} active={location.pathname === "/about"} iconOnly />
-            <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} active={location.pathname === "/login"} iconOnly />
-            <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} active={location.pathname === "/register"} iconOnly />
+            <NavLinkItem to="/search" label={t("nav.search")} icon={<Search size={iconSize} />} active={location.pathname === "/search"} bottomBar />
+            <NavLinkItem to="/tiers" label={t("nav.plans")} icon={<CreditCard size={iconSize} />} active={location.pathname === "/tiers"} bottomBar />
+            <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} active={location.pathname === "/about"} bottomBar />
+            <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} active={location.pathname === "/login"} bottomBar />
+            <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} active={location.pathname === "/register"} bottomBar />
           </>
         )}
       </nav>

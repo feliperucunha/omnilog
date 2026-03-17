@@ -503,43 +503,43 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
               })()
             }
           />
-          {/* Strong gradient: dark scrim from ~30% down so text always has contrast */}
+          {/* Strong gradient: dark scrim so text is always readable in both light and dark theme */}
           <div
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, transparent 20%, rgba(0,0,0,0.4) 50%, var(--color-darkest) 75%)",
+                "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 25%, rgba(0,0,0,0.5) 50%, rgba(13,27,42,0.97) 75%)",
             }}
           />
-          {/* Extra solid bar at bottom so title/meta sit on opaque background */}
+          {/* Bottom bar: always dark so hero text has contrast in light theme */}
           <div
             className="pointer-events-none absolute bottom-0 left-0 right-0 h-1/2 min-h-[140px]"
             style={{
-              background: "linear-gradient(to bottom, transparent 0%, var(--color-darkest) 55%)",
+              background: "linear-gradient(to bottom, transparent 0%, rgba(13,27,42,0.98) 55%)",
             }}
           />
-          {/* Back button: top-left with slight tint for contrast */}
+          {/* Back button: always light text on dark scrim (readable in both themes) */}
           <div className="absolute left-0 top-0 z-10 p-2 sm:p-3">
             <Button
               variant="ghost"
               size="sm"
-              className="max-md:min-h-[44px] max-md:min-w-[44px] rounded-full bg-black/40 text-[var(--color-lightest)] backdrop-blur-sm hover:bg-black/55"
+              className="max-md:min-h-[44px] max-md:min-w-[44px] rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/55 hover:text-white"
               onClick={onBack}
             >
               <ArrowLeft size={20} />
               {t("itemPage.back")}
             </Button>
           </div>
-          {/* Title and meta: text-shadow for readability on any image */}
+          {/* Title and meta: always light text on dark scrim (readable in both themes) */}
           <div className="absolute bottom-0 left-0 right-0 z-10 flex flex-col gap-1.5 p-4 pb-6 sm:p-6 sm:pb-8 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
-            <p className="text-sm font-medium uppercase tracking-wide text-[var(--color-light)] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+            <p className="text-sm font-medium uppercase tracking-wide text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
               {label}
             </p>
-            <h1 className="text-xl font-bold text-[var(--color-lightest)] break-words sm:text-2xl md:text-3xl [text-shadow:0_2px_8px_rgba(0,0,0,0.95)]">
+            <h1 className="text-xl font-bold text-white break-words sm:text-2xl md:text-3xl [text-shadow:0_2px_8px_rgba(0,0,0,0.95)]">
               {item.title}
             </h1>
             {(item.year || item.subtitle) && (
-              <p className="text-sm text-[var(--color-light)] [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
+              <p className="text-sm text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
                 {[item.year, item.subtitle].filter(Boolean).join(" · ")}
               </p>
             )}
@@ -555,15 +555,15 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                       })
                     : t("itemPage.timeToBeatHours", { hours: String(hours) });
                 return (
-                  <p className="text-sm text-[var(--color-light)] [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
+                  <p className="text-sm text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
                     {t("itemPage.timeToBeat")}: {value}
                   </p>
                 );
               })()}
             {meanGrade != null && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
+              <div className="mt-2 flex flex-wrap items-center gap-2 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] [--color-lightest:white]">
                 <StarRating value={gradeToStars(meanGrade)} readOnly size="md" />
-                <span className="text-sm text-[var(--color-light)]">
+                <span className="text-sm text-white/90">
                   ({reviewsTotal} review{reviewsTotal === 1 ? "" : "s"})
                 </span>
               </div>

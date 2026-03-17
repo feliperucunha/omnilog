@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLocale } from "@/contexts/LocaleContext";
 import { toast } from "sonner";
+import { showErrorToast } from "@/lib/errorToast";
 import { apiFetch } from "@/lib/api";
 import { modalContentVariants } from "@/lib/animations";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,7 @@ export function ForgotPassword() {
     e.preventDefault();
     if (!email.trim()) {
       setEmailError(t("forgotPassword.email") + " is required");
-      toast.error(t("toast.emailPasswordRequired"));
+      showErrorToast(t, "E001");
       return;
     }
     setEmailError(null);
@@ -37,7 +38,7 @@ export function ForgotPassword() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("toast.loginFailed");
       setEmailError(msg);
-      toast.error(msg);
+      showErrorToast(t, "E002", { originalError: err });
     } finally {
       setLoading(false);
     }

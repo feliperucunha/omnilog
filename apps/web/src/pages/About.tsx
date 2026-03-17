@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { StarRating } from "@/components/StarRating";
 import { apiFetch } from "@/lib/api";
 import * as storage from "@/lib/storage";
+import { ALL_ERROR_CODES, getErrorDocKey } from "@/lib/errorCodes";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 
 const FEEDBACK_COOLDOWN_KEY = "dogument_feedback_cooldown";
@@ -111,8 +113,8 @@ export function About() {
         setExpanded(false);
         setComments("");
         toast.success(t("about.feedbackSuccess"));
-      } catch {
-        toast.error(t("about.feedbackError"));
+      } catch (err) {
+        showErrorToast(t, "E024", { originalError: err });
       } finally {
         setSubmitting(false);
       }
@@ -326,6 +328,29 @@ export function About() {
             </motion.div>
           )}
         </AnimatePresence>
+      </Card>
+
+      {/* Error code reference */}
+      <Card
+        className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"
+        style={paperShadow}
+      >
+        <h2 className="mb-2 text-lg font-semibold text-[var(--color-lightest)]">
+          {t("errorCodes.docsTitle")}
+        </h2>
+        <p className="mb-4 text-[var(--color-light)] text-sm sm:text-base">
+          {t("errorCodes.docsIntro")}
+        </p>
+        <dl className="space-y-2 text-sm">
+          {ALL_ERROR_CODES.map((code) => (
+            <div key={code} className="flex gap-2">
+              <dt className="font-mono font-semibold text-[var(--color-lightest)] shrink-0 w-10">
+                {code}
+              </dt>
+              <dd className="text-[var(--color-light)]">{t(getErrorDocKey(code))}</dd>
+            </div>
+          ))}
+        </dl>
       </Card>
     </motion.div>
   );

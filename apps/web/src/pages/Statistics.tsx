@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import * as storage from "@/lib/storage";
 
@@ -183,7 +184,7 @@ export function Statistics() {
     setExporting(true);
     apiFetchFile("/logs/export")
       .then(({ blob, filename }) => downloadFile(blob, filename).then(() => toast.success(t("tiers.exportSuccess"))))
-      .catch((err) => toast.error(err instanceof Error ? err.message : t("tiers.exportFailed")))
+      .catch((err) => showErrorToast(t, "E010", { originalError: err }))
       .finally(() => setExporting(false));
   }, [isPro, t]);
 

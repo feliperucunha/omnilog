@@ -15,6 +15,7 @@ import { IN_PROGRESS_STATUSES, MEDIA_TYPES, LOG_STATUS_OPTIONS } from "@dogument
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { showAchievementToasts } from "@/lib/achievementToast";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -77,11 +78,11 @@ export function CustomEntryForm({
     e.preventDefault();
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
-      toast.error(t("customEntry.entryTitleRequired"));
+      showErrorToast(t, "E021");
       return;
     }
     if (imageUrl.trim() && !isValidUrl(imageUrl.trim())) {
-      toast.error(t("customEntry.invalidImageUrl"));
+      showErrorToast(t, "E022");
       return;
     }
     const image = imageUrl.trim() ? imageUrl.trim() : null;
@@ -121,8 +122,12 @@ export function CustomEntryForm({
       };
       onSaved(completion);
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("toast.failedToSave");
-      toast.error(message === LOG_LIMIT_REACHED_CODE ? t("tiers.logLimitReached") : message);
+      const message = err instanceof Error ? err.message : "";
+      if (message === LOG_LIMIT_REACHED_CODE) {
+        showErrorToast(t, "E011");
+      } else {
+        showErrorToast(t, "E013", { originalError: err });
+      }
     } finally {
       setLoading(false);
     }

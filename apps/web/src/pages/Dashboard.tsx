@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Share2, AlertTriangle, User, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchCached, LOGS_INVALIDATED_EVENT } from "@/lib/api";
@@ -18,7 +19,7 @@ import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, MEDIA_TYPES, type MediaType, 
 import type { Log } from "@dogument/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { MediaLogs } from "@/pages/MediaLogs";
 import { Select } from "@/components/ui/select";
@@ -255,8 +256,8 @@ export function Dashboard() {
     try {
       await navigator.clipboard.writeText(url);
       toast.success(t("dashboard.linkCopied"));
-    } catch {
-      toast.error(t("common.tryAgain"));
+    } catch (err) {
+      showErrorToast(t, "E017", { originalError: err });
     }
   }, [me?.user?.id, visibleTypes, selectedCategory, t]);
 
@@ -355,17 +356,21 @@ export function Dashboard() {
 
   const betaContent = (onClose: () => void) => (
     <>
-      <DialogHeader className="max-md:space-y-2">
-        <DialogTitle className="text-[var(--color-lightest)] text-xl max-md:text-2xl">
-          {t("dashboard.betaModalTitle")}
-        </DialogTitle>
-      </DialogHeader>
-      <p className="text-sm text-[var(--color-light)] max-md:text-base max-md:leading-relaxed">
-        {t("dashboard.betaModalMessage")}
-      </p>
-      <Button onClick={onClose} className="w-fit max-md:w-full max-md:min-h-[48px] max-md:text-base">
-        {t("dashboard.betaModalGotIt")}
-      </Button>
+      <div className="flex flex-col gap-6 max-md:gap-4">
+        <DialogHeader className="max-md:space-y-2">
+          <DialogTitle className="text-[var(--color-lightest)] text-xl max-md:text-2xl">
+            {t("dashboard.betaModalTitle")}
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-[var(--color-light)] max-md:text-base max-md:leading-relaxed">
+          {t("dashboard.betaModalMessage")}
+        </p>
+      </div>
+      <DrawerFooter>
+        <Button onClick={onClose} className="w-fit max-md:w-full max-md:min-h-[48px] max-md:text-base">
+          {t("dashboard.betaModalGotIt")}
+        </Button>
+      </DrawerFooter>
     </>
   );
 
@@ -379,7 +384,7 @@ export function Dashboard() {
               betaDrawerCloseRef.current = requestClose;
             }}
             mobileHeight="30%"
-            className="flex flex-col justify-center gap-6 p-6 max-md:min-h-0 max-md:justify-start max-md:pt-6"
+            className="flex flex-col p-6 max-md:pt-6"
           >
             {betaContent(() => betaDrawerCloseRef.current?.() ?? handleBetaModalClose())}
           </DrawerContent>

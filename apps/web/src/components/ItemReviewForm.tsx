@@ -12,6 +12,7 @@ import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@d
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { showAchievementToasts } from "@/lib/achievementToast";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -255,8 +256,12 @@ export function ItemReviewForm({
         });
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("toast.failedToSaveReview");
-      toast.error(message === LOG_LIMIT_REACHED_CODE ? t("tiers.logLimitReached") : message);
+      const message = err instanceof Error ? err.message : "";
+      if (message === LOG_LIMIT_REACHED_CODE) {
+        showErrorToast(t, "E011");
+      } else {
+        showErrorToast(t, "E012", { originalError: err });
+      }
     } finally {
       setSaving(false);
     }

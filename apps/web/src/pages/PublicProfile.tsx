@@ -13,6 +13,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { MediaLogs } from "@/pages/MediaLogs";
 import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 
 /** Per-medium milestone progress (same shape as API). */
@@ -142,8 +143,8 @@ export function PublicProfile() {
         setFollowing(true);
         toast.success(t("social.followSuccess"));
       }
-    } catch {
-      toast.error(t("common.tryAgain"));
+    } catch (err) {
+      showErrorToast(t, "E017", { originalError: err });
     } finally {
       setFollowLoading(false);
     }

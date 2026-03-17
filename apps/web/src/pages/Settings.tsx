@@ -11,6 +11,7 @@ import { SettingsSkeleton } from "@/components/skeletons";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { apiFetch, invalidateApiCache, apiFetchFile, downloadFile } from "@/lib/api";
 import { toast } from "sonner";
+import { showErrorToast } from "@/lib/errorToast";
 import { API_KEY_META, type ApiKeyProvider } from "@/lib/apiKeyMeta";
 import { useLocale, LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -22,7 +23,7 @@ import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@dogument/shared";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useMediaQuery";
-import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import {
   Dialog,
   DialogContent,
@@ -123,7 +124,7 @@ export function Settings() {
               ? ludopedia.trim()
               : comicvine.trim();
     if (!value) {
-      toast.error(t("toast.enterKeyToSave"));
+      showErrorToast(t, "E007");
       return;
     }
     setSaving(provider);
@@ -153,7 +154,7 @@ export function Settings() {
       if (provider === "comicvine") setComicvine("");
       toast.success(t("toast.keySaved", { name: API_KEY_META[provider].name }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
+      showErrorToast(t, "E008", { originalError: err });
     } finally {
       setSaving(null);
     }
@@ -171,7 +172,7 @@ export function Settings() {
       invalidateApiCache("/search");
       toast.success(t("settings.boardGameProviderSaved"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
+      showErrorToast(t, "E008", { originalError: err });
     } finally {
       setSavingBoardGameProvider(false);
     }
@@ -198,7 +199,7 @@ export function Settings() {
       await refetchVisibleTypes();
       toast.success(t("toast.mediaTypesSaved"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
+      showErrorToast(t, "E008", { originalError: err });
     } finally {
       setSavingMediaTypes(false);
     }
@@ -228,7 +229,7 @@ export function Settings() {
     async (onClose: () => void) => {
       const selected = Array.from(exportSelectedCategories);
       if (selected.length === 0) {
-        toast.error(t("settings.exportSelectAtLeastOne"));
+        showErrorToast(t, "E009");
         return;
       }
       setExporting(true);
@@ -242,7 +243,7 @@ export function Settings() {
         toast.success(t("tiers.exportSuccess"));
         onClose();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t("tiers.exportFailed"));
+        showErrorToast(t, "E010", { originalError: err });
       } finally {
         setExporting(false);
       }
@@ -253,11 +254,12 @@ export function Settings() {
   const exportModalContent = useCallback(
     (onClose: () => void) => (
       <>
-        <DialogHeader>
-          <DialogTitle>{t("settings.exportModalTitle")}</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-[var(--color-light)]">{t("settings.exportModalDesc")}</p>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>{t("settings.exportModalTitle")}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-[var(--color-light)]">{t("settings.exportModalDesc")}</p>
+          <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-sm">
             <button
               type="button"
@@ -300,8 +302,9 @@ export function Settings() {
               </label>
             ))}
           </div>
+          </div>
         </div>
-        <div className="flex gap-2 justify-end pt-2">
+        <DrawerFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={exporting}>
             {t("common.cancel")}
           </Button>
@@ -314,7 +317,7 @@ export function Settings() {
             <Download className="h-4 w-4" aria-hidden />
             {exporting ? t("common.saving") : t("settings.exportDownload")}
           </Button>
-        </div>
+        </DrawerFooter>
       </>
     ),
     [t, exporting, exportSelectedCategories, handleExportDownload]

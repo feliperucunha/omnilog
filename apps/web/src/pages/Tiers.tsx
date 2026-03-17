@@ -10,6 +10,7 @@ import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { TiersSkeleton } from "@/components/skeletons";
 
@@ -78,8 +79,7 @@ export function Tiers() {
       throw new Error("No checkout URL returned");
     } catch (err) {
       setCheckoutLoading(false);
-      const message = err instanceof Error ? err.message : t("tiers.checkoutError");
-      toast.error(message);
+      showErrorToast(t, "E025", { originalError: err });
     }
   };
 
@@ -97,8 +97,7 @@ export function Tiers() {
       throw new Error("No portal URL returned");
     } catch (err) {
       setPortalLoading(false);
-      const message = err instanceof Error ? err.message : t("tiers.manageSubscriptionError");
-      toast.error(message);
+      showErrorToast(t, "E099", { originalError: err });
     }
   };
 
@@ -121,7 +120,7 @@ export function Tiers() {
       } catch {
         // fall through
       }
-      toast.error(t("tiers.cancelSubscriptionError"));
+      showErrorToast(t, "E023");
     } finally {
       setCancelLoading(false);
     }

@@ -104,7 +104,17 @@ export class InvalidApiKeyError extends Error {
   }
 }
 
+/** User-friendly message when the server returns HTML (e.g. cold-start or proxy error page). */
+const HTML_RESPONSE_MESSAGE =
+  "The server is taking longer than usual to respond. Please wait a moment and try again.";
+
+function looksLikeHtml(text: string): boolean {
+  const t = text.trimStart().toLowerCase();
+  return t.startsWith("<!doctype") || t.startsWith("<html");
+}
+
 function parseErrorResponse(text: string, fallback: string): string {
+  if (looksLikeHtml(text)) return HTML_RESPONSE_MESSAGE;
   try {
     const data = JSON.parse(text) as { error?: string | Record<string, unknown>; code?: string };
     if (data.code === LOG_LIMIT_REACHED_CODE) return LOG_LIMIT_REACHED_CODE;
@@ -218,6 +228,11 @@ async function fetchInternal<T>(
       throw new ApiError(message, 401);
     }
 
+    if (looksLikeHtml(text)) {
+      fireFirstApiErrorOnce(LoadingErrorCodeEnum.SERVER_ERROR);
+      throw new ApiError(HTML_RESPONSE_MESSAGE, res.ok ? 200 : res.status);
+    }
+
     if (!res.ok) {
       fireFirstApiErrorOnce(statusToLoadingErrorCode(res.status));
       const message = parseErrorResponse(
@@ -243,6 +258,10 @@ async function fetchInternal<T>(
     }
 
     if (!text) return undefined as T;
+    if (looksLikeHtml(text)) {
+      fireFirstApiErrorOnce(LoadingErrorCodeEnum.SERVER_ERROR);
+      throw new ApiError(HTML_RESPONSE_MESSAGE, 200);
+    }
     return JSON.parse(text) as T;
   } catch (err) {
     clearTimeout(timeoutId);
@@ -275,6 +294,10 @@ export async function apiFetchPublic<T>(path: string, options?: RequestInit): Pr
     clearTimeout(timeoutId);
     fireFirstApiResponseOnce();
     const text = await res.text();
+    if (looksLikeHtml(text)) {
+      fireFirstApiErrorOnce(LoadingErrorCodeEnum.SERVER_ERROR);
+      throw new Error(HTML_RESPONSE_MESSAGE);
+    }
     if (!res.ok) {
       fireFirstApiErrorOnce(statusToLoadingErrorCode(res.status));
       const message = parseErrorResponse(text, res.status === 404 ? "Not found" : "Request failed");

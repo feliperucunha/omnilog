@@ -3,34 +3,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function DashboardSkeleton() {
   return (
     <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden">
-      {/* Title + Share */}
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <Skeleton className="h-8 w-32 rounded-md" />
-        <Skeleton className="h-9 w-9 rounded-md sm:h-8 sm:w-24" />
-      </div>
-
-      {/* Category: Mobile = horizontal scroll pills, Desktop = toggle group in box */}
-      <div className="flex min-w-0 justify-center overflow-hidden">
-        <div className="scrollbar-hide flex md:hidden min-w-0 gap-2 py-2 -mx-4 px-4 overflow-x-auto">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-24 flex-shrink-0 rounded-full" />
-          ))}
+      {/* Category section: same rounded-xl border box as Dashboard */}
+      <section
+        aria-hidden
+        className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
+      >
+        {/* Desktop: toggle group only (mobile uses StickyCategoryStrip below navbar) */}
+        <div className="flex min-w-0 w-full shrink-0 justify-center overflow-hidden">
+          <div className="hidden md:inline-flex flex-wrap justify-center gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-2 w-fit">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-9 w-20 rounded-md md:px-3 md:py-2" />
+            ))}
+          </div>
         </div>
-        <div className="hidden md:flex flex-wrap justify-center gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-1 w-full max-w-2xl md:w-fit">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-8 w-16 rounded-md" />
-          ))}
-        </div>
-      </div>
 
-      {/* Embedded MediaLogs: filter row + cards */}
-      <section className="flex min-w-0 flex-col gap-4 overflow-hidden">
-        {/* Mobile: 2 dropdowns in grid */}
+        {/* Embedded MediaLogs: mobile 2 dropdowns, desktop filter row, then cards */}
         <div className="grid w-full grid-cols-2 gap-2 md:hidden">
           <Skeleton className="h-10 w-full rounded-md min-w-0" />
           <Skeleton className="h-10 w-full rounded-md min-w-0" />
         </div>
-        {/* Desktop: label + buttons + label + buttons */}
         <div className="hidden md:flex min-w-0 flex-wrap items-center gap-3">
           <Skeleton className="h-5 w-14 rounded" />
           <div className="flex gap-2">
@@ -66,10 +57,16 @@ export function DashboardSkeleton() {
         </div>
       </section>
 
-      {/* Social section (shown when signed in) */}
+      {/* Social section */}
       <section className="flex min-w-0 flex-col gap-4 overflow-hidden" aria-hidden>
-        <Skeleton className="h-6 w-24 rounded" />
-        <div className="flex min-w-0 flex-col gap-2">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Skeleton className="h-5 w-5 shrink-0 rounded" />
+            <Skeleton className="h-6 w-24 rounded" />
+          </div>
+          <Skeleton className="h-4 w-20 rounded" />
+        </div>
+        <div className="flex min-w-0 flex-col gap-4 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50 p-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <div
               key={i}

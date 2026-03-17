@@ -15,6 +15,7 @@ import { useMe } from "@/contexts/MeContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { Link } from "react-router-dom";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { Loader2, Upload, FileSpreadsheet, ChevronDown, ChevronRight } from "lucide-react";
 import { parseSheetFile, type ParsedRow, type SheetParseResult } from "@/lib/parseSheet";
@@ -155,10 +156,10 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
       const results = data?.results ?? [];
       setPreviewResult(results[0] ?? null);
       if (results.length === 0) {
-        toast.error(t("batchEntry.noResultFor", { name: first.name }));
+        showErrorToast(t, "E018", { interpolation: { name: first.name } });
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("batchEntry.previewError"));
+      showErrorToast(t, "E019", { originalError: err });
     } finally {
       setLoadingPreview(false);
     }
@@ -220,7 +221,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
         const msg = err instanceof Error ? err.message : "";
         if (msg === LOG_LIMIT_REACHED_CODE) {
           reasons.push({ name: row.name, reason: t("tiers.logLimitReached") });
-          toast.error(t("tiers.logLimitReached"));
+          showErrorToast(t, "E011");
           break;
         }
         reasons.push({
@@ -242,7 +243,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel }: BatchEntry
       onDone();
     }
     if (reasons.length > 0) {
-      toast.error(t("batchEntry.someFailed", { count: String(reasons.length) }));
+      showErrorToast(t, "E020", { interpolation: { count: reasons.length } });
     }
   }, [parseResult, mediaType, boardGameProvider, overrideExistingLogs, t, onDone]);
 

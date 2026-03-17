@@ -10,6 +10,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthNavbar } from "@/components/AuthNavbar";
 import { toast } from "sonner";
+import { showErrorToast } from "@/lib/errorToast";
 import { apiFetch, ApiValidationError } from "@/lib/api";
 import type { AuthResponse } from "@dogument/shared";
 import { modalContentVariants } from "@/lib/animations";
@@ -54,7 +55,7 @@ export function Register() {
     if (password !== confirmPassword) errors.confirmPassword = t("register.passwordsDoNotMatch");
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      toast.error(t("toast.emailPasswordRequired"));
+      showErrorToast(t, "E001");
       return;
     }
     setFieldErrors({});
@@ -81,13 +82,13 @@ export function Register() {
           }
         }
         setFieldErrors(mapped);
-        toast.error(err.message);
+        showErrorToast(t, "E003", { originalError: err });
       } else {
         const msg = err instanceof Error ? err.message : t("toast.registrationFailed");
         if (msg.includes("Email") || msg.includes("email")) setFieldErrors((p) => ({ ...p, email: msg }));
         else if (msg.includes("Username") || msg.includes("username")) setFieldErrors((p) => ({ ...p, username: msg }));
         else setFieldErrors({});
-        toast.error(msg);
+        showErrorToast(t, "E003", { originalError: err });
       }
     } finally {
       setLoading(false);

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { apiFetch, invalidateApiCache } from "@/lib/api";
+import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { API_KEY_META, type ApiKeyProvider } from "@/lib/apiKeyMeta";
 
@@ -36,7 +37,7 @@ export function ApiKeyPrompt({
   const handleSave = async () => {
     const trimmed = key.trim();
     if (!trimmed) {
-      toast.error(t("toast.enterApiKey"));
+      showErrorToast(t, "E006");
       return;
     }
     setSaving(true);
@@ -56,7 +57,7 @@ export function ApiKeyPrompt({
       setKey("");
       onSaved();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("toast.failedToSave"));
+      showErrorToast(t, "E008", { originalError: err });
     } finally {
       setSaving(false);
     }
