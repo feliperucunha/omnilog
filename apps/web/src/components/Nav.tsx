@@ -114,6 +114,12 @@ export function Nav() {
           ) : (
             <>
               <NavLinkItem
+                to="/"
+                label={t("nav.dashboard")}
+                icon={<Home size={iconSize} />}
+                active={location.pathname === "/"}
+              />
+              <NavLinkItem
                 to="/search"
                 label={t("nav.search")}
                 icon={<Search size={iconSize} />}
@@ -145,6 +151,7 @@ export function Nav() {
           ))
         ) : (
           <>
+            <NavLinkItem to="/" label={t("nav.dashboard")} icon={<Home size={iconSize} />} active={location.pathname === "/"} bottomBar />
             <NavLinkItem to="/search" label={t("nav.search")} icon={<Search size={iconSize} />} active={location.pathname === "/search"} bottomBar />
             <NavLinkItem to="/tiers" label={t("nav.plans")} icon={<CreditCard size={iconSize} />} active={location.pathname === "/tiers"} bottomBar />
             <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} active={location.pathname === "/about"} bottomBar />

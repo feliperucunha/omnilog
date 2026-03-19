@@ -1,7 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLocale } from "@/contexts/LocaleContext";
 import { AppLayout } from "@/layouts/AppLayout";
 import { AnimatedOutlet } from "@/components/AnimatedOutlet";
 import { Login } from "@/pages/Login";
@@ -20,6 +18,7 @@ import { About } from "@/pages/About";
 import { Tiers } from "@/pages/Tiers";
 import { PublicProfile } from "@/pages/PublicProfile";
 import { PublicProfileLayout } from "@/layouts/PublicProfileLayout";
+import { GuestHome } from "@/pages/GuestHome";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { token, initializing } = useAuth();
@@ -43,33 +42,12 @@ const DashboardOrSearch = () => {
   const { token, initializing } = useAuth();
   if (initializing) return null;
   if (token) return <Dashboard />;
-  return <Navigate to="/search" replace />;
+  return <GuestHome />;
 };
-
-/** Full-screen overlay while session is being restored (cookie /me). Prevents showing logged-out UI during slow API. */
-function SessionCheckOverlay() {
-  const { initializing } = useAuth();
-  const { t } = useLocale();
-  if (!initializing) return null;
-  return (
-    <div
-      className="fixed inset-0 z-[99] flex items-center justify-center bg-[var(--color-dark)]"
-      role="status"
-      aria-live="polite"
-      aria-label={t("common.loading")}
-    >
-      <div className="flex flex-col items-center gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-mid)]" aria-hidden />
-        <span className="text-sm text-[var(--color-light)]">{t("common.checkingSession")}</span>
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   return (
     <>
-      <SessionCheckOverlay />
       <LogCompleteProvider>
       <RequireOnboarded>
         <InvalidApiKeyProvider>
