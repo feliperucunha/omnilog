@@ -6,10 +6,12 @@ import { LoadingErrorCode } from "@/lib/loadingErrorCodes";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 
-/** Full-screen loader shown until the first API response and auth has finished initializing (replaces separate cold-start % and session-check spinner). */
-const COLD_START_DURATION_MS = 50_000;
-/** Max total time before showing Try again so the user is never stuck (covers slow API + long "checking session"). */
-const MAX_TOTAL_WAIT_MS = 60_000;
+/** Progress bar reaches ~100% over this duration (aligned with max wait so we don’t show “timed out” UI before retries finish). */
+const COLD_START_PROGRESS_DURATION_MS = 180_000;
+/** Max wait before Try again (must exceed worst case: several API attempts × long timeout + backoff). */
+const MAX_TOTAL_WAIT_MS = 180_000;
+/** Show “server may be sleeping” hint after this many ms. */
+const SERVER_SLEEPING_HINT_MS = 15_000;
 
 type LoaderState = "loading" | "success" | "timed_out" | "error";
 
@@ -51,10 +53,9 @@ export function ColdStartLoader() {
     if (state !== "loading") return;
     const tick = () => {
       const elapsed = Date.now() - startTimeRef.current;
-      const p = Math.min(100, (elapsed / COLD_START_DURATION_MS) * 100);
+      const p = Math.min(99, (elapsed / COLD_START_PROGRESS_DURATION_MS) * 100);
       setProgress(Math.round(p));
-      if (p >= 100) setState("timed_out");
-      else rafRef.current = requestAnimationFrame(tick);
+      rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
@@ -145,6 +146,11 @@ export function ColdStartLoader() {
         </div>
         {initializing && progress >= 100 && (
           <span className="text-sm text-[var(--color-light)]">{t("common.checkingSession")}</span>
+        )}
+        {stillWaiting && elapsedMs >= SERVER_SLEEPING_HINT_MS && (
+          <p className="mt-3 max-w-sm text-center text-xs leading-relaxed text-[var(--color-mid)]">
+            {t("coldStart.serverSleepingHint")}
+          </p>
         )}
         {stillWaiting && elapsedMs >= 25_000 && elapsedMs < MAX_TOTAL_WAIT_MS && (
           <Button onClick={handleTryAgain} variant="outline" size="sm" className="mt-4">

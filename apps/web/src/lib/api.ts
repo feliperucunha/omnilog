@@ -13,7 +13,7 @@ if (API_BASE.startsWith("http") && !API_BASE.endsWith("/api")) {
 export function getApiBase(): string {
   return API_BASE;
 }
-/** Match cold-start wait (50s) so the first request is not aborted too early. */
+/** Per-attempt timeout; apiFetch retries several times for cold/sleeping servers. */
 const DEFAULT_TIMEOUT_MS = 55_000;
 
 /** Called once when the first API response is received (cold-start UX). Set from app root. */
@@ -86,7 +86,9 @@ export const INVALID_API_KEY_CODE = "INVALID_API_KEY";
 export class ApiError extends Error {
   constructor(
     message: string,
-    public readonly statusCode: number
+    public readonly statusCode: number,
+    /** Overrides cold-start / loading screen error code (e.g. version mismatch on 401). */
+    public readonly loadingErrorCode?: LoadingErrorCode
   ) {
     super(message);
     this.name = "ApiError";
@@ -159,6 +161,46 @@ export class ApiValidationError extends Error {
   }
 }
 
+/** Statuses where a sleeping / cold-starting server may recover on retry. */
+const RETRYABLE_HTTP_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+
+const MAX_FETCH_ATTEMPTS = 4;
+const RETRY_BACKOFF_MS = [2000, 4500, 9000] as const;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableAfterError(err: unknown): boolean {
+  if (err instanceof InvalidApiKeyError || err instanceof ApiValidationError) return false;
+  if (err instanceof ApiError) {
+    if (err.loadingErrorCode === LoadingErrorCodeEnum.VERSION_MISMATCH) return false;
+    if (RETRYABLE_HTTP_STATUSES.has(err.statusCode)) return true;
+    /** Proxy / sleeping host often returns HTML instead of JSON. */
+    if (err.message === HTML_RESPONSE_MESSAGE) return true;
+    return false;
+  }
+  if (err instanceof Error && err.name === "AbortError") return true;
+  if (err instanceof TypeError) return true;
+  return false;
+}
+
+function fireFirstApiErrorFromCaught(err: unknown): void {
+  if (err instanceof InvalidApiKeyError || err instanceof ApiValidationError) {
+    fireFirstApiErrorOnce(LoadingErrorCodeEnum.CLIENT_ERROR);
+    return;
+  }
+  if (err instanceof ApiError) {
+    fireFirstApiErrorOnce(err.loadingErrorCode ?? statusToLoadingErrorCode(err.statusCode));
+    return;
+  }
+  if (err instanceof Error && err.name === "AbortError") {
+    fireFirstApiErrorOnce(LoadingErrorCodeEnum.TIMEOUT);
+    return;
+  }
+  fireFirstApiErrorOnce(LoadingErrorCodeEnum.NETWORK);
+}
+
 /** Invalidate cached GET requests. Call after mutations (create/update/delete logs). */
 export function invalidateApiCache(prefix: string): void {
   invalidateByPrefix(prefix);
@@ -183,11 +225,12 @@ export interface ApiFetchOptions extends RequestInit {
   skipAuthRedirect?: boolean;
 }
 
-async function fetchInternal<T>(
+/** One fetch attempt; does not fire cold-start callbacks (retries may run first). */
+async function performSingleFetchAttempt<T>(
   path: string,
-  options?: ApiFetchOptions
+  options: ApiFetchOptions | undefined,
+  timeoutMs: number
 ): Promise<T> {
-  const timeoutMs = options?.timeout ?? DEFAULT_TIMEOUT_MS;
   const { timeout: _t, skipAuthRedirect, ...fetchOptions } = options ?? {};
 
   const controller = new AbortController();
@@ -201,7 +244,6 @@ async function fetchInternal<T>(
       headers: { ...getAuthHeaders(), ...fetchOptions.headers },
     });
     clearTimeout(timeoutId);
-    fireFirstApiResponseOnce();
 
     const text = await res.text();
 
@@ -214,11 +256,13 @@ async function fetchInternal<T>(
         /* ignore */
       }
       if (code === APP_VERSION_MISMATCH_CODE) {
-        fireFirstApiErrorOnce(LoadingErrorCodeEnum.VERSION_MISMATCH);
         window.dispatchEvent(new CustomEvent("app:version-mismatch"));
-        throw new ApiError(parseErrorResponse(text, "App version outdated. Please update the app."), 401);
+        throw new ApiError(
+          parseErrorResponse(text, "App version outdated. Please update the app."),
+          401,
+          LoadingErrorCodeEnum.VERSION_MISMATCH
+        );
       }
-      fireFirstApiErrorOnce(LoadingErrorCodeEnum.UNAUTHORIZED);
       const message = parseErrorResponse(text, "Session expired. Please sign in again.");
       if (!skipAuthRedirect) {
         void removeItem("dogument_token").then(() => removeItem("dogument_user"));
@@ -229,12 +273,10 @@ async function fetchInternal<T>(
     }
 
     if (looksLikeHtml(text)) {
-      fireFirstApiErrorOnce(LoadingErrorCodeEnum.SERVER_ERROR);
-      throw new ApiError(HTML_RESPONSE_MESSAGE, res.ok ? 200 : res.status);
+      throw new ApiError(HTML_RESPONSE_MESSAGE, res.ok ? 502 : res.status);
     }
 
     if (!res.ok) {
-      fireFirstApiErrorOnce(statusToLoadingErrorCode(res.status));
       const message = parseErrorResponse(
         text,
         res.status === 500 ? "Something went wrong. Please try again." : res.statusText || "Request failed"
@@ -259,29 +301,46 @@ async function fetchInternal<T>(
 
     if (!text) return undefined as T;
     if (looksLikeHtml(text)) {
-      fireFirstApiErrorOnce(LoadingErrorCodeEnum.SERVER_ERROR);
-      throw new ApiError(HTML_RESPONSE_MESSAGE, 200);
+      throw new ApiError(HTML_RESPONSE_MESSAGE, 502);
     }
     return JSON.parse(text) as T;
   } catch (err) {
     clearTimeout(timeoutId);
-    if (err instanceof Error) {
-      if (err.name === "AbortError") {
-        fireFirstApiErrorOnce(LoadingErrorCodeEnum.TIMEOUT);
-        throw new Error("Request took too long. Please try again.");
-      }
-      throw err;
-    }
-    fireFirstApiErrorOnce(LoadingErrorCodeEnum.NETWORK);
+    if (err instanceof Error) throw err;
     throw new Error("Network error. Check your connection and try again.");
   }
 }
 
-/**
- * Fetch public API (no auth). Use for read-only public endpoints (e.g. /users/:id).
- * Does not send credentials or redirect on 401.
- */
-export async function apiFetchPublic<T>(path: string, options?: RequestInit): Promise<T> {
+async function fetchInternal<T>(path: string, options?: ApiFetchOptions): Promise<T> {
+  const timeoutMs = options?.timeout ?? DEFAULT_TIMEOUT_MS;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < MAX_FETCH_ATTEMPTS; attempt++) {
+    try {
+      const result = await performSingleFetchAttempt<T>(path, options, timeoutMs);
+      fireFirstApiResponseOnce();
+      return result;
+    } catch (e) {
+      lastError = e;
+      const canRetry = attempt < MAX_FETCH_ATTEMPTS - 1 && isRetryableAfterError(e);
+      if (!canRetry) {
+        fireFirstApiErrorFromCaught(e);
+        if (e instanceof Error && e.name === "AbortError") {
+          throw new Error("Request took too long. Please try again.");
+        }
+        throw e;
+      }
+      const delayMs = RETRY_BACKOFF_MS[attempt] ?? RETRY_BACKOFF_MS[RETRY_BACKOFF_MS.length - 1];
+      await sleep(delayMs);
+    }
+  }
+  fireFirstApiErrorFromCaught(lastError);
+  if (lastError instanceof Error && lastError.name === "AbortError") {
+    throw new Error("Request took too long. Please try again.");
+  }
+  throw lastError;
+}
+
+async function performSinglePublicFetchAttempt<T>(path: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
   try {
@@ -292,31 +351,57 @@ export async function apiFetchPublic<T>(path: string, options?: RequestInit): Pr
       headers: { "Content-Type": "application/json", "X-App-Version": APP_VERSION, ...options?.headers },
     });
     clearTimeout(timeoutId);
-    fireFirstApiResponseOnce();
     const text = await res.text();
     if (looksLikeHtml(text)) {
-      fireFirstApiErrorOnce(LoadingErrorCodeEnum.SERVER_ERROR);
-      throw new Error(HTML_RESPONSE_MESSAGE);
+      throw new ApiError(HTML_RESPONSE_MESSAGE, res.ok ? 502 : res.status);
     }
     if (!res.ok) {
-      fireFirstApiErrorOnce(statusToLoadingErrorCode(res.status));
       const message = parseErrorResponse(text, res.status === 404 ? "Not found" : "Request failed");
-      throw new Error(message);
+      throw new ApiError(message, res.status);
     }
     if (!text) return undefined as T;
     return JSON.parse(text) as T;
   } catch (err) {
     clearTimeout(timeoutId);
-    if (err instanceof Error) {
-      if (err.name === "AbortError") {
-        fireFirstApiErrorOnce(LoadingErrorCodeEnum.TIMEOUT);
-        throw new Error("Request took too long. Please try again.");
-      }
-      throw err;
-    }
-    fireFirstApiErrorOnce(LoadingErrorCodeEnum.NETWORK);
-    throw new Error("Network error. Check your connection and try again.");
+    if (err instanceof Error && err.name === "AbortError") throw err;
+    if (err instanceof ApiError) throw err;
+    throw err instanceof Error ? err : new Error("Network error. Check your connection and try again.");
   }
+}
+
+function publicFetchErrorToError(e: unknown): Error {
+  if (e instanceof Error && e.name === "AbortError") {
+    return new Error("Request took too long. Please try again.");
+  }
+  if (e instanceof ApiError) return new Error(e.message);
+  if (e instanceof Error) return e;
+  return new Error("Network error. Check your connection and try again.");
+}
+
+/**
+ * Fetch public API (no auth). Use for read-only public endpoints (e.g. /users/:id).
+ * Does not send credentials or redirect on 401.
+ */
+export async function apiFetchPublic<T>(path: string, options?: RequestInit): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < MAX_FETCH_ATTEMPTS; attempt++) {
+    try {
+      const result = await performSinglePublicFetchAttempt<T>(path, options);
+      fireFirstApiResponseOnce();
+      return result;
+    } catch (e) {
+      lastError = e;
+      const canRetry = attempt < MAX_FETCH_ATTEMPTS - 1 && isRetryableAfterError(e);
+      if (!canRetry) {
+        fireFirstApiErrorFromCaught(e);
+        throw publicFetchErrorToError(e);
+      }
+      const delayMs = RETRY_BACKOFF_MS[attempt] ?? RETRY_BACKOFF_MS[RETRY_BACKOFF_MS.length - 1];
+      await sleep(delayMs);
+    }
+  }
+  fireFirstApiErrorFromCaught(lastError);
+  throw publicFetchErrorToError(lastError);
 }
 
 /**

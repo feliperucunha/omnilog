@@ -590,6 +590,7 @@
   },
   "coldStart": {
     "error": "Something went wrong. Please check your connection and try again.",
+    "serverSleepingHint": "This can take a minute if the server was asleep (e.g. free hosting). We’re retrying automatically—hang tight, or use Try again below.",
     "timedOut": "Taking longer than usual. The server may be waking up.",
     "errorCodeLabel": "Error code",
     "code_TIMEOUT": "The request took too long. Please try again.",

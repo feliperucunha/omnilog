@@ -59,11 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     if (!native) {
-      /** Web: safety timeout if /me hangs (storage is sync-friendly). */
+      /** Web: safety timeout if /me hangs (storage is sync-friendly). Long enough for cold-start retries in api.ts. */
       timeoutId = setTimeout(() => {
         if (cancelled) return;
         setState((prev) => (prev.initializing ? { ...prev, initializing: false } : prev));
-      }, 25_000);
+      }, 120_000);
     }
 
     (async () => {
@@ -122,7 +122,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           });
       };
-      attempt(1);
+      /** Extra outer retries if all inner apiFetch attempts still fail (e.g. host waking up). */
+      attempt(2);
     })();
 
     return () => {

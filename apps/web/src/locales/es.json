@@ -589,6 +589,7 @@
   },
   "coldStart": {
     "error": "Algo salió mal. Comprueba tu conexión e inténtalo de nuevo.",
+    "serverSleepingHint": "Puede tardar un minuto si el servidor estaba inactivo (p. ej. hosting gratuito). Estamos reintentando automáticamente—espera o usa Reintentar abajo.",
     "timedOut": "Está tardando más de lo habitual. El servidor puede estar iniciándose.",
     "errorCodeLabel": "Código de error",
     "code_TIMEOUT": "La solicitud tardó demasiado. Inténtalo de nuevo.",

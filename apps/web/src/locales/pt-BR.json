@@ -589,6 +589,7 @@
   },
   "coldStart": {
     "error": "Algo deu errado. Verifique sua conexão e tente novamente.",
+    "serverSleepingHint": "Pode levar um minuto se o servidor estava dormindo (ex.: hospedagem gratuita). Estamos tentando de novo automaticamente—aguarde ou use Tentar novamente abaixo.",
     "timedOut": "Está demorando mais que o normal. O servidor pode estar acordando.",
     "errorCodeLabel": "Código do erro",
     "code_TIMEOUT": "A requisição demorou demais. Tente novamente.",
