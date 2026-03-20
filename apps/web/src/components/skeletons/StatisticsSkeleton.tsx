@@ -3,6 +3,91 @@ import { Card } from "@/components/ui/card";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
+/** Four overview cards (Statistics summary row). */
+export function StatisticsSummarySkeleton() {
+  return (
+    <section
+      aria-hidden
+      className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4 md:gap-4"
+    >
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Card
+          key={i}
+          className="flex min-h-[5.5rem] min-w-0 flex-col justify-center border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
+          style={paperShadow}
+        >
+          <div className="flex items-start gap-2">
+            <Skeleton className="mt-0.5 h-4 w-4 shrink-0 rounded" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-2.5 w-24 rounded" />
+              <Skeleton className="h-7 w-16 max-w-full rounded" />
+            </div>
+          </div>
+        </Card>
+      ))}
+    </section>
+  );
+}
+
+/** Bar rows matching genre / status / category / hours charts (fixed height to avoid layout shift). */
+export function StatisticsBarsSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div
+      className="flex min-h-[12.5rem] min-w-0 flex-col justify-center gap-2 overflow-hidden"
+      aria-hidden
+    >
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex min-w-0 items-center gap-3">
+          <Skeleton className="h-3 w-14 shrink-0 rounded sm:w-20" />
+          <Skeleton className="h-6 min-w-0 flex-1 rounded bg-[var(--color-darkest)]" />
+          <Skeleton className="h-3 w-10 shrink-0 rounded sm:w-12" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Stacked “by category over time” blocks (period label + nested rows). */
+export function StatisticsCategoryOverTimeSkeleton() {
+  return (
+    <div className="flex min-h-[12.5rem] min-w-0 flex-col gap-4 overflow-hidden" aria-hidden>
+      {Array.from({ length: 3 }).map((_, block) => (
+        <div key={block} className="flex min-w-0 flex-col gap-2">
+          <Skeleton className="h-3 w-20 rounded" />
+          {Array.from({ length: 3 }).map((_, row) => (
+            <div key={row} className="flex min-w-0 items-center gap-3 pl-0">
+              <Skeleton className="h-3 w-20 max-w-[7rem] shrink-0 rounded" />
+              <Skeleton className="h-5 min-w-0 flex-1 rounded bg-[var(--color-darkest)]" />
+              <Skeleton className="h-3 w-8 shrink-0 rounded" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function StatisticsRecentLogsSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2" aria-hidden>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          className="flex min-w-0 flex-row overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-card)]"
+        >
+          <Skeleton className="h-28 w-20 shrink-0 rounded-l-lg" />
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-2 p-3">
+            <Skeleton className="h-2.5 w-16 rounded" />
+            <Skeleton className="h-4 w-full max-w-[14rem] rounded" />
+            <Skeleton className="h-3 w-24 rounded" />
+            <Skeleton className="h-3 w-full max-w-[11rem] rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function StatisticsSkeleton() {
   return (
     <div className="relative flex min-w-0 flex-col gap-10 overflow-x-hidden">

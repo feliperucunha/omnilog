@@ -1,10 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleCheck, Clock, Download, Layers, Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchCached, apiFetchFile, downloadFile } from "@/lib/api";
-import { StatisticsSkeleton } from "@/components/skeletons";
+import {
+  StatisticsSummarySkeleton,
+  StatisticsBarsSkeleton,
+  StatisticsCategoryOverTimeSkeleton,
+  StatisticsRecentLogsSkeleton,
+} from "@/components/skeletons";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
@@ -12,10 +17,11 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
-import { IN_PROGRESS_STATUSES, type Log } from "@dogument/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, type Log } from "@dogument/shared";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
-import { formatTimeToFinish } from "@/lib/formatDuration";
+import { formatTimeToBeatHours, formatTimeToFinish } from "@/lib/formatDuration";
+import { getStatusLabel } from "@/lib/statusLabel";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { DashboardCalendar } from "@/components/DashboardCalendar";
@@ -48,6 +54,23 @@ interface CategoryOverTimeEntry {
   hours: number;
 }
 
+/** GET /logs/stats?group=summary */
+interface LogStatsSummary {
+  totalLogs: number;
+  completedLogs: number;
+  reviewedLogs: number;
+  totalContentHours: number;
+  completedLogsWithHours: number;
+}
+
+const EMPTY_SUMMARY: LogStatsSummary = {
+  totalLogs: 0,
+  completedLogs: 0,
+  reviewedLogs: 0,
+  totalContentHours: 0,
+  completedLogsWithHours: 0,
+};
+
 export function Statistics() {
   const { t } = useLocale();
   const { me } = useMe();
@@ -55,13 +78,14 @@ export function Statistics() {
   const { setPageTitle, setRightSlot } = usePageTitle() ?? {};
   const isPro = me?.tier === "pro" || me?.tier === "admin";
   const [logs, setLogs] = useState<Log[]>([]);
+  const [summary, setSummary] = useState<LogStatsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [statsGroup, setStatsGroup] = useState<StatsGroup>("category");
   const [stats, setStats] = useState<StatsEntry[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [genreStats, setGenreStats] = useState<StatsEntry[]>([]);
   const [genreStatsLoading, setGenreStatsLoading] = useState(true);
-  const [genreGraphMode, setGenreGraphMode] = useState<GenreGraphMode>("genre");
+  const [genreGraphMode, setGenreGraphMode] = useState<GenreGraphMode>("byCategory");
   const [statusOverTimeGroup, setStatusOverTimeGroup] = useState<StatusOverTimeGroup>("month");
   const [statusOverTimeStats, setStatusOverTimeStats] = useState<StatsEntry[]>([]);
   const [statusOverTimeLoading, setStatusOverTimeLoading] = useState(true);
@@ -168,11 +192,18 @@ export function Statistics() {
 
   const fetchLogs = useCallback(() => {
     setLoading(true);
-    apiFetchCached<Log[] | { data: Log[]; nextCursor: string | null }>("/logs?limit=5&sort=date", {
-      ttlMs: 2 * 60 * 1000,
-    })
-      .then((res) => setLogs(Array.isArray(res) ? res : res.data))
-      .catch(() => setLogs([]))
+    Promise.all([
+      apiFetchCached<Log[] | { data: Log[]; nextCursor: string | null }>("/logs?limit=5&sort=date", {
+        ttlMs: 2 * 60 * 1000,
+      }).then((res) => setLogs(Array.isArray(res) ? res : res.data)),
+      apiFetch<{ data: LogStatsSummary }>("/logs/stats?group=summary")
+        .then((res) => setSummary(res.data ?? null))
+        .catch(() => setSummary(null)),
+    ])
+      .catch(() => {
+        setLogs([]);
+        setSummary(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -214,6 +245,7 @@ export function Statistics() {
     else {
       setLoading(false);
       setStatsLoading(false);
+      setSummary(null);
     }
   }, [isPro, fetchLogs]);
 
@@ -246,13 +278,7 @@ export function Statistics() {
   );
   const categoryOverTimePeriods = Object.keys(categoryOverTimeByPeriod).sort();
 
-  if (isPro && loading && logs.length === 0) {
-    return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-        <StatisticsSkeleton />
-      </motion.div>
-    );
-  }
+  const summaryData = summary ?? EMPTY_SUMMARY;
 
   return (
     <div className="relative flex min-w-0 flex-col gap-10 overflow-x-hidden">
@@ -275,6 +301,79 @@ export function Statistics() {
       </Dialog>
 
       <div className={`flex flex-col gap-12 ${!isPro ? "pointer-events-none select-none blur-sm" : ""}`}>
+      {isPro && loading && <StatisticsSummarySkeleton />}
+      {isPro && !loading && (
+        <section
+          aria-label={t("statistics.summaryTitle")}
+          className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4 md:gap-4"
+        >
+          <Card
+            className="flex min-h-[5.5rem] min-w-0 flex-col justify-center border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
+            style={paperShadow}
+          >
+            <div className="flex items-start gap-2">
+              <Layers className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-mid)]" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
+                  {t("statistics.summaryTotalLogs")}
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--color-lightest)] sm:text-2xl">
+                  {summaryData.totalLogs}
+                </p>
+              </div>
+            </div>
+          </Card>
+          <Card
+            className="flex min-h-[5.5rem] min-w-0 flex-col justify-center border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
+            style={paperShadow}
+          >
+            <div className="flex items-start gap-2">
+              <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-mid)]" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
+                  {t("statistics.summaryCompleted")}
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--color-lightest)] sm:text-2xl">
+                  {summaryData.completedLogs}
+                </p>
+              </div>
+            </div>
+          </Card>
+          <Card
+            className="flex min-h-[5.5rem] min-w-0 flex-col justify-center border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
+            style={paperShadow}
+          >
+            <div className="flex items-start gap-2">
+              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-mid)]" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
+                  {t("statistics.summaryHours")}
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--color-lightest)] sm:text-2xl">
+                  {summaryData.totalContentHours.toFixed(1)}
+                </p>
+              </div>
+            </div>
+          </Card>
+          <Card
+            className="flex min-h-[5.5rem] min-w-0 flex-col justify-center border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
+            style={paperShadow}
+          >
+            <div className="flex items-start gap-2">
+              <Star className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-mid)]" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
+                  Com nota
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--color-lightest)] sm:text-2xl">
+                  {summaryData.reviewedLogs}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </section>
+      )}
+
       <div className="grid min-w-0 grid-cols-1 gap-6 overflow-hidden md:grid-cols-2 md:gap-8">
         <section aria-label={t("dashboard.calendarTitle")} className="min-w-0 w-full">
           <DashboardCalendar isPro={isPro} />
@@ -330,97 +429,103 @@ export function Statistics() {
             )}
           </div>
           {genreGraphMode === "genre" && (
-            genreStatsLoading ? (
-              <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
-            ) : genreStats.length === 0 ? (
-              <p className="text-center text-sm text-[var(--color-light)]">
-                {t("dashboard.noStatsYet")}
-              </p>
-            ) : (
-              <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-                {genreStats.map(({ period, hours }) => (
-                  <div key={period} className="flex min-w-0 items-center gap-3">
-                    <span className="min-w-0 max-w-[8rem] shrink-0 truncate text-xs text-[var(--color-light)]">
-                      {period}
-                    </span>
-                    <div className="h-6 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
-                      <div
-                        className="h-full rounded bg-[var(--color-mid)]"
-                        style={{ width: `${Math.max(5, (hours / maxGenreCount) * 100)}%` }}
-                      />
+            <div className="min-h-[12.5rem] min-w-0">
+              {genreStatsLoading ? (
+                <StatisticsBarsSkeleton rows={6} />
+              ) : genreStats.length === 0 ? (
+                <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
+                  {t("dashboard.noStatsYet")}
+                </p>
+              ) : (
+                <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+                  {genreStats.map(({ period, hours }) => (
+                    <div key={period} className="flex min-w-0 items-center gap-3">
+                      <span className="min-w-0 max-w-[8rem] shrink-0 truncate text-xs text-[var(--color-light)]">
+                        {period}
+                      </span>
+                      <div className="h-6 min-w-0 flex-1 rounded bg-[var(--color-darkest)]">
+                        <div
+                          className="h-full rounded bg-[var(--color-mid)]"
+                          style={{ width: `${Math.max(5, (hours / maxGenreCount) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="w-12 shrink-0 text-right text-xs text-[var(--color-lightest)]">
+                        {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
+                      </span>
                     </div>
-                    <span className="w-12 shrink-0 text-right text-xs text-[var(--color-lightest)]">
-                      {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           {genreGraphMode === "statusOverTime" && (
-            statusOverTimeLoading ? (
-              <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
-            ) : statusOverTimeStats.length === 0 ? (
-              <p className="text-center text-sm text-[var(--color-light)]">
-                {t("dashboard.noStatusOverTimeYet")}
-              </p>
-            ) : (
-              <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-                {statusOverTimeStats.map(({ period, hours }) => (
-                  <div key={period} className="flex min-w-0 items-center gap-3">
-                    <span className="w-14 shrink-0 truncate text-xs text-[var(--color-light)] sm:w-20">
-                      {statusOverTimeGroup === "year" ? period : period.slice(0, 7)}
-                    </span>
-                    <div className="h-6 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
-                      <div
-                        className="h-full rounded bg-[var(--color-mid)]"
-                        style={{ width: `${Math.max(5, (hours / maxStatusOverTimeCount) * 100)}%` }}
-                      />
+            <div className="min-h-[12.5rem] min-w-0">
+              {statusOverTimeLoading ? (
+                <StatisticsBarsSkeleton rows={6} />
+              ) : statusOverTimeStats.length === 0 ? (
+                <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
+                  {t("dashboard.noStatusOverTimeYet")}
+                </p>
+              ) : (
+                <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+                  {statusOverTimeStats.map(({ period, hours }) => (
+                    <div key={period} className="flex min-w-0 items-center gap-3">
+                      <span className="w-14 shrink-0 truncate text-xs text-[var(--color-light)] sm:w-20">
+                        {statusOverTimeGroup === "year" ? period : period.slice(0, 7)}
+                      </span>
+                      <div className="h-6 min-w-0 flex-1 rounded bg-[var(--color-darkest)]">
+                        <div
+                          className="h-full rounded bg-[var(--color-mid)]"
+                          style={{ width: `${Math.max(5, (hours / maxStatusOverTimeCount) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="w-20 shrink-0 text-right text-xs text-[var(--color-lightest)]">
+                        {t("dashboard.completedCount", { count: String(Math.round(hours)) })}
+                      </span>
                     </div>
-                    <span className="w-20 shrink-0 text-right text-xs text-[var(--color-lightest)]">
-                      {t("dashboard.completedCount", { count: String(Math.round(hours)) })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           {genreGraphMode === "byCategory" && (
-            categoryOverTimeLoading ? (
-              <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
-            ) : categoryOverTimePeriods.length === 0 ? (
-              <p className="text-center text-sm text-[var(--color-light)]">
-                {t("dashboard.noStatsYet")}
-              </p>
-            ) : (
-              <div className="flex min-w-0 flex-col gap-3 overflow-hidden">
-                {categoryOverTimePeriods.map((period) => (
-                  <div key={period} className="flex min-w-0 flex-col gap-1.5">
-                    <span className="shrink-0 text-xs font-medium text-[var(--color-light)]">
-                      {categoryOverTimeGroup === "year" ? period : period.slice(0, 7)}
-                    </span>
-                    <div className="flex min-w-0 flex-col gap-1 pl-0">
-                      {(categoryOverTimeByPeriod[period] ?? []).map(({ mediaType, hours }) => (
-                        <div key={`${period}-${mediaType}`} className="flex min-w-0 items-center gap-3">
-                          <span className="min-w-0 max-w-[7rem] shrink-0 truncate text-xs text-[var(--color-light)]">
-                            {t(`nav.${mediaType}`)}
-                          </span>
-                          <div className="h-5 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
-                            <div
-                              className="h-full rounded bg-[var(--color-mid)]"
-                              style={{ width: `${Math.max(5, (hours / maxCategoryOverTimeCount) * 100)}%` }}
-                            />
+            <div className="min-h-[12.5rem] min-w-0">
+              {categoryOverTimeLoading ? (
+                <StatisticsCategoryOverTimeSkeleton />
+              ) : categoryOverTimePeriods.length === 0 ? (
+                <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
+                  {t("dashboard.noStatsYet")}
+                </p>
+              ) : (
+                <div className="flex min-w-0 flex-col gap-3 overflow-hidden">
+                  {categoryOverTimePeriods.map((period) => (
+                    <div key={period} className="flex min-w-0 flex-col gap-1.5">
+                      <span className="shrink-0 text-xs font-medium text-[var(--color-light)]">
+                        {categoryOverTimeGroup === "year" ? period : period.slice(0, 7)}
+                      </span>
+                      <div className="flex min-w-0 flex-col gap-1 pl-0">
+                        {(categoryOverTimeByPeriod[period] ?? []).map(({ mediaType, hours }) => (
+                          <div key={`${period}-${mediaType}`} className="flex min-w-0 items-center gap-3">
+                            <span className="min-w-0 max-w-[7rem] shrink-0 truncate text-xs text-[var(--color-light)]">
+                              {t(`nav.${mediaType}`)}
+                            </span>
+                            <div className="h-5 min-w-0 flex-1 rounded bg-[var(--color-darkest)]">
+                              <div
+                                className="h-full rounded bg-[var(--color-mid)]"
+                                style={{ width: `${Math.max(5, (hours / maxCategoryOverTimeCount) * 100)}%` }}
+                              />
+                            </div>
+                            <span className="w-10 shrink-0 text-right text-xs text-[var(--color-lightest)]">
+                              {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
+                            </span>
                           </div>
-                          <span className="w-10 shrink-0 text-right text-xs text-[var(--color-lightest)]">
-                            {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
-                          </span>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </Card>
       </div>
@@ -481,42 +586,44 @@ export function Statistics() {
                       {t("dashboard.byYear")}
                     </Button>
                   </div>
-                  {statsLoading ? (
-                    <div className="h-48 animate-pulse rounded-md bg-[var(--color-darkest)]" />
-                  ) : stats.length === 0 ? (
-                    <p className="text-center text-sm text-[var(--color-light)]">
-                      {t("dashboard.noStatsYet")}
-                    </p>
-                  ) : (
-                    <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-                      {displayedStats.map(({ period, hours }) => (
-                        <div key={period} className="flex min-w-0 items-center gap-3">
-                          <span
-                            className={
-                              statsGroup === "category"
-                                ? "min-w-0 max-w-[5.5rem] shrink-0 truncate text-xs text-[var(--color-light)] sm:min-w-[5.5rem] sm:max-w-[8rem]"
-                                : "w-14 shrink-0 truncate text-xs text-[var(--color-light)] sm:w-20"
-                            }
-                          >
-                            {statsGroup === "category"
-                              ? t(`nav.${period}`)
-                              : statsGroup === "year"
-                                ? period
-                                : period.slice(0, 7)}
-                          </span>
-                          <div className="h-6 flex-1 min-w-0 rounded bg-[var(--color-darkest)]">
-                            <div
-                              className="h-full rounded bg-[var(--color-mid)]"
-                              style={{ width: `${Math.max(5, (hours / maxHours) * 100)}%` }}
-                            />
+                  <div className="min-h-[12.5rem] min-w-0">
+                    {statsLoading ? (
+                      <StatisticsBarsSkeleton rows={5} />
+                    ) : stats.length === 0 ? (
+                      <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
+                        {t("dashboard.noStatsYet")}
+                      </p>
+                    ) : (
+                      <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+                        {displayedStats.map(({ period, hours }) => (
+                          <div key={period} className="flex min-w-0 items-center gap-3">
+                            <span
+                              className={
+                                statsGroup === "category"
+                                  ? "min-w-0 max-w-[5.5rem] shrink-0 truncate text-xs text-[var(--color-light)] sm:min-w-[5.5rem] sm:max-w-[8rem]"
+                                  : "w-14 shrink-0 truncate text-xs text-[var(--color-light)] sm:w-20"
+                              }
+                            >
+                              {statsGroup === "category"
+                                ? t(`nav.${period}`)
+                                : statsGroup === "year"
+                                  ? period
+                                  : period.slice(0, 7)}
+                            </span>
+                            <div className="h-6 min-w-0 flex-1 rounded bg-[var(--color-darkest)]">
+                              <div
+                                className="h-full rounded bg-[var(--color-mid)]"
+                                style={{ width: `${Math.max(5, (hours / maxHours) * 100)}%` }}
+                              />
+                            </div>
+                            <span className="w-12 shrink-0 text-right text-xs text-[var(--color-lightest)]">
+                              {t("dashboard.hoursConsumed", { hours: hours.toFixed(1) })}
+                            </span>
                           </div>
-                          <span className="w-12 shrink-0 text-right text-xs text-[var(--color-lightest)]">
-                            {t("dashboard.hoursConsumed", { hours: hours.toFixed(1) })}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </Card>
             </>
@@ -539,66 +646,118 @@ export function Statistics() {
           </button>
           {!recentLogsCollapsed && (
             <>
-              {recent.length === 0 ? (
-                <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6" style={paperShadow}>
-                  <p className="text-center text-[var(--color-light)]">
-                    {t("dashboard.noLogsYet")}{" "}
-                    <Link to="/search" className="text-[var(--color-lightest)] underline hover:no-underline">
-                      {t("dashboard.searchAndAddFirst")}
-                    </Link>
+              {loading ? (
+                <StatisticsRecentLogsSkeleton rows={5} />
+              ) : recent.length === 0 ? (
+                <Card className="min-h-[14rem] border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6" style={paperShadow}>
+                  <p className="flex min-h-[10rem] items-center justify-center text-center text-[var(--color-light)]">
+                    <span>
+                      {t("dashboard.noLogsYet")}{" "}
+                      <Link to="/search" className="text-[var(--color-lightest)] underline hover:no-underline">
+                        {t("dashboard.searchAndAddFirst")}
+                      </Link>
+                    </span>
                   </p>
                 </Card>
               ) : (
                 <motion.ul
-                  className="list-none m-0 min-w-0 p-0"
+                  className="m-0 flex min-w-0 list-none flex-col gap-2 p-0"
                   variants={staggerContainer}
                   initial="initial"
                   animate="animate"
                 >
-                  <div className="flex min-w-0 flex-col gap-2">
-                    {recent.map((log) => (
+                  {recent.map((log) => {
+                    const status = log.status ?? undefined;
+                    const isDropped = status === "dropped";
+                    const isInProgress =
+                      status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
+                    const isCompleted =
+                      status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
+                    const listBorderClass =
+                      status == null
+                        ? "border border-[var(--color-surface-border)]"
+                        : isDropped
+                          ? "border border-red-500"
+                          : isInProgress
+                            ? "border border-amber-400"
+                            : isCompleted
+                              ? "border border-emerald-600"
+                              : "border border-[var(--color-mid)]";
+                    const badgeClass =
+                      status == null
+                        ? ""
+                        : isDropped
+                          ? "bg-red-500/95 text-white"
+                          : isInProgress
+                            ? "bg-amber-400 text-[var(--color-darkest)]"
+                            : isCompleted
+                              ? "bg-emerald-600 text-white"
+                              : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
+                    const duration =
+                      log.startedAt && log.completedAt
+                        ? formatTimeToFinish(log.startedAt, log.completedAt)
+                        : "";
+                    return (
                       <motion.li key={log.id} variants={staggerItem} className="list-none">
                         <motion.div whileTap={tapScale} transition={tapTransition}>
                           <Link
                             to={`/item/${log.mediaType}/${log.externalId}`}
-                            className="flex min-w-0 gap-3 overflow-hidden rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 text-inherit no-underline"
-                            style={paperShadow}
+                            className={`flex min-w-0 flex-row overflow-hidden rounded-lg border bg-[var(--color-dark)] text-left text-inherit no-underline shadow-[var(--shadow-card)] transition-[opacity,border-color] hover:opacity-95 max-md:min-h-[44px] ${listBorderClass} ${status == null ? "hover:border-black" : ""}`}
                           >
-                            <ItemImage src={log.image} className="h-12 w-9 shrink-0 rounded" />
-                            <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden">
-                              <div className="flex min-w-0 items-center justify-between gap-2">
-                                <p className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
-                                  {log.title}
-                                </p>
-                                <div className="flex shrink-0 items-center gap-2">
-                                {(() => {
-                                  const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
-                                  return duration ? (
-                                    <span className="whitespace-nowrap text-xs text-[var(--color-light)]">
-                                      {t("dashboard.finishedIn", { duration })}
-                                    </span>
-                                  ) : null;
-                                })()}
-                                {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
-                                  <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
-                                    {t("common.inProgress")}
-                                  </span>
-                                ) : log.grade != null ? (
-                                  <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
-                                ) : (
-                                  <span className="text-[var(--color-light)]">—</span>
-                                )}
-                                </div>
-                              </div>
+                            <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-l-lg">
+                              <ItemImage src={log.image} className="h-full w-full" />
+                              {status && (
+                                <span
+                                  className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium ${badgeClass}`}
+                                  title={getStatusLabel(t, status, log.mediaType)}
+                                >
+                                  {getStatusLabel(t, status, log.mediaType)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 overflow-hidden p-3">
+                              <p className="truncate text-[10px] font-medium uppercase text-[var(--color-light)]">
+                                {t(`nav.${log.mediaType}`)}
+                              </p>
+                              <p className="line-clamp-2 text-sm font-semibold text-[var(--color-lightest)]">
+                                {log.title}
+                              </p>
                               {log.genres && log.genres.length > 0 && (
                                 <GenreBadges genres={log.genres} maxCount={1} />
                               )}
+                              {!isInProgress && log.grade != null && (
+                                <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+                              )}
+                              <p className="line-clamp-2 text-xs leading-snug text-[var(--color-light)]">
+                                {(() => {
+                                  const parts: string[] = [];
+                                  if (duration) {
+                                    parts.push(t("dashboard.finishedIn", { duration }));
+                                  }
+                                  if (
+                                    log.mediaType === "games" &&
+                                    log.hoursToBeat != null &&
+                                    log.hoursToBeat > 0
+                                  ) {
+                                    const { hours, minutes } = formatTimeToBeatHours(log.hoursToBeat);
+                                    parts.push(
+                                      minutes > 0
+                                        ? t("itemPage.timeToBeatHoursMinutes", {
+                                            hours: String(hours),
+                                            minutes: String(minutes),
+                                          })
+                                        : t("itemPage.timeToBeatHours", { hours: String(hours) })
+                                    );
+                                  }
+                                  return parts.join(" · ") || "—";
+                                })()}
+                              </p>
                             </div>
                           </Link>
                         </motion.div>
                       </motion.li>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </motion.ul>
               )}
             </>

@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { ItemImage } from "@/components/ItemImage";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
@@ -78,8 +79,12 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
   }, [isPro, tzOffsetMinutes]);
 
   useEffect(() => {
-    if (isPro) fetchCalendar(year, month);
-    else setData(null);
+    if (!isPro) {
+      setData(null);
+      setLoading(false);
+      return;
+    }
+    void fetchCalendar(year, month);
   }, [isPro, year, month, fetchCalendar]);
 
   const fetchDayLogs = useCallback(async (dateKey: string) => {
@@ -141,6 +146,11 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
     year: "numeric",
   });
 
+  /** Show skeleton until the viewed month matches loaded data (handles me/isPro hydration and month changes). */
+  const calendarBusy =
+    isPro &&
+    (loading || data == null || data.year !== year || data.month !== month);
+
   return (
     <>
       <Card
@@ -193,67 +203,82 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
               </div>
             )}
           </div>
-          <div className="grid grid-cols-7 text-center [&>*:nth-child(7n)]:border-r-0">
-            {WEEKDAY_KEYS.map((key) => (
-              <div
-                key={key}
-                className="border-b border-r border-[var(--color-mid)]/20 py-2 text-xs font-medium text-[var(--color-mid)]"
-              >
-                {t(key)}
-              </div>
-            ))}
-            {Array.from({ length: leadingBlanks }, (_, i) => (
-              <div
-                key={`blank-${i}`}
-                className="min-h-[3.5rem] border-b border-r border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/30 last:border-r-0"
-              />
-            ))}
-            {Array.from({ length: daysInMonth }, (_, i) => {
-              const day = i + 1;
-              const key = getMonthKey(year, month, day);
-              const count = data?.dates[key] ?? 0;
-              const isToday = isCurrentMonth && now.getDate() === day;
-              const DayCell = isPro ? "button" : "div";
-              return (
-                <DayCell
-                  key={day}
-                  type={isPro ? "button" : undefined}
-                  onClick={isPro ? () => handleDayClick(key) : undefined}
-                  className={`relative min-h-[3.5rem] flex flex-col items-center justify-start gap-0.5 border-b border-r border-[var(--color-mid)]/20 bg-[var(--color-dark)] pt-1.5 text-left ${
-                    isPro
-                      ? "cursor-pointer hover:bg-[var(--color-mid)]/15 active:bg-[var(--color-mid)]/25"
-                      : ""
-                  } ${isToday ? "ring-1 ring-inset ring-[var(--color-mid)] bg-[var(--color-mid)]/10" : ""}`}
-                  title={count > 0 ? t("dashboard.calendarCompletions", { count: String(count), date: key }) : undefined}
-                  aria-label={count > 0 ? t("dashboard.calendarCompletions", { count: String(count), date: key }) : `${day}`}
+          <div className="relative min-h-[16rem]">
+            <div className="grid grid-cols-7 text-center [&>*:nth-child(7n)]:border-r-0">
+              {WEEKDAY_KEYS.map((key) => (
+                <div
+                  key={key}
+                  className="border-b border-r border-[var(--color-mid)]/20 py-2 text-xs font-medium text-[var(--color-mid)]"
                 >
-                  <span
-                    className={`text-xs font-medium ${isToday ? "text-[var(--color-lightest)]" : count > 0 ? "text-[var(--color-lightest)]" : "text-[var(--color-mid)]"}`}
+                  {t(key)}
+                </div>
+              ))}
+              {Array.from({ length: leadingBlanks }, (_, i) => (
+                <div
+                  key={`blank-${i}`}
+                  className="min-h-[3.5rem] border-b border-r border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/30 last:border-r-0"
+                />
+              ))}
+              {Array.from({ length: daysInMonth }, (_, i) => {
+                const day = i + 1;
+                const key = getMonthKey(year, month, day);
+                const count = data?.dates[key] ?? 0;
+                const isToday = isCurrentMonth && now.getDate() === day;
+                const DayCell = isPro ? "button" : "div";
+                return (
+                  <DayCell
+                    key={day}
+                    type={isPro ? "button" : undefined}
+                    onClick={isPro ? () => handleDayClick(key) : undefined}
+                    className={`relative min-h-[3.5rem] flex flex-col items-center justify-start gap-0.5 border-b border-r border-[var(--color-mid)]/20 bg-[var(--color-dark)] pt-1.5 text-left ${
+                      isPro
+                        ? "cursor-pointer hover:bg-[var(--color-mid)]/15 active:bg-[var(--color-mid)]/25"
+                        : ""
+                    } ${isToday ? "ring-1 ring-inset ring-[var(--color-mid)] bg-[var(--color-mid)]/10" : ""}`}
+                    title={count > 0 ? t("dashboard.calendarCompletions", { count: String(count), date: key }) : undefined}
+                    aria-label={count > 0 ? t("dashboard.calendarCompletions", { count: String(count), date: key }) : `${day}`}
                   >
-                    {day}
-                  </span>
-                  {isPro && count > 0 && (
-                    <span className="flex gap-0.5 flex-wrap justify-center px-0.5">
-                      {Array.from({ length: Math.min(count, 4) }, (_, j) => (
-                        <span
-                          key={j}
-                          className="h-1.5 w-1.5 rounded-full bg-[var(--btn-gradient-start)]"
-                          aria-hidden
-                        />
-                      ))}
-                      {count > 4 && (
-                        <span className="text-[9px] text-[var(--color-light)] leading-none">+{count - 4}</span>
-                      )}
+                    <span
+                      className={`text-xs font-medium ${isToday ? "text-[var(--color-lightest)]" : count > 0 ? "text-[var(--color-lightest)]" : "text-[var(--color-mid)]"}`}
+                    >
+                      {day}
                     </span>
-                  )}
-                </DayCell>
-              );
-            })}
+                    {isPro && count > 0 && (
+                      <span className="flex gap-0.5 flex-wrap justify-center px-0.5">
+                        {Array.from({ length: Math.min(count, 4) }, (_, j) => (
+                          <span
+                            key={j}
+                            className="h-1.5 w-1.5 rounded-full bg-[var(--btn-gradient-start)]"
+                            aria-hidden
+                          />
+                        ))}
+                        {count > 4 && (
+                          <span className="text-[9px] text-[var(--color-light)] leading-none">+{count - 4}</span>
+                        )}
+                      </span>
+                    )}
+                  </DayCell>
+                );
+              })}
+            </div>
+            {calendarBusy && (
+              <div
+                className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3 bg-[var(--color-dark)]/82 p-3 backdrop-blur-[1px]"
+                aria-busy
+                aria-label={t("common.loading")}
+              >
+                <div className="grid w-full max-w-full grid-cols-7 gap-1 sm:gap-1.5">
+                  {Array.from({ length: 35 }).map((_, idx) => (
+                    <Skeleton
+                      key={idx}
+                      className="aspect-square min-h-[2.5rem] rounded-sm bg-[var(--color-mid)]/35"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        {isPro && loading && (
-          <div className="h-2 animate-pulse bg-[var(--color-darkest)]" aria-hidden />
-        )}
       </Card>
 
       {isPro && selectedDate && (

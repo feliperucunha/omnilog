@@ -7,6 +7,88 @@ function getKey(apiKey?: string | null): string | null {
   return apiKey ?? process.env.RAWG_API_KEY ?? null;
 }
 
+type RawgGameListRow = {
+  id: number;
+  name?: string;
+  released?: string;
+  background_image?: string;
+  playtime?: number;
+  genres?: Array<{ name?: string }>;
+};
+
+function mapRawgGameToSearchResult(item: RawgGameListRow): SearchResult {
+  const timeToBeatHours =
+    typeof item.playtime === "number" && item.playtime > 0 ? item.playtime : null;
+  const genres = item.genres?.map((g) => g.name).filter(Boolean) as string[] | undefined;
+  return {
+    id: String(item.id),
+    title: item.name ?? "Unknown",
+    image: item.background_image ?? null,
+    year: item.released?.slice(0, 4) ?? null,
+    subtitle: null,
+    timeToBeatHours,
+    genres: genres?.length ? genres : undefined,
+  };
+}
+
+/** Genre IDs for a game (used for recommendations; consumer API keys cannot use /games/{id}/suggested). */
+async function fetchRawgGameGenreIds(gameId: string, apiKey?: string | null): Promise<number[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const res = await fetch(`${BASE}/games/${encodeURIComponent(gameId)}?key=${key}`);
+  if (res.status === 401) throw new InvalidApiKeyError("rawg");
+  if (!res.ok) return [];
+  const data = (await res.json()) as { genres?: Array<{ id?: number }> };
+  return (data.genres ?? [])
+    .map((g) => g.id)
+    .filter((id): id is number => typeof id === "number" && id > 0);
+}
+
+/**
+ * Recommend games sharing genres with the user's recent logs (works with standard RAWG API keys).
+ * RAWG "suggested" is business/enterprise-only; this uses GET /games?genres=… instead.
+ */
+export async function getGamesRecommendationsFromSeedsViaGenres(
+  seedGameIds: string[],
+  exclude: Set<string>,
+  maxResults: number,
+  apiKey?: string | null,
+  maxSeeds = 4
+): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key || seedGameIds.length === 0) return [];
+  const seeds = seedGameIds.slice(0, maxSeeds);
+  const genreBatches = await Promise.all(seeds.map((id) => fetchRawgGameGenreIds(id, apiKey)));
+  const genreIds = new Set<number>();
+  for (const ids of genreBatches) {
+    for (const gid of ids.slice(0, 4)) genreIds.add(gid);
+  }
+  const gidList = [...genreIds].slice(0, 6);
+  if (gidList.length === 0) return [];
+
+  const params = new URLSearchParams({
+    key,
+    page_size: String(Math.min(40, Math.max(maxResults * 3, 20))),
+    ordering: "-rating",
+    genres: gidList.join(","),
+  });
+  const res = await fetch(`${BASE}/games?${params.toString()}`);
+  if (res.status === 401) throw new InvalidApiKeyError("rawg");
+  if (!res.ok) return [];
+  const data = (await res.json()) as { results?: RawgGameListRow[] };
+  const seedSet = new Set(seeds);
+  const seen = new Set<string>();
+  const out: SearchResult[] = [];
+  for (const item of data.results ?? []) {
+    const row = mapRawgGameToSearchResult(item);
+    if (exclude.has(row.id) || seedSet.has(row.id) || seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+    if (out.length >= maxResults) break;
+  }
+  return out;
+}
+
 export async function getGameById(id: string, apiKey?: string | null): Promise<ItemDetail | null> {
   const key = getKey(apiKey);
   if (!key) return null;
@@ -95,29 +177,35 @@ export async function searchGames(
   );
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("rawg");
   if (!res.ok) return { results: [] };
-  const data = (await res.json()) as {
-    results?: Array<{
-      id: number;
-      name?: string;
-      released?: string;
-      background_image?: string;
-      playtime?: number;
-      genres?: Array<{ name?: string }>;
-    }>;
-  };
-  const results = (data.results ?? []).map((item) => {
-    const timeToBeatHours =
-      typeof item.playtime === "number" && item.playtime > 0 ? item.playtime : null;
-    const genres = item.genres?.map((g) => g.name).filter(Boolean) as string[] | undefined;
-    return {
-      id: String(item.id),
-      title: item.name ?? "Unknown",
-      image: item.background_image ?? null,
-      year: item.released?.slice(0, 4) ?? null,
-      subtitle: null,
-      timeToBeatHours,
-      genres: genres?.length ? genres : undefined,
-    };
-  });
+  const data = (await res.json()) as { results?: RawgGameListRow[] };
+  const results = (data.results ?? []).map((item) => mapRawgGameToSearchResult(item));
   return { results };
+}
+
+/** Enterprise-only on RAWG; consumer keys should use getGamesRecommendationsFromSeedsViaGenres. */
+export async function getGameSuggestionsFromRawg(
+  gameId: string,
+  apiKey?: string | null,
+  max = 12
+): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const res = await fetch(`${BASE}/games/${encodeURIComponent(gameId)}/suggested?key=${key}&page_size=${max}`);
+  if (res.status === 401) throw new InvalidApiKeyError("rawg");
+  // 403/404: not available on consumer API tier or unknown game
+  if (res.status === 403 || res.status === 404 || !res.ok) return [];
+  const data = (await res.json()) as { results?: RawgGameListRow[] };
+  return (data.results ?? []).slice(0, max).map((item) => mapRawgGameToSearchResult(item));
+}
+
+/** Discover popular / highly rated games (same shape as search results). */
+export async function getPopularGames(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const params = new URLSearchParams({ key, page_size: String(max), ordering: "-rating" });
+  const res = await fetch(`${BASE}/games?${params.toString()}`);
+  if (res.status === 401) throw new InvalidApiKeyError("rawg");
+  if (!res.ok) return [];
+  const data = (await res.json()) as { results?: RawgGameListRow[] };
+  return (data.results ?? []).slice(0, max).map((item) => mapRawgGameToSearchResult(item));
 }

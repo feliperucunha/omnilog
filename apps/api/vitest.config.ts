@@ -9,7 +9,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],
-      include: ["src/services/milestone.service.ts", "src/services/gamification.service.ts", "src/scripts/seedMilestones.ts"],
+      include: [
+        "src/services/milestone.service.ts",
+        "src/services/gamification.service.ts",
+        "src/scripts/seedMilestones.ts",
+        "src/lib/completedLogHours.ts",
+        "src/lib/searchRecommendationsMerge.ts",
+      ],
       exclude: ["**/*.test.ts", "**/index.ts"],
     },
   },

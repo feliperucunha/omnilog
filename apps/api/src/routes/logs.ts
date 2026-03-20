@@ -81,6 +81,7 @@ function isCompleted(status: string | null | undefined): boolean {
 }
 
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
+import { hoursFromCompletedLogForStats, rollupHoursFromCompletedLogs } from "../lib/completedLogHours.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
 import {
   handleLogCreated,
@@ -292,28 +293,61 @@ logsRouter.delete("/:id/reaction", async (req: AuthenticatedRequest, res) => {
   res.status(204).end();
 });
 
-/** GET /logs/stats?group=category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear - hours (or count) per category/period/genre; categoryBy* returns { period, mediaType, hours }[] */
+/** GET /logs/stats?group=summary|category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear - summary = account totals; categoryBy* returns { period, mediaType, hours }[] */
 logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const groupParam = req.query.group as string;
   const group =
-    groupParam === "year"
-      ? "year"
-      : groupParam === "genre"
-        ? "genre"
-        : groupParam === "category"
-          ? "category"
-          : groupParam === "completedByYear"
-            ? "completedByYear"
-            : groupParam === "completedByMonth"
-              ? "completedByMonth"
-              : groupParam === "categoryByYear"
-                ? "categoryByYear"
-                : groupParam === "categoryByMonth"
-                  ? "categoryByMonth"
-                  : groupParam === "month"
-                    ? "month"
-                    : "month";
+    groupParam === "summary"
+      ? "summary"
+      : groupParam === "year"
+        ? "year"
+        : groupParam === "genre"
+          ? "genre"
+          : groupParam === "category"
+            ? "category"
+            : groupParam === "completedByYear"
+              ? "completedByYear"
+              : groupParam === "completedByMonth"
+                ? "completedByMonth"
+                : groupParam === "categoryByYear"
+                  ? "categoryByYear"
+                  : groupParam === "categoryByMonth"
+                    ? "categoryByMonth"
+                    : groupParam === "month"
+                      ? "month"
+                      : "month";
+
+  if (group === "summary") {
+    const [totalLogs, completedLogCount, reviewedLogs, completedLogs] = await Promise.all([
+      prisma.log.count({ where: { userId } }),
+      prisma.log.count({ where: { userId, completedAt: { not: null } } }),
+      prisma.log.count({ where: { userId, grade: { not: null } } }),
+      prisma.log.findMany({
+        where: { userId, completedAt: { not: null } },
+        select: {
+          completedAt: true,
+          contentHours: true,
+          startedAt: true,
+          mediaType: true,
+          hoursToBeat: true,
+          matchesPlayed: true,
+        },
+      }),
+    ]);
+    const { totalHours, logsWithPositiveHours } = rollupHoursFromCompletedLogs(completedLogs);
+    res.json({
+      group: "summary",
+      data: {
+        totalLogs,
+        completedLogs: completedLogCount,
+        reviewedLogs,
+        totalContentHours: totalHours,
+        completedLogsWithHours: logsWithPositiveHours,
+      },
+    });
+    return;
+  }
 
   if (group === "genre") {
     const logs = await prisma.log.findMany({
@@ -392,32 +426,17 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     select: { completedAt: true, contentHours: true, startedAt: true, mediaType: true, hoursToBeat: true, matchesPlayed: true },
   });
   const byKey: Record<string, number> = {};
-  const MS_PER_HOUR = 60 * 60 * 1000;
-  const FALLBACK_MAX_HOURS = 24; // cap derived hours (start→finish) so multi-day completions don't inflate stats
-  const mediaType = (log: { mediaType: unknown }) => log.mediaType as string;
   for (const log of logs) {
-    if (log.completedAt == null) continue;
-    let hours: number;
-    if (mediaType(log) === "boardgames") {
-      // Boardgames: 1 hour per match
-      hours = (log.matchesPlayed ?? 0) * 1;
-    } else if (mediaType(log) === "games" && log.hoursToBeat != null && log.hoursToBeat > 0) {
-      hours = log.hoursToBeat;
-    } else if (log.contentHours != null && log.contentHours > 0) {
-      hours = log.contentHours;
-    } else if (log.startedAt != null) {
-      const elapsedMs = log.completedAt.getTime() - log.startedAt.getTime();
-      hours = Math.min(elapsedMs / MS_PER_HOUR, FALLBACK_MAX_HOURS);
-      if (hours <= 0) continue;
-    } else {
-      continue;
-    }
+    const hours = hoursFromCompletedLogForStats(log);
+    if (hours === null) continue;
+    const completedAt = log.completedAt;
+    if (!completedAt) continue;
     const key =
       group === "category"
         ? (log.mediaType as string)
         : group === "year"
-          ? `${log.completedAt.getUTCFullYear()}`
-          : `${log.completedAt.getUTCFullYear()}-${String(log.completedAt.getUTCMonth() + 1).padStart(2, "0")}`;
+          ? `${completedAt.getUTCFullYear()}`
+          : `${completedAt.getUTCFullYear()}-${String(completedAt.getUTCMonth() + 1).padStart(2, "0")}`;
     byKey[key] = (byKey[key] ?? 0) + hours;
   }
   const entries = Object.entries(byKey)

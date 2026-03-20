@@ -286,7 +286,11 @@
   },
   "statistics": {
     "proOnlyTitle": "Estadísticas es una función Pro",
-    "proOnlyMessage": "Suscríbete al plan Pro para acceder a estadísticas y exportación."
+    "proOnlyMessage": "Suscríbete al plan Pro para acceder a estadísticas y exportación.",
+    "summaryTitle": "Resumen",
+    "summaryTotalLogs": "Registros totales",
+    "summaryCompleted": "Completados",
+    "summaryHours": "Horas registradas"
   },
   "search": {
     "title": "Buscar",
@@ -304,7 +308,10 @@
     "usersFilter": "Usuarios",
     "usersPlaceholder": "Buscar por nombre de usuario...",
     "noUsersFound": "Ningún usuario encontrado.",
-    "userLogCount": "{{count}} logs"
+    "userLogCount": "{{count}} logs",
+    "recommendationsTitle": "Recomendado para ti",
+    "recommendationsNav": "Carrusel de recomendaciones",
+    "recommendationsDotLabel": "Ir a la página {{index}}"
   },
   "searchSort": {
     "relevance": "Relevancia",

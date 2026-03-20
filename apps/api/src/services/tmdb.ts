@@ -185,3 +185,118 @@ export async function searchTv(
   const sorted = sortSearchResults(results, sort) as typeof results;
   return { results: sorted };
 }
+
+function mapMovieListItem(item: {
+  id: number;
+  title?: string;
+  release_date?: string;
+  poster_path?: string | null;
+}): SearchResult {
+  return {
+    id: String(item.id),
+    title: item.title ?? "Unknown",
+    image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,
+    year: item.release_date?.slice(0, 4) ?? null,
+    subtitle: null,
+  };
+}
+
+function mapTvListItem(item: {
+  id: number;
+  name?: string;
+  first_air_date?: string;
+  poster_path?: string | null;
+}): SearchResult {
+  return {
+    id: String(item.id),
+    title: item.name ?? "Unknown",
+    image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,
+    year: item.first_air_date?.slice(0, 4) ?? null,
+    subtitle: null,
+  };
+}
+
+/** Merge TMDB recommendations + similar; dedupe by id. */
+export async function getMovieRecommendationsMerged(
+  movieId: string,
+  apiKey?: string | null,
+  maxTotal = 16
+): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const seen = new Set<string>();
+  const out: SearchResult[] = [];
+  const paths = [`movie/${movieId}/recommendations`, `movie/${movieId}/similar`] as const;
+  for (const path of paths) {
+    const res = await fetch(`${BASE}/${path}?api_key=${key}&language=en-US`);
+    if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
+    if (!res.ok) continue;
+    const data = (await res.json()) as {
+      results?: Array<{ id: number; title?: string; release_date?: string; poster_path?: string | null }>;
+    };
+    for (const item of data.results ?? []) {
+      const row = mapMovieListItem(item);
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      out.push(row);
+      if (out.length >= maxTotal) return out;
+    }
+  }
+  return out;
+}
+
+export async function getTvRecommendationsMerged(
+  tvId: string,
+  apiKey?: string | null,
+  maxTotal = 16
+): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const seen = new Set<string>();
+  const out: SearchResult[] = [];
+  const paths = [`tv/${tvId}/recommendations`, `tv/${tvId}/similar`] as const;
+  for (const path of paths) {
+    const res = await fetch(`${BASE}/${path}?api_key=${key}&language=en-US`);
+    if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
+    if (!res.ok) continue;
+    const data = (await res.json()) as {
+      results?: Array<{ id: number; name?: string; first_air_date?: string; poster_path?: string | null }>;
+    };
+    for (const item of data.results ?? []) {
+      const row = mapTvListItem(item);
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      out.push(row);
+      if (out.length >= maxTotal) return out;
+    }
+  }
+  return out;
+}
+
+export async function getPopularMovies(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const res = await fetch(
+    `${BASE}/discover/movie?api_key=${key}&sort_by=popularity.desc&language=en-US&page=1`
+  );
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    results?: Array<{ id: number; title?: string; release_date?: string; poster_path?: string | null }>;
+  };
+  return (data.results ?? []).slice(0, max).map(mapMovieListItem);
+}
+
+export async function getPopularTv(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const res = await fetch(
+    `${BASE}/discover/tv?api_key=${key}&sort_by=popularity.desc&language=en-US&page=1`
+  );
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    results?: Array<{ id: number; name?: string; first_air_date?: string; poster_path?: string | null }>;
+  };
+  return (data.results ?? []).slice(0, max).map(mapTvListItem);
+}

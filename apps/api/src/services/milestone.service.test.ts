@@ -27,13 +27,15 @@ const emptyReviewStats = {
   mangaReviews: 0,
   comicReviews: 0,
   bookReviews: 0,
+  gameReviews: 0,
+  boardGameReviews: 0,
   totalReviews: 0,
 };
 
 const emptyLogGroupBy: { mediaType: string; _count: { id: number } }[] = [];
 
 function logGroupByFromCounts(counts: Record<string, number>): { mediaType: string; _count: { id: number } }[] {
-  const mediaTypes = ["movies", "tv", "anime", "manga", "comics", "books"];
+  const mediaTypes = ["movies", "tv", "anime", "manga", "comics", "books", "games", "boardgames"];
   return mediaTypes
     .filter((m) => (counts[m] ?? 0) > 0)
     .map((mediaType) => ({ mediaType, _count: { id: counts[mediaType] ?? 0 } }));
@@ -62,7 +64,7 @@ describe("getMilestoneProgress", () => {
 
     const progress = await getMilestoneProgress(userId);
 
-    expect(progress.perMedium).toHaveLength(6);
+    expect(progress.perMedium).toHaveLength(8);
     const movies = progress.perMedium.find((p) => p.mediaType === "movies");
     expect(movies).toBeDefined();
     expect(movies!.reviews.current).toBe(2);
@@ -88,7 +90,7 @@ describe("getMilestoneProgress", () => {
 
     const progress = await getMilestoneProgress(userId);
 
-    expect(progress.perMedium).toHaveLength(6);
+    expect(progress.perMedium).toHaveLength(8);
     const books = progress.perMedium.find((p) => p.mediaType === "books");
     expect(books!.reviews.current).toBe(1);
     expect(books!.logs.current).toBe(1);

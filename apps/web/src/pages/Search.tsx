@@ -30,11 +30,13 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, Search as SearchIcon, UserCheck, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
+import { SearchRecommendationsCarousel } from "@/components/SearchRecommendationsCarousel";
 import * as storage from "@/lib/storage";
 import type { Log } from "@dogument/shared";
 
 const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
 const FREE_SEARCH_USAGE_STORAGE_KEY = "dogument_free_search_usage";
+const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
 function getFreeSearchUsageKey(type: MediaType, boardProvider: BoardGameProvider): string {
   return type === "boardgames" ? `boardgames-${boardProvider}` : type;
@@ -69,6 +71,17 @@ interface SearchResponse {
   freeSearchLimit?: number;
   freeSearchLimitReached?: boolean;
 }
+
+interface RecommendationsResponse {
+  results: SearchResult[];
+  personalization?: "from_logs" | "popular" | "none";
+  requiresApiKey?: ApiKeyProvider;
+  link?: string;
+  tutorial?: string;
+}
+
+/** Media types supported by GET /search/recommendations (others skip the request). */
+const RECOMMENDATION_MEDIA_TYPES: MediaType[] = ["movies", "tv", "games", "anime"];
 
 interface UserSearchResult {
   id: string;
@@ -130,6 +143,15 @@ export function Search() {
   }, []);
   const [drawerItem, setDrawerItem] = useState<{ mediaType: MediaType; id: string } | null>(null);
   const [logsByExternalId, setLogsByExternalId] = useState<Map<string, string>>(new Map());
+  const [recResults, setRecResults] = useState<SearchResult[]>([]);
+  const [recLoading, setRecLoading] = useState(false);
+  const [recKeyPrompt, setRecKeyPrompt] = useState<{
+    provider: ApiKeyProvider;
+    link: string;
+    tutorial: string;
+  } | null>(null);
+  const [recRefreshNonce, setRecRefreshNonce] = useState(0);
+  /** Desktop: map vertical wheel to horizontal scroll (mobile uses native touch; unchanged). */
   const { token } = useAuth();
   const { me } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
@@ -293,7 +315,11 @@ export function Search() {
   }, [stateQuery, runSearch]);
 
   useEffect(() => {
-    if (!token || !hasSearched || searchFilter === USERS_SEARCH_TYPE || results.length === 0) {
+    const needsLogsForSearchResults =
+      hasSearched && searchFilter !== USERS_SEARCH_TYPE && results.length > 0;
+    const needsLogsForRecommendations =
+      !hasSearched && searchFilter !== USERS_SEARCH_TYPE && recResults.length > 0;
+    if (!token || (!needsLogsForSearchResults && !needsLogsForRecommendations)) {
       setLogsByExternalId(new Map());
       return;
     }
@@ -307,7 +333,52 @@ export function Search() {
         setLogsByExternalId(map);
       })
       .catch(() => setLogsByExternalId(new Map()));
-  }, [token, mediaType, hasSearched, results.length, searchFilter]);
+  }, [token, mediaType, hasSearched, results.length, recResults.length, searchFilter]);
+
+  useEffect(() => {
+    if (hasSearched || searchFilter === USERS_SEARCH_TYPE || !RECOMMENDATION_MEDIA_TYPES.includes(mediaType)) {
+      setRecResults([]);
+      setRecLoading(false);
+      setRecKeyPrompt(null);
+      return;
+    }
+    let cancelled = false;
+    setRecLoading(true);
+    setRecKeyPrompt(null);
+    const params = new URLSearchParams({
+      type: mediaType,
+      // Split client cache: recommendations differ when logged in (seeds from logs).
+      viewer: token ? "auth" : "guest",
+    });
+    apiFetchCached<RecommendationsResponse>(`/search/recommendations?${params.toString()}`, {
+      ttlMs: 5 * 60 * 1000,
+    })
+      .then((data) => {
+        if (cancelled) return;
+        setRecResults(data.results ?? []);
+        if (data.requiresApiKey && data.link) {
+          setRecKeyPrompt({
+            provider: data.requiresApiKey,
+            link: data.link,
+            tutorial: data.tutorial ?? "",
+          });
+        } else {
+          setRecKeyPrompt(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRecResults([]);
+          setRecKeyPrompt(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRecLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasSearched, mediaType, searchFilter, token, recRefreshNonce]);
 
   const handleSearch = async (e: React.FormEvent) => {
     setHasSearched(true);
@@ -318,9 +389,11 @@ export function Search() {
 
   const handleApiKeySaved = useCallback(() => {
     setRequiresApiKey(null);
+    setRecKeyPrompt(null);
     setLimitReachedByCategory({});
     setUsageByCategory({});
     invalidateApiCache("/search");
+    setRecRefreshNonce((n) => n + 1);
     toast.success(t("toast.trySearchingAgain"));
   }, [t]);
 
@@ -412,6 +485,44 @@ export function Search() {
       </div>
 
       <div className="relative z-10 flex flex-col gap-6 flex-1 min-h-0">
+      {!hasSearched && searchFilter !== USERS_SEARCH_TYPE && RECOMMENDATION_MEDIA_TYPES.includes(mediaType) && (
+        <Card
+          className="relative z-10 flex w-full min-w-0 shrink-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
+          style={paperShadow}
+        >
+          <h2 className="text-base font-semibold text-[var(--color-lightest)] sm:text-lg">
+            {t("search.recommendationsTitle")}
+          </h2>
+          {recLoading && (
+            <div
+              className="h-36 w-full animate-pulse rounded-lg bg-[var(--color-mid)]/20 sm:h-40"
+              aria-hidden
+            />
+          )}
+          {recKeyPrompt && !recLoading && (
+            <div className="border-t border-[var(--color-surface-border)] pt-4">
+              <p className="mb-3 text-sm text-[var(--color-light)]">{t("search.noResultsUntilApiKey")}</p>
+              <ApiKeyPrompt
+                provider={recKeyPrompt.provider}
+                name={t(`nav.${mediaType}`)}
+                link={recKeyPrompt.link}
+                tutorial={t(`settings.apiKeyTutorial.${recKeyPrompt.provider}`)}
+                onSaved={handleApiKeySaved}
+              />
+            </div>
+          )}
+          {!recLoading && !recKeyPrompt && recResults.length > 0 && (
+            <SearchRecommendationsCarousel
+              items={recResults}
+              mediaType={mediaType}
+              token={token}
+              logsByExternalId={logsByExternalId}
+              onItemOpen={(id) => setDrawerItem({ mediaType, id })}
+            />
+          )}
+        </Card>
+      )}
+
       <motion.div
         className={hasSearched ? "shrink-0 w-full" : "flex-1 flex flex-col justify-end items-center min-h-0"}
         layout

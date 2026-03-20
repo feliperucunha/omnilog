@@ -5,4 +5,10 @@ export { ItemPageSkeleton } from "./ItemPageSkeleton";
 export { TiersSkeleton } from "./TiersSkeleton";
 export { SettingsSkeleton } from "./SettingsSkeleton";
 export { PublicProfileSkeleton } from "./PublicProfileSkeleton";
-export { StatisticsSkeleton } from "./StatisticsSkeleton";
+export {
+  StatisticsSkeleton,
+  StatisticsSummarySkeleton,
+  StatisticsBarsSkeleton,
+  StatisticsCategoryOverTimeSkeleton,
+  StatisticsRecentLogsSkeleton,
+} from "./StatisticsSkeleton";

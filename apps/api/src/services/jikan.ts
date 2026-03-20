@@ -166,3 +166,53 @@ export async function searchManga(q: string, sort?: string): Promise<SearchResul
     };
   });
 }
+
+/** Jikan /anime/{id}/recommendations (rate-limit friendly: caller should not burst). */
+export async function getAnimeRecommendationsForId(animeId: string, maxTotal = 16): Promise<SearchResult[]> {
+  const res = await fetch(`${BASE}/anime/${animeId}/recommendations`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    data?: Array<{
+      entry?: {
+        mal_id?: number;
+        title?: string;
+        year?: number;
+        images?: { jpg?: { image_url?: string } };
+      };
+    }>;
+  };
+  const out: SearchResult[] = [];
+  for (const row of data.data ?? []) {
+    const e = row.entry;
+    if (e?.mal_id == null) continue;
+    out.push({
+      id: String(e.mal_id),
+      title: e.title ?? "Unknown",
+      image: e.images?.jpg?.image_url ?? null,
+      year: e.year != null ? String(e.year) : null,
+      subtitle: null,
+    });
+    if (out.length >= maxTotal) break;
+  }
+  return out;
+}
+
+export async function getTopAnimePopular(max = 12): Promise<SearchResult[]> {
+  const res = await fetch(`${BASE}/top/anime?filter=bypopularity&limit=${max}`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    data?: Array<{
+      mal_id: number;
+      title?: string;
+      year?: number;
+      images?: { jpg?: { image_url?: string } };
+    }>;
+  };
+  return (data.data ?? []).map((item) => ({
+    id: String(item.mal_id),
+    title: item.title ?? "Unknown",
+    image: item.images?.jpg?.image_url ?? null,
+    year: item.year != null ? String(item.year) : null,
+    subtitle: null,
+  }));
+}

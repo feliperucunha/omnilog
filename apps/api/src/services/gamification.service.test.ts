@@ -50,6 +50,8 @@ const emptyStats = {
   mangaReviews: 0,
   comicReviews: 0,
   bookReviews: 0,
+  gameReviews: 0,
+  boardGameReviews: 0,
   totalReviews: 0,
   distinctMediaReviewed: 0,
 };
@@ -78,8 +80,8 @@ describe("handleReviewCreated", () => {
     expect(mockUpsertReviewStats).not.toHaveBeenCalled();
   });
 
-  it("returns empty array for media types that do not count toward badges (e.g. boardgames)", async () => {
-    expect(await handleReviewCreated(userId, "log-1", "boardgames", "Great game")).toEqual([]);
+  it("returns empty array when media type is not mapped to badge stats", async () => {
+    expect(await handleReviewCreated(userId, "log-1", "unknown_medium", "Great game")).toEqual([]);
     expect(mockUpsertReviewStats).not.toHaveBeenCalled();
   });
 
@@ -133,8 +135,8 @@ describe("handleReviewCreated", () => {
 });
 
 describe("handleReviewRemoved", () => {
-  it("does nothing when media type is not in badge stats", async () => {
-    await handleReviewRemoved(userId, "boardgames");
+  it("does nothing when media type is not mapped to badge stats", async () => {
+    await handleReviewRemoved(userId, "unknown_medium");
     expect(mockFindUniqueReviewStats).not.toHaveBeenCalled();
     expect(mockUpdateReviewStats).not.toHaveBeenCalled();
   });
