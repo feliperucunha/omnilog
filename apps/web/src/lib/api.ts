@@ -106,9 +106,32 @@ export class InvalidApiKeyError extends Error {
   }
 }
 
-/** User-friendly message when the server returns HTML (e.g. cold-start or proxy error page). */
+/**
+ * Shown when the response isn’t normal app data (often right after the hosted app wakes up).
+ * Kept stable so retry logic can match on this exact string.
+ */
 const HTML_RESPONSE_MESSAGE =
-  "The server is taking longer than usual to respond. Please wait a moment and try again.";
+  "Dogument isn’t ready yet—this often happens when it hasn’t been used for a while. Wait a moment, then try again.";
+
+/** Fallbacks when the backend doesn’t return a clear message (plain language, no jargon). */
+const MSG = {
+  versionOutdated:
+    "This copy of Dogument is too old. Update it from the store or site where you installed it, then open the app again.",
+  sessionEnded: "Your sign-in has expired. Please sign in again to keep using your lists and reviews.",
+  genericServer:
+    "Dogument couldn’t finish that just now. Please try again in a minute or two—especially if you haven’t opened the app in a while.",
+  genericNotOk:
+    "Something didn’t work while talking to Dogument. Please try again. If it keeps happening, check your internet connection.",
+  notFound: "We couldn’t find that—it may have been removed or the link might be wrong.",
+  tookTooLong:
+    "Dogument is taking much longer than usual—often right after it hasn’t been used for a while. Check your internet, wait a bit, and try again.",
+  offline:
+    "We couldn’t reach Dogument. Check that you’re online (Wi‑Fi or mobile data), then try again.",
+  parseFallback:
+    "We couldn’t understand the reply from Dogument. Please try again in a moment.",
+  downloadFailed:
+    "We couldn’t prepare your file. Check that you’re still signed in, then try exporting again.",
+} as const;
 
 function looksLikeHtml(text: string): boolean {
   const t = text.trimStart().toLowerCase();
@@ -124,10 +147,14 @@ function parseErrorResponse(text: string, fallback: string): string {
     if (data.error && typeof data.error === "object") {
       const obj = data.error as { message?: string; code?: string };
       if (obj.code === LOG_LIMIT_REACHED_CODE) return LOG_LIMIT_REACHED_CODE;
-      return obj.message ?? JSON.stringify(data.error);
+      if (typeof obj.message === "string" && obj.message.trim()) return obj.message;
+      return MSG.parseFallback;
     }
   } catch {
-    if (text && text.trim().length > 0) return text.trim().slice(0, 200);
+    const t = text?.trim() ?? "";
+    if (t && !looksLikeHtml(t) && !t.includes("{") && !t.includes("[") && t.length < 300) {
+      return t.slice(0, 280);
+    }
   }
   return fallback;
 }
@@ -257,13 +284,9 @@ async function performSingleFetchAttempt<T>(
       }
       if (code === APP_VERSION_MISMATCH_CODE) {
         window.dispatchEvent(new CustomEvent("app:version-mismatch"));
-        throw new ApiError(
-          parseErrorResponse(text, "App version outdated. Please update the app."),
-          401,
-          LoadingErrorCodeEnum.VERSION_MISMATCH
-        );
+        throw new ApiError(parseErrorResponse(text, MSG.versionOutdated), 401, LoadingErrorCodeEnum.VERSION_MISMATCH);
       }
-      const message = parseErrorResponse(text, "Session expired. Please sign in again.");
+      const message = parseErrorResponse(text, MSG.sessionEnded);
       if (!skipAuthRedirect) {
         void removeItem("dogument_token").then(() => removeItem("dogument_user"));
         dispatchLogout();
@@ -279,7 +302,11 @@ async function performSingleFetchAttempt<T>(
     if (!res.ok) {
       const message = parseErrorResponse(
         text,
-        res.status === 500 ? "Something went wrong. Please try again." : res.statusText || "Request failed"
+        res.status === 500 || res.status === 502 || res.status === 503 || res.status === 504
+          ? MSG.genericServer
+          : res.status === 404
+            ? MSG.notFound
+            : MSG.genericNotOk
       );
       if (res.status === 400) {
         try {
@@ -307,7 +334,7 @@ async function performSingleFetchAttempt<T>(
   } catch (err) {
     clearTimeout(timeoutId);
     if (err instanceof Error) throw err;
-    throw new Error("Network error. Check your connection and try again.");
+    throw new Error(MSG.offline);
   }
 }
 
@@ -325,7 +352,7 @@ async function fetchInternal<T>(path: string, options?: ApiFetchOptions): Promis
       if (!canRetry) {
         fireFirstApiErrorFromCaught(e);
         if (e instanceof Error && e.name === "AbortError") {
-          throw new Error("Request took too long. Please try again.");
+          throw new Error(MSG.tookTooLong);
         }
         throw e;
       }
@@ -335,7 +362,7 @@ async function fetchInternal<T>(path: string, options?: ApiFetchOptions): Promis
   }
   fireFirstApiErrorFromCaught(lastError);
   if (lastError instanceof Error && lastError.name === "AbortError") {
-    throw new Error("Request took too long. Please try again.");
+    throw new Error(MSG.tookTooLong);
   }
   throw lastError;
 }
@@ -356,7 +383,7 @@ async function performSinglePublicFetchAttempt<T>(path: string, options?: Reques
       throw new ApiError(HTML_RESPONSE_MESSAGE, res.ok ? 502 : res.status);
     }
     if (!res.ok) {
-      const message = parseErrorResponse(text, res.status === 404 ? "Not found" : "Request failed");
+      const message = parseErrorResponse(text, res.status === 404 ? MSG.notFound : MSG.genericNotOk);
       throw new ApiError(message, res.status);
     }
     if (!text) return undefined as T;
@@ -365,17 +392,17 @@ async function performSinglePublicFetchAttempt<T>(path: string, options?: Reques
     clearTimeout(timeoutId);
     if (err instanceof Error && err.name === "AbortError") throw err;
     if (err instanceof ApiError) throw err;
-    throw err instanceof Error ? err : new Error("Network error. Check your connection and try again.");
+    throw err instanceof Error ? err : new Error(MSG.offline);
   }
 }
 
 function publicFetchErrorToError(e: unknown): Error {
   if (e instanceof Error && e.name === "AbortError") {
-    return new Error("Request took too long. Please try again.");
+    return new Error(MSG.tookTooLong);
   }
   if (e instanceof ApiError) return new Error(e.message);
   if (e instanceof Error) return e;
-  return new Error("Network error. Check your connection and try again.");
+  return new Error(MSG.offline);
 }
 
 /**
@@ -437,7 +464,7 @@ export async function apiFetchFile(
   });
   if (!res.ok) {
     const text = await res.text();
-    const msg = parseErrorResponse(text, "Download failed");
+    const msg = parseErrorResponse(text, MSG.downloadFailed);
     throw new Error(msg);
   }
   const blob = await res.blob();

@@ -589,23 +589,22 @@
     "message": "A new version of the app is available. Please update from the Play Store or App Store to continue."
   },
   "coldStart": {
-    "error": "Something went wrong. Please check your connection and try again.",
-    "serverSleepingHint": "This can take a minute if the server was asleep (e.g. free hosting). We’re retrying automatically—hang tight, or use Try again below.",
-    "timedOut": "Taking longer than usual. The server may be waking up.",
-    "errorCodeLabel": "Error code",
-    "code_TIMEOUT": "The request took too long. Please try again.",
-    "code_NETWORK": "Connection failed. Check your network and try again.",
-    "code_SERVER_ERROR": "The server had an error. Please try again later.",
-    "code_UNAUTHORIZED": "Session expired or invalid. Please sign in again.",
-    "code_FORBIDDEN": "You don't have permission to access this.",
-    "code_NOT_FOUND": "The requested resource was not found.",
-    "code_CLIENT_ERROR": "The request was invalid. Please try again.",
-    "code_VERSION_MISMATCH": "Please update the app to the latest version.",
-    "code_UNKNOWN": "Something went wrong. Please try again."
+    "error": "Dogument couldn’t finish loading. Check that you’re online, then tap Try again. If you haven’t opened the app in a while, it may need a little extra time the first time.",
+    "serverSleepingHint": "If nobody has used Dogument for a while, the first load can take up to a minute. We’re still trying in the background—you can also tap Try again whenever you like.",
+    "timedOut": "We’ve waited as long as we can and Dogument still isn’t responding. Check your internet connection and tap Try again. If you use a free hosting plan, waking the app up can take a full minute.",
+    "code_TIMEOUT": "Dogument is taking much longer than usual to answer—this often happens right after it hasn’t been used for a while. Check Wi‑Fi or mobile data, wait a bit, then tap Try again.",
+    "code_NETWORK": "We couldn’t reach Dogument. Make sure you’re connected to the internet, then try again.",
+    "code_SERVER_ERROR": "Dogument ran into a problem while working on your request. Please try again in a few minutes.",
+    "code_UNAUTHORIZED": "Your sign-in has expired or isn’t valid anymore. Sign in again to keep using your lists and reviews.",
+    "code_FORBIDDEN": "You don’t have access to that. If that surprises you, sign out and sign back in, or contact support.",
+    "code_NOT_FOUND": "We couldn’t find what you were looking for. It may have been removed, or the link might be old.",
+    "code_CLIENT_ERROR": "We couldn’t make sense of that action. Double-check what you entered and try again.",
+    "code_VERSION_MISMATCH": "This version of Dogument is too old. Update it from the App Store, Play Store, or wherever you installed it, then open the app again.",
+    "code_UNKNOWN": "Something unexpected went wrong while loading. Tap Try again. If it keeps happening, close the app completely and open it again, or install the latest update."
   },
   "errorBoundary": {
-    "title": "Something went wrong",
-    "message": "An unexpected error occurred.",
+    "title": "This part of Dogument couldn’t load",
+    "message": "Your saved items are usually fine—this is just one screen that hit a snag. Tap Try again to reload it.",
     "retry": "Try again"
   },
   "toast": {

@@ -5,8 +5,8 @@ import { getErrorMessageKey } from "./errorCodes";
 type TFunction = (key: string, opts?: Record<string, string>) => string;
 
 /**
- * Show an error toast with a user-friendly message and an error code.
- * The actual error can be logged for debugging but is never shown to the user.
+ * Show an error toast with a user-friendly message only (no technical codes in the UI).
+ * The error code is logged for debugging when an original error is provided.
  */
 export function showErrorToast(
   t: TFunction,
@@ -20,10 +20,10 @@ export function showErrorToast(
       Object.entries(options.interpolation).map(([k, v]) => [k, String(v)])
     ) as Record<string, string>;
   const message = options?.interpolation ? t(messageKey, params) : t(messageKey);
-  const codeLabel = t("errorCodes.codeLabel");
-  const display = `${message} (${codeLabel}: ${code})`;
-  toast.error(display);
+  toast.error(message);
   if (options?.originalError !== undefined) {
     console.error(`[${code}]`, options.originalError);
+  } else {
+    console.error(`[${code}]`);
   }
 }

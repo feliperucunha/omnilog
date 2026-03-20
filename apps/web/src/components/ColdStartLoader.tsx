@@ -92,12 +92,7 @@ export function ColdStartLoader() {
       >
         <Logo alt="" className="h-16 w-auto sm:h-20 md:h-24" />
         <div className="flex max-w-sm flex-col items-center gap-6 text-center">
-          {errorCode != null && (
-            <p className="font-mono text-sm font-medium text-[var(--color-mid)]" aria-label="Error code">
-              {t("coldStart.errorCodeLabel")}: {errorCode}
-            </p>
-          )}
-          <p className="text-sm text-[var(--color-light)]">
+          <p className="text-sm leading-relaxed text-[var(--color-light)]">
             {errorCode != null ? t(`coldStart.code_${errorCode}` as "coldStart.code_TIMEOUT") : t("coldStart.error")}
           </p>
           <Button onClick={handleTryAgain} variant="default" size="sm">

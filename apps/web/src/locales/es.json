@@ -588,23 +588,22 @@
     "message": "Hay una nueva versión de la app. Actualiza desde Play Store o App Store para continuar."
   },
   "coldStart": {
-    "error": "Algo salió mal. Comprueba tu conexión e inténtalo de nuevo.",
-    "serverSleepingHint": "Puede tardar un minuto si el servidor estaba inactivo (p. ej. hosting gratuito). Estamos reintentando automáticamente—espera o usa Reintentar abajo.",
-    "timedOut": "Está tardando más de lo habitual. El servidor puede estar iniciándose.",
-    "errorCodeLabel": "Código de error",
-    "code_TIMEOUT": "La solicitud tardó demasiado. Inténtalo de nuevo.",
-    "code_NETWORK": "Error de conexión. Comprueba tu red e inténtalo de nuevo.",
-    "code_SERVER_ERROR": "El servidor tuvo un error. Inténtalo más tarde.",
-    "code_UNAUTHORIZED": "Sesión expirada o inválida. Inicia sesión de nuevo.",
-    "code_FORBIDDEN": "No tienes permiso para acceder.",
-    "code_NOT_FOUND": "El recurso solicitado no se encontró.",
-    "code_CLIENT_ERROR": "La solicitud no era válida. Inténtalo de nuevo.",
-    "code_VERSION_MISMATCH": "Actualiza la app a la última versión.",
-    "code_UNKNOWN": "Algo salió mal. Inténtalo de nuevo."
+    "error": "Dogument no pudo terminar de cargar. Comprueba que tienes internet y pulsa Reintentar. Si hace tiempo que no abres la app, la primera vez puede tardar un poco más.",
+    "serverSleepingHint": "Si nadie ha usado Dogument en un rato, la primera carga puede tardar hasta un minuto. Seguimos intentándolo en segundo plano—también puedes pulsar Reintentar cuando quieras.",
+    "timedOut": "Hemos esperado todo lo razonable y Dogument sigue sin responder. Comprueba tu conexión y pulsa Reintentar. En planes de alojamiento gratuitos, despertar la app puede llevar un minuto entero.",
+    "code_TIMEOUT": "Dogument está tardando mucho más de lo normal en responder—suele pasar justo después de un tiempo sin usarlo. Comprueba Wi‑Fi o datos móviles, espera un poco y pulsa Reintentar.",
+    "code_NETWORK": "No pudimos conectar con Dogument. Asegúrate de tener internet e inténtalo de nuevo.",
+    "code_SERVER_ERROR": "Dogument tuvo un problema al procesar tu petición. Vuelve a intentarlo en unos minutos.",
+    "code_UNAUTHORIZED": "Tu sesión caducó o ya no es válida. Inicia sesión otra vez para seguir con tus listas y reseñas.",
+    "code_FORBIDDEN": "No tienes acceso a eso. Si te sorprende, cierra sesión y vuelve a entrar, o contacta con soporte.",
+    "code_NOT_FOUND": "No encontramos lo que buscas. Puede haberse eliminado o el enlace puede estar antiguo.",
+    "code_CLIENT_ERROR": "No pudimos entender esa acción. Revisa lo que escribiste e inténtalo de nuevo.",
+    "code_VERSION_MISMATCH": "Esta versión de Dogument es antigua. Actualízala en la App Store, Play Store o donde la instalaste y vuelve a abrir la app.",
+    "code_UNKNOWN": "Pasó algo inesperado al cargar. Pulsa Reintentar. Si sigue pasando, cierra la app por completo y ábrela de nuevo, o instala la última actualización."
   },
   "errorBoundary": {
-    "title": "Algo salió mal",
-    "message": "Ocurrió un error inesperado.",
+    "title": "Esta parte de Dogument no pudo cargarse",
+    "message": "Tus datos suelen estar bien—solo esta pantalla falló. Pulsa Reintentar para recargarla.",
     "retry": "Reintentar"
   },
   "toast": {
