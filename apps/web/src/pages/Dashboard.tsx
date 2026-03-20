@@ -27,6 +27,7 @@ import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
+import { getStatusLabel } from "@/lib/statusLabel";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import * as storage from "@/lib/storage";
 import { ReactionButtons } from "@/components/ReactionButtons";
@@ -568,6 +569,16 @@ export function Dashboard() {
                           : isCompleted
                             ? "border border-emerald-600"
                             : "border border-[var(--color-mid)]";
+                  const badgeClass =
+                    log.status == null
+                      ? ""
+                      : isDropped
+                        ? "bg-red-500/95 text-white"
+                        : isInProgress
+                          ? "bg-amber-400 text-[var(--color-darkest)]"
+                          : isCompleted
+                            ? "bg-emerald-600 text-white"
+                            : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
                   const isExpanded = expandedReviewLogId === log.id;
                   return (
                   <motion.li key={log.id} variants={staggerItem} className="list-none">
@@ -580,9 +591,17 @@ export function Dashboard() {
                       {/* Left: image full height */}
                       <Link
                         to={`/item/${log.mediaType}/${log.externalId}`}
-                        className="h-full min-h-full w-28 flex-shrink-0 overflow-hidden rounded-l-lg sm:w-32"
+                        className="relative block h-full min-h-full w-28 flex-shrink-0 overflow-hidden rounded-l-lg sm:w-32"
                       >
                         <ItemImage src={log.image} className="h-full w-full object-cover" />
+                        {log.status && (
+                          <span
+                            className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
+                            title={getStatusLabel(t, log.status, log.mediaType)}
+                          >
+                            {getStatusLabel(t, log.status, log.mediaType)}
+                          </span>
+                        )}
                       </Link>
                       {/* Middle: title, meta, user, review */}
                       <div className={`flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 sm:p-4 ${!isExpanded ? "min-h-0" : ""}`}>

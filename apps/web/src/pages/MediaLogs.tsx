@@ -907,6 +907,16 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                       : isCompleted
                         ? "border border-emerald-600"
                         : "border border-[var(--color-mid)]";
+              const badgeClass =
+                log.status == null
+                  ? ""
+                  : isDropped
+                    ? "bg-red-500/95 text-white"
+                    : isInProgress
+                      ? "bg-amber-400 text-[var(--color-darkest)]"
+                      : isCompleted
+                        ? "bg-emerald-600 text-white"
+                        : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
               const isReviewExpanded = embedded && expandedReviewLogId === log.id;
               return (
               <motion.div key={log.id} variants={staggerItem} className="min-h-0 sm:h-full">
@@ -923,9 +933,17 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                     {/* Left: image full height – flush with card edge, radius matches card (rounded-lg); click goes to item page */}
                     <Link
                       to={`/item/${log.mediaType}/${log.externalId}`}
-                      className="h-full min-h-full w-28 flex-shrink-0 overflow-hidden sm:w-32 block"
+                      className="relative block h-full min-h-full w-28 flex-shrink-0 overflow-hidden sm:w-32"
                     >
                       <ItemImage src={log.image} className="h-full w-full object-cover" />
+                      {log.status && (
+                        <span
+                          className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
+                          title={getStatusLabel(t, log.status, log.mediaType)}
+                        >
+                          {getStatusLabel(t, log.status, log.mediaType)}
+                        </span>
+                      )}
                     </Link>
                     {/* Middle: title, grade, badge, episode, review */}
                     <div className={`flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 sm:p-4 ${embedded && !isReviewExpanded ? "min-h-0" : ""}`}>
