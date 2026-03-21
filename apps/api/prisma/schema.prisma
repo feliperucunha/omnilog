@@ -211,3 +211,11 @@ model LogReaction {
   @@index([logId])
   @@index([userId])
 }
+
+/// App-wide toggles (e.g. relax API-key UX). Editable via admin API only.
+model FeatureFlag {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}

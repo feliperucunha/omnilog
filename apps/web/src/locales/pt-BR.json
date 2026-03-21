@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Dogument",
+    "name": "Geeklogs",
     "subtitle": "Acompanhe tudo que você assiste, joga e lê."
   },
   "nav": {
@@ -144,7 +144,7 @@
     "apiKeyTutorial": {
       "tmdb": "1. Acesse themoviedb.org e crie uma conta gratuita ou faça login.\n2. Abra Configurações → API no menu à esquerda (ou use o link abaixo).\n3. Clique em \"Request an API Key\" e escolha \"Developer\".\n4. Aceite os termos e preencha o formulário (Application URL: seu site ou http://localhost:5173, Application Summary: ex. \"Registro de mídia pessoal\").\n5. Na página da API, copie o \"API Key (v3 auth)\" e cole abaixo.",
       "rawg": "1. Acesse rawg.io e cadastre-se ou faça login.\n2. Abra o link da documentação da API abaixo e procure por \"Get your API key\" ou o formulário de cadastro.\n3. Registre-se para obter uma chave de API (plano gratuito disponível).\n4. Copie a chave da sua conta/painel e cole abaixo.",
-      "bgg": "1. Acesse boardgamegeek.com e faça login (ou crie uma conta).\n2. Abra o link Applications abaixo.\n3. Clique para criar uma nova aplicação (ex.: \"Dogument\").\n4. Escolha uso não comercial se for para uso pessoal; envie e aguarde a aprovação (pode levar alguns dias).\n5. Após aprovado, abra sua aplicação e crie um Token.\n6. Copie o Bearer token e cole abaixo.",
+      "bgg": "1. Acesse boardgamegeek.com e faça login (ou crie uma conta).\n2. Abra o link Applications abaixo.\n3. Clique para criar uma nova aplicação (ex.: \"Geeklogs\").\n4. Escolha uso não comercial se for para uso pessoal; envie e aguarde a aprovação (pode levar alguns dias).\n5. Após aprovado, abra sua aplicação e crie um Token.\n6. Copie o Bearer token e cole abaixo.",
       "ludopedia": "1. Crie uma conta em https://ludopedia.com.br/novousuario ou faça login em ludopedia.com.br.\n2. Abra Aplicativos (https://www.ludopedia.com.br/aplicativos) e crie uma aplicação.\n3. Use o fluxo OAuth da Ludopedia para obter um token de acesso (veja a documentação da API). A chave necessária para o Ominilog é o Access Token (ACCESS_TOKEN).\n4. O token vale por 60 dias; cole abaixo.",
       "comicvine": "1. Acesse comicvine.gamespot.com e crie uma conta gratuita ou faça login.\n2. Abra o link da documentação da API abaixo.\n3. Solicite uma chave de API (gratuita) na página da Comic Vine API.\n4. Copie sua chave de API e cole abaixo."
     },
@@ -156,7 +156,15 @@
     "adminTableUsername": "Usuário",
     "adminTableLogins": "Logins",
     "adminTableLogs": "Logs",
-    "adminTableLastLogin": "Último login"
+    "adminTableLastLogin": "Último login",
+    "adminFeatureFlagsTitle": "Feature flags",
+    "adminFeatureFlagsIntro": "Alterna comportamento global do app. As mudanças valem para todos os usuários após atualizar ou recarregar dados.",
+    "adminFeatureFlagsError": "Não foi possível carregar as feature flags.",
+    "adminFeatureFlagsEmpty": "Nenhuma feature flag no banco.",
+    "adminFeatureFlagsSaving": "Salvando…",
+    "adminFeatureFlagUpdated": "Feature flag atualizada.",
+    "adminFlag_disable_api_key_requirements": "Relaxar exigência de chaves de API",
+    "adminFlag_disable_api_key_requirements_hint": "Oculta avisos de chave ausente, limites de busca e alertas de chave inválida. As APIs externas ainda precisam de chaves no servidor ou do usuário para retornar dados."
   },
   "common": {
     "required": "obrigatório",
@@ -509,10 +517,10 @@
     "carouselNext": "Próximo membro",
     "carouselGoTo": "Ir para membro {{index}}",
     "projectTitle": "Sobre o projeto",
-    "projectBody": "Dogument é como um Stremio para seus logs: um agregador de APIs para ter tudo em um só lugar. Em vez de oito apps diferentes, use um só para acompanhar filmes, séries, board games, jogos, livros, anime, manga e quadrinhos em um único painel. Busque por categoria, adicione entradas manuais quando algo não está no banco de dados e mantenha resenhas e notas juntas. Não precisa alternar entre vários apps ou planilhas—tudo que você assiste, joga e lê fica aqui.",
+    "projectBody": "Geeklogs é como um Stremio para seus logs: um agregador de APIs para ter tudo em um só lugar. Em vez de oito apps diferentes, use um só para acompanhar filmes, séries, board games, jogos, livros, anime, manga e quadrinhos em um único painel. Busque por categoria, adicione entradas manuais quando algo não está no banco de dados e mantenha resenhas e notas juntas. Não precisa alternar entre vários apps ou planilhas—tudo que você assiste, joga e lê fica aqui.",
     "projectHostingNote": "O app está rodando atualmente em servidores e domínio gratuitos. As requisições às vezes podem demorar um pouco.",
     "donationTitle": "Apoie o projeto",
-    "donationIntro": "Se o Dogument for útil para você, pode apoiar o desenvolvimento com uma doação única ou apoio recorrente. Obrigado!",
+    "donationIntro": "Se o Geeklogs for útil para você, pode apoiar o desenvolvimento com uma doação única ou apoio recorrente. Obrigado!",
     "donateKofi": "Ko-fi",
     "donateGitHub": "GitHub Sponsors",
     "donationNotConfigured": "Links de doação não configurados. Defina VITE_DONATION_KOFI_URL e/ou VITE_DONATION_GITHUB_SPONSORS_URL no ambiente de deploy para exibi-los aqui.",
@@ -595,21 +603,21 @@
     "message": "Há uma nova versão do app. Atualize pela Play Store ou App Store para continuar."
   },
   "coldStart": {
-    "error": "O Dogument não conseguiu terminar de carregar. Confira se você está online e toque em Tentar novamente. Se faz tempo que você não abre o app, a primeira vez pode demorar um pouco mais.",
-    "serverSleepingHint": "Se ninguém usou o Dogument há um tempo, o primeiro carregamento pode levar até um minuto. Ainda estamos tentando em segundo plano—você também pode tocar em Tentar novamente quando quiser.",
-    "timedOut": "Esperamos o máximo possível e o Dogument ainda não respondeu. Confira sua internet e toque em Tentar novamente. Em planos gratuitos de hospedagem, acordar o app pode levar um minuto inteiro.",
-    "code_TIMEOUT": "O Dogument está demorando muito mais que o normal para responder—isso é comum logo depois de um período sem uso. Confira Wi‑Fi ou dados móveis, espere um pouco e toque em Tentar novamente.",
-    "code_NETWORK": "Não conseguimos alcançar o Dogument. Confira se você está conectado à internet e tente de novo.",
-    "code_SERVER_ERROR": "O Dogument encontrou um problema ao processar seu pedido. Tente de novo daqui a alguns minutos.",
+    "error": "O Geeklogs não conseguiu terminar de carregar. Confira se você está online e toque em Tentar novamente. Se faz tempo que você não abre o app, a primeira vez pode demorar um pouco mais.",
+    "serverSleepingHint": "Se ninguém usou o Geeklogs há um tempo, o primeiro carregamento pode levar até um minuto. Ainda estamos tentando em segundo plano—você também pode tocar em Tentar novamente quando quiser.",
+    "timedOut": "Esperamos o máximo possível e o Geeklogs ainda não respondeu. Confira sua internet e toque em Tentar novamente. Em planos gratuitos de hospedagem, acordar o app pode levar um minuto inteiro.",
+    "code_TIMEOUT": "O Geeklogs está demorando muito mais que o normal para responder—isso é comum logo depois de um período sem uso. Confira Wi‑Fi ou dados móveis, espere um pouco e toque em Tentar novamente.",
+    "code_NETWORK": "Não conseguimos alcançar o Geeklogs. Confira se você está conectado à internet e tente de novo.",
+    "code_SERVER_ERROR": "O Geeklogs encontrou um problema ao processar seu pedido. Tente de novo daqui a alguns minutos.",
     "code_UNAUTHORIZED": "Seu login expirou ou não é mais válido. Entre de novo para continuar usando suas listas e resenhas.",
     "code_FORBIDDEN": "Você não tem acesso a isso. Se isso parecer errado, saia da conta e entre de novo, ou fale com o suporte.",
     "code_NOT_FOUND": "Não encontramos o que você procura. Pode ter sido removido ou o link pode estar antigo.",
     "code_CLIENT_ERROR": "Não conseguimos entender essa ação. Confira o que você preencheu e tente de novo.",
-    "code_VERSION_MISMATCH": "Esta versão do Dogument está desatualizada. Atualize na App Store, Play Store ou de onde você instalou o app e abra de novo.",
+    "code_VERSION_MISMATCH": "Esta versão do Geeklogs está desatualizada. Atualize na App Store, Play Store ou de onde você instalou o app e abra de novo.",
     "code_UNKNOWN": "Algo inesperado aconteceu ao carregar. Toque em Tentar novamente. Se continuar, feche o app por completo e abra de novo, ou instale a última atualização."
   },
   "errorBoundary": {
-    "title": "Esta parte do Dogument não carregou",
+    "title": "Esta parte do Geeklogs não carregou",
     "message": "Seus dados costumam estar bem—só esta tela que travou. Toque em Tentar novamente para recarregar.",
     "retry": "Tentar novamente"
   },

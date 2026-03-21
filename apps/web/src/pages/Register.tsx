@@ -12,7 +12,7 @@ import { AuthNavbar } from "@/components/AuthNavbar";
 import { toast } from "sonner";
 import { showErrorToast } from "@/lib/errorToast";
 import { apiFetch, ApiValidationError } from "@/lib/api";
-import type { AuthResponse } from "@dogument/shared";
+import type { AuthResponse } from "@geeklogs/shared";
 import { modalContentVariants } from "@/lib/animations";
 import { cn } from "@/lib/utils";
 

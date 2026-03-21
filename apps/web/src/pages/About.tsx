@@ -13,7 +13,7 @@ import { ALL_ERROR_CODES, getErrorDocKey } from "@/lib/errorCodes";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 
-const FEEDBACK_COOLDOWN_KEY = "dogument_feedback_cooldown";
+const FEEDBACK_COOLDOWN_KEY = "geeklogs_feedback_cooldown";
 const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
 function formatCooldown(seconds: number): string {

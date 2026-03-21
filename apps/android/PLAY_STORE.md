@@ -1,4 +1,4 @@
-# Publishing Dogument to Google Play Store
+# Publishing Geeklogs to Google Play Store
 
 This app is configured to meet current Play Store technical requirements (target API 35, AAB, release signing). Follow these steps to build and publish.
 
@@ -8,6 +8,7 @@ This app is configured to meet current Play Store technical requirements (target
 - **Android App Bundle (AAB):** Use the AAB for uploads; Play will generate optimized APKs. Bundle splits are enabled (ABI, density, language).
 - **Release build:** `debuggable false`, `usesCleartextTraffic="false"`. Only `INTERNET` permission is declared.
 - **Versioning:** Bump `versionCode` (integer) for each upload and set `versionName` (e.g. `"1.0"`) in `android/app/build.gradle` before releasing.
+- **Launcher & splash icon:** Generated from `apps/web/public/logo-dark.png` (black background). After changing the web logo, run from repo root: `python3 apps/android/scripts/generate-launcher-icons.py` (requires Pillow).
 
 ## 2. App signing
 
@@ -57,7 +58,7 @@ From the **monorepo root** (so the web app is built first):
 
 ```bash
 pnpm install
-pnpm run build --filter=@dogument/web
+pnpm run build --filter=@geeklogs/web
 cd apps/android
 pnpm run build
 ```

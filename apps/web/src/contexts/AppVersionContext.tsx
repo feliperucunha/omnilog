@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { APP_VERSION } from "@dogument/shared";
+import { APP_VERSION } from "@geeklogs/shared";
 import { getApiBase } from "@/lib/api";
 
 function isNativePlatform(): boolean {

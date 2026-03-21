@@ -1,11 +1,11 @@
-import type { SearchResult, ItemDetail } from "@dogument/shared";
+import type { SearchResult, ItemDetail } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 
 const BASE = "https://openlibrary.org";
 
 export async function getBookById(workId: string): Promise<ItemDetail | null> {
   const res = await fetch(`${BASE}/works/${workId}.json`, {
-    headers: { "User-Agent": "Dogument/1.0 (https://github.com/dogument)" },
+    headers: { "User-Agent": "Geeklogs/1.0 (https://github.com/geeklogs)" },
   });
   if (!res.ok) return null;
   const data = (await res.json()) as {
@@ -31,7 +31,7 @@ export async function getBookById(workId: string): Promise<ItemDetail | null> {
       const names = await Promise.all(
         authorKeys.map(async (key) => {
           const authRes = await fetch(`${BASE}${key}.json`, {
-            headers: { "User-Agent": "Dogument/1.0 (https://github.com/dogument)" },
+            headers: { "User-Agent": "Geeklogs/1.0 (https://github.com/geeklogs)" },
           });
           if (!authRes.ok) return null;
           const auth = (await authRes.json()) as { name?: string };
@@ -59,7 +59,7 @@ export async function getBookById(workId: string): Promise<ItemDetail | null> {
 export async function searchBooks(q: string, sort?: string): Promise<SearchResult[]> {
   const res = await fetch(
     `${BASE}/search.json?q=${encodeURIComponent(q)}&limit=20`,
-    { headers: { "User-Agent": "Dogument/1.0 (https://github.com/dogument)" } }
+    { headers: { "User-Agent": "Geeklogs/1.0 (https://github.com/geeklogs)" } }
   );
   if (!res.ok) return [];
   const data = (await res.json()) as {

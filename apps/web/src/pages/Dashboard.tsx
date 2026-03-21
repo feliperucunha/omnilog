@@ -15,8 +15,9 @@ import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, MEDIA_TYPES, type MediaType, toMediaType } from "@dogument/shared";
-import type { Log } from "@dogument/shared";
+import { isDisableApiKeyRequirements } from "@/lib/featureFlags";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, MEDIA_TYPES, type MediaType, toMediaType } from "@geeklogs/shared";
+import type { Log } from "@geeklogs/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
@@ -39,11 +40,11 @@ interface FeedEntry {
 }
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
-const BETA_MODAL_STORAGE_KEY = "dogument.betaModalSeen";
-const SOCIAL_COLLAPSED_STORAGE_KEY = "dogument.dashboard.socialCollapsed";
+const BETA_MODAL_STORAGE_KEY = "geeklogs.betaModalSeen";
+const SOCIAL_COLLAPSED_STORAGE_KEY = "geeklogs.dashboard.socialCollapsed";
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** Base URL for share profile link (always prod so shared links work). */
-const PROFILE_SHARE_BASE_URL = "https://dogument-one.vercel.app";
+const PROFILE_SHARE_BASE_URL = "https://geeklogs-one.vercel.app";
 
 /** Milestone progress from GET /me/milestones/progress */
 interface ScopeProgress {
@@ -331,7 +332,9 @@ export function Dashboard() {
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
   const apiKeyProvider = getApiKeyProviderForMediaType(selectedCategory, boardGameProvider);
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
+  const skipApiKeyReq = isDisableApiKeyRequirements(me);
   const needsApiKeyBanner =
+    !skipApiKeyReq &&
     apiKeyProvider != null &&
     (selectedCategory === "boardgames"
       ? !hasBoardGameKey

@@ -1,5 +1,5 @@
-import type { MediaType } from "@dogument/shared";
-import { MEDIA_TYPES } from "@dogument/shared";
+import type { MediaType } from "@geeklogs/shared";
+import { MEDIA_TYPES } from "@geeklogs/shared";
 
 /**
  * Fixed badge icon per medium. Used for LevelBadge so the icon stays the same when

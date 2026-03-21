@@ -1,5 +1,5 @@
 {
-  "name": "@dogument/android",
+  "name": "@geeklogs/android",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -8,9 +8,9 @@
     "sync:ios": "cap sync ios",
     "open": "cap open android",
     "open:ios": "cap open ios",
-    "build": "pnpm --filter @dogument/web build:android && cap sync",
-    "android": "pnpm --filter @dogument/web build:android && cap sync android && cap open android",
-    "ios": "pnpm --filter @dogument/web build:android && cap sync ios && cap open ios"
+    "build": "pnpm --filter @geeklogs/web build:android && cap sync",
+    "android": "pnpm --filter @geeklogs/web build:android && cap sync android && cap open android",
+    "ios": "pnpm --filter @geeklogs/web build:android && cap sync ios && cap open ios"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.0.0",
@@ -19,7 +19,7 @@
     "@capacitor/splash-screen": "^7.0.0"
   },
   "dependencies": {
-    "@dogument/web": "workspace:*",
+    "@geeklogs/web": "workspace:*",
     "@capacitor/filesystem": "^7.0.0",
     "@capacitor/share": "^7.0.0"
   },

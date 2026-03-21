@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { SettingsSkeleton } from "@/components/skeletons";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { apiFetch, invalidateApiCache, apiFetchFile, downloadFile } from "@/lib/api";
@@ -20,7 +21,7 @@ import { useMe } from "@/contexts/MeContext";
 import { getShowCompleteModal, SHOW_COMPLETE_MODAL_STORAGE_KEY } from "@/contexts/LogCompleteContext";
 import * as storage from "@/lib/storage";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
-import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@dogument/shared";
+import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
@@ -69,6 +70,12 @@ export function Settings() {
   >([]);
   const [adminUsersLoading, setAdminUsersLoading] = useState(false);
   const [adminUsersError, setAdminUsersError] = useState<string | null>(null);
+  const [adminFeatureFlags, setAdminFeatureFlags] = useState<
+    { key: string; enabled: boolean; updatedAt: string }[]
+  >([]);
+  const [adminFeatureFlagsLoading, setAdminFeatureFlagsLoading] = useState(false);
+  const [adminFeatureFlagsError, setAdminFeatureFlagsError] = useState<string | null>(null);
+  const [adminFlagSavingKey, setAdminFlagSavingKey] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportSelectedCategories, setExportSelectedCategories] = useState<Set<MediaType>>(() => new Set(MEDIA_TYPES));
@@ -85,11 +92,46 @@ export function Settings() {
     if (me?.tier !== "admin" || !adminOpen) return;
     setAdminUsersLoading(true);
     setAdminUsersError(null);
-    apiFetch<{ data: typeof adminUsers }>("/admin/users")
-      .then((res) => setAdminUsers(res.data ?? []))
-      .catch((err) => setAdminUsersError(err instanceof Error ? err.message : t("settings.adminUsersError")))
-      .finally(() => setAdminUsersLoading(false));
+    setAdminFeatureFlagsLoading(true);
+    setAdminFeatureFlagsError(null);
+    void Promise.all([
+      apiFetch<{ data: typeof adminUsers }>("/admin/users")
+        .then((res) => setAdminUsers(res.data ?? []))
+        .catch((err) =>
+          setAdminUsersError(err instanceof Error ? err.message : t("settings.adminUsersError"))
+        ),
+      apiFetch<{ data: typeof adminFeatureFlags }>("/admin/feature-flags")
+        .then((res) => setAdminFeatureFlags(res.data ?? []))
+        .catch((err) =>
+          setAdminFeatureFlagsError(
+            err instanceof Error ? err.message : t("settings.adminFeatureFlagsError")
+          )
+        ),
+    ]).finally(() => {
+      setAdminUsersLoading(false);
+      setAdminFeatureFlagsLoading(false);
+    });
   }, [me?.tier, adminOpen, t]);
+
+  const handleToggleAdminFeatureFlag = async (flagKey: string, enabled: boolean) => {
+    setAdminFlagSavingKey(flagKey);
+    try {
+      await apiFetch(`/admin/feature-flags/${encodeURIComponent(flagKey)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ enabled }),
+      });
+      setAdminFeatureFlags((prev) =>
+        prev.map((f) => (f.key === flagKey ? { ...f, enabled } : f))
+      );
+      invalidateApiCache("/search");
+      await refetchMe();
+      toast.success(t("settings.adminFeatureFlagUpdated"));
+    } catch (err) {
+      showErrorToast(t, "E008", { originalError: err });
+    } finally {
+      setAdminFlagSavingKey(null);
+    }
+  };
 
   useEffect(() => {
     if (me?.apiKeys) {
@@ -791,6 +833,65 @@ export function Settings() {
                 {!adminUsersLoading && !adminUsersError && adminUsers.length === 0 && adminOpen && (
                   <p className="text-sm text-[var(--color-light)]">{t("settings.adminNoUsers")}</p>
                 )}
+
+                <div className="mt-8 border-t border-[var(--color-surface-border)] pt-6">
+                  <h3 className="mb-1 text-base font-semibold text-[var(--color-lightest)]">
+                    {t("settings.adminFeatureFlagsTitle")}
+                  </h3>
+                  <p className="mb-4 text-sm text-[var(--color-light)]">
+                    {t("settings.adminFeatureFlagsIntro")}
+                  </p>
+                  {adminFeatureFlagsLoading && (
+                    <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
+                  )}
+                  {adminFeatureFlagsError && (
+                    <p className="text-sm text-red-400">{adminFeatureFlagsError}</p>
+                  )}
+                  {!adminFeatureFlagsLoading &&
+                    !adminFeatureFlagsError &&
+                    adminFeatureFlags.length === 0 && (
+                      <p className="text-sm text-[var(--color-light)]">
+                        {t("settings.adminFeatureFlagsEmpty")}
+                      </p>
+                    )}
+                  <ul className="flex flex-col gap-4">
+                    {adminFeatureFlags.map((f) => (
+                      <li
+                        key={f.key}
+                        className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/30 p-4"
+                      >
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <p className="font-medium text-[var(--color-lightest)]">
+                            {t(`settings.adminFlag_${f.key}` as "settings.adminFlag_disable_api_key_requirements")}
+                          </p>
+                          <p className="text-xs leading-relaxed text-[var(--color-light)]">
+                            {t(
+                              `settings.adminFlag_${f.key}_hint` as "settings.adminFlag_disable_api_key_requirements_hint"
+                            )}
+                          </p>
+                          <p className="font-mono text-[10px] text-[var(--color-mid)]">{f.key}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {adminFlagSavingKey === f.key && (
+                            <span className="text-xs text-[var(--color-light)]">
+                              {t("settings.adminFeatureFlagsSaving")}
+                            </span>
+                          )}
+                          <Switch
+                            checked={f.enabled}
+                            disabled={adminFlagSavingKey === f.key}
+                            onCheckedChange={(v) => {
+                              void handleToggleAdminFeatureFlag(f.key, v);
+                            }}
+                            aria-label={t(
+                              `settings.adminFlag_${f.key}` as "settings.adminFlag_disable_api_key_requirements"
+                            )}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             )}
           </div>

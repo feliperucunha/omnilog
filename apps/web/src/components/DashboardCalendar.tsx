@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
-import { IN_PROGRESS_STATUSES, type Log } from "@dogument/shared";
+import { IN_PROGRESS_STATUSES, type Log } from "@geeklogs/shared";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 

@@ -18,7 +18,7 @@ import { adminRouter } from "./routes/admin.js";
 import { prisma } from "./lib/prisma.js";
 import { runSeedBadges } from "./scripts/seedBadges.js";
 import { runSeedMilestones } from "./scripts/seedMilestones.js";
-import { APP_VERSION } from "@dogument/shared";
+import { APP_VERSION } from "@geeklogs/shared";
 
 const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
 

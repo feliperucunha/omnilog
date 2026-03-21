@@ -1,4 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useMe } from "@/contexts/MeContext";
+import { isDisableApiKeyRequirements } from "@/lib/featureFlags";
 
 type InvalidApiKeyContextValue = {
   invalidProviders: string[];
@@ -9,6 +11,7 @@ type InvalidApiKeyContextValue = {
 const InvalidApiKeyContext = createContext<InvalidApiKeyContextValue | null>(null);
 
 export function InvalidApiKeyProvider({ children }: { children: React.ReactNode }) {
+  const { me } = useMe();
   const [invalidProviders, setInvalidProviders] = useState<string[]>([]);
 
   const addInvalidProvider = useCallback((provider: string) => {
@@ -22,13 +25,18 @@ export function InvalidApiKeyProvider({ children }: { children: React.ReactNode 
   }, []);
 
   useEffect(() => {
+    if (isDisableApiKeyRequirements(me)) setInvalidProviders([]);
+  }, [me]);
+
+  useEffect(() => {
     const handler = (e: CustomEvent<{ provider: string }>) => {
+      if (isDisableApiKeyRequirements(me)) return;
       if (e.detail?.provider) addInvalidProvider(e.detail.provider);
     };
     window.addEventListener("api:invalid-key", handler as EventListener);
     return () =>
       window.removeEventListener("api:invalid-key", handler as EventListener);
-  }, [addInvalidProvider]);
+  }, [addInvalidProvider, me]);
 
   return (
     <InvalidApiKeyContext.Provider

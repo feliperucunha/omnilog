@@ -5,7 +5,7 @@ const SMTP_PORT = parseInt(process.env.SMTP_PORT ?? "587", 10);
 const SMTP_SECURE = process.env.SMTP_SECURE === "true";
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const SMTP_FROM = process.env.SMTP_FROM ?? "Dogument <noreply@example.com>";
+const SMTP_FROM = process.env.SMTP_FROM ?? "Geeklogs <noreply@example.com>";
 
 function getTransporter(): nodemailer.Transporter | null {
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
@@ -23,7 +23,7 @@ function getTransporter(): nodemailer.Transporter | null {
  */
 export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
   const transporter = getTransporter();
-  const subject = "Reset your Dogument password";
+  const subject = "Reset your Geeklogs password";
   const text = `You requested a password reset. Open this link to set a new password:\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, ignore this email.`;
   const html = `<p>You requested a password reset. <a href="${resetUrl}">Click here to set a new password</a>.</p><p>Or copy this link: ${resetUrl}</p><p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>`;
 

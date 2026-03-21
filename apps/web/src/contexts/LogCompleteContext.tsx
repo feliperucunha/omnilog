@@ -4,7 +4,7 @@ import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { LogCompleteModal } from "@/components/LogCompleteModal";
 import * as storage from "@/lib/storage";
 
-export const SHOW_COMPLETE_MODAL_STORAGE_KEY = "dogument-showCompleteModal";
+export const SHOW_COMPLETE_MODAL_STORAGE_KEY = "geeklogs-showCompleteModal";
 
 export function getShowCompleteModal(): boolean {
   const stored = storage.getItemSync(SHOW_COMPLETE_MODAL_STORAGE_KEY);

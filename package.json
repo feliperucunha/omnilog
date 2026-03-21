@@ -1,5 +1,5 @@
 {
-  "name": "dogument",
+  "name": "geeklogs",
   "private": true,
   "scripts": {
     "dev": "turbo run dev",
@@ -7,9 +7,9 @@
     "lint": "turbo run lint",
     "start": "node apps/api/dist/index.js",
     "start:api": "node apps/api/dist/index.js",
-    "build:android": "pnpm --filter @dogument/web build:android",
-    "android": "pnpm --filter @dogument/android android",
-    "ios": "pnpm --filter @dogument/android ios"
+    "build:android": "pnpm --filter @geeklogs/web build:android",
+    "android": "pnpm --filter @geeklogs/android android",
+    "ios": "pnpm --filter @geeklogs/android ios"
   },
   "dependencies": {
     "turbo": "^2.3.0"

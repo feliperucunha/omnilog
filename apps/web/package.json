@@ -1,5 +1,5 @@
 {
-  "name": "@dogument/web",
+  "name": "@geeklogs/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
     "@capacitor/preferences": "^7.0.0",
     "@capacitor/share": "^7.0.0",
     "@capacitor/splash-screen": "^7.0.0",
-    "@dogument/shared": "workspace:*",
+    "@geeklogs/shared": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-label": "^2.1.8",

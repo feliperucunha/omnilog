@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { MEDIA_TYPES } from "@dogument/shared";
+import { MEDIA_TYPES } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { getMilestoneProgress } from "../services/milestone.service.js";
+import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
 
 export const meRouter = Router();
 
@@ -66,7 +67,10 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const logCount = await prisma.log.count({ where: { userId: user.id } });
+  const [logCount, disableApiKeyRequirements] = await Promise.all([
+    prisma.log.count({ where: { userId: user.id } }),
+    isDisableApiKeyRequirementsEnabled(),
+  ]);
   const theme = user.preferredTheme === "light" ? "light" : "dark";
   const locale =
     user.preferredLocale && ["en", "pt-BR", "es"].includes(user.preferredLocale)
@@ -121,6 +125,9 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       bgg: !!user.bggApiToken,
       ludopedia: !!user.ludopediaApiToken,
       comicvine: !!user.comicVineApiKey,
+    },
+    featureFlags: {
+      disableApiKeyRequirements,
     },
   });
 });

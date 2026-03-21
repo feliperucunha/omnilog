@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Dogument</string>
-    <string name="title_activity_main">Dogument</string>
-    <string name="package_name">com.dogument.app</string>
-    <string name="custom_url_scheme">com.dogument.app</string>
+    <string name="app_name">Geeklogs</string>
+    <string name="title_activity_main">Geeklogs</string>
+    <string name="package_name">com.geeklogs.app</string>
+    <string name="custom_url_scheme">com.geeklogs.app</string>
 </resources>

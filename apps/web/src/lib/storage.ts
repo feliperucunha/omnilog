@@ -5,9 +5,9 @@
  *   mirror for auth keys so we have a fallback if Preferences is cleared on app kill.
  */
 
-const TOKEN_KEY = "dogument_token";
-const USER_KEY = "dogument_user";
-const COOKIE_NAME = "dogument_token";
+const TOKEN_KEY = "geeklogs_token";
+const USER_KEY = "geeklogs_user";
+const COOKIE_NAME = "geeklogs_token";
 const COOKIE_MAX_AGE_DAYS = 365;
 
 function isNativePlatform(): boolean {

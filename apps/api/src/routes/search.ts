@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
-import { MEDIA_TYPES, SEARCH_SORT_OPTIONS } from "@dogument/shared";
-import type { MediaType, SearchResult } from "@dogument/shared";
+import { MEDIA_TYPES, SEARCH_SORT_OPTIONS } from "@geeklogs/shared";
+import type { MediaType, SearchResult } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { sanitizeText, SEARCH_QUERY_MAX_LENGTH } from "../lib/sanitize.js";
 import { optionalAuthMiddleware } from "../middleware/auth.js";
@@ -27,6 +27,7 @@ import { searchBoardGamesLudopedia } from "../services/ludopedia.js";
 import { searchComics } from "../services/comicvine.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 import { collectFromSeeds, topUpFromPopular } from "../lib/searchRecommendationsMerge.js";
+import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
 
 export const searchRouter = Router();
 searchRouter.use(optionalAuthMiddleware);
@@ -133,6 +134,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
   }
   const type = parsed.data.type as MediaType;
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
+  const skipApiKeyUX = await isDisableApiKeyRequirementsEnabled();
   const tmdbMeta = API_KEY_META.tmdb;
   const rawgMeta = API_KEY_META.rawg;
 
@@ -147,7 +149,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
       case "movies": {
         const userKey = keys?.tmdbApiKey ?? null;
         const hasKey = !!(userKey ?? process.env.TMDB_API_KEY);
-        if (!hasKey) {
+        if (!skipApiKeyUX && !hasKey) {
           res.json({
             results: [],
             personalization: "none" as const,
@@ -185,7 +187,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
       case "tv": {
         const userKey = keys?.tmdbApiKey ?? null;
         const hasKey = !!(userKey ?? process.env.TMDB_API_KEY);
-        if (!hasKey) {
+        if (!skipApiKeyUX && !hasKey) {
           res.json({
             results: [],
             personalization: "none" as const,
@@ -223,7 +225,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
       case "games": {
         const userKey = keys?.rawgApiKey ?? null;
         const hasKey = !!(userKey ?? process.env.RAWG_API_KEY);
-        if (!hasKey) {
+        if (!skipApiKeyUX && !hasKey) {
           res.json({
             results: [],
             personalization: "none" as const,
@@ -292,6 +294,11 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
     }
   } catch (err) {
     if (err instanceof InvalidApiKeyError) {
+      if (skipApiKeyUX) {
+        console.error("Recommendations error (INVALID_API_KEY UX disabled by feature flag):", err);
+        res.status(502).json({ error: "Recommendations failed" });
+        return;
+      }
       const userHadKey =
         err.provider === "tmdb"
           ? !!keys?.tmdbApiKey
@@ -333,6 +340,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const sort = rawSort && allowedSorts.includes(rawSort) ? rawSort : undefined;
   const clientUsed = getClientUsedFromRequest(req);
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
+  const skipApiKeyUX = await isDisableApiKeyRequirementsEnabled();
   const boardProvider =
     (type as string) === "boardgames"
       ? queryBoardProvider ?? (keys?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg")
@@ -355,7 +363,8 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
       ...(freeSearchLimit != null && { freeSearchLimit }),
       ...(freeSearchLimitReached && { freeSearchLimitReached: true }),
     };
-    const shouldAddPrompt = (req.user && !userHasKey) || freeSearchLimitReached;
+    const shouldAddPrompt =
+      !skipApiKeyUX && ((req.user && !userHasKey) || freeSearchLimitReached);
     if (shouldAddPrompt) {
       const meta =
         provider === "tmdb"
@@ -381,7 +390,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
   try {
     switch (type as MediaType) {
       case "movies": {
-        const userHasKey = !!keys?.tmdbApiKey;
+        const userHasKey = skipApiKeyUX || !!keys?.tmdbApiKey;
         if (!userHasKey) {
           const key = getFreeSearchKey(req, type, boardProvider);
           const { used } = getFreeSearchUsage(key, clientUsed);
@@ -400,7 +409,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           incrementFreeSearch(key, clientUsed);
         }
         const out = await searchMovies(q, keys?.tmdbApiKey, { link: tmdbMeta.link, tutorial: tmdbMeta.tutorial }, sort);
-        const key = !keys?.tmdbApiKey ? getFreeSearchKey(req, type, boardProvider) : "";
+        const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
         const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
         return res.json(
           addPromptIfUserHasNoKey(
@@ -414,7 +423,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         );
       }
       case "tv": {
-        const userHasKey = !!keys?.tmdbApiKey;
+        const userHasKey = skipApiKeyUX || !!keys?.tmdbApiKey;
         if (!userHasKey) {
           const key = getFreeSearchKey(req, type, boardProvider);
           const { used } = getFreeSearchUsage(key, clientUsed);
@@ -433,7 +442,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           incrementFreeSearch(key, clientUsed);
         }
         const out = await searchTv(q, keys?.tmdbApiKey, { link: tmdbMeta.link, tutorial: tmdbMeta.tutorial }, sort);
-        const key = !keys?.tmdbApiKey ? getFreeSearchKey(req, type, boardProvider) : "";
+        const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
         const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
         return res.json(
           addPromptIfUserHasNoKey(
@@ -448,7 +457,9 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
       }
       case "boardgames": {
         const provider = boardProvider === "ludopedia" ? "ludopedia" : "bgg";
-        const userHasKey = boardProvider === "ludopedia" ? !!keys?.ludopediaApiToken : !!keys?.bggApiToken;
+        const userHasKey =
+          skipApiKeyUX ||
+          (boardProvider === "ludopedia" ? !!keys?.ludopediaApiToken : !!keys?.bggApiToken);
         if (!userHasKey) {
           const key = getFreeSearchKey(req, type, boardProvider);
           const { used } = getFreeSearchUsage(key, clientUsed);
@@ -473,7 +484,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
             { link: ludopediaMeta.link, tutorial: ludopediaMeta.tutorial },
             sort
           );
-          const key = !keys?.ludopediaApiToken ? getFreeSearchKey(req, type, boardProvider) : "";
+          const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
           const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
           return res.json(
             addPromptIfUserHasNoKey(
@@ -487,7 +498,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           );
         }
         const out = await searchBoardGames(q, keys?.bggApiToken, { link: bggMeta.link, tutorial: bggMeta.tutorial }, sort);
-        const key = !keys?.bggApiToken ? getFreeSearchKey(req, type, boardProvider) : "";
+        const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
         const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
         return res.json(
           addPromptIfUserHasNoKey(
@@ -501,7 +512,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         );
       }
       case "games": {
-        const userHasKey = !!keys?.rawgApiKey;
+        const userHasKey = skipApiKeyUX || !!keys?.rawgApiKey;
         if (!userHasKey) {
           const key = getFreeSearchKey(req, type, boardProvider);
           const { used } = getFreeSearchUsage(key, clientUsed);
@@ -520,7 +531,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           incrementFreeSearch(key, clientUsed);
         }
         const out = await searchGames(q, keys?.rawgApiKey, { link: rawgMeta.link, tutorial: rawgMeta.tutorial }, sort);
-        const key = !keys?.rawgApiKey ? getFreeSearchKey(req, type, boardProvider) : "";
+        const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
         const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
         return res.json(
           addPromptIfUserHasNoKey(
@@ -547,7 +558,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
       }
       case "comics": {
         const comicvineKey = keys?.comicVineApiKey ?? process.env.COMIC_VINE_API_KEY ?? null;
-        const userHasKey = !!comicvineKey;
+        const userHasKey = skipApiKeyUX || !!comicvineKey;
         if (!userHasKey) {
           const key = getFreeSearchKey(req, type, boardProvider);
           const { used } = getFreeSearchUsage(key, clientUsed);
@@ -566,7 +577,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           incrementFreeSearch(key, clientUsed);
         }
         const out = await searchComics(q, keys?.comicVineApiKey, { link: comicvineMeta.link, tutorial: comicvineMeta.tutorial }, sort);
-        const key = !comicvineKey ? getFreeSearchKey(req, type, boardProvider) : "";
+        const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
         const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
         return res.json(
           addPromptIfUserHasNoKey(
@@ -582,6 +593,10 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
     }
   } catch (err) {
     if (err instanceof InvalidApiKeyError) {
+      if (skipApiKeyUX) {
+        console.error("Search error (INVALID_API_KEY UX disabled by feature flag):", err);
+        return res.status(502).json({ error: "Search failed" });
+      }
       const userHadKey =
         err.provider === "tmdb"
           ? !!keys?.tmdbApiKey

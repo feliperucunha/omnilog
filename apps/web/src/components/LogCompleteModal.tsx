@@ -11,7 +11,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Logo } from "@/components/Logo";
 import { getHeroImageUrl } from "@/lib/getHeroImageUrl";
 import { overlayVariants, modalContentVariants } from "@/lib/animations";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@dogument/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { showErrorToast } from "@/lib/errorToast";
 

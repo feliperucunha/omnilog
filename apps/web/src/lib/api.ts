@@ -1,4 +1,4 @@
-import { APP_VERSION } from "@dogument/shared";
+import { APP_VERSION } from "@geeklogs/shared";
 import type { LoadingErrorCode } from "./loadingErrorCodes.js";
 import { LoadingErrorCode as LoadingErrorCodeEnum } from "./loadingErrorCodes.js";
 
@@ -62,7 +62,7 @@ const COOKIE_SESSION = "cookie";
 export const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
 
 function getAuthHeaders(): HeadersInit {
-  const token = getItemSync("dogument_token");
+  const token = getItemSync("geeklogs_token");
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     "X-App-Version": APP_VERSION,
@@ -111,24 +111,24 @@ export class InvalidApiKeyError extends Error {
  * Kept stable so retry logic can match on this exact string.
  */
 const HTML_RESPONSE_MESSAGE =
-  "Dogument isn’t ready yet—this often happens when it hasn’t been used for a while. Wait a moment, then try again.";
+  "Geeklogs isn’t ready yet—this often happens when it hasn’t been used for a while. Wait a moment, then try again.";
 
 /** Fallbacks when the backend doesn’t return a clear message (plain language, no jargon). */
 const MSG = {
   versionOutdated:
-    "This copy of Dogument is too old. Update it from the store or site where you installed it, then open the app again.",
+    "This copy of Geeklogs is too old. Update it from the store or site where you installed it, then open the app again.",
   sessionEnded: "Your sign-in has expired. Please sign in again to keep using your lists and reviews.",
   genericServer:
-    "Dogument couldn’t finish that just now. Please try again in a minute or two—especially if you haven’t opened the app in a while.",
+    "Geeklogs couldn’t finish that just now. Please try again in a minute or two—especially if you haven’t opened the app in a while.",
   genericNotOk:
-    "Something didn’t work while talking to Dogument. Please try again. If it keeps happening, check your internet connection.",
+    "Something didn’t work while talking to Geeklogs. Please try again. If it keeps happening, check your internet connection.",
   notFound: "We couldn’t find that—it may have been removed or the link might be wrong.",
   tookTooLong:
-    "Dogument is taking much longer than usual—often right after it hasn’t been used for a while. Check your internet, wait a bit, and try again.",
+    "Geeklogs is taking much longer than usual—often right after it hasn’t been used for a while. Check your internet, wait a bit, and try again.",
   offline:
-    "We couldn’t reach Dogument. Check that you’re online (Wi‑Fi or mobile data), then try again.",
+    "We couldn’t reach Geeklogs. Check that you’re online (Wi‑Fi or mobile data), then try again.",
   parseFallback:
-    "We couldn’t understand the reply from Dogument. Please try again in a moment.",
+    "We couldn’t understand the reply from Geeklogs. Please try again in a moment.",
   downloadFailed:
     "We couldn’t prepare your file. Check that you’re still signed in, then try exporting again.",
 } as const;
@@ -234,7 +234,7 @@ export function invalidateApiCache(prefix: string): void {
 }
 
 /** Custom event dispatched when logs/items cache is invalidated so Dashboard/MediaLogs can refetch milestone progress. */
-export const LOGS_INVALIDATED_EVENT = "dogument-logs-invalidated";
+export const LOGS_INVALIDATED_EVENT = "geeklogs-logs-invalidated";
 
 /** Invalidate logs and items caches (use after any log mutation). */
 export function invalidateLogsAndItemsCache(): void {
@@ -288,9 +288,16 @@ async function performSingleFetchAttempt<T>(
       }
       const message = parseErrorResponse(text, MSG.sessionEnded);
       if (!skipAuthRedirect) {
-        void removeItem("dogument_token").then(() => removeItem("dogument_user"));
+        void removeItem("geeklogs_token").then(() => removeItem("geeklogs_user"));
         dispatchLogout();
         window.location.href = "/login";
+      } else {
+        /**
+         * Session probe and similar calls use skipAuthRedirect; 401 means "no session" but the API
+         * responded. Treat as cold-start success so guests are not stuck on the loading/error overlay
+         * (e.g. public profile at /:userId).
+         */
+        fireFirstApiResponseOnce();
       }
       throw new ApiError(message, 401);
     }

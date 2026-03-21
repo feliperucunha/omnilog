@@ -1,5 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
-import type { SearchResult, ItemDetail } from "@dogument/shared";
+import type { SearchResult, ItemDetail } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
@@ -8,7 +8,7 @@ const BASE = "https://boardgamegeek.com/xmlapi2";
 function bggHeaders(token?: string | null): HeadersInit {
   const t = token ?? process.env.BGG_API_TOKEN;
   const headers: HeadersInit = {
-    "User-Agent": "Dogument/1.0 (https://github.com/dogument)",
+    "User-Agent": "Geeklogs/1.0 (https://github.com/geeklogs)",
   };
   if (t) headers["Authorization"] = `Bearer ${t}`;
   return headers;

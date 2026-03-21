@@ -1,5 +1,5 @@
 {
-  "name": "@dogument/api",
+  "name": "@geeklogs/api",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -17,7 +17,7 @@
     "db:seed:badges": "tsx src/scripts/seedBadges.ts"
   },
   "dependencies": {
-    "@dogument/shared": "workspace:*",
+    "@geeklogs/shared": "workspace:*",
     "@prisma/client": "^5.22.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",

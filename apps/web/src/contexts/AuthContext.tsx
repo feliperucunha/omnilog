@@ -9,8 +9,8 @@ import {
 import { apiFetch, ApiError } from "@/lib/api";
 import * as storage from "@/lib/storage";
 
-const TOKEN_KEY = "dogument_token";
-const USER_KEY = "dogument_user";
+const TOKEN_KEY = "geeklogs_token";
+const USER_KEY = "geeklogs_user";
 
 /** Use this as token when session is cookie-based (no token in storage). */
 export const COOKIE_SESSION = "cookie";

@@ -22,7 +22,7 @@ export const API_KEY_META = {
     link: "https://boardgamegeek.com/applications",
     tutorial: `1. Go to boardgamegeek.com and log in (or create an account).
 2. Open the Applications link below.
-3. Click to create a new application (e.g. "Dogument").
+3. Click to create a new application (e.g. "Geeklogs").
 4. Choose non-commercial if it's for personal use; submit and wait for approval (can take a few days).
 5. Once approved, open your application and create a Token.
 6. Copy the Bearer token and paste it below.`,

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
-import type { ReactionType } from "@dogument/shared";
+import type { ReactionType } from "@geeklogs/shared";
 import { apiFetch, invalidateLogsAndItemsCache } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

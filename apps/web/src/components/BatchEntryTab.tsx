@@ -5,11 +5,12 @@ import { Select } from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
-import type { MediaType, SearchResult } from "@dogument/shared";
-import { MEDIA_TYPES, COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@dogument/shared";
+import type { MediaType, SearchResult } from "@geeklogs/shared";
+import { MEDIA_TYPES, COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { showAchievementToasts } from "@/lib/achievementToast";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
+import { isDisableApiKeyRequirements } from "@/lib/featureFlags";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { useMe } from "@/contexts/MeContext";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -101,11 +102,12 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
   const apiKeyProvider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
   const hasApiKeyForCategory =
-    apiKeyProvider == null
+    isDisableApiKeyRequirements(me) ||
+    (apiKeyProvider == null
       ? true
       : mediaType === "boardgames"
         ? hasBoardGameKey
-        : !!(me?.apiKeys && me.apiKeys[apiKeyProvider]);
+        : !!(me?.apiKeys && me.apiKeys[apiKeyProvider]));
   const apiKeyRequiredMessage =
     mediaType === "boardgames"
       ? t("batchEntry.apiKeyRequiredBoardgames")

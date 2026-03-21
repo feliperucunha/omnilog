@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
-import type { MediaType, Log } from "@dogument/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@dogument/shared";
+import type { MediaType, Log } from "@geeklogs/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, apiFetchFile, downloadFile, LOGS_INVALIDATED_EVENT } from "@/lib/api";
 import { showAchievementToasts } from "@/lib/achievementToast";
@@ -30,6 +30,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useLogComplete } from "@/contexts/LogCompleteContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
+import { isDisableApiKeyRequirements } from "@/lib/featureFlags";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Select } from "@/components/ui/select";
 import {
@@ -111,6 +112,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
   const needsKeyBanner =
     !publicUserId &&
+    !isDisableApiKeyRequirements(me) &&
     provider != null &&
     (mediaType === "boardgames" ? !hasBoardGameKey : me?.apiKeys && !me.apiKeys[provider]);
   const readOnly = !!publicUserId;

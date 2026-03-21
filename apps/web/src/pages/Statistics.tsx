@@ -17,7 +17,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, type Log } from "@dogument/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, type Log } from "@geeklogs/shared";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToBeatHours, formatTimeToFinish } from "@/lib/formatDuration";
@@ -37,8 +37,8 @@ import * as storage from "@/lib/storage";
 
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
-const STORAGE_KEY_STATS = "dogument.statistics.statsCollapsed";
-const STORAGE_KEY_RECENT = "dogument.statistics.recentLogsCollapsed";
+const STORAGE_KEY_STATS = "geeklogs.statistics.statsCollapsed";
+const STORAGE_KEY_RECENT = "geeklogs.statistics.recentLogsCollapsed";
 
 type StatsGroup = "category" | "month" | "year";
 type GenreGraphMode = "genre" | "statusOverTime" | "byCategory";

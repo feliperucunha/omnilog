@@ -1,4 +1,4 @@
-import type { SearchResult } from "@dogument/shared";
+import type { SearchResult } from "@geeklogs/shared";
 
 /**
  * Sort search results in memory (for APIs that don't support sort: TMDB, Open Library, BGG, Comic Vine).

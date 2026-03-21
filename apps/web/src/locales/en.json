@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Dogument",
+    "name": "Geeklogs",
     "subtitle": "Track everything you watch, play, and read."
   },
   "nav": {
@@ -145,7 +145,7 @@
     "apiKeyTutorial": {
       "tmdb": "1. Go to themoviedb.org and create a free account or log in.\n2. Open Settings → API from the left menu (or go to the link below).\n3. Click \"Request an API Key\" and choose \"Developer\".\n4. Accept the terms and fill the form (Application URL: your site or http://localhost:5173, Application Summary: e.g. \"Personal media log\").\n5. On the API page, copy the \"API Key (v3 auth)\" and paste it below.",
       "rawg": "1. Go to rawg.io and sign up or log in.\n2. Open the API docs link below and look for \"Get your API key\" or the signup form.\n3. Register for an API key (free tier available).\n4. Copy the key from your account/dashboard and paste it below.",
-      "bgg": "1. Go to boardgamegeek.com and log in (or create an account).\n2. Open the Applications link below.\n3. Click to create a new application (e.g. \"Dogument\").\n4. Choose non-commercial if it's for personal use; submit and wait for approval (can take a few days).\n5. Once approved, open your application and create a Token.\n6. Copy the Bearer token and paste it below.",
+      "bgg": "1. Go to boardgamegeek.com and log in (or create an account).\n2. Open the Applications link below.\n3. Click to create a new application (e.g. \"Geeklogs\").\n4. Choose non-commercial if it's for personal use; submit and wait for approval (can take a few days).\n5. Once approved, open your application and create a Token.\n6. Copy the Bearer token and paste it below.",
       "ludopedia": "1. Create an account at https://ludopedia.com.br/novousuario or log in at ludopedia.com.br.\n2. Open Aplicativos (https://www.ludopedia.com.br/aplicativos) and create an application.\n3. Use Ludopedia's OAuth flow to obtain an access token (see API documentation). The key required for Ominilog is the Access Token (ACCESS_TOKEN).\n4. The token is valid for 60 days; paste it below.",
       "comicvine": "1. Go to comicvine.gamespot.com and create a free account or log in.\n2. Open the API documentation link below.\n3. Request an API key (free) from the Comic Vine API page.\n4. Copy your API key and paste it below."
     },
@@ -157,7 +157,15 @@
     "adminTableUsername": "Username",
     "adminTableLogins": "Logins",
     "adminTableLogs": "Logs",
-    "adminTableLastLogin": "Last login"
+    "adminTableLastLogin": "Last login",
+    "adminFeatureFlagsTitle": "Feature flags",
+    "adminFeatureFlagsIntro": "Toggle app-wide behavior. Changes apply to all users after they refresh or refetch settings.",
+    "adminFeatureFlagsError": "Could not load feature flags.",
+    "adminFeatureFlagsEmpty": "No feature flags in database.",
+    "adminFeatureFlagsSaving": "Saving…",
+    "adminFeatureFlagUpdated": "Feature flag updated.",
+    "adminFlag_disable_api_key_requirements": "Relax API key requirements",
+    "adminFlag_disable_api_key_requirements_hint": "Hides missing-key banners, search limits, and invalid-key warnings. External APIs still need server or user keys to return data."
   },
   "common": {
     "required": "required",
@@ -510,10 +518,10 @@
     "carouselNext": "Next team member",
     "carouselGoTo": "Go to team member {{index}}",
     "projectTitle": "About the project",
-    "projectBody": "Dogument is like Stremio for your logs: an aggregator of APIs so you can have everything in one place. Instead of eight separate apps, use one to track movies, TV shows, board games, video games, books, anime, manga, and comics in one place. Search by category, add custom entries when something isn't in the database, and keep your reviews and grades together. No need to jump between different apps or spreadsheets—everything you watch, play, and read lives here.",
+    "projectBody": "Geeklogs is like Stremio for your logs: an aggregator of APIs so you can have everything in one place. Instead of eight separate apps, use one to track movies, TV shows, board games, video games, books, anime, manga, and comics in one place. Search by category, add custom entries when something isn't in the database, and keep your reviews and grades together. No need to jump between different apps or spreadsheets—everything you watch, play, and read lives here.",
     "projectHostingNote": "The app currently runs on free servers and a free domain. Requests may sometimes take a while.",
     "donationTitle": "Support the project",
-    "donationIntro": "If Dogument is useful to you, you can support its development with a one-time donation or recurring support. Thank you!",
+    "donationIntro": "If Geeklogs is useful to you, you can support its development with a one-time donation or recurring support. Thank you!",
     "donateKofi": "Ko-fi",
     "donateGitHub": "GitHub Sponsors",
     "donationNotConfigured": "Donation links are not configured. Set VITE_DONATION_KOFI_URL and/or VITE_DONATION_GITHUB_SPONSORS_URL in your deployment environment to show them here.",
@@ -596,21 +604,21 @@
     "message": "A new version of the app is available. Please update from the Play Store or App Store to continue."
   },
   "coldStart": {
-    "error": "Dogument couldn’t finish loading. Check that you’re online, then tap Try again. If you haven’t opened the app in a while, it may need a little extra time the first time.",
-    "serverSleepingHint": "If nobody has used Dogument for a while, the first load can take up to a minute. We’re still trying in the background—you can also tap Try again whenever you like.",
-    "timedOut": "We’ve waited as long as we can and Dogument still isn’t responding. Check your internet connection and tap Try again. If you use a free hosting plan, waking the app up can take a full minute.",
-    "code_TIMEOUT": "Dogument is taking much longer than usual to answer—this often happens right after it hasn’t been used for a while. Check Wi‑Fi or mobile data, wait a bit, then tap Try again.",
-    "code_NETWORK": "We couldn’t reach Dogument. Make sure you’re connected to the internet, then try again.",
-    "code_SERVER_ERROR": "Dogument ran into a problem while working on your request. Please try again in a few minutes.",
+    "error": "Geeklogs couldn’t finish loading. Check that you’re online, then tap Try again. If you haven’t opened the app in a while, it may need a little extra time the first time.",
+    "serverSleepingHint": "If nobody has used Geeklogs for a while, the first load can take up to a minute. We’re still trying in the background—you can also tap Try again whenever you like.",
+    "timedOut": "We’ve waited as long as we can and Geeklogs still isn’t responding. Check your internet connection and tap Try again. If you use a free hosting plan, waking the app up can take a full minute.",
+    "code_TIMEOUT": "Geeklogs is taking much longer than usual to answer—this often happens right after it hasn’t been used for a while. Check Wi‑Fi or mobile data, wait a bit, then tap Try again.",
+    "code_NETWORK": "We couldn’t reach Geeklogs. Make sure you’re connected to the internet, then try again.",
+    "code_SERVER_ERROR": "Geeklogs ran into a problem while working on your request. Please try again in a few minutes.",
     "code_UNAUTHORIZED": "Your sign-in has expired or isn’t valid anymore. Sign in again to keep using your lists and reviews.",
     "code_FORBIDDEN": "You don’t have access to that. If that surprises you, sign out and sign back in, or contact support.",
     "code_NOT_FOUND": "We couldn’t find what you were looking for. It may have been removed, or the link might be old.",
     "code_CLIENT_ERROR": "We couldn’t make sense of that action. Double-check what you entered and try again.",
-    "code_VERSION_MISMATCH": "This version of Dogument is too old. Update it from the App Store, Play Store, or wherever you installed it, then open the app again.",
+    "code_VERSION_MISMATCH": "This version of Geeklogs is too old. Update it from the App Store, Play Store, or wherever you installed it, then open the app again.",
     "code_UNKNOWN": "Something unexpected went wrong while loading. Tap Try again. If it keeps happening, close the app completely and open it again, or install the latest update."
   },
   "errorBoundary": {
-    "title": "This part of Dogument couldn’t load",
+    "title": "This part of Geeklogs couldn’t load",
     "message": "Your saved items are usually fine—this is just one screen that hit a snag. Tap Try again to reload it.",
     "retry": "Try again"
   },

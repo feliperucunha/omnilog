@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { MEDIA_TYPES, SEARCH_SORT_OPTIONS, type MediaType, type SearchResult } from "@dogument/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@dogument/shared";
+import { MEDIA_TYPES, SEARCH_SORT_OPTIONS, type MediaType, type SearchResult } from "@geeklogs/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
@@ -24,7 +24,8 @@ import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
-import type { BoardGameProvider } from "@dogument/shared";
+import { isDisableApiKeyRequirements } from "@/lib/featureFlags";
+import type { BoardGameProvider } from "@geeklogs/shared";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Search as SearchIcon, UserCheck, X } from "lucide-react";
@@ -32,10 +33,10 @@ import { Select } from "@/components/ui/select";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { SearchRecommendationsCarousel } from "@/components/SearchRecommendationsCarousel";
 import * as storage from "@/lib/storage";
-import type { Log } from "@dogument/shared";
+import type { Log } from "@geeklogs/shared";
 
 const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
-const FREE_SEARCH_USAGE_STORAGE_KEY = "dogument_free_search_usage";
+const FREE_SEARCH_USAGE_STORAGE_KEY = "geeklogs_free_search_usage";
 const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
 function getFreeSearchUsageKey(type: MediaType, boardProvider: BoardGameProvider): string {
@@ -155,9 +156,11 @@ export function Search() {
   const { token } = useAuth();
   const { me } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
+  const skipApiKeyReq = isDisableApiKeyRequirements(me);
   const provider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
   const needsKeyBanner =
+    !skipApiKeyReq &&
     provider != null &&
     (mediaType === "boardgames" ? !hasBoardGameKey : me?.apiKeys && !me.apiKeys[provider]);
   const [bannerDismissed, setBannerDismissed] = useState(() => {
@@ -301,7 +304,7 @@ export function Search() {
         setLoading(false);
       }
     },
-    [searchFilter, sortBy, t, me?.boardGameProvider]
+    [searchFilter, sortBy, t, me?.boardGameProvider, me?.featureFlags?.disableApiKeyRequirements]
   );
 
   const hasRunInitialSearch = useRef(false);
@@ -378,7 +381,7 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [hasSearched, mediaType, searchFilter, token, recRefreshNonce]);
+  }, [hasSearched, mediaType, searchFilter, token, recRefreshNonce, me?.featureFlags?.disableApiKeyRequirements]);
 
   const handleSearch = async (e: React.FormEvent) => {
     setHasSearched(true);
@@ -434,7 +437,12 @@ export function Search() {
         items={[
           ...effectiveVisibleTypes.map((type) => {
             const typeProvider = getApiKeyProviderForMediaType(type, boardGameProvider);
-            const hasKeyForType = typeProvider == null || !!me?.apiKeys?.[typeProvider];
+            const hasKeyForType =
+              skipApiKeyReq ||
+              typeProvider == null ||
+              (type === "boardgames"
+                ? hasBoardGameKey
+                : !!me?.apiKeys?.[typeProvider]);
             const categoryLimitReached = limitReachedByCategory[type];
             return {
               value: type,
@@ -462,6 +470,8 @@ export function Search() {
     query,
     boardGameProvider,
     me?.apiKeys,
+    skipApiKeyReq,
+    hasBoardGameKey,
     limitReachedByCategory,
     t,
     setBelowNavbar,
@@ -584,7 +594,12 @@ export function Search() {
                 }
                 const type = filter as MediaType;
                 const typeProvider = getApiKeyProviderForMediaType(type, boardGameProvider);
-                const hasKeyForType = typeProvider == null || !!me?.apiKeys?.[typeProvider];
+                const hasKeyForType =
+                  skipApiKeyReq ||
+                  typeProvider == null ||
+                  (type === "boardgames"
+                    ? hasBoardGameKey
+                    : !!me?.apiKeys?.[typeProvider]);
                 const categoryLimitReached = limitReachedByCategory[type];
                 const isDisabled = !hasKeyForType && !!categoryLimitReached;
                 return (

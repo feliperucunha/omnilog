@@ -1,4 +1,4 @@
-package com.dogument.app;
+package com.geeklogs.app;
 
 import com.getcapacitor.BridgeActivity;
 

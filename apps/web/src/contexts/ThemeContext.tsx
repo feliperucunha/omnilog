@@ -19,7 +19,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const STORAGE_KEY = "dogument-theme";
+const STORAGE_KEY = "geeklogs-theme";
 
 function getDefaultScheme(): ColorScheme {
   if (typeof document === "undefined") return "dark";

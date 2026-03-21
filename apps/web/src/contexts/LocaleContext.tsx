@@ -20,7 +20,7 @@ const messages: Record<Locale, Record<string, unknown>> = {
   es: es as Record<string, unknown>,
 };
 
-const STORAGE_KEY = "dogument-locale";
+const STORAGE_KEY = "geeklogs-locale";
 const VALID_LOCALES: Locale[] = ["en", "pt-BR", "es"];
 
 function getNested(obj: Record<string, unknown>, path: string): string | undefined {

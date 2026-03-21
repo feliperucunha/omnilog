@@ -1,13 +1,17 @@
 import { Link } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { useInvalidApiKey } from "@/contexts/InvalidApiKeyContext";
+import { useMe } from "@/contexts/MeContext";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { useLocale } from "@/contexts/LocaleContext";
+import { isDisableApiKeyRequirements } from "@/lib/featureFlags";
 
 export function InvalidApiKeyBanner() {
   const { t } = useLocale();
+  const { me } = useMe();
   const { invalidProviders, clearInvalidKeys } = useInvalidApiKey();
 
+  if (isDisableApiKeyRequirements(me)) return null;
   if (invalidProviders.length === 0) return null;
 
   const names = invalidProviders

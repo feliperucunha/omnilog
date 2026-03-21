@@ -15,10 +15,10 @@ import { showErrorToast } from "@/lib/errorToast";
 import { apiFetch, ApiValidationError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import * as storage from "@/lib/storage";
-import type { AuthResponse } from "@dogument/shared";
+import type { AuthResponse } from "@geeklogs/shared";
 import { modalContentVariants } from "@/lib/animations";
 
-const REMEMBER_LOGIN_KEY = "dogument-remember-login";
+const REMEMBER_LOGIN_KEY = "geeklogs-remember-login";
 
 type LoginFieldErrors = Partial<Record<"email" | "password", string>>;
 

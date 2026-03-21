@@ -1,4 +1,4 @@
-import type { SearchResult, ItemDetail } from "@dogument/shared";
+import type { SearchResult, ItemDetail } from "@geeklogs/shared";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const BASE = "https://api.rawg.io/api";

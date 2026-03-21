@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { MEDIA_TYPES } from "@dogument/shared";
-import type { MediaType } from "@dogument/shared";
+import { MEDIA_TYPES } from "@geeklogs/shared";
+import type { MediaType } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
 import { sanitizeText, EXTERNAL_ID_MAX_LENGTH } from "../lib/sanitize.js";
@@ -14,6 +14,7 @@ import { getBoardGameById } from "../services/bgg.js";
 import { getBoardGameByIdLudopedia } from "../services/ludopedia.js";
 import { getVolumeById } from "../services/comicvine.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
+import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
 import { getAllReviewerMilestonesForMediumBatch } from "../services/milestone.service.js";
 
 export const itemsRouter = Router();
@@ -79,6 +80,7 @@ itemsRouter.get("/:mediaType/:externalId/progress-options", async (req: Authenti
     return;
   }
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
+  const skipApiKeyUX = await isDisableApiKeyRequirementsEnabled();
 
   try {
     if (mediaType === "tv") {
@@ -136,6 +138,10 @@ itemsRouter.get("/:mediaType/:externalId/progress-options", async (req: Authenti
     res.json({});
   } catch (err) {
     if (err instanceof InvalidApiKeyError) {
+      if (skipApiKeyUX) {
+        console.error("Progress options error (INVALID_API_KEY UX disabled by feature flag):", err);
+        return res.status(502).json({ error: "Failed to load options" });
+      }
       const userHadKey =
         err.provider === "tmdb"
           ? !!keys?.tmdbApiKey
@@ -292,6 +298,7 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
   const reviewsSort = parseReviewSort(req.query.reviewsSort ?? req.query.sort);
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
   const currentUserId = req.user?.userId ?? null;
+  const skipApiKeyUX = await isDisableApiKeyRequirementsEnabled();
 
   let boardProviderUsed: "bgg" | "ludopedia" | null = null;
 
@@ -340,6 +347,10 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     }
   } catch (err) {
     if (err instanceof InvalidApiKeyError) {
+      if (skipApiKeyUX) {
+        console.error("Item fetch error (INVALID_API_KEY UX disabled by feature flag):", err);
+        return res.status(502).json({ error: "Item fetch failed" });
+      }
       const userHadKey =
         err.provider === "tmdb"
           ? !!keys?.tmdbApiKey

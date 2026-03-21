@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, type ItemDetail, type ItemPageData, type ItemReview, type MediaType } from "@dogument/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, type ItemDetail, type ItemPageData, type ItemReview, type MediaType } from "@geeklogs/shared";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetchCached } from "@/lib/api";

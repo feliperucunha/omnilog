@@ -1,9 +1,9 @@
 import { Router, type Request, type Response } from "express";
-import { MEDIA_TYPES } from "@dogument/shared";
-import type { MediaType } from "@dogument/shared";
+import { MEDIA_TYPES } from "@geeklogs/shared";
+import type { MediaType } from "@geeklogs/shared";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { LOG_STATUS_OPTIONS } from "@dogument/shared";
+import { LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { serializeLog } from "../lib/serializeLog.js";
 import { getMilestoneProgress } from "../services/milestone.service.js";
 

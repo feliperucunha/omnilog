@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.dogument.app",
-  appName: "Dogument",
+  appId: "com.geeklogs.app",
+  appName: "Geeklogs",
   webDir: "../web/dist",
   server: {
     // Allow live reload when using cap run android with dev server (optional)

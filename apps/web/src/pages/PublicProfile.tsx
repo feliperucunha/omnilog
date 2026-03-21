@@ -8,7 +8,7 @@ import { PublicProfileSkeleton } from "@/components/skeletons";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
-import { MEDIA_TYPES, type MediaType, toMediaType } from "@dogument/shared";
+import { MEDIA_TYPES, type MediaType, toMediaType } from "@geeklogs/shared";
 import { MediaLogs, type MediaLogsSort, type CategoryMilestoneProgress } from "@/pages/MediaLogs";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { LevelBadge } from "@/components/LevelBadge";
@@ -28,6 +28,7 @@ const RESERVED_PATHS = new Set([
   "reset-password",
   "onboarding",
   "search",
+  "statistics",
   "about",
   "tiers",
   "settings",

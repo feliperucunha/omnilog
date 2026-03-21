@@ -21,6 +21,8 @@ export interface MeResponse {
   country?: string; // ISO 3166-1 alpha-2 e.g. BR for pricing
   logCount: number;
   apiKeys: { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
+  /** App-wide flags from server (e.g. admin-toggled UX). */
+  featureFlags?: { disableApiKeyRequirements: boolean };
 }
 
 interface MeContextValue {

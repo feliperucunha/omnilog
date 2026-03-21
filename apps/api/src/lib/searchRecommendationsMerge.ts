@@ -1,4 +1,4 @@
-import type { SearchResult } from "@dogument/shared";
+import type { SearchResult } from "@geeklogs/shared";
 
 /**
  * Merge TMDB/RAWG/Jikan recommendation lists with dedupe and exclude-already-logged ids.

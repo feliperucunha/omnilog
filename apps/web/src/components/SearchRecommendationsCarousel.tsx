@@ -8,8 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import { motion } from "framer-motion";
-import type { MediaType, SearchResult } from "@dogument/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@dogument/shared";
+import type { MediaType, SearchResult } from "@geeklogs/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ItemImage } from "@/components/ItemImage";

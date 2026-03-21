@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { SearchResult } from "@dogument/shared";
+import type { SearchResult } from "@geeklogs/shared";
 import { collectFromSeeds, topUpFromPopular } from "./searchRecommendationsMerge.js";
 
 const r = (id: string, title = id): SearchResult => ({

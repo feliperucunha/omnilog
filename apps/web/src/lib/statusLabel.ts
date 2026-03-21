@@ -1,5 +1,5 @@
-import { STATUS_I18N_KEYS } from "@dogument/shared";
-import type { MediaType } from "@dogument/shared";
+import { STATUS_I18N_KEYS } from "@geeklogs/shared";
+import type { MediaType } from "@geeklogs/shared";
 
 const VIDEO_MEDIA_TYPES: MediaType[] = ["movies", "tv", "anime"];
 

@@ -7,7 +7,7 @@ import { prisma } from "../lib/prisma.js";
 import { sanitizeEmail, sanitizeText } from "../lib/sanitize.js";
 import { sendPasswordResetEmail } from "../lib/email.js";
 import { setAuthCookie, clearAuthCookie } from "../lib/authCookie.js";
-import type { AuthResponse } from "@dogument/shared";
+import type { AuthResponse } from "@geeklogs/shared";
 
 export const authRouter = Router();
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-in-production";

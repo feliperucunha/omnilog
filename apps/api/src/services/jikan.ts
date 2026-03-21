@@ -1,4 +1,4 @@
-import type { SearchResult, ItemDetail } from "@dogument/shared";
+import type { SearchResult, ItemDetail } from "@geeklogs/shared";
 
 /** Map our sort value to Jikan order_by and sort (asc/desc). */
 function jikanOrderParams(sort: string | undefined): { order_by?: string; sort?: string } {
