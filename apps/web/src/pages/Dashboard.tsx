@@ -44,7 +44,7 @@ const BETA_MODAL_STORAGE_KEY = "geeklogs.betaModalSeen";
 const SOCIAL_COLLAPSED_STORAGE_KEY = "geeklogs.dashboard.socialCollapsed";
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** Base URL for share profile link (always prod so shared links work). */
-const PROFILE_SHARE_BASE_URL = "https://geeklogs-one.vercel.app";
+const PROFILE_SHARE_BASE_URL = "https://geeklogs.vercel.app";
 
 /** Milestone progress from GET /me/milestones/progress */
 interface ScopeProgress {

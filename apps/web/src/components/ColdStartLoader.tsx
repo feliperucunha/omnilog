@@ -136,10 +136,10 @@ export function ColdStartLoader() {
         <div className="h-1.5 w-48 overflow-hidden rounded-full bg-[var(--color-darkest)] sm:w-56">
           <div
             className="h-full rounded-full bg-[var(--btn-gradient-start)] transition-[width] duration-300 ease-out"
-            style={{ width: `${initializing ? 100 : progress}%` }}
+            style={{ width: `${progress}%` }}
           />
         </div>
-        {initializing && progress >= 100 && (
+        {initializing && state === "success" && (
           <span className="text-sm text-[var(--color-light)]">{t("common.checkingSession")}</span>
         )}
         {stillWaiting && elapsedMs >= SERVER_SLEEPING_HINT_MS && (
