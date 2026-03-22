@@ -484,7 +484,7 @@ export function Search() {
     >
       <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center gap-2 overflow-hidden" aria-hidden>
         <Logo alt="" className="h-24 w-auto max-w-[90vw] opacity-20 sm:h-40 md:h-48 md:pr-4" />
-        <div className="-mt-8 flex flex-col items-center">
+        <div className=" flex flex-col items-center">
           <span className="text-xl font-bold text-[var(--color-lightest)] opacity-80 sm:text-2xl">
             {t("app.name")}
           </span>
