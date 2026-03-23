@@ -6,6 +6,8 @@ export interface StickyCategoryStripItem {
   /** Optional count shown after label, e.g. "(12)" */
   count?: number;
   disabled?: boolean;
+  /** e.g. native tooltip when disabled */
+  title?: string;
 }
 
 interface StickyCategoryStripProps {
@@ -66,6 +68,7 @@ export function StickyCategoryStrip({
                 role="tab"
                 aria-selected={selected}
                 disabled={item.disabled}
+                title={item.title}
                 onClick={() => !item.disabled && onSelect(item.value)}
                 className={cn(
                   "flex h-full shrink-0 flex-col items-center justify-start border-b-2 pt-3 text-sm transition-colors max-md:min-h-[44px]",

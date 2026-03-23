@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ImageOff } from "lucide-react";
+import { coerceImageUrlString } from "@/lib/getHeroImageUrl";
 
 interface ItemImageProps {
   /** Image URL; when null/undefined/empty, shows placeholder. */
@@ -35,7 +36,8 @@ export function ItemImage({
   useEffect(() => {
     setError(false);
   }, [src]);
-  const hasImage = !error && src != null && String(src).trim() !== "";
+  const resolvedSrc = coerceImageUrlString(src);
+  const hasImage = !error && resolvedSrc != null;
   const rootClass = [
     "flex-shrink-0 overflow-hidden bg-[var(--color-darkest)]",
     fitContent && "w-fit min-h-[2rem] min-w-[2rem]",
@@ -50,7 +52,7 @@ export function ItemImage({
     <div className={rootClass}>
       {hasImage ? (
         <img
-          src={src!}
+          src={resolvedSrc!}
           alt={alt}
           className={`${imgSizeClass} ${imgClassName}`.trim()}
           loading={loading}

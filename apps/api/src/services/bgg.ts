@@ -5,6 +5,30 @@ import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const BASE = "https://boardgamegeek.com/xmlapi2";
 
+/**
+ * BGG XML: text-only nodes parse as strings; if the element has attributes, fast-xml-parser
+ * returns `{ "#text": "...", "@_attr": "..." }`. Search/detail must coerce to a URL string.
+ */
+function bggXmlText(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const s = value.trim();
+    return s || null;
+  }
+  if (typeof value === "object" && "#text" in (value as object)) {
+    const t = (value as { "#text"?: unknown })["#text"];
+    if (typeof t === "string") {
+      const s = t.trim();
+      return s || null;
+    }
+  }
+  return null;
+}
+
+function bggImageFromThing(image: unknown, thumbnail: unknown): string | null {
+  return bggXmlText(image) ?? bggXmlText(thumbnail);
+}
+
 function bggHeaders(token?: string | null): HeadersInit {
   const t = token ?? process.env.BGG_API_TOKEN;
   const headers: HeadersInit = {
@@ -28,7 +52,8 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
         "@_id": string;
         name?: { "#text"?: string; "@_value"?: string; "@_type"?: string } | Array<{ "#text"?: string; "@_value"?: string; "@_type"?: string }>;
         yearpublished?: { "@_value"?: string };
-        image?: string;
+        image?: string | { "#text"?: string };
+        thumbnail?: string | { "#text"?: string };
         description?: string;
         minplayers?: { "@_value"?: string };
         maxplayers?: { "@_value"?: string };
@@ -67,10 +92,11 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
   const categories = linkList.filter((l) => l["@_type"] === "boardgamecategory").map((l) => l["@_value"]).filter(Boolean) as string[];
   const mechanics = linkList.filter((l) => l["@_type"] === "boardgamemechanic").map((l) => l["@_value"]).filter(Boolean) as string[];
   const genres = categories.length > 0 ? categories : null;
+  const imageUrl = bggImageFromThing(item.image, item.thumbnail);
   return {
     id: item["@_id"],
     title,
-    image: item.image ?? null,
+    image: imageUrl,
     year,
     subtitle: null,
     description: description ?? null,
@@ -126,7 +152,8 @@ export async function searchBoardGames(
         "@_id": string;
         name?: { "#text"?: string; "@_value"?: string; "@_type"?: string } | Array<{ "#text"?: string; "@_value"?: string; "@_type"?: string }>;
         yearpublished?: { "@_value"?: string };
-        image?: string;
+        image?: string | { "#text"?: string };
+        thumbnail?: string | { "#text"?: string };
       }>;
     };
   };
@@ -146,10 +173,11 @@ export async function searchBoardGames(
       title = getTitle(names);
     }
     const year = (item as { yearpublished?: { "@_value"?: string } }).yearpublished?.["@_value"] ?? null;
+    const row = item as { image?: unknown; thumbnail?: unknown };
     return {
       id: item["@_id"],
       title,
-      image: item.image ?? null,
+      image: bggImageFromThing(row.image, row.thumbnail),
       year,
       subtitle: null,
     };

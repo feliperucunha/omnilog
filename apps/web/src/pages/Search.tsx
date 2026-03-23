@@ -444,10 +444,18 @@ export function Search() {
                 ? hasBoardGameKey
                 : !!me?.apiKeys?.[typeProvider]);
             const categoryLimitReached = limitReachedByCategory[type];
+            const isDisabled = !hasKeyForType && !!categoryLimitReached;
             return {
               value: type,
               label: t(`nav.${type}`),
-              disabled: !hasKeyForType && !!categoryLimitReached,
+              disabled: isDisabled,
+              title: isDisabled
+                ? t("search.categoryLimitReachedTooltip", {
+                    type: t(`nav.${type}`),
+                    used: String(usageByCategory[type]?.used ?? 10),
+                    limit: String(usageByCategory[type]?.limit ?? 10),
+                  })
+                : undefined,
             };
           }),
           { value: USERS_SEARCH_TYPE, label: t("search.usersFilter") },
@@ -458,7 +466,7 @@ export function Search() {
           if (query.trim()) runSearch(query, v as MediaType | typeof USERS_SEARCH_TYPE);
         }}
         showCount={false}
-        mobileOnly
+        mobileOnly={false}
         bare
         aria-label={t("dashboard.category")}
       />
@@ -473,6 +481,7 @@ export function Search() {
     skipApiKeyReq,
     hasBoardGameKey,
     limitReachedByCategory,
+    usageByCategory,
     t,
     setBelowNavbar,
     runSearch,
@@ -571,63 +580,6 @@ export function Search() {
                   <X className="h-4 w-4" />
                 </button>
               )}
-            </div>
-            {/* Desktop: category buttons */}
-            <div className="hidden md:flex flex-wrap gap-2 mt-2 items-center justify-center">
-              {[...effectiveVisibleTypes, USERS_SEARCH_TYPE].map((filter) => {
-                if (filter === USERS_SEARCH_TYPE) {
-                  return (
-                    <motion.div key={USERS_SEARCH_TYPE} whileTap={tapScale} transition={tapTransition}>
-                      <Button
-                        type="button"
-                        variant={searchFilter === USERS_SEARCH_TYPE ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => {
-                          setSearchFilter(USERS_SEARCH_TYPE);
-                          if (query.trim()) runSearch(query, USERS_SEARCH_TYPE);
-                        }}
-                      >
-                        {t("search.usersFilter")}
-                      </Button>
-                    </motion.div>
-                  );
-                }
-                const type = filter as MediaType;
-                const typeProvider = getApiKeyProviderForMediaType(type, boardGameProvider);
-                const hasKeyForType =
-                  skipApiKeyReq ||
-                  typeProvider == null ||
-                  (type === "boardgames"
-                    ? hasBoardGameKey
-                    : !!me?.apiKeys?.[typeProvider]);
-                const categoryLimitReached = limitReachedByCategory[type];
-                const isDisabled = !hasKeyForType && !!categoryLimitReached;
-                return (
-                  <motion.div key={type} whileTap={isDisabled ? undefined : tapScale} transition={tapTransition}>
-                    <Button
-                      type="button"
-                      variant={searchFilter === type ? "default" : "outline"}
-                      size="sm"
-                      disabled={isDisabled}
-                      title={
-                        isDisabled
-                          ? t("search.categoryLimitReachedTooltip", {
-                              type: t(`nav.${type}`),
-                              used: String(usageByCategory[type]?.used ?? 10),
-                              limit: String(usageByCategory[type]?.limit ?? 10),
-                            })
-                          : undefined
-                      }
-                      onClick={() => {
-                        setSearchFilter(type);
-                        if (query.trim()) runSearch(query, type);
-                      }}
-                    >
-                      {t(`nav.${type}`)}
-                    </Button>
-                  </motion.div>
-                );
-              })}
             </div>
             {hasSearched && searchFilter !== USERS_SEARCH_TYPE && (
               <div

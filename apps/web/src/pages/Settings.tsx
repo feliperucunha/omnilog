@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronRight, Download, GripVertical, HelpCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, GripVertical, HelpCircle, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -621,8 +621,11 @@ export function Settings() {
           </>
         )}
 
-        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
-          <div className="flex flex-col gap-4">
+        <Card className="relative overflow-hidden border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+          <div
+            className={cn("flex flex-col gap-4", savingBoardGameProvider && "pointer-events-none opacity-60")}
+            aria-busy={savingBoardGameProvider}
+          >
             <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
               {t("settings.boardGameProviderLabel")}
             </h3>
@@ -651,6 +654,17 @@ export function Settings() {
               </ToggleGroup>
             </div>
           </div>
+          {savingBoardGameProvider && (
+            <div
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-md bg-[var(--color-dark)]/75 backdrop-blur-[2px]"
+              role="status"
+              aria-live="polite"
+              aria-label={t("settings.saving")}
+            >
+              <Loader2 className="h-10 w-10 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
+              <span className="text-sm font-medium text-[var(--color-lightest)]">{t("settings.saving")}</span>
+            </div>
+          )}
         </Card>
 
         <div className="rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">
@@ -691,6 +705,8 @@ export function Settings() {
                 {(Object.keys(API_KEY_META) as ApiKeyProvider[]).map((provider) => {
                   const meta = API_KEY_META[provider];
                   const isSet = status?.[provider];
+                  const isBoardGameApiKey = provider === "bgg" || provider === "ludopedia";
+                  const isBoardGameKeySaving = isBoardGameApiKey && saving === provider;
                   const value =
                     provider === "tmdb"
                       ? tmdb
@@ -714,9 +730,15 @@ export function Settings() {
                   return (
                     <Card
                       key={provider}
-                      className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]"
+                      className={cn(
+                        "border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]",
+                        isBoardGameApiKey && "relative overflow-hidden",
+                      )}
                     >
-                      <div className="flex flex-col gap-4">
+                      <div
+                        className={cn("flex flex-col gap-4", isBoardGameKeySaving && "pointer-events-none opacity-60")}
+                        aria-busy={isBoardGameKeySaving}
+                      >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
                             {meta.name}
@@ -760,9 +782,29 @@ export function Settings() {
                           onClick={() => handleSave(provider)}
                           disabled={!value.trim() || saving === provider}
                         >
-                          {saving === provider ? t("settings.saving") : isSet ? t("settings.updateKey") : t("settings.saveKey")}
+                          {saving === provider ? (
+                            <span className="inline-flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                              {t("settings.saving")}
+                            </span>
+                          ) : isSet ? (
+                            t("settings.updateKey")
+                          ) : (
+                            t("settings.saveKey")
+                          )}
                         </Button>
                       </div>
+                      {isBoardGameKeySaving && (
+                        <div
+                          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-md bg-[var(--color-dark)]/75 backdrop-blur-[2px]"
+                          role="status"
+                          aria-live="polite"
+                          aria-label={t("settings.saving")}
+                        >
+                          <Loader2 className="h-10 w-10 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
+                          <span className="text-sm font-medium text-[var(--color-lightest)]">{t("settings.saving")}</span>
+                        </div>
+                      )}
                     </Card>
                   );
                 })}

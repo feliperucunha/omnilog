@@ -88,6 +88,7 @@ import {
   handleReviewCreated,
   handleReviewRemoved,
   handleReviewLiked,
+  countsAsReviewForGamification,
 } from "../services/gamification.service.js";
 
 const FREE_LOG_LIMIT = 500;
@@ -714,7 +715,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     }
     let log;
     if (existing) {
-      const hadReview = Boolean(existing.review && existing.review.trim().length > 0);
+      const hadStatsReview = countsAsReviewForGamification(existing.grade, existing.review);
       const updateData: {
         title: string;
         image?: string | null;
@@ -757,17 +758,21 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         data: updateData,
       });
       let newBadges: Array<{ id: string; name: string; icon: string }> = [];
-      if (!hadReview && sanitizedReview && sanitizedReview.trim().length > 0) {
+      const hasStatsReview = countsAsReviewForGamification(log.grade, log.review);
+      if (!hadStatsReview && hasStatsReview) {
         try {
-          newBadges = await handleReviewCreated(userId, log.id, log.mediaType, sanitizedReview);
+          newBadges = await handleReviewCreated(userId, log.id, log.mediaType, {
+            grade: log.grade,
+            review: log.review,
+          });
         } catch (err) {
-          console.error("Gamification (review created on upsert):", err);
+          console.error("Gamification (review stats added on upsert):", err);
         }
-      } else if (hadReview && (!sanitizedReview || sanitizedReview.trim().length === 0)) {
+      } else if (hadStatsReview && !hasStatsReview) {
         try {
           await handleReviewRemoved(userId, log.mediaType);
         } catch (err) {
-          console.error("Gamification (review removed on upsert):", err);
+          console.error("Gamification (review stats removed on upsert):", err);
         }
       }
       const body = serializeLog(log) as Record<string, unknown>;
@@ -821,8 +826,11 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       try {
         const fromLog = await handleLogCreated(userId);
         newBadges.push(...fromLog);
-        if (sanitizedReview && sanitizedReview.trim().length > 0) {
-          const fromReview = await handleReviewCreated(userId, log.id, mediaType, sanitizedReview);
+        if (countsAsReviewForGamification(log.grade, sanitizedReview)) {
+          const fromReview = await handleReviewCreated(userId, log.id, mediaType, {
+            grade: log.grade,
+            review: sanitizedReview,
+          });
           const seen = new Set(newBadges.map((b) => b.id));
           for (const b of fromReview) {
             if (!seen.has(b.id)) {
@@ -905,30 +913,23 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     where: { id: log.id },
     data,
   });
-  const hadReview = Boolean(log.review && log.review.trim().length > 0);
-  const newReview =
-    parsed.data.review !== undefined ? sanitizeReview(parsed.data.review) : null;
+  const hadStatsReview = countsAsReviewForGamification(log.grade, log.review);
+  const hasStatsReview = countsAsReviewForGamification(updated.grade, updated.review);
   let newBadges: Array<{ id: string; name: string; icon: string }> = [];
-  if (
-    parsed.data.review !== undefined &&
-    !hadReview &&
-    newReview &&
-    newReview.trim().length > 0
-  ) {
+  if (!hadStatsReview && hasStatsReview) {
     try {
-      newBadges = await handleReviewCreated(userId, updated.id, log.mediaType, newReview);
+      newBadges = await handleReviewCreated(userId, updated.id, log.mediaType, {
+        grade: updated.grade,
+        review: updated.review,
+      });
     } catch (err) {
-      console.error("Gamification (review added on update):", err);
+      console.error("Gamification (review stats added on PATCH):", err);
     }
-  } else if (
-    parsed.data.review !== undefined &&
-    hadReview &&
-    (!newReview || newReview.trim().length === 0)
-  ) {
+  } else if (hadStatsReview && !hasStatsReview) {
     try {
       await handleReviewRemoved(userId, log.mediaType);
     } catch (err) {
-      console.error("Gamification (review removed on update):", err);
+      console.error("Gamification (review stats removed on PATCH):", err);
     }
   }
   const body = serializeLog(updated) as Record<string, unknown>;
@@ -945,12 +946,12 @@ logsRouter.delete("/:id", async (req: AuthenticatedRequest, res) => {
     res.status(404).json({ error: "Log not found" });
     return;
   }
-  const hadReview = Boolean(log.review && log.review.trim().length > 0);
-  if (hadReview) {
+  const hadStatsReview = countsAsReviewForGamification(log.grade, log.review);
+  if (hadStatsReview) {
     try {
       await handleReviewRemoved(userId, log.mediaType);
     } catch (err) {
-      console.error("Gamification (review removed on log delete):", err);
+      console.error("Gamification (review stats removed on log delete):", err);
     }
   }
   await prisma.log.delete({ where: { id: log.id } });

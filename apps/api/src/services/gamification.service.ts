@@ -51,6 +51,18 @@ function getStatsColumn(medium: BadgeMedium): ReviewCountKey {
   return map[medium];
 }
 
+/**
+ * A log counts toward review milestones/badges if the user left a star rating and/or written review.
+ * (In-progress logs have grade cleared server-side, so grade implies completed-like state from the client.)
+ */
+export function countsAsReviewForGamification(
+  grade: number | null | undefined,
+  review: string | null | undefined
+): boolean {
+  if (grade != null) return true;
+  return Boolean(review && review.trim().length > 0);
+}
+
 async function ensureReviewStats(userId: string): Promise<{
   movieReviews: number;
   tvShowReviews: number;
@@ -76,14 +88,14 @@ async function ensureReviewStats(userId: string): Promise<{
   };
 }
 
-/** Call when a new review is added (log created with review, or log updated from no review to having review). Returns badges newly granted. */
+/** Call when a log newly qualifies for review stats (grade and/or text), or on recalc. Returns badges newly granted. */
 export async function handleReviewCreated(
   userId: string,
   logId: string,
   mediaType: string,
-  reviewText: string | null
+  payload: { grade?: number | null; review?: string | null }
 ): Promise<NewBadge[]> {
-  if (!reviewText || reviewText.trim().length === 0) return [];
+  if (!countsAsReviewForGamification(payload.grade, payload.review ?? null)) return [];
   const medium = MEDIA_TO_BADGE[mediaType];
   if (!medium) return [];
 
@@ -305,6 +317,67 @@ export async function grantEarnedBadges(userId: string): Promise<NewBadge[]> {
     newBadges.push({ id: badge.id, name: badge.name, icon: badge.icon });
   }
   return newBadges;
+}
+
+/**
+ * Recompute UserReviewStats from logs (grade and/or non-empty review counts).
+ * Use after changing review-count rules or to repair drift. Re-evaluates badges.
+ */
+export async function recalculateUserReviewStatsFromLogs(userId: string): Promise<NewBadge[]> {
+  const logs = await prisma.log.findMany({
+    where: { userId, mediaType: { in: APP_MEDIA_TYPES_LIST } },
+    select: { mediaType: true, grade: true, review: true },
+  });
+  const perMedium: Record<BadgeMedium, number> = {
+    MOVIE: 0,
+    TV_SHOW: 0,
+    ANIME: 0,
+    MANGA: 0,
+    COMIC: 0,
+    BOOK: 0,
+    GAME: 0,
+    BOARD_GAME: 0,
+  };
+  let totalReviews = 0;
+  for (const l of logs) {
+    if (!countsAsReviewForGamification(l.grade, l.review)) continue;
+    const medium = MEDIA_TO_BADGE[l.mediaType];
+    if (!medium) continue;
+    perMedium[medium]++;
+    totalReviews++;
+  }
+  const distinctMediaReviewed = Object.values(perMedium).filter((c) => c > 0).length;
+
+  await prisma.userReviewStats.upsert({
+    where: { userId },
+    create: {
+      userId,
+      movieReviews: perMedium.MOVIE,
+      tvShowReviews: perMedium.TV_SHOW,
+      animeReviews: perMedium.ANIME,
+      mangaReviews: perMedium.MANGA,
+      comicReviews: perMedium.COMIC,
+      bookReviews: perMedium.BOOK,
+      gameReviews: perMedium.GAME,
+      boardGameReviews: perMedium.BOARD_GAME,
+      totalReviews,
+      distinctMediaReviewed,
+    },
+    update: {
+      movieReviews: perMedium.MOVIE,
+      tvShowReviews: perMedium.TV_SHOW,
+      animeReviews: perMedium.ANIME,
+      mangaReviews: perMedium.MANGA,
+      comicReviews: perMedium.COMIC,
+      bookReviews: perMedium.BOOK,
+      gameReviews: perMedium.GAME,
+      boardGameReviews: perMedium.BOARD_GAME,
+      totalReviews,
+      distinctMediaReviewed,
+    },
+  });
+
+  return grantEarnedBadges(userId);
 }
 
 export async function setSelectedBadges(userId: string, badgeIds: string[]): Promise<void> {

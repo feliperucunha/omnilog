@@ -73,15 +73,15 @@ afterEach(() => {
 });
 
 describe("handleReviewCreated", () => {
-  it("returns empty array when reviewText is null or empty", async () => {
-    expect(await handleReviewCreated(userId, "log-1", "movies", null)).toEqual([]);
-    expect(await handleReviewCreated(userId, "log-1", "movies", "")).toEqual([]);
-    expect(await handleReviewCreated(userId, "log-1", "movies", "   ")).toEqual([]);
+  it("returns empty array when there is no grade and no non-empty review text", async () => {
+    expect(await handleReviewCreated(userId, "log-1", "movies", { review: null, grade: null })).toEqual([]);
+    expect(await handleReviewCreated(userId, "log-1", "movies", { review: "", grade: null })).toEqual([]);
+    expect(await handleReviewCreated(userId, "log-1", "movies", { review: "   ", grade: null })).toEqual([]);
     expect(mockUpsertReviewStats).not.toHaveBeenCalled();
   });
 
   it("returns empty array when media type is not mapped to badge stats", async () => {
-    expect(await handleReviewCreated(userId, "log-1", "unknown_medium", "Great game")).toEqual([]);
+    expect(await handleReviewCreated(userId, "log-1", "unknown_medium", { review: "Great game" })).toEqual([]);
     expect(mockUpsertReviewStats).not.toHaveBeenCalled();
   });
 
@@ -89,7 +89,7 @@ describe("handleReviewCreated", () => {
     mockFindUniqueReviewStats.mockResolvedValue(null);
     mockCreateReviewStats.mockResolvedValue({ ...emptyStats, userId });
 
-    await handleReviewCreated(userId, "log-1", "movies", "Good film");
+    await handleReviewCreated(userId, "log-1", "movies", { review: "Good film" });
 
     expect(mockUpsertReviewStats).toHaveBeenCalledTimes(1);
     const call = mockUpsertReviewStats.mock.calls[0][0];
@@ -110,7 +110,7 @@ describe("handleReviewCreated", () => {
       distinctMediaReviewed: 1,
     });
 
-    await handleReviewCreated(userId, "log-1", "movies", "Another review");
+    await handleReviewCreated(userId, "log-1", "movies", { review: "Another review" });
 
     expect(mockUpsertReviewStats).toHaveBeenCalledTimes(1);
     const call = mockUpsertReviewStats.mock.calls[0][0];
@@ -125,12 +125,24 @@ describe("handleReviewCreated", () => {
     mockFindUniqueReviewStats.mockResolvedValue({ ...emptyStats, movieReviews: 1, totalReviews: 1 });
     mockFindUniqueUser.mockResolvedValue({ lastReviewDate: yesterday, currentStreak: 2 });
 
-    await handleReviewCreated(userId, "log-1", "movies", "Review");
+    await handleReviewCreated(userId, "log-1", "movies", { review: "Review" });
 
     expect(mockUpdateUser).toHaveBeenCalledWith({
       where: { id: userId },
       data: expect.objectContaining({ currentStreak: 3 }),
     });
+  });
+
+  it("upserts UserReviewStats when only a star grade is set (no comment)", async () => {
+    mockFindUniqueReviewStats.mockResolvedValue(null);
+    mockCreateReviewStats.mockResolvedValue({ ...emptyStats, userId });
+
+    await handleReviewCreated(userId, "log-1", "anime", { grade: 8, review: null });
+
+    expect(mockUpsertReviewStats).toHaveBeenCalledTimes(1);
+    const call = mockUpsertReviewStats.mock.calls[0][0];
+    expect(call.create.animeReviews).toBe(1);
+    expect(call.create.totalReviews).toBe(1);
   });
 });
 

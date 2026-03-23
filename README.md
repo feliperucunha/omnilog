@@ -61,6 +61,7 @@ Register, then use **Search** to find media and add logs (grade + optional revie
 |--------|-------------|
 | `pnpm dev` | Web + API in dev (Turbo) |
 | `pnpm build` | Build all workspaces (`@geeklogs/shared`, API, web, Android sync) |
+| `pnpm run heroku-build` | **API only** (shared + API)—for Heroku / slim server deploys |
 | `pnpm lint` | ESLint across workspaces |
 | `pnpm start` / `pnpm start:api` | Run compiled API: `node apps/api/dist/index.js` |
 | `pnpm build:android` | Web production build for Capacitor only (`vite --mode capacitor`) |
@@ -80,6 +81,12 @@ Equivalent filters:
   `pnpm install && pnpm run build --filter=@geeklogs/api...`  
   **Start:** `node apps/api/dist/index.js`  
   Env: `DATABASE_URL`, `JWT_SECRET`, `WEB_ORIGIN`, optional provider keys. Optional Blueprint: `render.yaml`.
+- **Backend (Heroku / Node pnpm buildpack):** Deploy from the **repo root** (not `apps/api` alone—workspace deps need the monorepo). The root `pnpm run build` runs the **full** Turbo pipeline (web + Android sync) and usually **fails** on Heroku. Use the API-only script instead:
+  - **`heroku-build`** (in root `package.json`) runs `turbo run build --filter=@geeklogs/api...` (shared + API only).
+  - **`Procfile`** defines `web: node apps/api/dist/index.js`.
+  - If your build log shows `pnpm run build` failing (not `heroku-build`), set the platform **build command** to `pnpm run heroku-build`, or ensure the Heroku Node pnpm buildpack picks up `heroku-build`.
+  - **Migrations:** add a [release phase](https://devcenter.heroku.com/articles/release-phase), e.g. `release: pnpm --filter @geeklogs/api exec prisma migrate deploy`, or run migrations from CI.
+  - Set **`DATABASE_URL`**, **`JWT_SECRET`**, **`WEB_ORIGIN`**, and any API keys in config vars.
 
 ## Mobile (Capacitor)
 
