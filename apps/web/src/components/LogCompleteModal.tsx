@@ -8,7 +8,7 @@ import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { ItemImage } from "@/components/ItemImage";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Logo } from "@/components/Logo";
+import { Logo, getLogoSrc } from "@/components/Logo";
 import { getHeroImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
 import { overlayVariants, modalContentVariants } from "@/lib/animations";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
@@ -78,6 +78,11 @@ interface LogCompleteModalProps {
  * plain close/share controls, no framer-motion on the shell). Set to `false` to restore the web-only layout.
  */
 const USE_NATIVE_LOG_COMPLETE_LAYOUT_ON_WEB = false;
+
+/** Share scene lays out at this width (CSS px) so type and images rasterize sharp; avoid huge `pixelRatio` on a tiny DOM (blur/filter + foreignObject degrade). */
+const SHARE_EXPORT_SCENE_WIDTH_PX = 1080;
+/** Extra multiplier for the final PNG (scene width × this ≈ output width, e.g. 1080×2 = 2160). */
+const SHARE_CAPTURE_PIXEL_RATIO = 2;
 
 /** Dark theme: avoid pure black (#000) for OLED – use dark grays so the card doesn’t blend and to reduce smearing. */
 const NATIVE_DARK = {
@@ -202,7 +207,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const { toPng } = await import("html-to-image");
       const dataUrl = await toPng(el, {
-        pixelRatio: 2,
+        pixelRatio: SHARE_CAPTURE_PIXEL_RATIO,
         cacheBust: true,
         backgroundColor: nativeColors.cardBg,
         style: { transform: "none" },
@@ -354,9 +359,9 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
         </p>
       )}
 
-      <div className="mt-auto flex shrink-0 items-center gap-1.5 pt-3 border-t border-[var(--color-mid)]/30 md:gap-2 md:pt-4">
+      <div className="mt-auto flex w-full shrink-0 flex-nowrap items-center gap-1.5 border-t border-[var(--color-mid)]/30 pt-3 md:gap-2 md:pt-4">
         <Logo alt="" className="h-7 w-auto shrink-0 opacity-90 md:h-8" aria-hidden />
-        <span className="text-xs font-medium text-[var(--color-light)] md:text-sm">
+        <span className="shrink-0 whitespace-nowrap text-xs font-medium text-[var(--color-light)] [overflow-wrap:normal] [word-break:normal] md:text-sm">
           {t("logComplete.loggedWith", { app: t("app.name") })}
         </span>
       </div>
@@ -372,15 +377,24 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   );
 
   /**
-   * Share scene: matches native complete-log modal proportions — tall hero + room for metadata/footer.
-   * Scene is sized so the card never clips; text column keeps min ~200px before its own scroll.
+   * Share scene: same proportions as the small native reference (320×760 / 348×808) but scaled to
+   * SHARE_EXPORT_SCENE_WIDTH_PX so html-to-image captures a large layout + moderate pixelRatio (sharp text,
+   * stable filters). Footer uses a plain <img> logo — `Logo`’s mix-blend-lighten often disappears in capture.
    */
-  const shareSceneWidth = compactShareLayout ? 300 : 326;
-  const shareSceneHeight = compactShareLayout ? 668 : 712;
-  const shareCardWidth = compactShareLayout ? 258 : 278;
-  const shareCardMaxHeight = compactShareLayout ? 512 : 556;
-  /** Hero: ~56–58% of max card height so layout aligns with native modal (large poster, text below). */
-  const shareHeroHeight = compactShareLayout ? 292 : 322;
+  const shareBase = compactShareLayout
+    ? { sceneH: 760, cardW: 288, cardMaxH: 604, heroH: 348, refSceneW: 320 }
+    : { sceneH: 808, cardW: 308, cardMaxH: 652, heroH: 382, refSceneW: 348 };
+  const shareLayoutScale = SHARE_EXPORT_SCENE_WIDTH_PX / shareBase.refSceneW;
+  const sz = (n: number) => Math.max(1, Math.round(n * shareLayoutScale));
+  const shareSceneWidth = SHARE_EXPORT_SCENE_WIDTH_PX;
+  const shareSceneHeight = sz(shareBase.sceneH);
+  const shareCardWidth = sz(shareBase.cardW);
+  const shareCardMaxHeight = sz(shareBase.cardMaxH);
+  const shareHeroHeight = sz(shareBase.heroH);
+  const shareOuterPad = sz(20);
+  const shareCardRadius = sz(20);
+  const shareBlurBgLight = Math.min(48, sz(4));
+  const shareBlurBgDark = Math.min(56, sz(10));
   const shareCard = (
     <div
       style={{
@@ -416,8 +430,8 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
               height: "100%",
               objectFit: "cover",
               objectPosition: "center",
-              filter: isLight ? "blur(4px)" : "blur(10px)",
-              WebkitFilter: isLight ? "blur(4px)" : "blur(10px)",
+              filter: isLight ? `blur(${shareBlurBgLight}px)` : `blur(${shareBlurBgDark}px)`,
+              WebkitFilter: isLight ? `blur(${shareBlurBgLight}px)` : `blur(${shareBlurBgDark}px)`,
               transform: "scale(1.25)",
             }}
           />
@@ -448,7 +462,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
             left: "50%",
             top: "50%",
             transform: "translate(-50%, -50%)",
-            padding: 20,
+            padding: shareOuterPad,
           }}
         >
           <div
@@ -458,7 +472,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
               maxWidth: shareCardWidth,
               maxHeight: shareCardMaxHeight,
               overflow: "hidden",
-              borderRadius: 20,
+              borderRadius: shareCardRadius,
               border: `1px solid ${nativeColors.border}`,
               backgroundColor: nativeColors.cardBg,
               color: nativeColors.text,
@@ -466,7 +480,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
               flexDirection: "column",
             }}
           >
-            {/* Hero: fixed height so content (title, stars, footer) is visible */}
+            {/* Hero: fixed height; title/review scroll above pinned footer */}
             <div style={{ position: "relative", width: "100%", height: shareHeroHeight, flexShrink: 0, overflow: "hidden" }}>
               {cachedHeroDataUrl ? (
                 <img
@@ -491,7 +505,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                 }}
               />
             </div>
-            {/* Content: same as modal, inline colors only */}
+            {/* Scrollable body only — footer below is full card width so branding never wraps in a narrow column. */}
             <div
               style={{
                 display: "flex",
@@ -499,16 +513,17 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                 flexDirection: "column",
                 minHeight: 0,
                 overflowY: "auto",
-                padding: "8px 12px 12px",
+                overflowX: "hidden",
+                padding: `${sz(8)}px ${sz(12)}px ${sz(6)}px`,
               }}
             >
               <span
                 style={{
                   display: "inline-flex",
-                  marginBottom: 6,
+                  marginBottom: sz(6),
                   borderRadius: 9999,
-                  padding: "3px 8px",
-                  fontSize: 9,
+                  padding: `${sz(3)}px ${sz(8)}px`,
+                  fontSize: sz(9),
                   fontWeight: 600,
                   letterSpacing: "0.05em",
                   textTransform: "uppercase",
@@ -520,8 +535,8 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
               </span>
               <h1
                 style={{
-                  marginBottom: 6,
-                  fontSize: "1rem",
+                  marginBottom: sz(6),
+                  fontSize: sz(16),
                   fontWeight: 700,
                   lineHeight: 1.25,
                   color: nativeColors.text,
@@ -534,12 +549,12 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                 {title}
               </h1>
               {grade != null && (
-                <div style={{ marginBottom: 6, color: "#fbbf24", fontSize: "1.1rem", letterSpacing: "0.05em" }}>
+                <div style={{ marginBottom: sz(6), color: "#fbbf24", fontSize: sz(18), letterSpacing: "0.05em" }}>
                   {"★".repeat(Math.round(stars))}{"☆".repeat(5 - Math.round(stars))}
                 </div>
               )}
               {showBoardGameMeta && (own != null || (matchesPlayed != null && matchesPlayed > 0)) && (
-                <div style={{ marginBottom: 6, fontSize: 11, color: nativeColors.textMuted }}>
+                <div style={{ marginBottom: sz(6), fontSize: sz(11), color: nativeColors.textMuted }}>
                   {own != null && (
                     <span>{t("itemReviewForm.own")}: {own ? t("common.yes") : t("common.no")}</span>
                   )}
@@ -551,8 +566,8 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
               {review != null && review.trim() !== "" && (
                 <p
                   style={{
-                    marginBottom: 10,
-                    fontSize: 10,
+                    marginBottom: sz(4),
+                    fontSize: sz(10),
                     lineHeight: 1.4,
                     color: nativeColors.textMuted,
                     display: "-webkit-box",
@@ -565,37 +580,53 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                   {review.trim()}
                 </p>
               )}
-              <div
+            </div>
+            <div
+              style={{
+                flexShrink: 0,
+                flexGrow: 0,
+                width: "100%",
+                boxSizing: "border-box",
+                padding: compactShareLayout
+                  ? `${sz(8)}px ${sz(12)}px ${sz(10)}px`
+                  : `${sz(10)}px ${sz(12)}px ${sz(12)}px`,
+                borderTop: `1px solid ${nativeColors.textMuted}4D`,
+                display: "flex",
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "flex-start",
+                columnGap: compactShareLayout ? sz(6) : sz(8),
+                rowGap: sz(4),
+              }}
+            >
+              <img
+                src={getLogoSrc(theme.colorScheme)}
+                alt=""
+                aria-hidden
                 style={{
-                  marginTop: "auto",
-                  paddingTop: compactShareLayout ? 6 : 9,
-                  borderTop: `1px solid ${nativeColors.textMuted}4D`,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: compactShareLayout ? 3 : 5,
+                  display: "block",
+                  height: compactShareLayout ? sz(14) : sz(20),
+                  width: "auto",
+                  flexShrink: 0,
+                  objectFit: "contain",
+                  opacity: 0.9,
+                }}
+              />
+              <span
+                style={{
+                  flex: "1 1 0",
+                  minWidth: 0,
+                  fontSize: compactShareLayout ? sz(9) : sz(11),
+                  fontWeight: 500,
+                  lineHeight: 1.35,
+                  color: nativeColors.textMuted,
+                  whiteSpace: "normal",
+                  overflowWrap: "break-word",
+                  wordBreak: "break-word",
                 }}
               >
-                <Logo
-                  alt=""
-                  className="w-auto shrink-0 opacity-90"
-                  aria-hidden
-                  style={{
-                    display: "block",
-                    height: compactShareLayout ? 13 : 18,
-                    width: "auto",
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: compactShareLayout ? 8 : 10,
-                    fontWeight: 500,
-                    lineHeight: 1.25,
-                    color: nativeColors.textMuted,
-                  }}
-                >
-                  {t("logComplete.loggedWith", { app: t("app.name") })}
-                </span>
-              </div>
+                {t("logComplete.loggedWith", { app: t("app.name") })}
+              </span>
             </div>
           </div>
         </div>

@@ -24,7 +24,7 @@ import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
-import { isDisableApiKeyRequirements } from "@/lib/featureFlags";
+import { skipApiKeyMissingUi } from "@/lib/featureFlags";
 import type { BoardGameProvider } from "@geeklogs/shared";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Link } from "react-router-dom";
@@ -154,9 +154,9 @@ export function Search() {
   const [recRefreshNonce, setRecRefreshNonce] = useState(0);
   /** Desktop: map vertical wheel to horizontal scroll (mobile uses native touch; unchanged). */
   const { token } = useAuth();
-  const { me } = useMe();
+  const { me, loading: meLoading } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
-  const skipApiKeyReq = isDisableApiKeyRequirements(me);
+  const skipApiKeyReq = skipApiKeyMissingUi(me, { token: !!token, meLoading });
   const provider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
   const needsKeyBanner =
@@ -284,7 +284,8 @@ export function Search() {
           void storage.setItem(FREE_SEARCH_USAGE_STORAGE_KEY, JSON.stringify({ ...prev, [usageKey]: usage }));
           setUsageByCategory((prev) => ({ ...prev, [searchType]: usage }));
         }
-        if ("requiresApiKey" in data && data.requiresApiKey) {
+        const skipKeyUi = skipApiKeyMissingUi(me, { token: !!token, meLoading });
+        if (!skipKeyUi && "requiresApiKey" in data && data.requiresApiKey) {
           setRequiresApiKey({
             provider: data.requiresApiKey,
             link: data.link ?? "#",
@@ -304,7 +305,7 @@ export function Search() {
         setLoading(false);
       }
     },
-    [searchFilter, sortBy, t, me?.boardGameProvider, me?.featureFlags?.disableApiKeyRequirements]
+    [searchFilter, sortBy, t, token, me, meLoading]
   );
 
   const hasRunInitialSearch = useRef(false);
@@ -359,7 +360,8 @@ export function Search() {
       .then((data) => {
         if (cancelled) return;
         setRecResults(data.results ?? []);
-        if (data.requiresApiKey && data.link) {
+        const skipKeyUi = skipApiKeyMissingUi(me, { token: !!token, meLoading });
+        if (!skipKeyUi && data.requiresApiKey && data.link) {
           setRecKeyPrompt({
             provider: data.requiresApiKey,
             link: data.link,
@@ -381,7 +383,7 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [hasSearched, mediaType, searchFilter, token, recRefreshNonce, me?.featureFlags?.disableApiKeyRequirements]);
+  }, [hasSearched, mediaType, searchFilter, token, recRefreshNonce, me, meLoading]);
 
   const handleSearch = async (e: React.FormEvent) => {
     setHasSearched(true);
@@ -518,7 +520,7 @@ export function Search() {
               aria-hidden
             />
           )}
-          {recKeyPrompt && !recLoading && (
+          {recKeyPrompt && !recLoading && !skipApiKeyReq && (
             <div className="border-t border-[var(--color-surface-border)] pt-4">
               <p className="mb-3 text-sm text-[var(--color-light)]">{t("search.noResultsUntilApiKey")}</p>
               <ApiKeyPrompt
@@ -777,7 +779,7 @@ export function Search() {
         </motion.div>
       )}
 
-      {hasSearched && !loading && requiresApiKey && (
+      {hasSearched && !loading && requiresApiKey && !skipApiKeyReq && (
         <div className="flex flex-col gap-4">
           <p className="text-sm text-[var(--color-light)]">
             {requiresApiKey.freeSearchLimitReached

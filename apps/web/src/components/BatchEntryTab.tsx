@@ -10,8 +10,9 @@ import { MEDIA_TYPES, COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/s
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
-import { isDisableApiKeyRequirements } from "@/lib/featureFlags";
+import { skipApiKeyMissingUi } from "@/lib/featureFlags";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
+import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { getStatusLabel } from "@/lib/statusLabel";
@@ -78,7 +79,8 @@ interface BatchEntryTabProps {
 
 export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooterOutside = false, onFooterChange }: BatchEntryTabProps) {
   const { t } = useLocale();
-  const { me } = useMe();
+  const { token } = useAuth();
+  const { me, loading: meLoading } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
 
   const [mediaType, setMediaType] = useState<MediaType>(initialMediaType ?? "movies");
@@ -102,7 +104,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
   const apiKeyProvider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
   const hasApiKeyForCategory =
-    isDisableApiKeyRequirements(me) ||
+    skipApiKeyMissingUi(me, { token: !!token, meLoading }) ||
     (apiKeyProvider == null
       ? true
       : mediaType === "boardgames"

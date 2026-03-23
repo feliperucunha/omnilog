@@ -29,7 +29,13 @@
     "light": "Claro"
   },
   "topbar": {
-    "preferences": "Tema e idioma"
+    "preferences": "Preferências",
+    "preferencesSubtitle": "Tema, idioma e catálogo de board games na busca.",
+    "preferencesThemeHint": "Vale para o app neste aparelho.",
+    "preferencesThemeRow": "Claro / escuro",
+    "preferencesLanguageHint": "Idioma da interface.",
+    "boardGameBggHint": "BoardGameGeek — catálogo global.",
+    "boardGameLudopediaHint": "Ludopedia — forte no Brasil."
   },
   "login": {
     "title": "Entrar",

@@ -28,9 +28,10 @@ import { toast } from "sonner";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useLogComplete } from "@/contexts/LogCompleteContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
-import { isDisableApiKeyRequirements } from "@/lib/featureFlags";
+import { skipApiKeyMissingUi } from "@/lib/featureFlags";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Select } from "@/components/ui/select";
 import {
@@ -106,13 +107,14 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   const { t } = useLocale();
   const navigate = useNavigate();
   const { showLogComplete } = useLogComplete();
-  const { me } = useMe();
+  const { token } = useAuth();
+  const { me, loading: meLoading } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
   const provider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
   const needsKeyBanner =
     !publicUserId &&
-    !isDisableApiKeyRequirements(me) &&
+    !skipApiKeyMissingUi(me, { token: !!token, meLoading }) &&
     provider != null &&
     (mediaType === "boardgames" ? !hasBoardGameKey : me?.apiKeys && !me.apiKeys[provider]);
   const readOnly = !!publicUserId;

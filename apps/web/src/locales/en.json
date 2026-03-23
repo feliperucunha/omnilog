@@ -29,7 +29,13 @@
     "light": "Light"
   },
   "topbar": {
-    "preferences": "Theme & language"
+    "preferences": "Preferences",
+    "preferencesSubtitle": "Theme, language, and board game catalog for search.",
+    "preferencesThemeHint": "Applies across the app on this device.",
+    "preferencesThemeRow": "Light / dark",
+    "preferencesLanguageHint": "Interface language.",
+    "boardGameBggHint": "BoardGameGeek — global catalog.",
+    "boardGameLudopediaHint": "Ludopedia — strong in Brazil."
   },
   "login": {
     "title": "Sign in",

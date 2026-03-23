@@ -18,7 +18,9 @@ export async function isDisableApiKeyRequirementsEnabled(): Promise<boolean> {
     where: { key: FEATURE_FLAG_KEYS.DISABLE_API_KEY_REQUIREMENTS },
     select: { enabled: true },
   });
-  return row?.enabled ?? false;
+  // No row (pre-migration DB): default relaxed UX. Row present: honor explicit enabled value.
+  if (row == null) return true;
+  return row.enabled;
 }
 
 export async function listFeatureFlags() {

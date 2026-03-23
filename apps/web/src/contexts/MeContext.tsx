@@ -3,11 +3,12 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, invalidateApiCache } from "@/lib/api";
 
 export interface MeResponse {
   user: { id: string; username?: string; email: string; onboarded: boolean };
@@ -37,6 +38,7 @@ export function MeProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const wasLoadingRef = useRef(false);
 
   const refetch = useCallback(async () => {
     if (!token) {
@@ -67,6 +69,18 @@ export function MeProvider({ children }: { children: ReactNode }) {
     }
     refetch();
   }, [token, refetch]);
+
+  /** Bust client GET cache for search so recommendations/search responses match latest /me feature flags. */
+  useEffect(() => {
+    if (!token) {
+      wasLoadingRef.current = false;
+      return;
+    }
+    if (wasLoadingRef.current && !loading) {
+      invalidateApiCache("/search");
+    }
+    wasLoadingRef.current = loading;
+  }, [token, loading]);
 
   const value: MeContextValue = { me, refetch, loading };
 

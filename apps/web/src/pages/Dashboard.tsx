@@ -15,7 +15,7 @@ import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
-import { isDisableApiKeyRequirements } from "@/lib/featureFlags";
+import { skipApiKeyMissingUi } from "@/lib/featureFlags";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, MEDIA_TYPES, type MediaType, toMediaType } from "@geeklogs/shared";
 import type { Log } from "@geeklogs/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -332,7 +332,7 @@ export function Dashboard() {
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
   const apiKeyProvider = getApiKeyProviderForMediaType(selectedCategory, boardGameProvider);
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
-  const skipApiKeyReq = isDisableApiKeyRequirements(me);
+  const skipApiKeyReq = skipApiKeyMissingUi(me, { token: !!token, meLoading });
   const needsApiKeyBanner =
     !skipApiKeyReq &&
     apiKeyProvider != null &&

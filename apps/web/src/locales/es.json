@@ -29,7 +29,13 @@
     "light": "Claro"
   },
   "topbar": {
-    "preferences": "Tema e idioma"
+    "preferences": "Preferencias",
+    "preferencesSubtitle": "Tema, idioma y catálogo de juegos de mesa en la búsqueda.",
+    "preferencesThemeHint": "Se aplica en este dispositivo.",
+    "preferencesThemeRow": "Claro / oscuro",
+    "preferencesLanguageHint": "Idioma de la interfaz.",
+    "boardGameBggHint": "BoardGameGeek — catálogo global.",
+    "boardGameLudopediaHint": "Ludopedia — muy usada en Brasil."
   },
   "login": {
     "title": "Iniciar sesión",

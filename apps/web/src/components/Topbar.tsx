@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Settings, Info, LogOut } from "lucide-react";
+import { Settings, Info, LogOut, SlidersHorizontal } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
+import { PreferencesModal } from "@/components/PreferencesModal";
 
 const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/": "nav.dashboard",
@@ -40,6 +42,7 @@ export function Topbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const pageTitleContext = usePageTitle();
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
 
   const fallbackTitleKey = ROUTE_TITLE_KEYS[location.pathname];
   const displayTitle =
@@ -147,33 +150,13 @@ export function Topbar() {
                 <p className="text-xs font-medium text-[var(--color-light)]">{user.email}</p>
               </div>
               <DropdownMenuSeparator />
-              <div className="px-2 py-2 space-y-3">
-                <div>
-                  <p className="text-xs text-[var(--color-light)] mb-1.5">{t("nav.theme")}</p>
-                  <ThemeSwitcher />
-                </div>
-                <div>
-                  <p className="text-xs text-[var(--color-light)] mb-1.5">{t("settings.language")}</p>
-                  <ToggleGroup
-                    type="single"
-                    value={locale}
-                    onValueChange={(v) => v && handleLocaleChange(v as Locale)}
-                    className="gap-0 inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5"
-                    aria-label={t("settings.language")}
-                  >
-                    {LOCALE_OPTIONS.map((opt) => (
-                      <ToggleGroupItem
-                        key={opt.value}
-                        value={opt.value}
-                        className="h-8 px-2 text-xs data-[state=on]:bg-[var(--color-mid)]/50"
-                        aria-label={opt.label}
-                      >
-                        {LOCALE_SHORT_LABELS[opt.value]}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                </div>
-              </div>
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer max-md:min-h-[48px]"
+                onSelect={() => setPreferencesOpen(true)}
+              >
+                <SlidersHorizontal className="size-4 shrink-0" aria-hidden />
+                {t("topbar.preferences")}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link to="/settings" className="flex items-center gap-2">
@@ -197,6 +180,7 @@ export function Topbar() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+        <PreferencesModal open={preferencesOpen} onOpenChange={setPreferencesOpen} />
         </div>
     </header>
   );
