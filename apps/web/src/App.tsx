@@ -6,7 +6,6 @@ import { Login } from "@/pages/Login";
 import { Register } from "@/pages/Register";
 import { ForgotPassword } from "@/pages/ForgotPassword";
 import { ResetPassword } from "@/pages/ResetPassword";
-import { LogCompleteProvider } from "@/contexts/LogCompleteContext";
 import { InvalidApiKeyProvider } from "@/contexts/InvalidApiKeyContext";
 import { Onboarding } from "@/pages/Onboarding";
 import { Dashboard } from "@/pages/Dashboard";
@@ -48,7 +47,6 @@ const DashboardOrSearch = () => {
 export default function App() {
   return (
     <>
-      <LogCompleteProvider>
       <RequireOnboarded>
         <InvalidApiKeyProvider>
         <Routes>
@@ -83,7 +81,6 @@ export default function App() {
         </Routes>
         </InvalidApiKeyProvider>
       </RequireOnboarded>
-    </LogCompleteProvider>
     </>
   );
 }

@@ -43,7 +43,6 @@ export function Topbar() {
   const location = useLocation();
   const pageTitleContext = usePageTitle();
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-
   const fallbackTitleKey = ROUTE_TITLE_KEYS[location.pathname];
   const displayTitle =
     pageTitleContext?.pageTitle ?? (fallbackTitleKey ? t(fallbackTitleKey) : null);

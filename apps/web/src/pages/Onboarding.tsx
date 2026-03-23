@@ -3,12 +3,14 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
-import { apiFetch } from "@/lib/api";
-import { MEDIA_TYPES, type MediaType } from "@geeklogs/shared";
+import { useMe } from "@/contexts/MeContext";
+import { apiFetch, invalidateApiCache } from "@/lib/api";
+import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
 import { cn } from "@/lib/utils";
 
 export function Onboarding() {
@@ -17,8 +19,10 @@ export function Onboarding() {
   const { user, setUser } = useAuth();
   const { colorScheme, setColorScheme } = useTheme();
   const { refetch: refetchVisibleTypes } = useVisibleMediaTypes();
+  const { refetch: refetchMe } = useMe();
   const [selectedTypes, setSelectedTypes] = useState<Set<MediaType>>(new Set(MEDIA_TYPES));
   const [theme, setTheme] = useState<"light" | "dark">(colorScheme);
+  const [boardGameProvider, setBoardGameProvider] = useState<BoardGameProvider>("bgg");
   const [loading, setLoading] = useState(false);
 
   if (!user) {
@@ -38,20 +42,33 @@ export function Onboarding() {
     if (!user) return;
     setLoading(true);
     try {
+      const types = Array.from(selectedTypes);
+      const body: {
+        theme: "light" | "dark";
+        types: MediaType[];
+        boardGameProvider?: BoardGameProvider;
+      } = { theme, types };
+      if (selectedTypes.has("boardgames")) {
+        body.boardGameProvider = boardGameProvider;
+      }
       await apiFetch("/settings/onboarding", {
         method: "PUT",
-        body: JSON.stringify({ theme, types: Array.from(selectedTypes) }),
+        body: JSON.stringify(body),
       });
       setColorScheme(theme);
       setUser({ ...user, onboarded: true });
       await refetchVisibleTypes();
+      await refetchMe();
+      invalidateApiCache("/search");
       navigate("/", { replace: true });
     } catch {
-      setLoading(false);
+      // keep loading false in finally
     } finally {
       setLoading(false);
     }
   };
+
+  const showBoardGameApi = selectedTypes.has("boardgames");
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--color-darkest)] p-6">
@@ -137,6 +154,44 @@ export function Onboarding() {
             ))}
           </div>
         </div>
+
+        {showBoardGameApi && (
+          <div className="flex flex-col gap-4 rounded-xl border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/40 p-4">
+            <div className="flex flex-col gap-1">
+              <Label className="text-base font-medium text-[var(--color-lightest)]">
+                {t("settings.boardGameProviderLabel")}
+              </Label>
+              <p className="text-sm text-[var(--color-light)]">{t("onboarding.boardGameApiHint")}</p>
+            </div>
+            <ToggleGroup
+              type="single"
+              value={boardGameProvider}
+              onValueChange={(v) => v && setBoardGameProvider(v as BoardGameProvider)}
+              className="inline-flex w-full max-w-md flex-wrap rounded-md border border-[var(--color-mid)]/30 p-0.5"
+              aria-label={t("settings.boardGameProviderLabel")}
+            >
+              {BOARD_GAME_PROVIDERS.map((provider) => (
+                <ToggleGroupItem
+                  key={provider}
+                  value={provider}
+                  className="h-10 flex-1 px-3 text-sm data-[state=on]:bg-[var(--color-mid)]/50"
+                  aria-label={
+                    provider === "bgg"
+                      ? t("settings.boardGameProviderBgg")
+                      : t("settings.boardGameProviderLudopedia")
+                  }
+                >
+                  {provider === "bgg"
+                    ? t("settings.boardGameProviderBgg")
+                    : t("settings.boardGameProviderLudopedia")}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <p className="text-xs leading-relaxed text-[var(--color-light)]">
+              {t("settings.boardGameProviderIntro")}
+            </p>
+          </div>
+        )}
 
         <Button
           className="w-full"

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { MEDIA_TYPES } from "@geeklogs/shared";
+import { BOARD_GAME_PROVIDERS, MEDIA_TYPES } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { sanitizeApiKey } from "../lib/sanitize.js";
 import { authMiddleware } from "../middleware/auth.js";
@@ -10,6 +10,7 @@ import { setSelectedBadges } from "../services/gamification.service.js";
 const onboardingSchema = z.object({
   theme: z.enum(["light", "dark"]),
   types: z.array(z.enum(MEDIA_TYPES as unknown as [string, ...string[]])),
+  boardGameProvider: z.enum(BOARD_GAME_PROVIDERS as unknown as [string, ...string[]]).optional(),
 });
 
 export const settingsRouter = Router();
@@ -268,13 +269,24 @@ settingsRouter.put("/onboarding", async (req: AuthenticatedRequest, res) => {
     res.status(400).json({ error: "Invalid body" });
     return;
   }
+  const typesSet = new Set(parsed.data.types);
+  const data: {
+    preferredTheme: "light" | "dark";
+    visibleMediaTypes: string;
+    onboarded: boolean;
+    boardGameProvider?: string;
+  } = {
+    preferredTheme: parsed.data.theme,
+    visibleMediaTypes: JSON.stringify(parsed.data.types),
+    onboarded: true,
+  };
+  if (typesSet.has("boardgames")) {
+    data.boardGameProvider = parsed.data.boardGameProvider ?? "bgg";
+  }
+
   await prisma.user.update({
     where: { id: req.user.userId },
-    data: {
-      preferredTheme: parsed.data.theme,
-      visibleMediaTypes: JSON.stringify(parsed.data.types),
-      onboarded: true,
-    },
+    data,
   });
   res.json({ ok: true });
 });

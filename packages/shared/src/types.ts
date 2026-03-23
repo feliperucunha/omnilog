@@ -308,6 +308,8 @@ export interface Log {
   genres: string[] | null;
   createdAt: string;
   updatedAt: string;
+  /** Board games: which API this log’s externalId came from (affects image aspect handling for BGG). */
+  boardGameSource?: BoardGameProvider | null;
   /** Number of like reactions (feed/reviews). */
   likesCount?: number;
   /** Number of dislike reactions (feed/reviews). */

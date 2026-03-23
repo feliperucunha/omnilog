@@ -30,12 +30,10 @@
   },
   "topbar": {
     "preferences": "Preferencias",
-    "preferencesSubtitle": "Tema, idioma y catálogo de juegos de mesa en la búsqueda.",
+    "preferencesSubtitle": "Tema e idioma de la interfaz. También puedes cambiarlos en Ajustes.",
     "preferencesThemeHint": "Se aplica en este dispositivo.",
     "preferencesThemeRow": "Claro / oscuro",
-    "preferencesLanguageHint": "Idioma de la interfaz.",
-    "boardGameBggHint": "BoardGameGeek — catálogo global.",
-    "boardGameLudopediaHint": "Ludopedia — muy usada en Brasil."
+    "preferencesLanguageHint": "Idioma de la interfaz."
   },
   "login": {
     "title": "Iniciar sesión",
@@ -87,10 +85,11 @@
   },
   "onboarding": {
     "title": "Configura tus preferencias",
-    "subtitle": "Elige el tema y los tipos de contenido que quieres ver. Puedes cambiarlos después en Ajustes.",
+    "subtitle": "Elige el tema y los tipos de contenido. Si activas juegos de mesa, elige la API del catálogo. Puedes cambiarlo todo después en Ajustes.",
     "themeLabel": "Tema",
     "mediaTypesLabel": "Tipos de contenido",
     "mediaTypesHint": "Selecciona qué tipos se muestran en la barra y en la búsqueda. Puedes cambiarlo en Ajustes.",
+    "boardGameApiHint": "Activaste juegos de mesa: elige qué base usamos para la búsqueda y los detalles.",
     "continue": "Continuar",
     "continuing": "Continuando…"
   },

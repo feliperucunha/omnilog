@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
 import { Loader2 } from "lucide-react";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useMe } from "@/contexts/MeContext";
 import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars, starsToGrade } from "@/lib/gradeStars";
@@ -59,6 +60,7 @@ const toNum = (v: number | ""): number | null => (v === "" ? null : v);
 
 export function LogForm(props: LogFormProps) {
   const { t } = useLocale();
+  const { me } = useMe();
   const isEdit = props.mode === "edit";
   const log = isEdit ? props.log : null;
   const mediaType = isEdit ? (log!.mediaType as MediaType) : (props as LogFormCreateProps).mediaType;
@@ -256,7 +258,13 @@ export function LogForm(props: LogFormProps) {
   const formContent = (
     <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
       <div className="mb-4 flex gap-4">
-        <ItemImage src={image} className="h-20 w-14 rounded" />
+        <ItemImage
+          src={image}
+          className="h-20 w-14 rounded"
+          mediaType={mediaType}
+          boardGameSource={isEdit ? log?.boardGameSource : undefined}
+          activeBoardGameProvider={!isEdit && mediaType === "boardgames" ? (me?.boardGameProvider ?? null) : undefined}
+        />
         <h3 className="line-clamp-2 text-lg font-semibold text-[var(--color-lightest)]">
           {title}
         </h3>

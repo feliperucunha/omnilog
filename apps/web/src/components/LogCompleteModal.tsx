@@ -7,13 +7,16 @@ import { gradeToStars } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { ItemImage } from "@/components/ItemImage";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useMe } from "@/contexts/MeContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Logo, getLogoSrc } from "@/components/Logo";
 import { getHeroImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
+import { isBggBoardGameImageContext } from "@/lib/boardGameImageFit";
 import { overlayVariants, modalContentVariants } from "@/lib/animations";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { showErrorToast } from "@/lib/errorToast";
+import { cn } from "@/lib/utils";
 
 /**
  * Real-device WebView can report isNativePlatform() later than the emulator, and animated
@@ -96,6 +99,7 @@ const NATIVE_LIGHT = { cardBg: "#ffffff", text: "#0f172a", textMuted: "#64748b",
 
 export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const { t } = useLocale();
+  const { me } = useMe();
   const theme = useTheme();
   const isCapacitorNative = useIsNative();
   const nativeUi = USE_NATIVE_LOG_COMPLETE_LAYOUT_ON_WEB || isCapacitorNative;
@@ -105,6 +109,14 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const stars = grade != null ? gradeToStars(grade) : 0;
   const statusLabel = status ? getStatusLabel(t, status, state.mediaType) : t("logComplete.logged");
   const heroImageUrl = getHeroImageUrl(image) ?? image;
+  const bggBoardFraming = isBggBoardGameImageContext(
+    mediaType,
+    heroImageUrl,
+    null,
+    me?.boardGameProvider ?? null
+  );
+  /** BGG box art is landscape; a shorter card + hero keeps the modal from feeling overly tall on web and native. */
+  const bggShorterCard = bggBoardFraming;
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [shareInProgress, setShareInProgress] = useState(false);
   const [cachedHeroDataUrl, setCachedHeroDataUrl] = useState<string | null>(null);
@@ -156,13 +168,16 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       : "fixed inset-0 z-50 flex min-h-[100dvh] min-h-dvh-fallback items-center justify-center bg-black/90 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] md:bg-transparent md:p-6";
   const cardClass =
     "relative flex max-h-full w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-dark)] shadow-[0_24px_80px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.08)] md:rounded-3xl";
-  /** On native: real-device Android WebView clips the top of flex-centered content when it overflows. Use scrollable overlay + centered card so the full modal can be seen by scrolling. */
+  /**
+   * Native: fill the viewport without document-level scroll; the card body scrolls internally.
+   * (Older overflow-y-auto on the overlay caused double-scroll and clipped flex layout on phones.)
+   */
   const overlayClassNative =
     isLight
-      ? "fixed inset-0 z-50 overflow-y-auto bg-white/90 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] min-h-[100dvh] min-h-[100vh]"
-      : "fixed inset-0 z-50 overflow-y-auto bg-black/90 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] min-h-[100dvh] min-h-[100vh]";
+      ? "fixed inset-0 z-50 flex min-h-0 flex-col overflow-hidden overscroll-y-contain bg-white/90 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] h-[100dvh] max-h-[100dvh]"
+      : "fixed inset-0 z-50 flex min-h-0 flex-col overflow-hidden overscroll-y-contain bg-black/90 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] h-[100dvh] max-h-[100dvh]";
   const cardClassNative =
-    "relative flex w-full max-w-[400px] max-h-[85dvh] flex-col overflow-hidden rounded-2xl border md:rounded-3xl my-auto mx-4 flex-shrink-0";
+    "relative flex min-h-0 max-h-full w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border md:rounded-3xl mx-4 flex-shrink-0";
 
   const closeButton = (
     <div className="absolute right-2 top-2 z-10 md:right-4 md:top-4">
@@ -275,19 +290,27 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
     </div>
   );
 
+  const heroWebWrapperClass = cn(
+    "relative w-full md:h-auto md:min-h-0",
+    bggShorterCard
+      ? "h-[36vh] min-h-[136px] md:aspect-[7/8] md:max-h-[min(40vh,360px)]"
+      : "h-[60vh] min-h-[190px] md:aspect-[2/3]"
+  );
+
   const imageSection = (
     <div className="relative flex-shrink-0 overflow-hidden rounded-t-2xl md:rounded-t-3xl">
-      <div className="relative h-[60vh] w-full min-h-[190px] md:h-auto md:min-h-0 md:aspect-[2/3]">
+      <div className={heroWebWrapperClass}>
         <ItemImage
           src={heroImageUrl}
           className="absolute inset-0 h-full w-full"
-          imgClassName="object-cover object-center"
+          mediaType={mediaType}
+          activeBoardGameProvider={me?.boardGameProvider ?? null}
           fitContent={false}
           loading="eager"
           referrerPolicy="no-referrer"
         />
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 z-[2]"
           style={{
             background:
               "linear-gradient(to top, var(--color-dark) 0%, transparent 40%, transparent 100%)",
@@ -297,19 +320,27 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
     </div>
   );
 
+  const heroNativeWrapperClass = cn(
+    "relative w-full md:h-auto md:min-h-0",
+    bggShorterCard
+      ? "h-[32vh] min-h-[124px] max-h-[40dvh] md:max-h-[min(38vh,340px)] md:aspect-[7/8]"
+      : "h-[48vh] min-h-[156px] max-h-[56dvh] md:max-h-none md:aspect-[2/3]"
+  );
+
   const imageSectionNative = (
     <div className="relative flex-shrink-0 overflow-hidden rounded-t-2xl md:rounded-t-3xl" style={{ transform: "none", willChange: "auto" }}>
-      <div className="relative h-[62vh] w-full min-h-[176px] max-h-[72dvh] md:h-auto md:min-h-0 md:max-h-none md:aspect-[2/3]">
+      <div className={heroNativeWrapperClass}>
         <ItemImage
           src={heroImageUrl}
           className="absolute inset-0 h-full w-full"
-          imgClassName="object-cover object-center"
+          mediaType={mediaType}
+          activeBoardGameProvider={me?.boardGameProvider ?? null}
           fitContent={false}
           loading="eager"
           referrerPolicy="no-referrer"
         />
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 z-[2]"
           style={{
             background: "linear-gradient(to top, var(--color-dark) 0%, transparent 40%, transparent 100%)",
             transform: "none",
@@ -380,10 +411,25 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
    * Share scene: same proportions as the small native reference (320×760 / 348×808) but scaled to
    * SHARE_EXPORT_SCENE_WIDTH_PX so html-to-image captures a large layout + moderate pixelRatio (sharp text,
    * stable filters). Footer uses a plain <img> logo — `Logo`’s mix-blend-lighten often disappears in capture.
+   * BGG: shorter hero matches modal (7/8 vs 2/3 → scale hero by 16/21); scene and card max shrink by the same delta.
    */
-  const shareBase = compactShareLayout
-    ? { sceneH: 760, cardW: 288, cardMaxH: 604, heroH: 348, refSceneW: 320 }
-    : { sceneH: 808, cardW: 308, cardMaxH: 652, heroH: 382, refSceneW: 348 };
+  const shareBase = (() => {
+    const compact = { sceneH: 760, cardW: 288, cardMaxH: 604, heroH: 348, refSceneW: 320 };
+    const wide = { sceneH: 808, cardW: 308, cardMaxH: 652, heroH: 382, refSceneW: 348 };
+    if (!bggShorterCard) {
+      return compactShareLayout ? compact : wide;
+    }
+    const bggHeroScale = 16 / 21; // (8/7) / (3/2): modal BGG aspect 7/8 vs default 2/3
+    const pick = compactShareLayout ? compact : wide;
+    const heroH = Math.max(1, Math.round(pick.heroH * bggHeroScale));
+    const delta = pick.heroH - heroH;
+    return {
+      ...pick,
+      heroH,
+      sceneH: pick.sceneH - delta,
+      cardMaxH: pick.cardMaxH - delta,
+    };
+  })();
   const shareLayoutScale = SHARE_EXPORT_SCENE_WIDTH_PX / shareBase.refSceneW;
   const sz = (n: number) => Math.max(1, Math.round(n * shareLayoutScale));
   const shareSceneWidth = SHARE_EXPORT_SCENE_WIDTH_PX;
@@ -483,11 +529,54 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
             {/* Hero: fixed height; title/review scroll above pinned footer */}
             <div style={{ position: "relative", width: "100%", height: shareHeroHeight, flexShrink: 0, overflow: "hidden" }}>
               {cachedHeroDataUrl ? (
-                <img
-                  src={cachedHeroDataUrl}
-                  alt=""
-                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
-                />
+                bggBoardFraming ? (
+                  <>
+                    <img
+                      src={cachedHeroDataUrl}
+                      alt=""
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        objectPosition: "center",
+                        transform: "scale(1.12)",
+                        filter: isLight ? `blur(${Math.min(shareHeroHeight * 0.05, 28)}px)` : `blur(${Math.min(shareHeroHeight * 0.06, 36)}px)`,
+                        WebkitFilter: isLight ? `blur(${Math.min(shareHeroHeight * 0.05, 28)}px)` : `blur(${Math.min(shareHeroHeight * 0.06, 36)}px)`,
+                        opacity: 0.68,
+                        display: "block",
+                      }}
+                    />
+                    <img
+                      src={cachedHeroDataUrl}
+                      alt=""
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        zIndex: 1,
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        objectPosition: "center",
+                        display: "block",
+                      }}
+                    />
+                  </>
+                ) : (
+                  <img
+                    src={cachedHeroDataUrl}
+                    alt=""
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      objectPosition: "center",
+                      display: "block",
+                    }}
+                  />
+                )
               ) : (
                 <div
                   style={{
@@ -501,6 +590,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                 style={{
                   position: "absolute",
                   inset: 0,
+                  zIndex: 2,
                   background: `linear-gradient(to top, ${nativeColors.cardBg} 0%, transparent 40%)`,
                 }}
               />
@@ -662,8 +752,8 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
           style={{ backgroundColor: nativeColors.overlay }}
           aria-hidden
         />
-        {/* Wrapper allows vertical centering when card fits; when card is taller than viewport, overlay scrolls so full content (close button, image, description) is reachable. */}
-        <div className="relative min-h-full flex items-center justify-center py-6 px-4">
+        {/* flex-1 min-h-0 bounds card height so inner contentBlock can scroll; no overlay scroll. */}
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-4">
           <article
             className={cardClassNative}
             onClick={(e) => e.stopPropagation()}

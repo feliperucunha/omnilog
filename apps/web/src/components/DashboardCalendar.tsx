@@ -314,7 +314,12 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
                           className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
                           onClick={() => setSelectedDate(null)}
                         >
-                        <ItemImage src={log.image} className="h-14 w-10 shrink-0 rounded object-cover" />
+                        <ItemImage
+                          src={log.image}
+                          className="h-14 w-10 shrink-0 rounded object-cover"
+                          mediaType={log.mediaType}
+                          boardGameSource={log.boardGameSource}
+                        />
                         <div className="min-w-0 flex-1 flex flex-col gap-0.5 justify-center">
                           <p className="truncate font-medium text-[var(--color-lightest)] text-sm">
                             {log.title}
@@ -376,7 +381,12 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
                           className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
                           onClick={() => setSelectedDate(null)}
                         >
-                          <ItemImage src={log.image} className="h-14 w-10 shrink-0 rounded object-cover" />
+                          <ItemImage
+                          src={log.image}
+                          className="h-14 w-10 shrink-0 rounded object-cover"
+                          mediaType={log.mediaType}
+                          boardGameSource={log.boardGameSource}
+                        />
                           <div className="min-w-0 flex-1 flex flex-col gap-0.5 justify-center">
                             <p className="truncate font-medium text-[var(--color-lightest)] text-sm">
                               {log.title}

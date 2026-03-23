@@ -30,12 +30,10 @@
   },
   "topbar": {
     "preferences": "Preferências",
-    "preferencesSubtitle": "Tema, idioma e catálogo de board games na busca.",
+    "preferencesSubtitle": "Tema e idioma da interface. Você também pode alterar em Configurações.",
     "preferencesThemeHint": "Vale para o app neste aparelho.",
     "preferencesThemeRow": "Claro / escuro",
-    "preferencesLanguageHint": "Idioma da interface.",
-    "boardGameBggHint": "BoardGameGeek — catálogo global.",
-    "boardGameLudopediaHint": "Ludopedia — forte no Brasil."
+    "preferencesLanguageHint": "Idioma da interface."
   },
   "login": {
     "title": "Entrar",
@@ -87,10 +85,11 @@
   },
   "onboarding": {
     "title": "Configure suas preferências",
-    "subtitle": "Escolha o tema e os tipos de mídia que deseja ver. Você pode alterar depois em Configurações.",
+    "subtitle": "Escolha o tema e os tipos de mídia no app. Se ativar jogos de tabuleiro, escolha a API do catálogo. Tudo pode ser alterado depois em Configurações.",
     "themeLabel": "Tema",
     "mediaTypesLabel": "Tipos de mídia",
     "mediaTypesHint": "Selecione quais tipos aparecem na barra e na busca. Você pode alterar em Configurações.",
+    "boardGameApiHint": "Você ativou Jogos de tabuleiro — escolha qual base usamos na busca e nos detalhes.",
     "continue": "Continuar",
     "continuing": "Continuando…"
   },

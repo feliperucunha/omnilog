@@ -504,6 +504,8 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
               alt=""
               className="h-24 w-16 shrink-0 rounded object-cover"
               fitContent
+              mediaType={mediaType}
+              activeBoardGameProvider={mediaType === "boardgames" ? boardGameProvider : undefined}
             />
             <div className="min-w-0 flex-1">
               <p className="font-medium text-[var(--color-lightest)]">

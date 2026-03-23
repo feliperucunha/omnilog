@@ -30,12 +30,10 @@
   },
   "topbar": {
     "preferences": "Preferences",
-    "preferencesSubtitle": "Theme, language, and board game catalog for search.",
+    "preferencesSubtitle": "Theme and interface language. You can also change these in Settings.",
     "preferencesThemeHint": "Applies across the app on this device.",
     "preferencesThemeRow": "Light / dark",
-    "preferencesLanguageHint": "Interface language.",
-    "boardGameBggHint": "BoardGameGeek — global catalog.",
-    "boardGameLudopediaHint": "Ludopedia — strong in Brazil."
+    "preferencesLanguageHint": "Interface language."
   },
   "login": {
     "title": "Sign in",
@@ -87,10 +85,11 @@
   },
   "onboarding": {
     "title": "Set up your preferences",
-    "subtitle": "Choose your preferred theme and the types of media you want to see. You can change these later in Settings.",
+    "subtitle": "Choose your theme and which media types you want in the app. If you enable board games, pick your catalog API. You can change everything later in Settings.",
     "themeLabel": "Theme",
     "mediaTypesLabel": "Media types",
     "mediaTypesHint": "Select which media types appear in the sidebar and search. You can change this in Settings.",
+    "boardGameApiHint": "You enabled Board Games — choose which database we use for search and details.",
     "continue": "Continue",
     "continuing": "Continuing…"
   },

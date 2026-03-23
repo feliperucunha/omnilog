@@ -940,7 +940,12 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                       to={`/item/${log.mediaType}/${log.externalId}`}
                       className="relative block h-full min-h-full w-28 flex-shrink-0 overflow-hidden sm:w-32"
                     >
-                      <ItemImage src={log.image} className="h-full w-full object-cover" />
+                      <ItemImage
+                        src={log.image}
+                        className="h-full w-full object-cover"
+                        mediaType={log.mediaType}
+                        boardGameSource={log.boardGameSource}
+                      />
                       {log.status && (
                         <span
                           className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}

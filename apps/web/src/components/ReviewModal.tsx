@@ -51,6 +51,8 @@ export function ReviewModal({ open, onClose, log, user }: ReviewModalProps) {
             <ItemImage
               src={log.image}
               className="h-14 w-10 shrink-0 rounded"
+              mediaType={log.mediaType}
+              boardGameSource={log.boardGameSource}
             />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="line-clamp-2 font-medium text-[var(--color-lightest)]">

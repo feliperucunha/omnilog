@@ -705,7 +705,12 @@ export function Statistics() {
                             className={`flex min-w-0 flex-row overflow-hidden rounded-lg border bg-[var(--color-dark)] text-left text-inherit no-underline shadow-[var(--shadow-card)] transition-[opacity,border-color] hover:opacity-95 max-md:min-h-[44px] ${listBorderClass} ${status == null ? "hover:border-black" : ""}`}
                           >
                             <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-l-lg">
-                              <ItemImage src={log.image} className="h-full w-full" />
+                              <ItemImage
+                                src={log.image}
+                                className="h-full w-full"
+                                mediaType={log.mediaType}
+                                boardGameSource={log.boardGameSource}
+                              />
                               {status && (
                                 <span
                                   className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium ${badgeClass}`}

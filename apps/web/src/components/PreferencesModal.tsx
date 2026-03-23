@@ -1,15 +1,11 @@
-import { useRef, useState } from "react";
-import { Loader2, SlidersHorizontal } from "lucide-react";
+import { useRef } from "react";
+import { SlidersHorizontal } from "lucide-react";
 import { useLocale, LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useMe } from "@/contexts/MeContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
-import { apiFetch, invalidateApiCache } from "@/lib/api";
-import { toast } from "sonner";
-import { showErrorToast } from "@/lib/errorToast";
-import { BOARD_GAME_PROVIDERS, type BoardGameProvider } from "@geeklogs/shared";
+import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
@@ -31,12 +27,11 @@ interface PreferencesModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/** Theme + language quick settings from the user menu (board game API stays in Settings / onboarding). */
 export function PreferencesModal({ open, onOpenChange }: PreferencesModalProps) {
   const { t, locale, setLocale } = useLocale();
   const { token } = useAuth();
-  const { me, refetch: refetchMe } = useMe();
   const isMobile = useIsMobile();
-  const [savingBoardGameProvider, setSavingBoardGameProvider] = useState(false);
   const drawerCloseRef = useRef<(() => void) | null>(null);
 
   const handleLocaleChange = (newLocale: Locale) => {
@@ -46,24 +41,6 @@ export function PreferencesModal({ open, onOpenChange }: PreferencesModalProps) 
         method: "PUT",
         body: JSON.stringify({ locale: newLocale }),
       }).catch(() => {});
-    }
-  };
-
-  const handleBoardGameProviderChange = async (provider: BoardGameProvider) => {
-    if (!me || me.boardGameProvider === provider) return;
-    setSavingBoardGameProvider(true);
-    try {
-      await apiFetch("/settings/board-game-provider", {
-        method: "PUT",
-        body: JSON.stringify({ provider }),
-      });
-      await refetchMe();
-      invalidateApiCache("/search");
-      toast.success(t("settings.boardGameProviderSaved"));
-    } catch (err) {
-      showErrorToast(t, "E008", { originalError: err });
-    } finally {
-      setSavingBoardGameProvider(false);
     }
   };
 
@@ -109,60 +86,6 @@ export function PreferencesModal({ open, onOpenChange }: PreferencesModalProps) 
           ))}
         </ToggleGroup>
       </section>
-
-      {me && (
-        <section
-          className={cn(
-            "flex flex-col gap-3 rounded-xl border border-[var(--color-mid)]/25 bg-[var(--color-darkest)]/30 p-4 max-md:p-3.5",
-            savingBoardGameProvider && "pointer-events-none opacity-60"
-          )}
-          aria-busy={savingBoardGameProvider}
-        >
-          <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-[var(--color-lightest)]">
-              {t("settings.boardGameProviderLabel")}
-            </h3>
-            <p className="text-xs leading-relaxed text-[var(--color-light)]">
-              {t("settings.boardGameProviderIntro")}
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {BOARD_GAME_PROVIDERS.map((provider) => {
-              const selected = (me.boardGameProvider ?? "bgg") === provider;
-              const label =
-                provider === "bgg"
-                  ? t("settings.boardGameProviderBgg")
-                  : t("settings.boardGameProviderLudopedia");
-              const hint =
-                provider === "bgg" ? t("topbar.boardGameBggHint") : t("topbar.boardGameLudopediaHint");
-              return (
-                <button
-                  key={provider}
-                  type="button"
-                  disabled={savingBoardGameProvider}
-                  onClick={() => void handleBoardGameProviderChange(provider)}
-                  className={cn(
-                    "flex min-h-[56px] flex-col items-stretch justify-center rounded-xl border px-3 py-3 text-left transition-colors max-md:min-h-[52px] max-md:px-3 max-md:py-2.5",
-                    selected
-                      ? "border-[var(--btn-gradient-start)] bg-[var(--btn-gradient-start)]/12 ring-2 ring-[var(--btn-gradient-start)]/35"
-                      : "border-[var(--color-mid)]/40 bg-[var(--color-dark)] hover:border-[var(--color-mid)]/70 active:bg-[var(--color-darkest)]/50"
-                  )}
-                >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold leading-tight text-[var(--color-lightest)]">
-                      {label}
-                    </span>
-                    {savingBoardGameProvider && selected && (
-                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
-                    )}
-                  </span>
-                  <span className="mt-1 text-[11px] leading-snug text-[var(--color-light)]">{hint}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
     </div>
   );
 

@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { motion } from "framer-motion";
-import type { MediaType, SearchResult } from "@geeklogs/shared";
+import type { BoardGameProvider, MediaType, SearchResult } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -82,6 +82,8 @@ function durationMsForDistance(dist: number): number {
 export interface SearchRecommendationsCarouselProps {
   items: SearchResult[];
   mediaType: MediaType;
+  /** Used for BGG landscape box art in portrait frames. */
+  boardGameProvider?: BoardGameProvider;
   token: string | null;
   logsByExternalId: Map<string, string>;
   onItemOpen: (id: string) => void;
@@ -90,6 +92,7 @@ export interface SearchRecommendationsCarouselProps {
 export function SearchRecommendationsCarousel({
   items,
   mediaType,
+  boardGameProvider,
   token,
   logsByExternalId,
   onItemOpen,
@@ -137,7 +140,12 @@ export function SearchRecommendationsCarousel({
             className={`flex h-full w-full flex-col overflow-hidden rounded-lg border bg-[var(--color-dark)] text-left text-inherit shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 ${listBorderClass}`}
           >
             <div className="relative aspect-[2/3] w-full overflow-hidden rounded-t-lg">
-              <ItemImage src={item.image} className="h-full w-full" />
+              <ItemImage
+                src={item.image}
+                className="h-full w-full"
+                mediaType={mediaType}
+                activeBoardGameProvider={mediaType === "boardgames" ? boardGameProvider : undefined}
+              />
               {token && status && (
                 <span
                   className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium ${badgeClass}`}

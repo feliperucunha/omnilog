@@ -9,6 +9,7 @@ import { ThemeSync } from "@/components/ThemeSync";
 import { LocaleSync } from "@/components/LocaleSync";
 import { MeProvider } from "@/contexts/MeContext";
 import { VisibleMediaTypesProvider } from "@/contexts/VisibleMediaTypesContext";
+import { LogCompleteProvider } from "@/contexts/LogCompleteContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ColdStartLoader } from "@/components/ColdStartLoader";
 import { AppVersionModal } from "@/components/AppVersionModal";
@@ -27,11 +28,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <AppVersionProvider>
                 <MeProvider>
                   <VisibleMediaTypesProvider>
-                    <ThemeSync />
-                    <LocaleSync />
-                    <ColdStartLoader />
-                    <App />
-                    <AppVersionModal />
+                    <LogCompleteProvider>
+                      <ThemeSync />
+                      <LocaleSync />
+                      <ColdStartLoader />
+                      <App />
+                      <AppVersionModal />
+                    </LogCompleteProvider>
                   </VisibleMediaTypesProvider>
                 </MeProvider>
               </AppVersionProvider>

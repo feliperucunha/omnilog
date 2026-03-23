@@ -21,6 +21,11 @@ import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { getItemDisplayImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
+import {
+  BGG_BLUR_BACKDROP_IMG_CLASS,
+  BGG_CONTAIN_FOREGROUND_IMG_CLASS,
+  isBggBoardGameImageContext,
+} from "@/lib/boardGameImageFit";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
 
@@ -483,7 +488,8 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
   const totalPages = Math.max(1, Math.ceil(reviewsTotal / pageSize));
   const showPagination = reviewsTotal > pageSize;
 
-  console.log(item)
+  const heroUrl = getItemDisplayImageUrl(item.image, item.thumbnail);
+  const bggHeroFraming = isBggBoardGameImageContext(mediaType, heroUrl, item.itemSource ?? null, undefined);
 
   return (
     <motion.div
@@ -495,19 +501,32 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
       <div className="flex min-w-0 flex-col gap-8">
         {/* Hero header: high-res image background with strong gradient for readable text */}
         <header className="relative min-h-[min(38vh,280px)] w-full overflow-hidden rounded-xl sm:min-h-[min(42vh,360px)]">
-          {/* Background image (higher-res when possible) or fallback */}
-          <div
-            className="absolute inset-0 bg-[var(--color-darkest)] bg-cover bg-center bg-no-repeat"
-            style={
-              (() => {
-                const heroUrl = getItemDisplayImageUrl(item.image, item.thumbnail);
-                return heroUrl ? { backgroundImage: cssBackgroundImageUrl(heroUrl) } : undefined;
-              })()
-            }
-          />
+          {/* Background: BGG = blurred fill + full-bleed contain art; else CSS cover poster */}
+          {heroUrl && bggHeroFraming ? (
+            <div className="absolute inset-0 overflow-hidden bg-[var(--color-darkest)]">
+              <img
+                src={heroUrl}
+                alt=""
+                aria-hidden
+                className={BGG_BLUR_BACKDROP_IMG_CLASS}
+                referrerPolicy="no-referrer"
+              />
+              <img
+                src={heroUrl}
+                alt=""
+                className={BGG_CONTAIN_FOREGROUND_IMG_CLASS}
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          ) : (
+            <div
+              className="absolute inset-0 bg-[var(--color-darkest)] bg-cover bg-center bg-no-repeat"
+              style={heroUrl ? { backgroundImage: cssBackgroundImageUrl(heroUrl) } : undefined}
+            />
+          )}
           {/* Strong gradient: dark scrim so text is always readable in both light and dark theme */}
           <div
-            className="pointer-events-none absolute inset-0"
+            className="pointer-events-none absolute inset-0 z-[2]"
             style={{
               background:
                 "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 25%, rgba(0,0,0,0.5) 50%, rgba(13,27,42,0.97) 75%)",
@@ -515,7 +534,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
           />
           {/* Bottom bar: always dark so hero text has contrast in light theme */}
           <div
-            className="pointer-events-none absolute bottom-0 left-0 right-0 h-1/2 min-h-[140px]"
+            className="pointer-events-none absolute bottom-0 left-0 right-0 z-[2] h-1/2 min-h-[140px]"
             style={{
               background: "linear-gradient(to bottom, transparent 0%, rgba(13,27,42,0.98) 55%)",
             }}

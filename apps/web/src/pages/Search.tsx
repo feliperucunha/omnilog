@@ -536,6 +536,7 @@ export function Search() {
             <SearchRecommendationsCarousel
               items={recResults}
               mediaType={mediaType}
+              boardGameProvider={boardGameProvider}
               token={token}
               logsByExternalId={logsByExternalId}
               onItemOpen={(id) => setDrawerItem({ mediaType, id })}
@@ -728,7 +729,12 @@ export function Search() {
                     className={`h-full w-full flex flex-row sm:flex-col text-left overflow-hidden rounded-lg border bg-[var(--color-dark)] text-inherit no-underline shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 max-md:min-h-[44px] ${listBorderClass} ${status == null ? "hover:border-black" : ""}`}
                   >
                     <div className="w-20 h-28 flex-shrink-0 overflow-hidden relative rounded-l-lg sm:w-full sm:h-auto sm:aspect-[2/3] sm:rounded-l-none sm:rounded-t-lg">
-                      <ItemImage src={item.image} className="h-full w-full" />
+                      <ItemImage
+                        src={item.image}
+                        className="h-full w-full"
+                        mediaType={mediaType}
+                        activeBoardGameProvider={mediaType === "boardgames" ? boardGameProvider : undefined}
+                      />
                       {token && status && (
                         <span
                           className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
