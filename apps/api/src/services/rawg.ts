@@ -13,6 +13,7 @@ type RawgGameListRow = {
   released?: string;
   background_image?: string;
   playtime?: number;
+  rating?: number;
   genres?: Array<{ name?: string }>;
 };
 
@@ -28,6 +29,7 @@ function mapRawgGameToSearchResult(item: RawgGameListRow): SearchResult {
     subtitle: null,
     timeToBeatHours,
     genres: genres?.length ? genres : undefined,
+    score: typeof item.rating === "number" && item.rating > 0 ? item.rating : null,
   };
 }
 

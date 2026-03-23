@@ -191,6 +191,7 @@ function mapMovieListItem(item: {
   title?: string;
   release_date?: string;
   poster_path?: string | null;
+  vote_average?: number;
 }): SearchResult {
   return {
     id: String(item.id),
@@ -198,6 +199,7 @@ function mapMovieListItem(item: {
     image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,
     year: item.release_date?.slice(0, 4) ?? null,
     subtitle: null,
+    score: typeof item.vote_average === "number" && item.vote_average > 0 ? item.vote_average : null,
   };
 }
 
@@ -206,6 +208,7 @@ function mapTvListItem(item: {
   name?: string;
   first_air_date?: string;
   poster_path?: string | null;
+  vote_average?: number;
 }): SearchResult {
   return {
     id: String(item.id),
@@ -213,6 +216,7 @@ function mapTvListItem(item: {
     image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,
     year: item.first_air_date?.slice(0, 4) ?? null,
     subtitle: null,
+    score: typeof item.vote_average === "number" && item.vote_average > 0 ? item.vote_average : null,
   };
 }
 
@@ -232,7 +236,13 @@ export async function getMovieRecommendationsMerged(
     if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
     if (!res.ok) continue;
     const data = (await res.json()) as {
-      results?: Array<{ id: number; title?: string; release_date?: string; poster_path?: string | null }>;
+      results?: Array<{
+        id: number;
+        title?: string;
+        release_date?: string;
+        poster_path?: string | null;
+        vote_average?: number;
+      }>;
     };
     for (const item of data.results ?? []) {
       const row = mapMovieListItem(item);
@@ -260,7 +270,13 @@ export async function getTvRecommendationsMerged(
     if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
     if (!res.ok) continue;
     const data = (await res.json()) as {
-      results?: Array<{ id: number; name?: string; first_air_date?: string; poster_path?: string | null }>;
+      results?: Array<{
+        id: number;
+        name?: string;
+        first_air_date?: string;
+        poster_path?: string | null;
+        vote_average?: number;
+      }>;
     };
     for (const item of data.results ?? []) {
       const row = mapTvListItem(item);
@@ -273,16 +289,26 @@ export async function getTvRecommendationsMerged(
   return out;
 }
 
+/** Discover highly user-rated titles (min vote count avoids one-vote 10/10 noise). */
+const TMDB_DISCOVER_MIN_VOTES_MOVIE = 200;
+const TMDB_DISCOVER_MIN_VOTES_TV = 80;
+
 export async function getPopularMovies(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
   const key = getKey(apiKey);
   if (!key) return [];
   const res = await fetch(
-    `${BASE}/discover/movie?api_key=${key}&sort_by=popularity.desc&language=en-US&page=1`
+    `${BASE}/discover/movie?api_key=${key}&sort_by=vote_average.desc&vote_count.gte=${TMDB_DISCOVER_MIN_VOTES_MOVIE}&language=en-US&page=1`
   );
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res.ok) return [];
   const data = (await res.json()) as {
-    results?: Array<{ id: number; title?: string; release_date?: string; poster_path?: string | null }>;
+    results?: Array<{
+      id: number;
+      title?: string;
+      release_date?: string;
+      poster_path?: string | null;
+      vote_average?: number;
+    }>;
   };
   return (data.results ?? []).slice(0, max).map(mapMovieListItem);
 }
@@ -291,12 +317,18 @@ export async function getPopularTv(apiKey?: string | null, max = 12): Promise<Se
   const key = getKey(apiKey);
   if (!key) return [];
   const res = await fetch(
-    `${BASE}/discover/tv?api_key=${key}&sort_by=popularity.desc&language=en-US&page=1`
+    `${BASE}/discover/tv?api_key=${key}&sort_by=vote_average.desc&vote_count.gte=${TMDB_DISCOVER_MIN_VOTES_TV}&language=en-US&page=1`
   );
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res.ok) return [];
   const data = (await res.json()) as {
-    results?: Array<{ id: number; name?: string; first_air_date?: string; poster_path?: string | null }>;
+    results?: Array<{
+      id: number;
+      name?: string;
+      first_air_date?: string;
+      poster_path?: string | null;
+      vote_average?: number;
+    }>;
   };
   return (data.results ?? []).slice(0, max).map(mapTvListItem);
 }

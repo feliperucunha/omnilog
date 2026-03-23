@@ -1,10 +1,18 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, type ItemDetail, type ItemPageData, type ItemReview, type MediaType } from "@geeklogs/shared";
+import {
+  COMPLETED_STATUSES,
+  IN_PROGRESS_STATUSES,
+  type ItemDetail,
+  type ItemPageData,
+  type ItemReview,
+  type LogAffinityContext,
+  type MediaType,
+} from "@geeklogs/shared";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetchCached } from "@/lib/api";
@@ -439,6 +447,45 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
     fetchReviews(reviewsPage, reviewsSort);
   }, [data?.item, reviewsPage, reviewsSort, fetchReviews]);
 
+  const affinityContextDraft = useMemo((): LogAffinityContext | undefined => {
+    const it = data?.item;
+    if (!it) return undefined;
+    if (mediaType === "boardgames") {
+      return {
+        boardgames: {
+          playingTimeMinutes: it.playingTimeMinutes ?? null,
+          playersMin: it.playersMin ?? null,
+          playersMax: it.playersMax ?? null,
+          minAge: it.minAge ?? null,
+          averageWeight: it.averageWeight ?? null,
+        },
+      };
+    }
+    if (mediaType === "books") {
+      const y = it.year ? parseInt(it.year.slice(0, 4), 10) : NaN;
+      const subjects = [...(it.subjects ?? []), ...(it.genres ?? [])].filter(Boolean);
+      return {
+        books: {
+          subjects: subjects.slice(0, 15),
+          authors: (it.authors ?? []).slice(0, 5),
+          publisher: it.publisher ?? null,
+          year: Number.isFinite(y) ? y : null,
+        },
+      };
+    }
+    if (mediaType === "manga") {
+      return {
+        manga: {
+          genres: (it.genres ?? []).slice(0, 12),
+          themes: (it.themes ?? []).slice(0, 12),
+          demographics: (it.demographics ?? []).slice(0, 6),
+          serialization: it.serialization ?? null,
+        },
+      };
+    }
+    return undefined;
+  }, [data?.item, mediaType]);
+
   if (loading && !data) {
     return (
       <motion.div
@@ -602,7 +649,13 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             image={getItemDisplayImageUrl(item.image, item.thumbnail)}
             runtimeMinutes={item.runtimeMinutes ?? null}
             episodesCount={item.episodesCount ?? null}
-            genres={item.genres ?? undefined}
+            genres={
+              mediaType === "boardgames"
+                ? (item.categories ?? item.genres ?? undefined)
+                : (item.genres ?? undefined)
+            }
+            mechanics={mediaType === "boardgames" ? (item.mechanics ?? undefined) : undefined}
+            affinityContextDraft={affinityContextDraft}
             onSaved={() => {
               setReviewsPage(1);
               onBack();

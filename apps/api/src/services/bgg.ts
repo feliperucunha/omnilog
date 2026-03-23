@@ -62,6 +62,46 @@ function bggNormalizeThingItem<T>(item: T | T[] | undefined): T | null {
   return item;
 }
 
+function bggReadNumericXmlNode(node: unknown): number | null {
+  if (node == null || typeof node !== "object") return null;
+  const o = node as Record<string, unknown>;
+  const raw = o["@_value"] ?? o["#text"];
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/** BGG `statistics.ratings.averageweight` when `stats=1` on thing. */
+function bggExtractAverageWeight(item: Record<string, unknown>): number | null {
+  const statsRaw = item.statistics;
+  const stats = Array.isArray(statsRaw) ? statsRaw[0] : statsRaw;
+  if (!stats || typeof stats !== "object") return null;
+  const ratingsRaw = (stats as { ratings?: unknown }).ratings;
+  const ratings = Array.isArray(ratingsRaw) ? ratingsRaw[0] : ratingsRaw;
+  if (!ratings || typeof ratings !== "object") return null;
+  const aw = (ratings as { averageweight?: unknown }).averageweight;
+  const n = bggReadNumericXmlNode(aw);
+  if (n == null) return null;
+  return Math.round(n * 1000) / 1000;
+}
+
+/** BGG `statistics.ratings.bayesaverage` (community rank-style score, often ~0–10). */
+function bggExtractBayesAverage(item: Record<string, unknown>): number | null {
+  const statsRaw = item.statistics;
+  const stats = Array.isArray(statsRaw) ? statsRaw[0] : statsRaw;
+  if (!stats || typeof stats !== "object") return null;
+  const ratingsRaw = (stats as { ratings?: unknown }).ratings;
+  const ratings = Array.isArray(ratingsRaw) ? ratingsRaw[0] : ratingsRaw;
+  if (!ratings || typeof ratings !== "object") return null;
+  const ba = (ratings as { bayesaverage?: unknown }).bayesaverage;
+  const n = bggReadNumericXmlNode(ba);
+  if (n == null || n <= 0) return null;
+  return Math.round(n * 100) / 100;
+}
+
 function bggHeaders(token?: string | null): HeadersInit {
   const t = token ?? process.env.BGG_API_TOKEN;
   const headers: HeadersInit = {
@@ -74,7 +114,7 @@ function bggHeaders(token?: string | null): HeadersInit {
 export async function getBoardGameById(id: string, apiToken?: string | null): Promise<ItemDetail | null> {
   const token = apiToken ?? process.env.BGG_API_TOKEN;
   if (!token) return null;
-  const res = await fetch(`${BASE}/thing?id=${id}`, { headers: bggHeaders(token) });
+  const res = await fetch(`${BASE}/thing?id=${id}&stats=1`, { headers: bggHeaders(token) });
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("bgg");
   if (!res.ok) return null;
   const xml = await res.text();
@@ -98,6 +138,7 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
   };
   const item = bggNormalizeThingItem(parsed.items?.item);
   if (!item) return null;
+  const itemRec = item as unknown as Record<string, unknown>;
   const names = item.name;
   const getTitle = (n: { "#text"?: string; "@_value"?: string } | undefined): string =>
     (n?.["@_value"] ?? n?.["#text"] ?? "Unknown").trim() || "Unknown";
@@ -127,6 +168,7 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
   const genres = categories.length > 0 ? categories : null;
   const fullImage = bggExtractImageUrl(item.image);
   const thumbImage = bggExtractImageUrl(item.thumbnail);
+  const averageWeight = bggExtractAverageWeight(itemRec);
   return {
     id: item["@_id"],
     title,
@@ -139,6 +181,7 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
     playersMax: maxVal != null && !Number.isNaN(maxVal) ? maxVal : null,
     playingTimeMinutes: timeVal != null && !Number.isNaN(timeVal) ? timeVal : null,
     minAge: minAge != null && !Number.isNaN(minAge) ? minAge : null,
+    averageWeight: averageWeight != null && averageWeight > 0 ? averageWeight : null,
     categories: categories.length > 0 ? categories : null,
     mechanics: mechanics.length > 0 ? mechanics : null,
     genres,
@@ -177,7 +220,7 @@ export async function searchBoardGames(
   if (itemsList.length === 0) return { results: [] };
 
   const ids = itemsList.slice(0, 20).map((i) => i["@_id"]).join(",");
-  const thingRes = await fetch(`${BASE}/thing?id=${ids}`, { headers: bggHeaders(token) });
+  const thingRes = await fetch(`${BASE}/thing?id=${ids}&stats=1`, { headers: bggHeaders(token) });
   if (thingRes.status === 401 || thingRes.status === 403) throw new InvalidApiKeyError("bgg");
   if (!thingRes.ok) return { results: [] };
   const thingXml = await thingRes.text();
@@ -209,12 +252,15 @@ export async function searchBoardGames(
     }
     const year = (item as { yearpublished?: { "@_value"?: string } }).yearpublished?.["@_value"] ?? null;
     const row = item as { image?: unknown; thumbnail?: unknown };
+    const itemRec = item as unknown as Record<string, unknown>;
+    const score = bggExtractBayesAverage(itemRec);
     return {
       id: item["@_id"],
       title,
       image: bggExtractImageUrl(row.image) ?? bggExtractImageUrl(row.thumbnail),
       year,
       subtitle: null,
+      score: score != null ? score : null,
     };
   });
   const sorted = sortSearchResults(results, sort) as typeof results;

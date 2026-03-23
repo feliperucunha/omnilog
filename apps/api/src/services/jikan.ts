@@ -86,6 +86,7 @@ export async function searchAnime(q: string, sort?: string): Promise<SearchResul
       mal_id: number;
       title?: string;
       year?: number;
+      score?: number;
       images?: { jpg?: { image_url?: string } };
     }>;
   };
@@ -96,6 +97,7 @@ export async function searchAnime(q: string, sort?: string): Promise<SearchResul
     image: item.images?.jpg?.image_url ?? null,
     year: item.year != null ? String(item.year) : null,
     subtitle: null,
+    score: typeof item.score === "number" && item.score > 0 ? item.score : null,
   }));
 }
 
@@ -113,7 +115,10 @@ export async function getMangaById(id: string): Promise<ItemDetail | null> {
       chapters?: number | null;
       volumes?: number | null;
       genres?: Array<{ name?: string }>;
+      themes?: Array<{ name?: string }>;
+      demographics?: Array<{ name?: string }>;
       serialization?: { name?: string };
+      serializations?: Array<{ name?: string }>;
     };
   };
   const d = data.data;
@@ -121,7 +126,12 @@ export async function getMangaById(id: string): Promise<ItemDetail | null> {
   const year = d.published?.from ? d.published.from.slice(0, 4) : null;
   const description = d.synopsis?.trim().slice(0, 2000) || null;
   const genres = d.genres?.map((g) => g.name).filter(Boolean) as string[] | undefined;
-  const serialization = (d.serialization?.name?.trim()) || null;
+  const themes = d.themes?.map((t) => t.name).filter(Boolean) as string[] | undefined;
+  const demographics = d.demographics?.map((x) => x.name).filter(Boolean) as string[] | undefined;
+  const serialization =
+    (Array.isArray(d.serializations) && d.serializations.length > 0
+      ? d.serializations[0]?.name?.trim()
+      : d.serialization?.name?.trim()) || null;
   return {
     id: String(d.mal_id ?? id),
     title: d.title ?? "Unknown",
@@ -133,6 +143,8 @@ export async function getMangaById(id: string): Promise<ItemDetail | null> {
     chaptersCount: (d.chapters ?? 0) > 0 ? d.chapters! : null,
     volumesCount: (d.volumes ?? 0) > 0 ? d.volumes! : null,
     genres: genres?.length ? genres : null,
+    themes: themes?.length ? themes : null,
+    demographics: demographics?.length ? demographics : null,
     serialization: serialization ?? null,
   };
 }
@@ -151,6 +163,7 @@ export async function searchManga(q: string, sort?: string): Promise<SearchResul
       mal_id: number;
       title?: string;
       published?: { from?: string };
+      score?: number;
       images?: { jpg?: { image_url?: string } };
     }>;
   };
@@ -163,6 +176,7 @@ export async function searchManga(q: string, sort?: string): Promise<SearchResul
       image: item.images?.jpg?.image_url ?? null,
       year: year ?? null,
       subtitle: null,
+      score: typeof item.score === "number" && item.score > 0 ? item.score : null,
     };
   });
 }
@@ -197,14 +211,45 @@ export async function getAnimeRecommendationsForId(animeId: string, maxTotal = 1
   return out;
 }
 
-export async function getTopAnimePopular(max = 12): Promise<SearchResult[]> {
-  const res = await fetch(`${BASE}/top/anime?filter=bypopularity&limit=${max}`);
+/** Highest MAL score first (better default than popularity when user has no logs). */
+export async function getTopMangaByScore(max = 12): Promise<SearchResult[]> {
+  const res = await fetch(`${BASE}/manga?order_by=score&sort=desc&limit=${max}`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    data?: Array<{
+      mal_id: number;
+      title?: string;
+      published?: { from?: string };
+      score?: number;
+      images?: { jpg?: { image_url?: string } };
+    }>;
+  };
+  return (data.data ?? []).map((item) => {
+    const year = item.published?.from ? item.published.from.slice(0, 4) : null;
+    return {
+      id: String(item.mal_id),
+      title: item.title ?? "Unknown",
+      image: item.images?.jpg?.image_url ?? null,
+      year: year ?? null,
+      subtitle: null,
+      score: typeof item.score === "number" && item.score > 0 ? item.score : null,
+    };
+  });
+}
+
+/** @deprecated Use getTopMangaByScore for rating-ordered lists. */
+export const getTopMangaPopular = getTopMangaByScore;
+
+/** Highest MAL score first (better default than popularity when user has no logs). */
+export async function getTopAnimeByScore(max = 12): Promise<SearchResult[]> {
+  const res = await fetch(`${BASE}/anime?order_by=score&sort=desc&limit=${max}`);
   if (!res.ok) return [];
   const data = (await res.json()) as {
     data?: Array<{
       mal_id: number;
       title?: string;
       year?: number;
+      score?: number;
       images?: { jpg?: { image_url?: string } };
     }>;
   };
@@ -214,5 +259,9 @@ export async function getTopAnimePopular(max = 12): Promise<SearchResult[]> {
     image: item.images?.jpg?.image_url ?? null,
     year: item.year != null ? String(item.year) : null,
     subtitle: null,
+    score: typeof item.score === "number" && item.score > 0 ? item.score : null,
   }));
 }
+
+/** @deprecated Use getTopAnimeByScore for rating-ordered lists. */
+export const getTopAnimePopular = getTopAnimeByScore;

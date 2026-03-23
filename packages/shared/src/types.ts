@@ -1,3 +1,5 @@
+import type { LogAffinityContext } from "./affinityContext.js";
+
 export const MEDIA_TYPES = [
   "movies",
   "tv",
@@ -68,6 +70,11 @@ export interface SearchResult {
   timeToBeatHours?: number | null;
   /** Genre names (when available from API). Show up to 2 badges. */
   genres?: string[] | null;
+  /**
+   * Public/catalog rating when the source provides it (scales differ: TMDB ~0–10, RAWG ~0–5, MAL ~0–10, BGG Bayesian ~0–10).
+   * Used for recommendation ordering when present.
+   */
+  score?: number | null;
 }
 
 /** Sort option for search: value sent to API, labelKey for i18n (e.g. searchSort.titleAsc). */
@@ -177,6 +184,8 @@ export interface ItemDetail {
   playersMax?: number | null;
   /** Board games: playing time in minutes */
   playingTimeMinutes?: number | null;
+  /** Board games: BGG community average weight (complexity), ~1–5 when from BGG with stats. */
+  averageWeight?: number | null;
   /** Books: author names */
   authors?: string[] | null;
   /** Comics/Books: publisher name */
@@ -216,6 +225,8 @@ export interface ItemDetail {
   studios?: string[] | null;
   /** Anime: theme names */
   themes?: string[] | null;
+  /** Manga (Jikan): demographic labels (e.g. Shōnen, Seinen). */
+  demographics?: string[] | null;
   /** Anime: episode duration string (e.g. "24 min per ep") */
   duration?: string | null;
   /** Manga: serialization name (where it was published) */
@@ -306,6 +317,10 @@ export interface Log {
   matchesPlayed: number | null;
   /** Genre names (for stats and badges). Stored when logging. */
   genres: string[] | null;
+  /** Board games: mechanic names from BGG / Ludopedia when logging. */
+  mechanics?: string[] | null;
+  /** Snapshot for personalized recommendations (optional). */
+  affinityContext?: LogAffinityContext | null;
   createdAt: string;
   updatedAt: string;
   /** Board games: which API this log’s externalId came from (affects image aspect handling for BGG). */
@@ -334,8 +349,11 @@ export interface CreateLogInput {
   contentHours?: number | null;
   /** Games only: how long it took to beat (hours). */
   hoursToBeat?: number | null;
-  /** Genre names from item (for stats and badges). Store up to 2 when logging. */
+  /** Genre/category names from item (for stats, badges, recommendations). */
   genres?: string[] | null;
+  /** Board games: mechanic names from item detail. */
+  mechanics?: string[] | null;
+  affinityContext?: LogAffinityContext | null;
   /** When mediaType is boardgames: which API this id came from (bgg | ludopedia). Stored so details are fetched from the correct API. */
   boardGameSource?: BoardGameProvider | null;
   /** Boardgames only: user owns a copy. */
@@ -358,6 +376,8 @@ export interface UpdateLogInput {
   /** Games only: how long it took to beat (hours). */
   hoursToBeat?: number | null;
   genres?: string[] | null;
+  mechanics?: string[] | null;
+  affinityContext?: LogAffinityContext | null;
   /** Boardgames only: user owns a copy. */
   own?: boolean | null;
   /** Boardgames only: number of matches/sessions played. */

@@ -21,13 +21,17 @@ import {
   getPopularGames,
 } from "../services/rawg.js";
 import { searchBooks } from "../services/openLibrary.js";
-import { searchAnime, searchManga, getAnimeRecommendationsForId, getTopAnimePopular } from "../services/jikan.js";
+import { searchAnime, searchManga, getAnimeRecommendationsForId, getTopAnimeByScore } from "../services/jikan.js";
 import { searchBoardGames } from "../services/bgg.js";
 import { searchBoardGamesLudopedia } from "../services/ludopedia.js";
 import { searchComics } from "../services/comicvine.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 import { collectFromSeeds, topUpFromPopular } from "../lib/searchRecommendationsMerge.js";
 import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
+import { fetchBoardGameRecommendationsMerged } from "../services/boardGameRecommendations.js";
+import { fetchBookRecommendationsMerged } from "../services/bookRecommendations.js";
+import { fetchMangaRecommendationsMerged } from "../services/mangaRecommendations.js";
+import { sortRecommendationsByScoreDesc } from "../lib/recommendationsSort.js";
 
 export const searchRouter = Router();
 searchRouter.use(optionalAuthMiddleware);
@@ -120,6 +124,8 @@ async function getRecentSeedIds(userId: string, mediaType: string, maxSeeds: num
 
 const recommendationsQuerySchema = z.object({
   type: z.enum(MEDIA_TYPES as unknown as [string, ...string[]]),
+  boardGameProvider: z.enum(["bgg", "ludopedia"]).optional(),
+  sort: z.string().optional(),
 });
 
 /**
@@ -127,7 +133,11 @@ const recommendationsQuerySchema = z.object({
  * Query: type (media). Optional auth: seeds from recent logs when logged in.
  */
 searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
-  const parsed = recommendationsQuerySchema.safeParse({ type: req.query.type });
+  const parsed = recommendationsQuerySchema.safeParse({
+    type: req.query.type,
+    boardGameProvider: req.query.boardGameProvider,
+    sort: req.query.sort,
+  });
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid type" });
     return;
@@ -138,7 +148,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
   const tmdbMeta = API_KEY_META.tmdb;
   const rawgMeta = API_KEY_META.rawg;
 
-  const unsupported: MediaType[] = ["books", "manga", "boardgames", "comics"];
+  const unsupported: MediaType[] = ["comics"];
   if ((unsupported as string[]).includes(type)) {
     res.json({ results: [], personalization: "none" as const });
     return;
@@ -178,6 +188,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
           exclude,
           RECOMMENDATIONS_MAX
         );
+        results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
         res.json({
           results,
           personalization: fromLogs ? ("from_logs" as const) : ("popular" as const),
@@ -216,6 +227,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
           exclude,
           RECOMMENDATIONS_MAX
         );
+        results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
         res.json({
           results,
           personalization: fromLogs ? ("from_logs" as const) : ("popular" as const),
@@ -255,6 +267,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
           exclude,
           RECOMMENDATIONS_MAX
         );
+        results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
         res.json({
           results,
           personalization: fromLogs ? ("from_logs" as const) : ("popular" as const),
@@ -277,13 +290,136 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
         if (results.length > 0) fromLogs = true;
         results = await topUpFromPopular(
           results,
-          () => getTopAnimePopular(RECOMMENDATIONS_MAX),
+          () => getTopAnimeByScore(RECOMMENDATIONS_MAX),
           exclude,
           RECOMMENDATIONS_MAX
         );
+        results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
         res.json({
           results,
           personalization: fromLogs ? ("from_logs" as const) : ("popular" as const),
+        });
+        return;
+      }
+      case "books": {
+        const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "books") : new Set<string>();
+        const logs =
+          req.user != null
+            ? await prisma.log.findMany({
+                where: { userId: req.user.userId, mediaType: "books" },
+                select: { genres: true, affinityContext: true, grade: true, status: true },
+                orderBy: { updatedAt: "desc" },
+                take: 120,
+              })
+            : [];
+        const sortParam = parsed.data.sort;
+        const allowedSorts = SEARCH_SORT_OPTIONS.books.map((o) => o.value);
+        const sort = sortParam && allowedSorts.includes(sortParam) ? sortParam : undefined;
+        const outcome = await fetchBookRecommendationsMerged({
+          logs,
+          exclude,
+          maxResults: RECOMMENDATIONS_MAX,
+          sort,
+          maxSearchCalls: 2,
+        });
+        const bookResults = sortRecommendationsByScoreDesc(outcome.results).slice(0, RECOMMENDATIONS_MAX);
+        res.json({
+          results: bookResults,
+          personalization: outcome.personalization,
+        });
+        return;
+      }
+      case "manga": {
+        const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "manga") : new Set<string>();
+        const logs =
+          req.user != null
+            ? await prisma.log.findMany({
+                where: { userId: req.user.userId, mediaType: "manga" },
+                select: { genres: true, affinityContext: true, grade: true, status: true },
+                orderBy: { updatedAt: "desc" },
+                take: 120,
+              })
+            : [];
+        const sortParam = parsed.data.sort;
+        const allowedSorts = SEARCH_SORT_OPTIONS.manga.map((o) => o.value);
+        const sort = sortParam && allowedSorts.includes(sortParam) ? sortParam : undefined;
+        const outcome = await fetchMangaRecommendationsMerged({
+          logs,
+          exclude,
+          maxResults: RECOMMENDATIONS_MAX,
+          sort,
+          maxSearchCalls: 2,
+        });
+        const mangaResults = sortRecommendationsByScoreDesc(outcome.results).slice(0, RECOMMENDATIONS_MAX);
+        res.json({
+          results: mangaResults,
+          personalization: outcome.personalization,
+        });
+        return;
+      }
+      case "boardgames": {
+        const bggMeta = API_KEY_META.bgg;
+        const ludopediaMeta = API_KEY_META.ludopedia;
+        const boardProvider =
+          parsed.data.boardGameProvider ??
+          (keys?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg");
+        const userBgg = keys?.bggApiToken ?? null;
+        const userLudo = keys?.ludopediaApiToken ?? null;
+        const hasKey =
+          skipApiKeyUX ||
+          (boardProvider === "bgg"
+            ? !!(userBgg ?? process.env.BGG_API_TOKEN)
+            : !!(userLudo ?? process.env.LUDOPEDIA_API_TOKEN));
+        if (!hasKey) {
+          const meta = boardProvider === "bgg" ? bggMeta : ludopediaMeta;
+          res.json({
+            results: [],
+            personalization: "none" as const,
+            requiresApiKey: boardProvider,
+            link: meta.link,
+            tutorial: meta.tutorial,
+          });
+          return;
+        }
+        const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "boardgames") : new Set<string>();
+        const logs =
+          req.user != null
+            ? await prisma.log.findMany({
+                where: { userId: req.user.userId, mediaType: "boardgames" },
+                select: { genres: true, mechanics: true, grade: true, status: true, affinityContext: true },
+                orderBy: { updatedAt: "desc" },
+                take: 120,
+              })
+            : [];
+        const token = boardProvider === "bgg" ? userBgg : userLudo;
+        const sortParam = parsed.data.sort;
+        const allowedSorts = SEARCH_SORT_OPTIONS.boardgames.map((o) => o.value);
+        const sort = sortParam && allowedSorts.includes(sortParam) ? sortParam : undefined;
+        const outcome = await fetchBoardGameRecommendationsMerged({
+          logs,
+          exclude,
+          maxResults: RECOMMENDATIONS_MAX,
+          provider: boardProvider,
+          apiToken: token,
+          sort,
+          bggMeta,
+          ludopediaMeta,
+          maxSearchCalls: 2,
+        });
+        if ("requiresApiKey" in outcome) {
+          res.json({
+            results: [],
+            personalization: "none" as const,
+            requiresApiKey: outcome.requiresApiKey,
+            link: outcome.link,
+            tutorial: outcome.tutorial,
+          });
+          return;
+        }
+        const boardResults = sortRecommendationsByScoreDesc(outcome.results).slice(0, RECOMMENDATIONS_MAX);
+        res.json({
+          results: boardResults,
+          personalization: outcome.personalization,
         });
         return;
       }
@@ -304,7 +440,11 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
           ? !!keys?.tmdbApiKey
           : err.provider === "rawg"
             ? !!keys?.rawgApiKey
-            : false;
+            : err.provider === "bgg"
+              ? !!keys?.bggApiToken
+              : err.provider === "ludopedia"
+                ? !!keys?.ludopediaApiToken
+                : false;
       if (userHadKey) {
         res.status(400).json({
           error: "Invalid API key",

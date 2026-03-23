@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { NumberCombobox } from "@/components/ui/number-combobox";
-import type { MediaType, Log } from "@geeklogs/shared";
+import type { LogAffinityContext, MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
@@ -47,8 +47,12 @@ interface ItemReviewFormProps {
   runtimeMinutes?: number | null;
   /** TV/Anime: total episodes (used to set episode when user selects completed status) */
   episodesCount?: number | null;
-  /** Genre names from item (stored with log for stats). Up to 2 sent to API. */
+  /** Genre/category names from item (stored with log for stats and recommendations). */
   genres?: string[] | null;
+  /** Board games: mechanic names from item detail. */
+  mechanics?: string[] | null;
+  /** Snapshot from item detail for affinity-based recommendations (board games, books, manga). */
+  affinityContextDraft?: LogAffinityContext | null;
   onSaved: () => void;
   onSavedComplete?: (data: LogCompleteState) => void;
 }
@@ -61,6 +65,8 @@ export function ItemReviewForm({
   runtimeMinutes,
   episodesCount,
   genres,
+  mechanics,
+  affinityContextDraft,
   onSaved,
   onSavedComplete,
 }: ItemReviewFormProps) {
@@ -154,6 +160,13 @@ export function ItemReviewForm({
 
   const toNum = (v: number | ""): number | null => (v === "" ? null : v);
 
+  const sameStringList = (a: string[], b: string[] | null | undefined): boolean => {
+    if (a.length !== (b?.length ?? 0)) return false;
+    return a.every((x, i) => x === b![i]);
+  };
+
+  const affinityJsonStable = (v: LogAffinityContext | null | undefined) => JSON.stringify(v ?? null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
@@ -169,7 +182,8 @@ export function ItemReviewForm({
         isCompleted && showSeasonEpisode && episodesCount != null && episodesCount > 0
           ? episodesCount
           : toNum(episode);
-      const genreList = (genres ?? myLog?.genres ?? []).slice(0, 2);
+      const genreList = (genres ?? myLog?.genres ?? []).slice(0, 20);
+      const mechanicList = (mechanics ?? myLog?.mechanics ?? []).slice(0, 20);
       const payload: Record<string, unknown> = {
         grade: gradeNum,
         review: review.trim() || null,
@@ -186,9 +200,23 @@ export function ItemReviewForm({
         payload.matchesPlayed = toNum(matchesPlayed);
       }
       if (genreList.length > 0) payload.genres = genreList;
+      if (showBoardGameFields && mechanicList.length > 0) payload.mechanics = mechanicList;
+      if (
+        (mediaType === "boardgames" || mediaType === "books" || mediaType === "manga") &&
+        affinityContextDraft != null &&
+        Object.keys(affinityContextDraft).length > 0
+      ) {
+        payload.affinityContext = affinityContextDraft;
+      }
       if (myLog) {
         const currentStatus = myLog.status ?? myLog.listType ?? null;
         const statusChanged = (status ?? null) !== currentStatus;
+        const mechanicsMatch =
+          !showBoardGameFields || sameStringList(mechanicList, myLog.mechanics ?? []);
+        const affinityMatch =
+          mediaType !== "boardgames" && mediaType !== "books" && mediaType !== "manga"
+            ? true
+            : affinityJsonStable(myLog.affinityContext) === affinityJsonStable(affinityContextDraft);
         const noChange =
           gradeNum === (myLog.grade ?? null) &&
           (review.trim() || null) === (myLog.review ?? null) &&
@@ -198,6 +226,9 @@ export function ItemReviewForm({
           toNum(chapter) === (myLog.chapter ?? null) &&
           toNum(volume) === (myLog.volume ?? null) &&
           (!showHoursToBeat || toNum(hoursToBeat) === (myLog.hoursToBeat ?? null)) &&
+          sameStringList(genreList, myLog.genres ?? []) &&
+          mechanicsMatch &&
+          affinityMatch &&
           (!showBoardGameFields ||
             (own === (myLog.own ?? false) && toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)));
         if (noChange) {

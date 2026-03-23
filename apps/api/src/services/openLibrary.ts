@@ -56,11 +56,26 @@ export async function getBookById(workId: string): Promise<ItemDetail | null> {
   };
 }
 
-export async function searchBooks(q: string, sort?: string): Promise<SearchResult[]> {
-  const res = await fetch(
-    `${BASE}/search.json?q=${encodeURIComponent(q)}&limit=20`,
-    { headers: { "User-Agent": "Geeklogs/1.0 (https://github.com/geeklogs)" } }
-  );
+/** When set, Open Library server-side sort + fields for `ratings_average` (used for recommendation ordering). */
+export type OpenLibrarySearchOptions = {
+  openLibraryApiSort?: "rating" | "rating_count";
+};
+
+const OL_FIELDS_WITH_RATING = "key,title,first_publish_year,cover_i,author_name,ratings_average";
+
+export async function searchBooks(
+  q: string,
+  sort?: string,
+  options?: OpenLibrarySearchOptions
+): Promise<SearchResult[]> {
+  const params = new URLSearchParams({ q, limit: "20" });
+  if (options?.openLibraryApiSort) {
+    params.set("sort", options.openLibraryApiSort);
+    params.set("fields", OL_FIELDS_WITH_RATING);
+  }
+  const res = await fetch(`${BASE}/search.json?${params.toString()}`, {
+    headers: { "User-Agent": "Geeklogs/1.0 (https://github.com/geeklogs)" },
+  });
   if (!res.ok) return [];
   const data = (await res.json()) as {
     docs?: Array<{
@@ -69,6 +84,7 @@ export async function searchBooks(q: string, sort?: string): Promise<SearchResul
       first_publish_year?: number;
       cover_i?: number;
       author_name?: string[];
+      ratings_average?: number;
     }>;
   };
   const docs = data.docs ?? [];
@@ -80,6 +96,8 @@ export async function searchBooks(q: string, sort?: string): Promise<SearchResul
       : null,
     year: doc.first_publish_year != null ? String(doc.first_publish_year) : null,
     subtitle: Array.isArray(doc.author_name) ? doc.author_name.join(", ") : null,
+    score:
+      typeof doc.ratings_average === "number" && doc.ratings_average > 0 ? doc.ratings_average : null,
   }));
   return sortSearchResults(results, sort);
 }

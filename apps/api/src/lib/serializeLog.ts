@@ -1,3 +1,5 @@
+import { parseLogAffinityContextJson } from "./logAffinityContext.js";
+
 /**
  * Parse genres JSON string from Log.genres to string[] for API response.
  */
@@ -12,12 +14,19 @@ export function parseGenresJson(json: string | null): string[] | null {
   }
 }
 
+/** Board-game mechanics stored like genres (JSON string array). */
+export function parseMechanicsJson(json: string | null): string[] | null {
+  return parseGenresJson(json);
+}
+
 export function serializeLog<T extends {
   startedAt?: Date | null;
   completedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   genres?: string | null;
+  mechanics?: string | null;
+  affinityContext?: string | null;
 }>(log: T) {
   return {
     ...log,
@@ -26,5 +35,7 @@ export function serializeLog<T extends {
     createdAt: log.createdAt.toISOString(),
     updatedAt: log.updatedAt.toISOString(),
     genres: parseGenresJson(log.genres ?? null),
+    mechanics: parseMechanicsJson(log.mechanics ?? null),
+    affinityContext: parseLogAffinityContextJson(log.affinityContext ?? null),
   };
 }

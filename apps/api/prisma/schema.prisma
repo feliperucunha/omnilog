@@ -188,6 +188,8 @@ model Log {
   own            Boolean? // boardgames only: user owns a physical/digital copy
   matchesPlayed  Int?     // boardgames only: number of matches/sessions played
   genres         String?  // JSON array of genre names (for stats and badges)
+  mechanics       String?  // JSON array of board-game mechanic names (BGG / Ludopedia); optional
+  affinityContext String?  // JSON: recommendation snapshot (board stats, book subjects, manga themes, …)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   reactions   LogReaction[]

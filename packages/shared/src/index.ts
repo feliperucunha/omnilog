@@ -1,3 +1,4 @@
+export type { LogAffinityContext } from "./affinityContext.js";
 export type {
   MediaType,
   BoardGameProvider,

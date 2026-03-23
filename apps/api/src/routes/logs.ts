@@ -28,6 +28,8 @@ const optionalInt = z.number().int().min(0).nullable().optional();
 const optionalFloat = z.number().min(0).nullable().optional();
 
 const genresSchema = z.array(z.string().min(1).max(80)).max(20).optional().nullable();
+const mechanicsSchema = z.array(z.string().min(1).max(80)).max(20).optional().nullable();
+const affinityContextSchema = logAffinityContextSchema.optional().nullable();
 
 const createLogSchema = z.object({
   mediaType: z.enum(MEDIA_TYPES as unknown as [string, ...string[]]),
@@ -45,6 +47,8 @@ const createLogSchema = z.object({
   contentHours: optionalFloat,
   hoursToBeat: optionalFloat,
   genres: genresSchema,
+  mechanics: mechanicsSchema,
+  affinityContext: affinityContextSchema,
   boardGameSource: z.enum(["bgg", "ludopedia"]).nullable().optional(),
   own: z.boolean().nullable().optional(),
   matchesPlayed: z.number().int().min(0).nullable().optional(),
@@ -63,6 +67,8 @@ const updateLogSchema = z.object({
   contentHours: optionalFloat,
   hoursToBeat: optionalFloat,
   genres: genresSchema,
+  mechanics: mechanicsSchema,
+  affinityContext: affinityContextSchema,
   own: z.boolean().nullable().optional(),
   matchesPlayed: z.number().int().min(0).nullable().optional(),
 });
@@ -82,6 +88,7 @@ function isCompleted(status: string | null | undefined): boolean {
 }
 
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
+import { stringifyLogAffinityContext, logAffinityContextSchema } from "../lib/logAffinityContext.js";
 import { hoursFromCompletedLogForStats, rollupHoursFromCompletedLogs } from "../lib/completedLogHours.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
 import {
@@ -654,6 +661,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     contentHours,
     hoursToBeat,
     genres: genresInput,
+    mechanics: mechanicsInput,
+    affinityContext: affinityInput,
     boardGameSource: bodyBoardGameSource,
     own: bodyOwn,
     matchesPlayed: bodyMatchesPlayed,
@@ -662,6 +671,12 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     genresInput && genresInput.length > 0
       ? JSON.stringify(genresInput.slice(0, 20))
       : null;
+  const mechanicsJson =
+    mechanicsInput && mechanicsInput.length > 0
+      ? JSON.stringify(mechanicsInput.slice(0, 20))
+      : null;
+  const affinityStored =
+    affinityInput === undefined ? undefined : stringifyLogAffinityContext(affinityInput);
   const mediaType = mediaTypeRaw as MediaType;
   if (!validateStatus(mediaType, status)) {
     res.status(400).json({ error: { status: ["Invalid status for this media type"] } });
@@ -733,6 +748,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         chapter: number | null;
         volume: number | null;
         genres?: string | null;
+        mechanics?: string | null;
+        affinityContext?: string | null;
         own?: boolean | null;
         matchesPlayed?: number | null;
       } = {
@@ -750,6 +767,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       };
       if (image !== undefined) updateData.image = sanitizedImage ?? null;
       if (genresJson !== undefined) updateData.genres = genresJson;
+      if (mechanicsJson !== undefined) updateData.mechanics = mechanicsJson;
+      if (affinityStored !== undefined) updateData.affinityContext = affinityStored;
       if (bodyOwn !== undefined) updateData.own = bodyOwn ?? null;
       if (bodyMatchesPlayed !== undefined) updateData.matchesPlayed = bodyMatchesPlayed ?? null;
       if (isInProgress(status) && existing.startedAt == null) updateData.startedAt = now;
@@ -818,6 +837,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           chapter: chapter ?? null,
           volume: volume ?? null,
           genres: genresJson,
+          mechanics: mechanicsJson,
+          affinityContext: affinityStored !== undefined ? affinityStored : null,
           boardGameSource,
           own: mediaType === "boardgames" ? (bodyOwn ?? null) : null,
           matchesPlayed: mediaType === "boardgames" ? (bodyMatchesPlayed ?? null) : null,
@@ -885,6 +906,8 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     chapter?: number | null;
     volume?: number | null;
     genres?: string | null;
+    mechanics?: string | null;
+    affinityContext?: string | null;
     own?: boolean | null;
     matchesPlayed?: number | null;
   } = {};
@@ -906,6 +929,18 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
   if (parsed.data.volume !== undefined) data.volume = parsed.data.volume;
   if (parsed.data.genres !== undefined) {
     data.genres = parsed.data.genres && parsed.data.genres.length > 0 ? JSON.stringify(parsed.data.genres.slice(0, 20)) : null;
+  }
+  if (parsed.data.mechanics !== undefined) {
+    data.mechanics =
+      parsed.data.mechanics && parsed.data.mechanics.length > 0
+        ? JSON.stringify(parsed.data.mechanics.slice(0, 20))
+        : null;
+  }
+  if (parsed.data.affinityContext !== undefined) {
+    data.affinityContext =
+      parsed.data.affinityContext == null
+        ? null
+        : stringifyLogAffinityContext(parsed.data.affinityContext);
   }
   if (parsed.data.own !== undefined) data.own = parsed.data.own ?? null;
   if (parsed.data.matchesPlayed !== undefined) data.matchesPlayed = parsed.data.matchesPlayed ?? null;

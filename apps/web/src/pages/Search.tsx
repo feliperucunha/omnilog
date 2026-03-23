@@ -82,7 +82,15 @@ interface RecommendationsResponse {
 }
 
 /** Media types supported by GET /search/recommendations (others skip the request). */
-const RECOMMENDATION_MEDIA_TYPES: MediaType[] = ["movies", "tv", "games", "anime"];
+const RECOMMENDATION_MEDIA_TYPES: MediaType[] = [
+  "movies",
+  "tv",
+  "games",
+  "anime",
+  "boardgames",
+  "books",
+  "manga",
+];
 
 interface UserSearchResult {
   id: string;
@@ -354,6 +362,9 @@ export function Search() {
       // Split client cache: recommendations differ when logged in (seeds from logs).
       viewer: token ? "auth" : "guest",
     });
+    if (mediaType === "boardgames") {
+      params.set("boardGameProvider", boardGameProvider);
+    }
     apiFetchCached<RecommendationsResponse>(`/search/recommendations?${params.toString()}`, {
       ttlMs: 5 * 60 * 1000,
     })
@@ -383,7 +394,7 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [hasSearched, mediaType, searchFilter, token, recRefreshNonce, me, meLoading]);
+  }, [hasSearched, mediaType, searchFilter, token, recRefreshNonce, me, meLoading, boardGameProvider]);
 
   const handleSearch = async (e: React.FormEvent) => {
     setHasSearched(true);
