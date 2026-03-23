@@ -14,7 +14,7 @@ import type { MediaType } from "@geeklogs/shared";
 import { IN_PROGRESS_STATUSES, MEDIA_TYPES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
-import { showAchievementToasts } from "@/lib/achievementToast";
+import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
@@ -97,7 +97,7 @@ export function CustomEntryForm({
     setLoading(true);
     try {
       const externalId = `custom-${crypto.randomUUID()}`;
-      const created = await apiFetch<{ newBadges?: Array<{ id: string; name: string; icon: string }> }>("/logs", {
+      const created = await apiFetch<{ newBadges?: NewBadge[] }>("/logs", {
         method: "POST",
         body: JSON.stringify({
           mediaType,

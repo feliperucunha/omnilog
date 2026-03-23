@@ -103,7 +103,7 @@ export function Dashboard() {
   /** Current filters from MediaLogs (for share URL). */
   const shareFiltersRef = useRef<SharedFilters>({
     status: "",
-    sort: "dateAsc",
+    sort: "dateDesc",
     search: "",
     own: "",
   });
@@ -173,7 +173,7 @@ export function Dashboard() {
     if (!needInitial) return;
     const params = new URLSearchParams({
       mediaType: selectedCategory,
-      sort: "date",
+      sort: "dateDesc",
       limit: String(LOGS_PAGE_SIZE),
     });
     let cancelled = false;
@@ -263,7 +263,7 @@ export function Dashboard() {
       params.set("category", selectedCategory);
       const f = shareFiltersRef.current;
       if (f.status) params.set("status", f.status);
-      if (f.sort && f.sort !== "dateAsc") params.set("sort", f.sort);
+      if (f.sort && f.sort !== "dateDesc") params.set("sort", f.sort);
       if (f.search.trim()) params.set("q", f.search.trim());
       if (f.own === "owned") params.set("own", "true");
     }

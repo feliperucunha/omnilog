@@ -222,7 +222,15 @@ export async function handleLogCreated(userId: string): Promise<NewBadge[]> {
   return grantEarnedBadges(userId);
 }
 
-export type NewBadge = { id: string; name: string; icon: string };
+export type NewBadge = {
+  id: string;
+  name: string;
+  icon: string;
+  /** App media slug when badge is per-medium (for client category icon). */
+  mediaType: string | null;
+  /** 1-based tier index for Roman numeral display; null when not a tiered badge. */
+  level: number | null;
+};
 
 const LOG_MEDIA_TO_BADGE: Record<string, BadgeMedium> = {
   movies: "MOVIE",
@@ -284,6 +292,33 @@ export async function grantEarnedBadges(userId: string): Promise<NewBadge[]> {
   }
   const distinctMediaLogged = Object.values(logCountByMedium).filter((c) => c > 0).length;
 
+  const tierMeta = (
+    b: { id: string; conditionType: BadgeConditionType; conditionValue: number; medium: BadgeMedium | null }
+  ): { mediaType: string | null; level: number | null } => {
+    const cond = b.conditionType;
+    const sameSorted = (predicate: (x: (typeof allBadges)[number]) => boolean) =>
+      [...allBadges].filter(predicate).sort((a, c) => a.conditionValue - c.conditionValue || a.id.localeCompare(c.id));
+    if ((cond === "REVIEW_COUNT_PER_MEDIA" || cond === "LOG_COUNT_PER_MEDIA") && b.medium) {
+      const same = sameSorted((x) => x.conditionType === cond && x.medium === b.medium);
+      const idx = same.findIndex((x) => x.id === b.id);
+      return {
+        mediaType: BADGE_MEDIUM_TO_APP[b.medium],
+        level: idx >= 0 ? idx + 1 : null,
+      };
+    }
+    if (cond === "REVIEW_COUNT_GLOBAL") {
+      const same = sameSorted((x) => x.conditionType === "REVIEW_COUNT_GLOBAL");
+      const idx = same.findIndex((x) => x.id === b.id);
+      return { mediaType: null, level: idx >= 0 ? idx + 1 : null };
+    }
+    if (cond === "LOG_COUNT_GLOBAL") {
+      const same = sameSorted((x) => x.conditionType === "LOG_COUNT_GLOBAL");
+      const idx = same.findIndex((x) => x.id === b.id);
+      return { mediaType: null, level: idx >= 0 ? idx + 1 : null };
+    }
+    return { mediaType: null, level: null };
+  };
+
   const newBadges: NewBadge[] = [];
   for (const badge of allBadges) {
     if (existingUserBadgeIds.has(badge.id)) continue;
@@ -314,7 +349,14 @@ export async function grantEarnedBadges(userId: string): Promise<NewBadge[]> {
       data: { userId, badgeId: badge.id },
     });
     existingUserBadgeIds.add(badge.id);
-    newBadges.push({ id: badge.id, name: badge.name, icon: badge.icon });
+    const { mediaType, level } = tierMeta(badge);
+    newBadges.push({
+      id: badge.id,
+      name: badge.name,
+      icon: badge.icon,
+      mediaType,
+      level,
+    });
   }
   return newBadges;
 }

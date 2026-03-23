@@ -15,6 +15,23 @@ export function coerceImageUrlString(imageUrl: unknown): string | null {
   return null;
 }
 
+/** Prefer primary poster; use thumbnail when missing (e.g. BGG full image vs thumb). */
+export function getItemDisplayImageUrl(
+  image: string | null | undefined,
+  thumbnail: string | null | undefined
+): string | null {
+  return getHeroImageUrl(image) ?? getHeroImageUrl(thumbnail);
+}
+
+/**
+ * Safe `background-image` value for React `style`. Unquoted `url(https://…)` is invalid CSS when
+ * the URL contains `)` — e.g. BGG CDN paths like `filters:format(jpeg)/…` — so the rule is dropped.
+ */
+export function cssBackgroundImageUrl(url: string): string {
+  const escaped = url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `url("${escaped}")`;
+}
+
 /**
  * Returns a higher-resolution image URL for hero/header use when the source
  * is a known CDN that supports size parameters. Improves quality for item detail hero.

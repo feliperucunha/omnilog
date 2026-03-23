@@ -11,7 +11,7 @@ import type { MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
-import { showAchievementToasts } from "@/lib/achievementToast";
+import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { tapScale, tapTransition } from "@/lib/animations";
@@ -235,7 +235,7 @@ export function ItemReviewForm({
         };
         if (mediaType === "boardgames" && (me?.boardGameProvider === "bgg" || me?.boardGameProvider === "ludopedia"))
           createBody.boardGameSource = me.boardGameProvider;
-        const created = await apiFetch<Log & { newBadges?: Array<{ id: string; name: string; icon: string }> }>(
+        const created = await apiFetch<Log & { newBadges?: NewBadge[] }>(
           "/logs",
           { method: "POST", body: JSON.stringify(createBody) }
         );

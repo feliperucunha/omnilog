@@ -42,6 +42,11 @@ type DrawerContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.
   mobileHeight?: "95%" | "30%";
   /** Called with (animatedClose, closeImmediately). Use closeImmediately for X/close button so overlay and drawer close together. */
   onReady?: (requestClose: () => void, requestCloseImmediately?: () => void) => void;
+  /**
+   * When false, overlay / outside-pointer will not close the drawer. Use while a nested dialog
+   * (e.g. delete confirm) is open — otherwise Radix treats those interactions as "outside" the drawer.
+   */
+  closeOnInteractOutside?: boolean;
 };
 
 function isDrawerFooter(child: React.ReactNode): boolean {
@@ -51,7 +56,7 @@ function isDrawerFooter(child: React.ReactNode): boolean {
 const DrawerContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   DrawerContentProps
->(({ className, children, onClose, onReady, mobileHeight = "95%", ...props }, ref) => {
+>(({ className, children, onClose, onReady, mobileHeight = "95%", closeOnInteractOutside = true, ...props }, ref) => {
   const [isClosing, setIsClosing] = React.useState(false);
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -87,7 +92,10 @@ const DrawerContent = React.forwardRef<
       : "max-md:!h-[95dvh] max-md:!min-h-[95dvh]";
   return (
     <DialogPortal>
-      <DialogOverlay onClick={closeImmediately} onPointerDown={closeImmediately} />
+      <DialogOverlay
+        onClick={closeOnInteractOutside ? closeImmediately : undefined}
+        onPointerDown={closeOnInteractOutside ? closeImmediately : undefined}
+      />
       <DialogPrimitive.Content
         ref={ref}
         data-closing={isClosing ? "true" : undefined}
@@ -106,6 +114,10 @@ const DrawerContent = React.forwardRef<
           handleClose();
         }}
         onPointerDownOutside={(e) => {
+          if (!closeOnInteractOutside) {
+            e.preventDefault();
+            return;
+          }
           const target = e.target as HTMLElement;
           if (target.closest("[data-radix-select-content]") || target.closest("[data-dropdown-portal]")) {
             e.preventDefault();
@@ -115,6 +127,10 @@ const DrawerContent = React.forwardRef<
           closeImmediately();
         }}
         onInteractOutside={(e) => {
+          if (!closeOnInteractOutside) {
+            e.preventDefault();
+            return;
+          }
           const target = e.target as HTMLElement;
           if (target.closest("[data-radix-select-content]") || target.closest("[data-dropdown-portal]")) {
             e.preventDefault();

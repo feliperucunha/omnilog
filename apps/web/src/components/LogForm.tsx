@@ -18,7 +18,7 @@ import type { MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
-import { showAchievementToasts } from "@/lib/achievementToast";
+import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
@@ -184,7 +184,7 @@ export function LogForm(props: LogFormProps) {
           props.onCancel();
           return;
         }
-        const updated = await apiFetch<Log & { newBadges?: Array<{ id: string; name: string; icon: string }> }>(
+        const updated = await apiFetch<Log & { newBadges?: NewBadge[] }>(
           `/logs/${props.log.id}`,
           { method: "PATCH", body: JSON.stringify(payload) }
         );
@@ -207,7 +207,7 @@ export function LogForm(props: LogFormProps) {
           props.onSaved();
         }
       } else {
-        const created = await apiFetch<Log & { newBadges?: Array<{ id: string; name: string; icon: string }> }>(
+        const created = await apiFetch<Log & { newBadges?: NewBadge[] }>(
           "/logs",
           {
             method: "POST",
@@ -489,8 +489,8 @@ export function LogForm(props: LogFormProps) {
   );
 
   const drawerFooterContent = (
-    <div className="flex flex-col gap-3">
-      <div className="flex gap-4">
+    <div className="flex w-full min-w-0 flex-col gap-3">
+      <div className="flex w-full min-w-0 gap-4">
         <Button
           type="button"
           variant="outline"
@@ -525,9 +525,14 @@ export function LogForm(props: LogFormProps) {
   return (
     <>
       {isMobile ? (
-        <Drawer open modal={false} onOpenChange={(open) => !open && props.onCancel()}>
+        <Drawer
+          open
+          modal={false}
+          onOpenChange={(open) => !open && !confirmDeleteOpen && props.onCancel()}
+        >
           <DrawerContent
             onClose={props.onCancel}
+            closeOnInteractOutside={!confirmDeleteOpen}
             mobileHeight="95%"
             className="flex max-h-[85dvh] w-full max-w-lg flex-col p-4 sm:p-6"
           >
@@ -536,8 +541,12 @@ export function LogForm(props: LogFormProps) {
           </DrawerContent>
         </Drawer>
       ) : (
-        <Dialog open modal={false} onOpenChange={(open) => !open && props.onCancel()}>
-          <DialogContent onClose={props.onCancel}>
+        <Dialog
+          open
+          modal={false}
+          onOpenChange={(open) => !open && !confirmDeleteOpen && props.onCancel()}
+        >
+          <DialogContent onClose={props.onCancel} closeOnInteractOutside={!confirmDeleteOpen}>
             {formContent}
           </DialogContent>
         </Dialog>
@@ -577,6 +586,8 @@ export function LogForm(props: LogFormProps) {
                   await props.onDelete(log.id);
                   setConfirmDeleteOpen(false);
                   props.onCancel();
+                } catch {
+                  // Parent (e.g. MediaLogs) shows toast and rethrows on delete failure
                 } finally {
                   setDeleting(false);
                 }

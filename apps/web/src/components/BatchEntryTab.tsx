@@ -8,7 +8,7 @@ import { gradeToStars } from "@/lib/gradeStars";
 import type { MediaType, SearchResult } from "@geeklogs/shared";
 import { MEDIA_TYPES, COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
-import { showAchievementToasts } from "@/lib/achievementToast";
+import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { isDisableApiKeyRequirements } from "@/lib/featureFlags";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
@@ -201,7 +201,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
           }
           const grade = row.grade ?? null;
           const status = resolveRowStatus(row, mediaType, defaultStatus);
-          const res = await apiFetch<{ newBadges?: Array<{ id: string; name: string; icon: string }> }>("/logs", {
+          const res = await apiFetch<{ newBadges?: NewBadge[] }>("/logs", {
             method: "POST",
             body: JSON.stringify({
               mediaType,

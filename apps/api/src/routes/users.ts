@@ -211,7 +211,7 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
   const validSorts = ["dateAsc", "dateDesc", "gradeAsc", "gradeDesc"] as const;
   const boardgameSorts = ["matchesPlayedAsc", "matchesPlayedDesc"] as const;
   const gameSorts = ["timeToBeatAsc", "timeToBeatDesc"] as const;
-  let sort = validSorts.includes(sortParam as (typeof validSorts)[number]) ? sortParam : "dateAsc";
+  let sort = validSorts.includes(sortParam as (typeof validSorts)[number]) ? sortParam : "dateDesc";
   if (mediaType === "boardgames" && boardgameSorts.includes(sortParam as (typeof boardgameSorts)[number])) sort = sortParam;
   else if (mediaType === "games" && gameSorts.includes(sortParam as (typeof gameSorts)[number])) sort = sortParam;
   const ownFilter = req.query.own === "true";

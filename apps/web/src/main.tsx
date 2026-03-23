@@ -40,6 +40,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 richColors
                 duration={2500}
                 mobileOffset={{ top: "5rem" }}
+                expand
+                gap={12}
+                visibleToasts={6}
               />
             </AuthProvider>
           </BrowserRouter>

@@ -6,27 +6,60 @@ import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 const BASE = "https://boardgamegeek.com/xmlapi2";
 
 /**
- * BGG XML: text-only nodes parse as strings; if the element has attributes, fast-xml-parser
- * returns `{ "#text": "...", "@_attr": "..." }`. Search/detail must coerce to a URL string.
+ * Coerce BGG `<image>` / `<thumbnail>` XML nodes to a single URL string.
+ * fast-xml-parser variants seen in the wild:
+ * - plain string
+ * - `{ "#text": "url", "@_attr": "..." }` when the element has attributes
+ * - array of strings when multiple sibling tags share the same name
+ * - `{ "@_href": "url" }` or similar when the URL is attribute-only (no text node)
  */
-function bggXmlText(value: unknown): string | null {
+function normalizeBggHttpUrl(s: string): string | null {
+  let t = s.trim();
+  if (!t) return null;
+  if (t.startsWith("//")) t = `https:${t}`;
+  if (t.startsWith("http://") || t.startsWith("https://")) return t;
+  return null;
+}
+
+/** Exported for unit tests; also handles all BGG XML shapes for image/thumbnail. */
+export function bggExtractImageUrl(value: unknown): string | null {
   if (value == null) return null;
   if (typeof value === "string") {
-    const s = value.trim();
-    return s || null;
+    return normalizeBggHttpUrl(value);
   }
-  if (typeof value === "object" && "#text" in (value as object)) {
-    const t = (value as { "#text"?: unknown })["#text"];
-    if (typeof t === "string") {
-      const s = t.trim();
-      return s || null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return normalizeBggHttpUrl(String(value));
+  }
+  if (Array.isArray(value)) {
+    for (const el of value) {
+      const u = bggExtractImageUrl(el);
+      if (u) return u;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    if ("#text" in o) {
+      const u = bggExtractImageUrl(o["#text"]);
+      if (u) return u;
+    }
+    const attrKeys = ["@_href", "@_src", "@_value", "href", "src", "value"] as const;
+    for (const k of attrKeys) {
+      const v = o[k];
+      if (typeof v === "string") {
+        const u = normalizeBggHttpUrl(v);
+        if (u) return u;
+      }
     }
   }
   return null;
 }
 
-function bggImageFromThing(image: unknown, thumbnail: unknown): string | null {
-  return bggXmlText(image) ?? bggXmlText(thumbnail);
+/** Single `/thing?id=` responses sometimes parse `item` as a one-element array. */
+function bggNormalizeThingItem<T>(item: T | T[] | undefined): T | null {
+  if (item == null) return null;
+  if (Array.isArray(item)) return item.length > 0 ? (item[0] ?? null) : null;
+  return item;
 }
 
 function bggHeaders(token?: string | null): HeadersInit {
@@ -63,8 +96,8 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
       };
     };
   };
-  const item = parsed.items?.item;
-  if (!item || Array.isArray(item)) return null;
+  const item = bggNormalizeThingItem(parsed.items?.item);
+  if (!item) return null;
   const names = item.name;
   const getTitle = (n: { "#text"?: string; "@_value"?: string } | undefined): string =>
     (n?.["@_value"] ?? n?.["#text"] ?? "Unknown").trim() || "Unknown";
@@ -92,11 +125,13 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
   const categories = linkList.filter((l) => l["@_type"] === "boardgamecategory").map((l) => l["@_value"]).filter(Boolean) as string[];
   const mechanics = linkList.filter((l) => l["@_type"] === "boardgamemechanic").map((l) => l["@_value"]).filter(Boolean) as string[];
   const genres = categories.length > 0 ? categories : null;
-  const imageUrl = bggImageFromThing(item.image, item.thumbnail);
+  const fullImage = bggExtractImageUrl(item.image);
+  const thumbImage = bggExtractImageUrl(item.thumbnail);
   return {
     id: item["@_id"],
     title,
-    image: imageUrl,
+    image: fullImage,
+    thumbnail: thumbImage,
     year,
     subtitle: null,
     description: description ?? null,
@@ -177,7 +212,7 @@ export async function searchBoardGames(
     return {
       id: item["@_id"],
       title,
-      image: bggImageFromThing(row.image, row.thumbnail),
+      image: bggExtractImageUrl(row.image) ?? bggExtractImageUrl(row.thumbnail),
       year,
       subtitle: null,
     };

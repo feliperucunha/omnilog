@@ -169,12 +169,12 @@ export function PublicProfile() {
     "matchesPlayedAsc", "matchesPlayedDesc", "timeToBeatAsc", "timeToBeatDesc",
   ];
   const statusParam = searchParams.get("status") ?? "";
-  const sortParamRaw = searchParams.get("sort") ?? "dateAsc";
-  const sortParam = VALID_SORTS.includes(sortParamRaw as MediaLogsSort) ? (sortParamRaw as MediaLogsSort) : "dateAsc";
+  const sortParamRaw = searchParams.get("sort") ?? "dateDesc";
+  const sortParam = VALID_SORTS.includes(sortParamRaw as MediaLogsSort) ? (sortParamRaw as MediaLogsSort) : "dateDesc";
   const qParam = searchParams.get("q") ?? "";
   const ownParam = searchParams.get("own") === "true" ? "owned" : "";
   const initialFilters =
-    statusParam || sortParam !== "dateAsc" || qParam || ownParam
+    statusParam || sortParam !== "dateDesc" || qParam || ownParam
       ? { status: statusParam, sort: sortParam, search: qParam, own: ownParam as "" | "owned" }
       : undefined;
 

@@ -470,7 +470,8 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     where: { mediaType, externalId, image: { not: null } },
     select: { image: true },
   });
-  const itemImage = item.image ?? (logWithImage?.image as string | null) ?? null;
+  const itemImage =
+    item.image ?? item.thumbnail ?? (logWithImage?.image as string | null) ?? null;
 
   res.json({
     item: {

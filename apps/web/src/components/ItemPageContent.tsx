@@ -20,7 +20,7 @@ import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
-import { getHeroImageUrl } from "@/lib/getHeroImageUrl";
+import { getItemDisplayImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
 
@@ -483,6 +483,8 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
   const totalPages = Math.max(1, Math.ceil(reviewsTotal / pageSize));
   const showPagination = reviewsTotal > pageSize;
 
+  console.log(item)
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -498,8 +500,8 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             className="absolute inset-0 bg-[var(--color-darkest)] bg-cover bg-center bg-no-repeat"
             style={
               (() => {
-                const heroUrl = getHeroImageUrl(item.image);
-                return heroUrl ? { backgroundImage: `url(${heroUrl})` } : undefined;
+                const heroUrl = getItemDisplayImageUrl(item.image, item.thumbnail);
+                return heroUrl ? { backgroundImage: cssBackgroundImageUrl(heroUrl) } : undefined;
               })()
             }
           />
@@ -578,7 +580,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             mediaType={mediaType}
             externalId={id}
             title={item.title}
-            image={item.image}
+            image={getItemDisplayImageUrl(item.image, item.thumbnail)}
             runtimeMinutes={item.runtimeMinutes ?? null}
             episodesCount={item.episodesCount ?? null}
             genres={item.genres ?? undefined}

@@ -148,6 +148,8 @@ export interface ItemDetail {
   id: string;
   title: string;
   image: string | null;
+  /** Smaller/poster URL when the API provides it (e.g. BGG thumbnail). Clients should use `image ?? thumbnail` for display. */
+  thumbnail?: string | null;
   year?: string | null;
   subtitle?: string | null;
   /** When mediaType is boardgames: which API provided this data ("bgg" | "ludopedia"). Enables UI to show "Source: …". */

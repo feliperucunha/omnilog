@@ -52,7 +52,8 @@ function mapJogoToItemDetail(raw: {
     : [];
   const description =
     typeof raw.descricao === "string" ? raw.descricao.replace(/<[^>]+>/g, "").trim().slice(0, 2000) || null : null;
-  const image = (raw.thumb ?? raw.url_imagem)?.trim() || null;
+  const thumb = raw.thumb?.trim() || null;
+  const full = raw.url_imagem?.trim() || null;
   const playersMin = raw.qt_jogadores_min ?? raw.qt_min_jogadores;
   const playersMax = raw.qt_jogadores_max ?? raw.qt_max_jogadores;
   const playingTime = raw.vl_tempo_jogo ?? raw.tempo_jogo;
@@ -60,7 +61,8 @@ function mapJogoToItemDetail(raw: {
   return {
     id,
     title: raw.nm_jogo ?? "Unknown",
-    image,
+    image: full,
+    thumbnail: thumb,
     year,
     subtitle: null,
     description: description ?? null,

@@ -10,7 +10,7 @@ import type { MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, apiFetchFile, downloadFile, LOGS_INVALIDATED_EVENT } from "@/lib/api";
-import { showAchievementToasts } from "@/lib/achievementToast";
+import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
@@ -100,7 +100,7 @@ interface MediaLogsProps {
   onFiltersChange?: (filters: SharedFilters) => void;
 }
 
-const DEFAULT_SORT: MediaLogsSort = "dateAsc";
+const DEFAULT_SORT: MediaLogsSort = "dateDesc";
 
 export function MediaLogs({ mediaType, embedded = false, publicUserId, milestoneProgress: milestoneProgressProp, initialLogs: initialLogsProp, initialNextCursor: initialNextCursorProp, initialFilters, onFiltersChange }: MediaLogsProps) {
   const { t } = useLocale();
@@ -259,15 +259,15 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
     setCategorySearchQuery("");
     if (mediaType !== "boardgames") {
       setOwnedFilter("");
-      setSortBy((prev) => (prev === "matchesPlayedAsc" || prev === "matchesPlayedDesc" ? "dateAsc" : prev));
+      setSortBy((prev) => (prev === "matchesPlayedAsc" || prev === "matchesPlayedDesc" ? "dateDesc" : prev));
     }
     if (mediaType !== "games") {
-      setSortBy((prev) => (prev === "timeToBeatAsc" || prev === "timeToBeatDesc" ? "dateAsc" : prev));
+      setSortBy((prev) => (prev === "timeToBeatAsc" || prev === "timeToBeatDesc" ? "dateDesc" : prev));
     }
   }, [mediaType]);
 
   useEffect(() => {
-    const defaultsMatch = sortBy === "dateAsc" && statusFilter === "" && ownedFilter === "";
+    const defaultsMatch = sortBy === "dateDesc" && statusFilter === "" && ownedFilter === "";
     const useInitial = embedded && initialLogsProp !== undefined && defaultsMatch;
     if (useInitial) {
       setLogs(initialLogsProp ?? []);
@@ -336,6 +336,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       toast.success(t("toast.logDeleted"));
     } catch (err) {
       showErrorToast(t, "E014", { originalError: err });
+      throw err;
     } finally {
       setDeletingId(null);
     }
@@ -354,7 +355,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
     const next = value + 1;
     setIncrementingId(log.id);
     try {
-      const updated = await apiFetch<Log & { newBadges?: Array<{ id: string; name: string; icon: string }> }>(
+      const updated = await apiFetch<Log & { newBadges?: NewBadge[] }>(
         `/logs/${log.id}`,
         { method: "PATCH", body: JSON.stringify({ [field]: next }) }
       );
@@ -521,8 +522,8 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                 value={sortBy}
                 onValueChange={(v) => setSortBy(v as typeof sortBy)}
                 options={[
-                  { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
                   { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
+                  { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
                   { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
                   { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
                   ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
@@ -676,8 +677,8 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
             value={sortBy}
             onValueChange={(v) => setSortBy(v as typeof sortBy)}
             options={[
-              { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
               { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
+              { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
               { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
               { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
               ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
@@ -723,8 +724,8 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           value={sortBy}
           onValueChange={(v) => setSortBy(v as typeof sortBy)}
           options={[
-            { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
             { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
+            { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
             { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
             { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
             ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),

@@ -9,7 +9,7 @@ import { ItemImage } from "@/components/ItemImage";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Logo } from "@/components/Logo";
-import { getHeroImageUrl } from "@/lib/getHeroImageUrl";
+import { getHeroImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
 import { overlayVariants, modalContentVariants } from "@/lib/animations";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
@@ -73,6 +73,12 @@ interface LogCompleteModalProps {
   onClose: () => void;
 }
 
+/**
+ * When true, the browser uses the same completed-log modal as Capacitor (scrollable overlay,
+ * plain close/share controls, no framer-motion on the shell). Set to `false` to restore the web-only layout.
+ */
+const USE_NATIVE_LOG_COMPLETE_LAYOUT_ON_WEB = false;
+
 /** Dark theme: avoid pure black (#000) for OLED – use dark grays so the card doesn’t blend and to reduce smearing. */
 const NATIVE_DARK = {
   cardBg: "#1c1c1c",
@@ -86,7 +92,8 @@ const NATIVE_LIGHT = { cardBg: "#ffffff", text: "#0f172a", textMuted: "#64748b",
 export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const { t } = useLocale();
   const theme = useTheme();
-  const isNative = useIsNative();
+  const isCapacitorNative = useIsNative();
+  const nativeUi = USE_NATIVE_LOG_COMPLETE_LAYOUT_ON_WEB || isCapacitorNative;
   const nativeColors = theme.colorScheme === "light" ? NATIVE_LIGHT : NATIVE_DARK;
   const { image, title, grade, status, review, own, matchesPlayed, mediaType } = state;
   const showBoardGameMeta = mediaType === "boardgames";
@@ -96,9 +103,21 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [shareInProgress, setShareInProgress] = useState(false);
   const [cachedHeroDataUrl, setCachedHeroDataUrl] = useState<string | null>(null);
+  /** Share PNG layout: smaller footer + shorter hero on narrow viewports (phone / WebView). */
+  const [compactShareLayout, setCompactShareLayout] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 640px)").matches : false
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 640px)");
+    const update = () => setCompactShareLayout(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
-    if (!heroImageUrl || !isNative) {
+    if (!heroImageUrl || !nativeUi) {
       setCachedHeroDataUrl(null);
       return;
     }
@@ -123,7 +142,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
     return () => {
       cancelled = true;
     };
-  }, [heroImageUrl, isNative]);
+  }, [heroImageUrl, nativeUi]);
 
   const isLight = theme.colorScheme === "light";
   const overlayClass =
@@ -253,7 +272,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
 
   const imageSection = (
     <div className="relative flex-shrink-0 overflow-hidden rounded-t-2xl md:rounded-t-3xl">
-      <div className="relative h-[40vh] w-full min-h-[160px] md:h-auto md:min-h-0 md:aspect-[2/3]">
+      <div className="relative h-[60vh] w-full min-h-[190px] md:h-auto md:min-h-0 md:aspect-[2/3]">
         <ItemImage
           src={heroImageUrl}
           className="absolute inset-0 h-full w-full"
@@ -275,7 +294,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
 
   const imageSectionNative = (
     <div className="relative flex-shrink-0 overflow-hidden rounded-t-2xl md:rounded-t-3xl" style={{ transform: "none", willChange: "auto" }}>
-      <div className="relative h-[40vh] w-full min-h-[160px] md:h-auto md:min-h-0 md:aspect-[2/3]">
+      <div className="relative h-[62vh] w-full min-h-[176px] max-h-[72dvh] md:h-auto md:min-h-0 md:max-h-none md:aspect-[2/3]">
         <ItemImage
           src={heroImageUrl}
           className="absolute inset-0 h-full w-full"
@@ -300,7 +319,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const contentBlock = (
     <div
       className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-3 md:px-6 md:pb-6 md:pt-5"
-      style={isNative ? { transform: "none", willChange: "auto" } : undefined}
+      style={nativeUi ? { transform: "none", willChange: "auto" } : undefined}
     >
       <span
         className={`mb-2 inline-flex w-fit rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider md:mb-3 md:px-3 md:py-1 md:text-xs ${statusColor(status)}`}
@@ -346,19 +365,22 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
 
   const cardContent = (
     <>
-      {isNative ? topButtonsNative : closeButton}
-      {isNative ? imageSectionNative : imageSection}
+      {nativeUi ? topButtonsNative : closeButton}
+      {nativeUi ? imageSectionNative : imageSection}
       {contentBlock}
     </>
   );
 
-  /** Share scene: matches modal (blurred hero bg + overlay + centered card). Wrapper off-screen; scene has fixed size and position relative so html-to-image captures it. Card is smaller so blurred background is visible. */
-  const shareSceneWidth = 300;
-  const shareSceneHeight = 533; // same proportion as 360:640
-  const shareCardWidth = 252;
-  const shareCardMaxHeight = 380;
-  /** Hero height in share card so the text block has room (full 2:3 would use ~378px and leave almost no space). */
-  const shareHeroHeight = 230;
+  /**
+   * Share scene: matches native complete-log modal proportions — tall hero + room for metadata/footer.
+   * Scene is sized so the card never clips; text column keeps min ~200px before its own scroll.
+   */
+  const shareSceneWidth = compactShareLayout ? 300 : 326;
+  const shareSceneHeight = compactShareLayout ? 668 : 712;
+  const shareCardWidth = compactShareLayout ? 258 : 278;
+  const shareCardMaxHeight = compactShareLayout ? 512 : 556;
+  /** Hero: ~56–58% of max card height so layout aligns with native modal (large poster, text below). */
+  const shareHeroHeight = compactShareLayout ? 292 : 322;
   const shareCard = (
     <div
       style={{
@@ -546,15 +568,31 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
               <div
                 style={{
                   marginTop: "auto",
-                  paddingTop: 10,
+                  paddingTop: compactShareLayout ? 6 : 9,
                   borderTop: `1px solid ${nativeColors.textMuted}4D`,
                   display: "flex",
                   alignItems: "center",
-                  gap: 5,
+                  gap: compactShareLayout ? 3 : 5,
                 }}
               >
-                <Logo alt="" className="h-6 w-auto shrink-0 opacity-90" aria-hidden style={{ display: "block" }} />
-                <span style={{ fontSize: 11, fontWeight: 500, color: nativeColors.textMuted }}>
+                <Logo
+                  alt=""
+                  className="w-auto shrink-0 opacity-90"
+                  aria-hidden
+                  style={{
+                    display: "block",
+                    height: compactShareLayout ? 13 : 18,
+                    width: "auto",
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: compactShareLayout ? 8 : 10,
+                    fontWeight: 500,
+                    lineHeight: 1.25,
+                    color: nativeColors.textMuted,
+                  }}
+                >
                   {t("logComplete.loggedWith", { app: t("app.name") })}
                 </span>
               </div>
@@ -565,8 +603,8 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
     </div>
   );
 
-  /** Android/iOS only: share button and native card layout. Share image = DOM capture of share card (matches modal). */
-  if (isNative) {
+  /** Capacitor + optional web: share button and native card layout. Share image = DOM capture of share card (matches modal). */
+  if (nativeUi) {
     return (
       <div
         className={overlayClassNative}
@@ -580,7 +618,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
         <div
           className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: heroImageUrl ? `url(${heroImageUrl})` : undefined,
+            backgroundImage: heroImageUrl ? cssBackgroundImageUrl(heroImageUrl) : undefined,
             backgroundSize: "cover",
             filter: isLight ? "blur(4px)" : "blur(10px)",
             WebkitFilter: isLight ? "blur(4px)" : "blur(10px)",
@@ -631,7 +669,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       <div
         className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: heroImageUrl ? `url(${heroImageUrl})` : undefined,
+          backgroundImage: heroImageUrl ? cssBackgroundImageUrl(heroImageUrl) : undefined,
           backgroundSize: "cover",
           filter: isLight ? "blur(4px)" : "blur(10px)",
           WebkitFilter: isLight ? "blur(4px)" : "blur(10px)",

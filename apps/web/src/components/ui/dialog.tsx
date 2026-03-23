@@ -28,10 +28,15 @@ const DialogContent = React.forwardRef<
     onClose?: () => void;
     /** Optional class for the overlay (e.g. z-[60] for stacking above another modal). */
     overlayClassName?: string;
+    /** When false, outside clicks / overlay won't call onClose (use while a nested dialog is open). */
+    closeOnInteractOutside?: boolean;
   }
->(({ className, children, onClose, overlayClassName, ...props }, ref) => (
+>(({ className, children, onClose, overlayClassName, closeOnInteractOutside = true, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className={overlayClassName} onClick={onClose} />
+    <DialogOverlay
+      className={overlayClassName}
+      onClick={closeOnInteractOutside ? onClose : undefined}
+    />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
@@ -42,14 +47,23 @@ const DialogContent = React.forwardRef<
         "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:translate-x-[-50%] sm:translate-y-[-50%] sm:h-auto sm:min-h-0 sm:max-h-[90vh] sm:max-w-lg sm:rounded-lg sm:border sm:border-[var(--color-surface-border)] sm:place-items-stretch sm:content-normal",
         className
       )}
-      onEscapeKeyDown={onClose}
+      onEscapeKeyDown={closeOnInteractOutside ? onClose : (e) => e.preventDefault()}
       onPointerDownOutside={(e) => {
+        if (!closeOnInteractOutside) {
+          e.preventDefault();
+          return;
+        }
         const target = e.target as HTMLElement;
         if (target.closest("[data-radix-select-content]") || target.closest("[data-dropdown-portal]")) {
           e.preventDefault();
           return;
         }
         onClose?.();
+      }}
+      onInteractOutside={(e) => {
+        if (!closeOnInteractOutside) {
+          e.preventDefault();
+        }
       }}
       {...props}
     >

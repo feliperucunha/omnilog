@@ -18,6 +18,7 @@ import {
   EXTERNAL_ID_MAX_LENGTH,
 } from "../lib/sanitize.js";
 import { authMiddleware, type AuthenticatedRequest } from "../middleware/auth.js";
+import type { NewBadge } from "../services/gamification.service.js";
 
 export const logsRouter = Router();
 logsRouter.use(authMiddleware);
@@ -142,7 +143,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const validSorts = ["dateAsc", "dateDesc", "gradeAsc", "gradeDesc"] as const;
   const boardgameSorts = ["matchesPlayedAsc", "matchesPlayedDesc"] as const;
   const gameSorts = ["timeToBeatAsc", "timeToBeatDesc"] as const;
-  let sort = validSorts.includes(sortParam as (typeof validSorts)[number]) ? sortParam : "dateAsc";
+  let sort = validSorts.includes(sortParam as (typeof validSorts)[number]) ? sortParam : "dateDesc";
   if (mediaType === "boardgames" && boardgameSorts.includes(sortParam as (typeof boardgameSorts)[number])) sort = sortParam;
   else if (mediaType === "games" && gameSorts.includes(sortParam as (typeof gameSorts)[number])) sort = sortParam;
   const ownFilter = req.query.own === "true";
@@ -757,7 +758,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         where: { id: existing.id },
         data: updateData,
       });
-      let newBadges: Array<{ id: string; name: string; icon: string }> = [];
+      let newBadges: NewBadge[] = [];
       const hasStatsReview = countsAsReviewForGamification(log.grade, log.review);
       if (!hadStatsReview && hasStatsReview) {
         try {
@@ -822,7 +823,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           matchesPlayed: mediaType === "boardgames" ? (bodyMatchesPlayed ?? null) : null,
         },
       });
-      const newBadges: Array<{ id: string; name: string; icon: string }> = [];
+      const newBadges: NewBadge[] = [];
       try {
         const fromLog = await handleLogCreated(userId);
         newBadges.push(...fromLog);
@@ -915,7 +916,7 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
   });
   const hadStatsReview = countsAsReviewForGamification(log.grade, log.review);
   const hasStatsReview = countsAsReviewForGamification(updated.grade, updated.review);
-  let newBadges: Array<{ id: string; name: string; icon: string }> = [];
+  let newBadges: NewBadge[] = [];
   if (!hadStatsReview && hasStatsReview) {
     try {
       newBadges = await handleReviewCreated(userId, updated.id, log.mediaType, {
