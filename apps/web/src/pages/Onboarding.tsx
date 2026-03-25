@@ -12,12 +12,14 @@ import { useMe } from "@/contexts/MeContext";
 import { apiFetch, invalidateApiCache } from "@/lib/api";
 import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
 import { cn } from "@/lib/utils";
+import { trackProductEvent } from "@/lib/productAnalytics";
 
 export function Onboarding() {
   const { t } = useLocale();
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
   const { colorScheme, setColorScheme } = useTheme();
+  const themeForDefaults = colorScheme === "light" ? "light" : "dark";
   const { refetch: refetchVisibleTypes } = useVisibleMediaTypes();
   const { refetch: refetchMe } = useMe();
   const [selectedTypes, setSelectedTypes] = useState<Set<MediaType>>(new Set(MEDIA_TYPES));
@@ -60,9 +62,41 @@ export function Onboarding() {
       await refetchVisibleTypes();
       await refetchMe();
       invalidateApiCache("/search");
+      trackProductEvent("onboarding_completed", { path: "custom" });
       navigate("/", { replace: true });
     } catch {
       // keep loading false in finally
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUseDefaults = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const body: {
+        theme: "light" | "dark";
+        types: MediaType[];
+        boardGameProvider?: BoardGameProvider;
+      } = {
+        theme: themeForDefaults,
+        types: [...MEDIA_TYPES],
+        boardGameProvider: "bgg",
+      };
+      await apiFetch("/settings/onboarding", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
+      setColorScheme(themeForDefaults);
+      setUser({ ...user, onboarded: true });
+      await refetchVisibleTypes();
+      await refetchMe();
+      invalidateApiCache("/search");
+      trackProductEvent("onboarding_completed", { path: "defaults" });
+      navigate("/", { replace: true });
+    } catch {
+      /* finally clears loading */
     } finally {
       setLoading(false);
     }
@@ -200,6 +234,12 @@ export function Onboarding() {
         >
           {loading ? t("onboarding.continuing") : t("onboarding.continue")}
         </Button>
+        <div className="flex flex-col items-center gap-2 border-t border-[var(--color-surface-border)] pt-4">
+          <p className="text-center text-xs text-[var(--color-light)]">{t("onboarding.useDefaultsHint")}</p>
+          <Button type="button" variant="outline" className="w-full" disabled={loading} onClick={handleUseDefaults}>
+            {t("onboarding.useDefaults")}
+          </Button>
+        </div>
       </motion.div>
     </div>
   );

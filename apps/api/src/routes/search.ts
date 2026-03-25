@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { MEDIA_TYPES, SEARCH_SORT_OPTIONS } from "@geeklogs/shared";
 import type { MediaType, SearchResult } from "@geeklogs/shared";
@@ -34,6 +35,16 @@ import { fetchMangaRecommendationsMerged } from "../services/mangaRecommendation
 import { sortRecommendationsByScoreDesc } from "../lib/recommendationsSort.js";
 
 export const searchRouter = Router();
+
+searchRouter.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: Number(process.env.SEARCH_RATE_LIMIT_MAX) || 120,
+    message: { error: "Search rate limit exceeded. Try again in a minute." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
 searchRouter.use(optionalAuthMiddleware);
 
 /** Free searches per category when user has no API key. Key: userId|ip + type (+ boardProvider for boardgames). */

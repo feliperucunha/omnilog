@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Dialog,
@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import type { MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
+import { trackProductEvent } from "@/lib/productAnalytics";
 import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { triggerImpact } from "@/lib/capacitorHaptics";
 import { showErrorToast } from "@/lib/errorToast";
@@ -148,13 +149,75 @@ export function LogForm(props: LogFormProps) {
   const title = isEdit ? log!.title : props.title;
   const image = isEdit ? (log!.image ?? null) : (props as LogFormCreateProps).image;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const isDirty = useMemo(() => {
+    if (isEdit && log) {
+      const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
+      const grade = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
+      const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
+      const episodesCount = "episodesCount" in props ? props.episodesCount : undefined;
+      const episodeForPayload =
+        isCompleted && showSeasonEpisode && episodesCount != null && episodesCount > 0
+          ? episodesCount
+          : toNum(episode);
+      const currentStatus = log.status ?? log.listType ?? null;
+      const noChange =
+        grade === (log.grade ?? null) &&
+        (review.trim() || null) === (log.review ?? null) &&
+        (status ?? null) === currentStatus &&
+        toNum(season) === (log.season ?? null) &&
+        episodeForPayload === (log.episode ?? null) &&
+        toNum(chapter) === (log.chapter ?? null) &&
+        toNum(volume) === (log.volume ?? null) &&
+        (!showHoursToBeat || toNum(hoursToBeat) === (log.hoursToBeat ?? null)) &&
+        (!showCollectionOwnership ||
+          (own === (log.own ?? false) && wantToBuy === (log.wantToBuy ?? false))) &&
+        (!showBoardGameFields || toNum(matchesPlayed) === (log.matchesPlayed ?? null));
+      return !noChange;
+    }
+    const p = props as LogFormCreateProps;
+    const defaultStatus = LOG_STATUS_OPTIONS[p.mediaType][0];
+    const defaultMatches = p.mediaType === "boardgames" ? 1 : "";
+    return (
+      stars !== null ||
+      review.trim() !== "" ||
+      (status ?? null) !== defaultStatus ||
+      season !== "" ||
+      episode !== "" ||
+      chapter !== "" ||
+      volume !== "" ||
+      (showHoursToBeat && hoursToBeat !== "") ||
+      (showCollectionOwnership && (own || wantToBuy)) ||
+      (showBoardGameFields &&
+        toNum(matchesPlayed) !== (typeof defaultMatches === "number" ? defaultMatches : null))
+    );
+  }, [
+    isEdit,
+    log,
+    stars,
+    review,
+    status,
+    season,
+    episode,
+    chapter,
+    volume,
+    hoursToBeat,
+    own,
+    wantToBuy,
+    matchesPlayed,
+    props,
+    showSeasonEpisode,
+    showHoursToBeat,
+    showCollectionOwnership,
+    showBoardGameFields,
+  ]);
+
+  const performSave = useCallback(async (): Promise<boolean> => {
+    const wasFirstLog = !isEdit && (me?.logCount ?? 0) === 0;
     const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
     const grade = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
     setLoading(true);
     try {
-      if (isEdit) {
+      if (isEdit && log) {
         const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
         const episodesCount = "episodesCount" in props ? props.episodesCount : undefined;
         const episodeForPayload =
@@ -195,7 +258,7 @@ export function LogForm(props: LogFormProps) {
         if (noChange) {
           setLoading(false);
           props.onCancel();
-          return;
+          return true;
         }
         const updated = await apiFetch<Log & { newBadges?: NewBadge[] }>(
           `/logs/${props.log.id}`,
@@ -221,42 +284,44 @@ export function LogForm(props: LogFormProps) {
         } else {
           props.onSaved();
         }
-      } else {
-        const created = await apiFetch<Log & { newBadges?: NewBadge[] }>(
-          "/logs",
-          {
-            method: "POST",
-            body: JSON.stringify({
-              mediaType: props.mediaType,
-              externalId: props.externalId,
-              title: props.title,
-              image: image ?? null,
-              grade,
-              review,
-              status: status ?? null,
-              ...(showHoursToBeat && { hoursToBeat: toNum(hoursToBeat) }),
-              ...(showCollectionOwnership && { own, wantToBuy }),
-              ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
-            }),
-          }
-        );
-        if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
-        toast.success(t("toast.logSaved"));
-        triggerImpact("medium");
-        invalidateLogsAndItemsCache();
-        const completion: LogCompleteState = {
-          image,
-          title,
-          grade: grade ?? null,
-          status: status ?? undefined,
-          mediaType: props.mediaType,
-          id: props.externalId,
-          review: review.trim() || null,
-          ...(showCollectionOwnership && { own, wantToBuy }),
-          ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
-        };
-        props.onSaved(completion);
+        return true;
       }
+      const created = await apiFetch<Log & { newBadges?: NewBadge[] }>(
+        "/logs",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            mediaType: (props as LogFormCreateProps).mediaType,
+            externalId: (props as LogFormCreateProps).externalId,
+            title: (props as LogFormCreateProps).title,
+            image: image ?? null,
+            grade,
+            review,
+            status: status ?? null,
+            ...(showHoursToBeat && { hoursToBeat: toNum(hoursToBeat) }),
+            ...(showCollectionOwnership && { own, wantToBuy }),
+            ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
+          }),
+        }
+      );
+      if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
+      toast.success(t("toast.logSaved"));
+      triggerImpact("medium");
+      invalidateLogsAndItemsCache();
+      if (wasFirstLog) trackProductEvent("first_log_created");
+      const completion: LogCompleteState = {
+        image,
+        title,
+        grade: grade ?? null,
+        status: status ?? undefined,
+        mediaType: (props as LogFormCreateProps).mediaType,
+        id: (props as LogFormCreateProps).externalId,
+        review: review.trim() || null,
+        ...(showCollectionOwnership && { own, wantToBuy }),
+        ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
+      };
+      props.onSaved(completion);
+      return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       if (message === LOG_LIMIT_REACHED_CODE) {
@@ -264,12 +329,44 @@ export function LogForm(props: LogFormProps) {
       } else {
         showErrorToast(t, "E013", { originalError: err });
       }
+      return false;
     } finally {
       setLoading(false);
     }
+  }, [
+    isEdit,
+    log,
+    me?.logCount,
+    status,
+    stars,
+    review,
+    season,
+    episode,
+    chapter,
+    volume,
+    hoursToBeat,
+    own,
+    wantToBuy,
+    matchesPlayed,
+    image,
+    props,
+    showSeasonEpisode,
+    showHoursToBeat,
+    showCollectionOwnership,
+    showBoardGameFields,
+    t,
+  ]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performSave();
   };
 
-  const formId = "log-form-drawer";
+  const handleDrawerBeforeDismiss = useCallback(async (): Promise<boolean> => {
+    if (!isDirty) return true;
+    return performSave();
+  }, [isDirty, performSave]);
+
   const includeButtonsInForm = !isMobile;
 
   const formContent = (
@@ -286,7 +383,7 @@ export function LogForm(props: LogFormProps) {
           {title}
         </h3>
       </div>
-      <form id={isMobile ? formId : undefined} onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-4">
               {isEdit && (
                 <>
@@ -506,43 +603,22 @@ export function LogForm(props: LogFormProps) {
                   )}
                 </div>
               )}
+              {isMobile && isEdit && "onDelete" in props && props.onDelete && (
+                <div className="border-t border-[var(--color-surface-border)] pt-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full text-red-400 hover:bg-red-500/20 hover:text-red-400"
+                    onClick={() => setConfirmDeleteOpen(true)}
+                    disabled={loading || deleting}
+                  >
+                    {t("common.delete")}
+                  </Button>
+                </div>
+              )}
             </div>
           </form>
     </motion.div>
-  );
-
-  const drawerFooterContent = (
-    <div className="flex w-full min-w-0 flex-col gap-3">
-      <div className="flex w-full min-w-0 gap-4">
-        <Button
-          type="button"
-          variant="outline"
-          className="flex-1"
-          onClick={props.onCancel}
-        >
-          {t("common.cancel")}
-        </Button>
-        <Button
-          type="submit"
-          form={formId}
-          className="flex-1"
-          disabled={loading}
-        >
-          {loading ? t("common.saving") : isEdit ? t("common.update") : t("common.save")}
-        </Button>
-      </div>
-      {isEdit && "onDelete" in props && props.onDelete && (
-        <Button
-          type="button"
-          variant="ghost"
-          className="w-full text-red-400 hover:bg-red-500/20 hover:text-red-400"
-          onClick={() => setConfirmDeleteOpen(true)}
-          disabled={loading || deleting}
-        >
-          {t("common.delete")}
-        </Button>
-      )}
-    </div>
   );
 
   return (
@@ -555,12 +631,12 @@ export function LogForm(props: LogFormProps) {
         >
           <DrawerContent
             onClose={props.onCancel}
+            onBeforeDismiss={handleDrawerBeforeDismiss}
             closeOnInteractOutside={!confirmDeleteOpen}
             mobileHeight="95%"
             className="flex max-h-[85dvh] w-full max-w-lg flex-col p-4 sm:p-6"
           >
             <div className="mt-6">{formContent}</div>
-            <DrawerFooter>{drawerFooterContent}</DrawerFooter>
           </DrawerContent>
         </Drawer>
       ) : (

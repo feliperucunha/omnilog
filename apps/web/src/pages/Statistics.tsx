@@ -35,8 +35,7 @@ import {
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import * as storage from "@/lib/storage";
-
-const paperShadow = { boxShadow: "var(--shadow-sm)" };
+import { paperShadow } from "@/lib/paperShadow";
 
 const STORAGE_KEY_STATS = "geeklogs.statistics.statsCollapsed";
 const STORAGE_KEY_RECENT = "geeklogs.statistics.recentLogsCollapsed";
@@ -714,7 +713,7 @@ export function Statistics() {
                               />
                               {status && (
                                 <span
-                                  className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium ${badgeClass}`}
+                                  className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium ${badgeClass}`}
                                   title={getStatusLabel(t, status, log.mediaType)}
                                 >
                                   {getStatusLabel(t, status, log.mediaType)}

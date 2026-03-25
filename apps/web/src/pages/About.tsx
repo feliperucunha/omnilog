@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { Link } from "react-router-dom";
 import { Heart, Github, ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -12,6 +13,7 @@ import * as storage from "@/lib/storage";
 import { ALL_ERROR_CODES, getErrorDocKey } from "@/lib/errorCodes";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
+import { paperShadow } from "@/lib/paperShadow";
 
 const FEEDBACK_COOLDOWN_KEY = "geeklogs_feedback_cooldown";
 const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
@@ -21,8 +23,6 @@ function formatCooldown(seconds: number): string {
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
-
-const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
 const DEFAULT_KOFI_URL = "https://ko-fi.com/felipecunha23777";
 
@@ -47,6 +47,15 @@ const TEAM_MEMBERS = [
   { roleKey: "about.teamRoleDesigner", nameKey: "about.teamNameDesigner", image: "/designer.jpeg" },
   { roleKey: "about.teamRoleQA", nameKey: "about.teamNameQA", image: "/qa.jpeg" },
 ] as const;
+
+type DonationLinkConfig = (typeof DONATION_LINKS)[number];
+
+function resolveDonationUrl(link: DonationLinkConfig): string | null {
+  const raw = import.meta.env[link.envKey] as string | undefined;
+  const trimmed = typeof raw === "string" && raw.trim() !== "" ? raw.trim() : "";
+  if (link.key === "kofi") return trimmed || DEFAULT_KOFI_URL;
+  return trimmed || null;
+}
 
 function ErrorCodesCollapsible({ t }: { t: (key: string) => string }) {
   const [open, setOpen] = useState(false);
@@ -172,23 +181,10 @@ export function About() {
     [token, submitting, rating, comments, t]
   );
 
-  const donationButtons = DONATION_LINKS.filter((link) => {
-    const envUrl = import.meta.env[link.envKey] as string | undefined;
-    const url =
-      link.key === "kofi"
-        ? (envUrl != null && String(envUrl).trim() !== "" ? String(envUrl).trim() : DEFAULT_KOFI_URL)
-        : envUrl != null && String(envUrl).trim() !== ""
-          ? String(envUrl).trim()
-          : null;
-    return url != null;
-  }).map((link) => {
-    const envUrl = import.meta.env[link.envKey] as string | undefined;
-    const url =
-      link.key === "kofi"
-        ? (envUrl != null && String(envUrl).trim() !== "" ? String(envUrl).trim() : DEFAULT_KOFI_URL)
-        : String(import.meta.env[link.envKey]).trim();
-    return { ...link, url };
-  });
+  const donationButtons = DONATION_LINKS.map((link) => {
+    const url = resolveDonationUrl(link);
+    return url ? { ...link, url } : null;
+  }).filter((entry): entry is DonationLinkConfig & { url: string } => entry != null);
 
   return (
     <motion.div
@@ -197,6 +193,31 @@ export function About() {
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
       className="flex flex-col gap-8 w-full"
     >
+      <section className="w-full">
+        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 sm:p-6" style={paperShadow}>
+          <h2 className="mb-3 text-lg font-semibold text-[var(--color-lightest)]">
+            {t("about.helpLegalTitle")}
+          </h2>
+          <ul className="flex flex-col gap-2 text-sm text-[var(--color-light)] sm:flex-row sm:flex-wrap sm:gap-x-6">
+            <li>
+              <Link to="/faq" className="text-[var(--color-mid)] underline-offset-2 hover:underline">
+                {t("about.linkFaq")}
+              </Link>
+            </li>
+            <li>
+              <Link to="/privacy" className="text-[var(--color-mid)] underline-offset-2 hover:underline">
+                {t("about.linkPrivacy")}
+              </Link>
+            </li>
+            <li>
+              <Link to="/terms" className="text-[var(--color-mid)] underline-offset-2 hover:underline">
+                {t("about.linkTerms")}
+              </Link>
+            </li>
+          </ul>
+        </Card>
+      </section>
+
       {/* Team */}
       <section className="w-full">
         <h2 className="mb-3 sm:mb-4 text-base font-semibold text-[var(--color-lightest)] sm:text-lg">

@@ -1,14 +1,45 @@
 import { Router } from "express";
+import { z } from "zod";
 import { MEDIA_TYPES } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { getMilestoneProgress } from "../services/milestone.service.js";
-import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
+import { isBetaBannerEnabled, isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
+import { APP_SETTING_KEYS, getAppSettingValue } from "../lib/appSettings.js";
 
 export const meRouter = Router();
 
 meRouter.use(authMiddleware);
+
+const productEventSchema = z.object({
+  name: z.string().min(1).max(64),
+  props: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** POST /me/product-events — structured product analytics (logged server-side; wire to your pipeline later). */
+meRouter.post("/product-events", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const parsed = productEventSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const propsJson =
+    parsed.data.props && Object.keys(parsed.data.props).length > 0
+      ? JSON.stringify(parsed.data.props).slice(0, 2048)
+      : "";
+  console.log(
+    JSON.stringify({
+      type: "product_event",
+      name: parsed.data.name,
+      userId: req.user.userId,
+      props: propsJson || undefined,
+      at: new Date().toISOString(),
+    })
+  );
+  res.json({ ok: true });
+});
 
 /** GET /me/milestones/progress - Per-medium and global milestone progress (reviews + logs). Simple next-milestone + progress. */
 meRouter.get("/milestones/progress", async (req: AuthenticatedRequest, res) => {
@@ -67,9 +98,11 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const [logCount, disableApiKeyRequirements] = await Promise.all([
+  const [logCount, disableApiKeyRequirements, betaBannerEnabled, betaBannerMessageFromDb] = await Promise.all([
     prisma.log.count({ where: { userId: user.id } }),
     isDisableApiKeyRequirementsEnabled(),
+    isBetaBannerEnabled(),
+    getAppSettingValue(APP_SETTING_KEYS.BETA_BANNER_MESSAGE),
   ]);
   const theme = user.preferredTheme === "light" ? "light" : "dark";
   const locale =
@@ -110,6 +143,10 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
         )
       : null;
 
+  const betaBannerMessageDefault =
+    "Thanks for joining the Geeklogs beta.\n\nAs a beta user, you will have all features for free — forever.\n\nWe’ll keep shipping improvements and may use this banner for important announcements.";
+  const betaBannerMessage = (betaBannerMessageFromDb ?? betaBannerMessageDefault).trim();
+
   res.json({
     user: {
       id: user.id,
@@ -135,6 +172,12 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     },
     featureFlags: {
       disableApiKeyRequirements,
+    },
+    announcements: {
+      betaBanner: {
+        enabled: betaBannerEnabled,
+        message: betaBannerMessage,
+      },
     },
   });
 });

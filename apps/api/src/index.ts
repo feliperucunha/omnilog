@@ -1,5 +1,7 @@
+import "./instrument-sentry.js";
 import "express-async-errors";
 import express from "express";
+import { Sentry } from "./instrument-sentry.js";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
@@ -96,6 +98,9 @@ app.get("/api/health", (_req, res) => {
 /** Global error handler: log and return 500 JSON. */
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error("API error:", err);
+  if (process.env.SENTRY_DSN?.trim() && err instanceof Error) {
+    Sentry.captureException(err);
+  }
   const message = err instanceof Error ? err.message : "Internal server error";
   res.status(500).json({ error: message });
 });

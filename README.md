@@ -88,6 +88,13 @@ Equivalent filters:
   - **Migrations:** add a [release phase](https://devcenter.heroku.com/articles/release-phase), e.g. `release: pnpm --filter @geeklogs/api exec prisma migrate deploy`, or run migrations from CI.
   - Set **`DATABASE_URL`**, **`JWT_SECRET`**, **`WEB_ORIGIN`**, and any API keys in config vars.
 
+### Observability & ops (optional)
+
+- **Sentry:** set `SENTRY_DSN` on the API and `VITE_SENTRY_DSN` on the web build for error reporting (see `apps/api/.env.example` and `apps/web/src/lib/sentry.ts`).
+- **Product events:** authenticated clients can `POST /api/me/product-events`; logs are structured JSON on the server (see `docs/strategy/persona-and-metrics.md`).
+- **DB backups / compliance:** `docs/operations/database-backups.md`, `docs/compliance/privacy-and-terms-outline.md`.
+- **Support email in app copy:** `VITE_SUPPORT_EMAIL` (Privacy, Terms, FAQ).
+
 ## Mobile (Capacitor)
 
 Native projects live under **`apps/android`** (not inside `apps/web`). App id: **`com.geeklogs.app`**.

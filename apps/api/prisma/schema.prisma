@@ -199,6 +199,7 @@ model Log {
   @@unique([userId, mediaType, externalId])
   @@index([userId])
   @@index([userId, mediaType])
+  @@index([userId, updatedAt])
   @@index([mediaType, externalId])
 }
 
@@ -223,3 +224,19 @@ model FeatureFlag {
   enabled   Boolean  @default(false)
   updatedAt DateTime @updatedAt
 }
+
+/// Simple key/value settings edited via admin UI (e.g. announcement text).
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+/// Processed Stripe webhook `event.id` values — claim-before-handling for idempotency (retries safe).
+model StripeWebhookEvent {
+  id             String   @id @default(cuid())
+  stripeEventId  String   @unique
+  createdAt      DateTime @default(now())
+}
+

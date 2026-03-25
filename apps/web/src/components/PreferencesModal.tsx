@@ -1,14 +1,12 @@
-import { useRef } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { useLocale, LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useMediaQuery";
-import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +30,6 @@ export function PreferencesModal({ open, onOpenChange }: PreferencesModalProps) 
   const { t, locale, setLocale } = useLocale();
   const { token } = useAuth();
   const isMobile = useIsMobile();
-  const drawerCloseRef = useRef<(() => void) | null>(null);
 
   const handleLocaleChange = (newLocale: Locale) => {
     setLocale(newLocale);
@@ -108,26 +105,14 @@ export function PreferencesModal({ open, onOpenChange }: PreferencesModalProps) 
       <Drawer open={open} onOpenChange={onOpenChange}>
         <DrawerContent
           onClose={close}
-          onReady={(requestClose) => {
-            drawerCloseRef.current = requestClose;
-          }}
           mobileHeight="95%"
-          className="flex max-h-[95dvh] flex-col gap-0 px-4 pb-0 pt-2"
+          className="flex max-h-[95dvh] flex-col gap-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2"
           aria-labelledby="preferences-modal-title"
         >
           <div className="px-2 pb-2 pt-2">
             {mobileHeader}
             <div className="pt-6">{body}</div>
           </div>
-          <DrawerFooter className="border-t border-[var(--color-surface-border)] px-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <Button
-              type="button"
-              className="w-full max-md:min-h-[48px]"
-              onClick={() => drawerCloseRef.current?.() ?? close()}
-            >
-              {t("common.close")}
-            </Button>
-          </DrawerFooter>
         </DrawerContent>
       </Drawer>
     );

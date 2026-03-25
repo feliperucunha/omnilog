@@ -25,7 +25,7 @@ import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaTy
 import { cn } from "@/lib/utils";
 import { tierHasProFeatures } from "@/lib/userTier";
 import { useIsMobile } from "@/hooks/useMediaQuery";
-import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import {
   Dialog,
   DialogContent,
@@ -82,8 +82,16 @@ export function Settings() {
   const [exportSelectedCategories, setExportSelectedCategories] = useState<Set<MediaType>>(() => new Set(MEDIA_TYPES));
   const [showCompleteModal, setShowCompleteModal] = useState(() => getShowCompleteModal());
   const [draggedMediaTypeIndex, setDraggedMediaTypeIndex] = useState<number | null>(null);
-  const exportDrawerCloseRef = useRef<(() => void) | null>(null);
+  const exportOpenSnapshotRef = useRef<Set<MediaType>>(new Set());
+  const prevExportModalOpenRef = useRef(false);
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (exportModalOpen && !prevExportModalOpenRef.current) {
+      exportOpenSnapshotRef.current = new Set(exportSelectedCategories);
+    }
+    prevExportModalOpenRef.current = exportModalOpen;
+  }, [exportModalOpen, exportSelectedCategories]);
 
   useEffect(() => {
     if (searchParams.get("open") === "api-keys") setAdvancedOpen(true);
@@ -269,11 +277,11 @@ export function Settings() {
   };
 
   const handleExportDownload = useCallback(
-    async (onClose: () => void) => {
+    async (onClose?: () => void): Promise<boolean> => {
       const selected = Array.from(exportSelectedCategories);
       if (selected.length === 0) {
         showErrorToast(t, "E009");
-        return;
+        return false;
       }
       setExporting(true);
       try {
@@ -284,9 +292,11 @@ export function Settings() {
           if (i < selected.length - 1) await new Promise((r) => setTimeout(r, 300));
         }
         toast.success(t("tiers.exportSuccess"));
-        onClose();
+        onClose?.();
+        return true;
       } catch (err) {
         showErrorToast(t, "E010", { originalError: err });
+        return false;
       } finally {
         setExporting(false);
       }
@@ -294,15 +304,25 @@ export function Settings() {
     [exportSelectedCategories, t]
   );
 
+  const exportDrawerBeforeDismiss = useCallback(async (): Promise<boolean> => {
+    const snap = exportOpenSnapshotRef.current;
+    const cur = exportSelectedCategories;
+    const dirty = snap.size !== cur.size || [...snap].some((x) => !cur.has(x));
+    if (!dirty) return true;
+    if (cur.size === 0) return true;
+    return handleExportDownload();
+  }, [exportSelectedCategories, handleExportDownload]);
+
+  const closeExportModal = useCallback(() => setExportModalOpen(false), []);
+
   const exportModalContent = useCallback(
-    (onClose: () => void) => (
-      <>
-        <div className="flex flex-col gap-4">
-          <DialogHeader>
-            <DialogTitle>{t("settings.exportModalTitle")}</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-[var(--color-light)]">{t("settings.exportModalDesc")}</p>
-          <div className="flex flex-col gap-2">
+    () => (
+      <div className="flex flex-col gap-4">
+        <DialogHeader>
+          <DialogTitle>{t("settings.exportModalTitle")}</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-[var(--color-light)]">{t("settings.exportModalDesc")}</p>
+        <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-sm">
             <button
               type="button"
@@ -345,25 +365,19 @@ export function Settings() {
               </label>
             ))}
           </div>
-          </div>
         </div>
-        <DrawerFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={exporting}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            type="button"
-            className="gap-2"
-            disabled={exporting || exportSelectedCategories.size === 0}
-            onClick={() => handleExportDownload(onClose)}
-          >
-            <Download className="h-4 w-4" aria-hidden />
-            {exporting ? t("common.saving") : t("settings.exportDownload")}
-          </Button>
-        </DrawerFooter>
-      </>
+        <Button
+          type="button"
+          className="gap-2 w-full sm:w-auto"
+          disabled={exporting || exportSelectedCategories.size === 0}
+          onClick={() => void handleExportDownload(closeExportModal)}
+        >
+          <Download className="h-4 w-4" aria-hidden />
+          {exporting ? t("common.saving") : t("settings.exportDownload")}
+        </Button>
+      </div>
     ),
-    [t, exporting, exportSelectedCategories, handleExportDownload]
+    [t, exporting, exportSelectedCategories, handleExportDownload, closeExportModal]
   );
 
   if (loading && !me) {
@@ -610,19 +624,17 @@ export function Settings() {
               <Drawer open={exportModalOpen} onOpenChange={(open) => !open && setExportModalOpen(false)}>
                 <DrawerContent
                   onClose={() => setExportModalOpen(false)}
-                  onReady={(requestClose) => {
-                    exportDrawerCloseRef.current = requestClose;
-                  }}
+                  onBeforeDismiss={exportDrawerBeforeDismiss}
                   mobileHeight="95%"
                   className="flex flex-col gap-4 p-6"
                 >
-                  {exportModalContent(() => exportDrawerCloseRef.current?.() ?? setExportModalOpen(false))}
+                  {exportModalContent()}
                 </DrawerContent>
               </Drawer>
             ) : (
               <Dialog open={exportModalOpen} onOpenChange={(open) => !open && setExportModalOpen(false)}>
                 <DialogContent onClose={() => setExportModalOpen(false)} className="flex flex-col gap-4 px-6 py-6 sm:max-w-md">
-                  {exportModalContent(() => setExportModalOpen(false))}
+                  {exportModalContent()}
                 </DialogContent>
               </Dialog>
             )}

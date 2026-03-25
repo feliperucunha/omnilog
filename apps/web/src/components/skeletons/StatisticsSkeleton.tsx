@@ -1,7 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-
-const paperShadow = { boxShadow: "var(--shadow-sm)" };
+import { paperShadow } from "@/lib/paperShadow";
 
 /** Four overview cards (Statistics summary row). */
 export function StatisticsSummarySkeleton() {

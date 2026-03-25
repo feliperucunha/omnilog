@@ -6,6 +6,7 @@
     "build": "turbo run build",
     "heroku-build": "pnpm exec turbo run build --filter=@geeklogs/api...",
     "lint": "turbo run lint",
+    "test": "turbo run test",
     "start": "node apps/api/dist/index.js",
     "start:api": "node apps/api/dist/index.js",
     "build:android": "pnpm --filter @geeklogs/web build:android",

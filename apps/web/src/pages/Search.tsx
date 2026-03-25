@@ -36,10 +36,10 @@ import { SearchRecommendationsCarousel } from "@/components/SearchRecommendation
 import * as storage from "@/lib/storage";
 import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
 import type { Log } from "@geeklogs/shared";
+import { paperShadow } from "@/lib/paperShadow";
 
 const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
 const FREE_SEARCH_USAGE_STORAGE_KEY = "geeklogs_free_search_usage";
-const paperShadow = { boxShadow: "var(--shadow-sm)" };
 
 function getFreeSearchUsageKey(type: MediaType, boardProvider: BoardGameProvider): string {
   return type === "boardgames" ? `boardgames-${boardProvider}` : type;
@@ -770,7 +770,7 @@ export function Search() {
                       />
                       {token && status && (
                         <span
-                          className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
+                          className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
                           title={getStatusLabel(t, status, mediaType)}
                         >
                           {getStatusLabel(t, status, mediaType)}

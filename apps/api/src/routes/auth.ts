@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -11,6 +12,16 @@ import { setAuthCookie, clearAuthCookie } from "../lib/authCookie.js";
 import type { AuthResponse } from "@geeklogs/shared";
 
 export const authRouter = Router();
+
+const authRouteLimiter = rateLimit({
+  windowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.AUTH_RATE_LIMIT_MAX) || 60,
+  message: { error: "Too many authentication attempts. Try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+authRouter.use(authRouteLimiter);
+
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-in-production";
 const WEB_ORIGIN = process.env.WEB_ORIGIN ?? "http://localhost:5173";
 const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour

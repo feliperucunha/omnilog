@@ -24,6 +24,12 @@ export interface MeResponse {
   apiKeys: { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
   /** App-wide flags from server (e.g. admin-toggled UX). */
   featureFlags?: { disableApiKeyRequirements: boolean };
+  announcements?: {
+    betaBanner?: {
+      enabled: boolean;
+      message: string;
+    };
+  };
 }
 
 interface MeContextValue {

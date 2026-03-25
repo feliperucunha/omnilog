@@ -20,6 +20,7 @@
   "dependencies": {
     "@geeklogs/shared": "workspace:*",
     "@prisma/client": "^5.22.0",
+    "@sentry/node": "8",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
@@ -33,6 +34,7 @@
     "express-async-errors": "^3.1.1",
     "express-rate-limit": "^7.4.1",
     "fast-xml-parser": "^4.3.5",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^8.0.1",
     "prisma": "^5.22.0",

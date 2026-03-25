@@ -19,6 +19,8 @@ import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useMe } from "@/contexts/MeContext";
+import { trackProductEvent } from "@/lib/productAnalytics";
 import { StarRating } from "@/components/StarRating";
 import { starsToGrade } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
@@ -61,6 +63,7 @@ export function CustomEntryForm({
   formId: formIdProp,
 }: CustomEntryFormProps) {
   const { t } = useLocale();
+  const { me } = useMe();
   const [mediaType, setMediaType] = useState<MediaType>(initialMediaType ?? "movies");
   const [title, setTitle] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -99,6 +102,7 @@ export function CustomEntryForm({
     const image = imageUrl.trim() ? imageUrl.trim() : null;
     const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
     const grade = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
+    const wasFirstLog = (me?.logCount ?? 0) === 0;
     setLoading(true);
     try {
       const externalId = `custom-${crypto.randomUUID()}`;
@@ -122,6 +126,7 @@ export function CustomEntryForm({
       });
       if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
       invalidateLogsAndItemsCache();
+      if (wasFirstLog) trackProductEvent("first_log_created");
       toast.success(t("toast.logSaved"));
       const completion: LogCompleteState = {
         image,

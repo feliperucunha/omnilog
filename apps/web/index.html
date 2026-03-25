@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="theme-color" content="#1B263B" />
+    <!-- Initial value; ThemeContext syncs to match light/dark (see themeChromeSync.ts). -->
+    <meta name="theme-color" content="#0b1220" />
     <title>Geeklogs — Track everything you watch, play, and read.</title>
     <meta name="description" content="Track movies, TV, games, books, anime, manga and more in one place. Log what you watch, read and play with ratings and reviews." />
     <!-- Favicon -->
@@ -31,6 +32,9 @@
         document.documentElement.setAttribute('data-theme', t);
         var link = document.querySelector('link[rel="icon"]');
         if (link) link.href = t === 'dark' ? '/logo-dark.png' : '/logo.png';
+        /* Keep in sync with src/lib/themeChromeSync.ts */
+        var tc = document.querySelector('meta[name="theme-color"]');
+        if (tc) tc.setAttribute('content', t === 'dark' ? '#0b1220' : '#F1F5F9');
       })();
     </script>
   </head>

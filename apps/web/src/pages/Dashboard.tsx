@@ -39,13 +39,13 @@ import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/an
 import * as storage from "@/lib/storage";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
+import { paperShadow } from "@/lib/paperShadow";
 
 interface FeedEntry {
   log: Log;
   user: { id: string; username: string | null };
 }
 
-const paperShadow = { boxShadow: "var(--shadow-sm)" };
 const BETA_MODAL_STORAGE_KEY = "geeklogs.betaModalSeen";
 const SOCIAL_COLLAPSED_STORAGE_KEY = "geeklogs.dashboard.socialCollapsed";
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -248,8 +248,6 @@ export function Dashboard() {
     setShowBetaModal(false);
   }, [me?.user?.id]);
 
-  const betaDrawerCloseRef = useRef<(() => void) | null>(null);
-
   useEffect(() => {
     if (!token) {
       setFollowedUsers([]);
@@ -436,24 +434,33 @@ export function Dashboard() {
     );
   }
 
-  const betaContent = (onClose: () => void) => (
-    <>
-      <div className="flex flex-col gap-6 max-md:gap-4">
-        <DialogHeader className="max-md:space-y-2">
-          <DialogTitle className="text-[var(--color-lightest)] text-xl max-md:text-2xl">
-            {t("dashboard.betaModalTitle")}
-          </DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-[var(--color-light)] max-md:text-base max-md:leading-relaxed">
-          {t("dashboard.betaModalMessage")}
-        </p>
+  const betaMessageParagraphs = t("dashboard.betaModalMessage").split("\n\n");
+
+  const betaBody = (
+    <div className="flex flex-col gap-4 max-md:gap-3">
+      <DialogHeader className="max-md:space-y-2">
+        <DialogTitle className="text-[var(--color-lightest)] text-xl max-md:text-2xl">
+          {t("dashboard.betaModalTitle")}
+        </DialogTitle>
+      </DialogHeader>
+      <div className="flex flex-col gap-3 text-sm text-[var(--color-light)] max-md:text-base max-md:leading-relaxed">
+        {betaMessageParagraphs.map((paragraph, i) => (
+          <p key={i} className="m-0">
+            {paragraph}
+          </p>
+        ))}
       </div>
-      <DrawerFooter>
-        <Button onClick={onClose} className="w-fit max-md:w-full max-md:min-h-[48px] max-md:text-base">
-          {t("dashboard.betaModalGotIt")}
-        </Button>
-      </DrawerFooter>
-    </>
+    </div>
+  );
+
+  const betaUnderstoodButton = (
+    <Button
+      type="button"
+      className="w-full max-md:min-h-[48px] max-md:text-base md:w-fit"
+      onClick={handleBetaModalClose}
+    >
+      {t("dashboard.betaModalGotIt")}
+    </Button>
   );
 
   return (
@@ -462,19 +469,20 @@ export function Dashboard() {
         <Drawer open={showBetaModal} onOpenChange={(open) => !open && handleBetaModalClose()}>
           <DrawerContent
             onClose={handleBetaModalClose}
-            onReady={(requestClose) => {
-              betaDrawerCloseRef.current = requestClose;
-            }}
-            mobileHeight="30%"
-            className="flex flex-col p-6 max-md:pt-6"
+            mobileHeight="auto"
+            className="flex flex-col gap-0 px-4 pb-0 pt-2 max-md:px-4"
           >
-            {betaContent(() => betaDrawerCloseRef.current?.() ?? handleBetaModalClose())}
+            <div className="px-2 pb-2 pt-4">{betaBody}</div>
+            <DrawerFooter className="border-t border-[var(--color-surface-border)] px-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {betaUnderstoodButton}
+            </DrawerFooter>
           </DrawerContent>
         </Drawer>
       ) : (
         <Dialog open={showBetaModal} onOpenChange={(open) => !open && handleBetaModalClose()}>
-          <DialogContent onClose={handleBetaModalClose} className="flex flex-col gap-6 px-8 py-6 max-md:px-6">
-            {betaContent(handleBetaModalClose)}
+          <DialogContent onClose={handleBetaModalClose} className="flex max-h-[min(90vh,720px)] flex-col gap-6 overflow-y-auto px-8 py-6 max-md:px-6">
+            {betaBody}
+            <div className="shrink-0 border-t border-[var(--color-surface-border)] pt-4">{betaUnderstoodButton}</div>
           </DialogContent>
         </Dialog>
       )}
@@ -685,7 +693,7 @@ export function Dashboard() {
                         />
                         {log.status && (
                           <span
-                            className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
+                            className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
                             title={getStatusLabel(t, log.status, log.mediaType)}
                           >
                             {getStatusLabel(t, log.status, log.mediaType)}

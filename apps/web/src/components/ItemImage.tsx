@@ -63,10 +63,10 @@ export function ItemImage({
 
   const rootClass = [
     "flex-shrink-0 overflow-hidden bg-[var(--color-darkest)]",
-    useBggBlurStack && "relative",
+    /* isolate: BGG foreground uses z-[1]; without isolation it can stack above sibling overlays (e.g. status badge). */
+    useBggBlurStack && "relative isolate",
     fitContent && !useBggBlurStack && "w-fit min-h-[2rem] min-w-[2rem]",
-    fitContent && useBggBlurStack && "relative flex w-fit min-h-[2rem] min-w-[2rem] items-center justify-center",
-    !fitContent && useBggBlurStack && "relative",
+    fitContent && useBggBlurStack && "flex w-fit min-h-[2rem] min-w-[2rem] items-center justify-center",
     className,
   ]
     .filter(Boolean)

@@ -16,8 +16,11 @@ import { AppVersionModal } from "@/components/AppVersionModal";
 import { AppVersionProvider } from "@/contexts/AppVersionContext";
 import App from "./App";
 import { CapacitorAndroidIntegration } from "@/components/CapacitorAndroidIntegration";
+import { initSentry } from "@/lib/sentry";
 import "./fonts.css";
 import "./index.css";
+
+initSentry();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

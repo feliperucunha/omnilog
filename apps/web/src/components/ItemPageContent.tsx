@@ -36,8 +36,7 @@ import {
 } from "@/lib/boardGameImageFit";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
-
-const paperShadow = { boxShadow: "var(--shadow-sm)" };
+import { paperShadow } from "@/lib/paperShadow";
 
 function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType: MediaType; t: (key: string, params?: Record<string, string>) => string }) {
   const hasDescription = item.description && item.description.length > 0;

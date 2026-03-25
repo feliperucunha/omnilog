@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/layouts/AppLayout";
@@ -9,15 +10,28 @@ import { ResetPassword } from "@/pages/ResetPassword";
 import { InvalidApiKeyProvider } from "@/contexts/InvalidApiKeyContext";
 import { Onboarding } from "@/pages/Onboarding";
 import { Dashboard } from "@/pages/Dashboard";
-import { Statistics } from "@/pages/Statistics";
-import { Search } from "@/pages/Search";
-import { ItemPage } from "@/pages/ItemPage";
-import { Settings } from "@/pages/Settings";
-import { About } from "@/pages/About";
-import { Tiers } from "@/pages/Tiers";
 import { PublicProfile } from "@/pages/PublicProfile";
 import { PublicProfileLayout } from "@/layouts/PublicProfileLayout";
 import { GuestHome } from "@/pages/GuestHome";
+
+const Statistics = lazy(() => import("@/pages/Statistics").then((m) => ({ default: m.Statistics })));
+const Search = lazy(() => import("@/pages/Search").then((m) => ({ default: m.Search })));
+const ItemPage = lazy(() => import("@/pages/ItemPage").then((m) => ({ default: m.ItemPage })));
+const Settings = lazy(() => import("@/pages/Settings").then((m) => ({ default: m.Settings })));
+const About = lazy(() => import("@/pages/About").then((m) => ({ default: m.About })));
+const Tiers = lazy(() => import("@/pages/Tiers").then((m) => ({ default: m.Tiers })));
+const FAQ = lazy(() => import("@/pages/FAQ").then((m) => ({ default: m.FAQ })));
+const Privacy = lazy(() => import("@/pages/Privacy").then((m) => ({ default: m.Privacy })));
+const Terms = lazy(() => import("@/pages/Terms").then((m) => ({ default: m.Terms })));
+
+function LazyRouteFallback() {
+  return (
+    <div
+      className="min-h-[28vh] animate-pulse rounded-xl bg-[var(--color-mid)]/10"
+      aria-hidden
+    />
+  );
+}
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { token, initializing } = useAuth();
@@ -31,7 +45,16 @@ const RequireOnboarded = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   if (initializing) return null;
   if (token && user && user.onboarded === false) {
-    const allowed = ["/onboarding", "/login", "/register", "/forgot-password", "/reset-password"];
+    const allowed = [
+      "/onboarding",
+      "/login",
+      "/register",
+      "/forgot-password",
+      "/reset-password",
+      "/faq",
+      "/privacy",
+      "/terms",
+    ];
     if (!allowed.includes(location.pathname)) return <Navigate to="/onboarding" replace />;
   }
   return <>{children}</>;
@@ -56,11 +79,20 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/" element={<AppLayout />}>
-            <Route element={<AnimatedOutlet />}>
+            <Route
+              element={
+                <Suspense fallback={<LazyRouteFallback />}>
+                  <AnimatedOutlet />
+                </Suspense>
+              }
+            >
               <Route index element={<DashboardOrSearch />} />
               <Route path="statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
               <Route path="search" element={<Search />} />
               <Route path="about" element={<About />} />
+              <Route path="faq" element={<FAQ />} />
+              <Route path="privacy" element={<Privacy />} />
+              <Route path="terms" element={<Terms />} />
               <Route path="tiers" element={<Tiers />} />
               <Route path="item/:mediaType/:id" element={<ItemPage />} />
               <Route path="movies" element={<ProtectedRoute><Navigate to="/?category=movies" replace /></ProtectedRoute>} />

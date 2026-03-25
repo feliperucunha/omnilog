@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -17,10 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { IN_PROGRESS_STATUSES, type Log } from "@geeklogs/shared";
-
-const paperShadow = { boxShadow: "var(--shadow-sm)" };
+import { paperShadow } from "@/lib/paperShadow";
 
 const WEEKDAY_KEYS = [
   "dashboard.calendarMon",
@@ -51,8 +50,6 @@ function formatCalendarDayDate(dateKey: string, locale: string): string {
 export function DashboardCalendar({ isPro }: { isPro: boolean }) {
   const { t, locale } = useLocale();
   const isMobile = useIsMobile();
-  const drawerCloseRef = useRef<(() => void) | null>(null);
-  const drawerCloseImmediatelyRef = useRef<(() => void) | null>(null);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [data, setData] = useState<CalendarData | null>(null);
@@ -288,10 +285,6 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
               mobileHeight="95%"
               className="flex flex-col p-4 sm:p-6"
               onClose={() => setSelectedDate(null)}
-              onReady={(requestClose, requestCloseImmediately) => {
-                drawerCloseRef.current = requestClose;
-                drawerCloseImmediatelyRef.current = requestCloseImmediately ?? null;
-              }}
             >
               <div className="mt-6">
                 <h2 className="mb-4 min-w-0 truncate text-lg font-semibold text-[var(--color-lightest)]">
@@ -345,11 +338,6 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
                   </ul>
                 )}
               </div>
-              <DrawerFooter>
-                <Button type="button" variant="outline" className="w-full max-md:min-h-[48px]" onClick={() => setSelectedDate(null)}>
-                  {t("common.close")}
-                </Button>
-              </DrawerFooter>
             </DrawerContent>
           </Drawer>
         ) : (

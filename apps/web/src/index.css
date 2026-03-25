@@ -1,5 +1,26 @@
 @import "tailwindcss";
 
+/* Native form controls / scrollbars follow app theme (not system). */
+html[data-theme="light"] {
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* iOS: avoid automatic text inflation in landscape / accessibility quirks. */
+body {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* In-page anchors / scrollIntoView: smooth only when motion is OK (WCAG). */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 @layer base {
   button:not(:disabled),
   [role="button"]:not(:disabled) {

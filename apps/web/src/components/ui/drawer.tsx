@@ -51,9 +51,14 @@ DrawerFooter.displayName = "DrawerFooter";
 type DrawerContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   onClose?: () => void;
   /** On mobile: height of the drawer. Desktop keeps centered modal. */
-  mobileHeight?: "95%" | "30%";
+  mobileHeight?: "95%" | "30%" | "auto";
   /** Called with (animatedClose, closeImmediately). Use closeImmediately for X/close button so overlay and drawer close together. */
   onReady?: (requestClose: () => void, requestCloseImmediately?: () => void) => void;
+  /**
+   * Runs before dismiss (overlay, drag, escape, Android back). Return false to keep the drawer open
+   * (e.g. save failed). Async is awaited.
+   */
+  onBeforeDismiss?: () => boolean | Promise<boolean>;
   /**
    * When false, overlay / outside-pointer will not close the drawer. Use while a nested dialog
    * (e.g. delete confirm) is open — otherwise Radix treats those interactions as "outside" the drawer.
@@ -68,42 +73,128 @@ function isDrawerFooter(child: React.ReactNode): boolean {
 const DrawerContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   DrawerContentProps
->(({ className, children, onClose, onReady, mobileHeight = "95%", closeOnInteractOutside = true, ...props }, ref) => {
+>(({ className, children, onClose, onReady, onBeforeDismiss, mobileHeight = "95%", closeOnInteractOutside = true, ...props }, ref) => {
   const [dataStateRef, radixOpen] = useRadixDataStateOpenRef<HTMLDivElement>();
-  const mergedRef = React.useMemo(() => mergeRefs(ref, dataStateRef), [ref, dataStateRef]);
+  /** Mobile drag: transform the sheet surface (Content) so box-shadow moves with the panel, not a stuck “shadow frame”. */
+  const dragSurfaceRef = React.useRef<HTMLDivElement | null>(null);
+  const mergedRef = React.useMemo(
+    () => mergeRefs(ref, dataStateRef, dragSurfaceRef),
+    [ref, dataStateRef]
+  );
   const [isClosing, setIsClosing] = React.useState(false);
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMobileDrawer = useIsMobile();
-  const dragPanelRef = React.useRef<HTMLDivElement>(null);
+  const overlayRef = React.useRef<HTMLDivElement | null>(null);
   const swipeDraggingRef = React.useRef(false);
   const swipeStartYRef = React.useRef(0);
   const swipeStartTimeRef = React.useRef(0);
+  const closeInFlightRef = React.useRef(false);
 
-  const resetDragPanelStyles = React.useCallback(() => {
-    const el = dragPanelRef.current;
+  const resetDragSurfaceStyles = React.useCallback(() => {
+    const el = dragSurfaceRef.current;
     if (!el) return;
     el.style.transform = "";
     el.style.transition = "";
+    el.style.willChange = "";
   }, []);
+
+  const dismissThresholdPx = React.useCallback(
+    () =>
+      typeof window !== "undefined"
+        ? Math.max(DISMISS_MIN_PX, window.innerHeight * DISMISS_FRACTION_OF_VH)
+        : DISMISS_MIN_PX,
+    []
+  );
+
+  /** Mobile: keep scrim in sync with drag so the gap above the sheet isn’t a solid black layer. */
+  const setScrimOpacityForDragY = React.useCallback(
+    (y: number) => {
+      const el = overlayRef.current;
+      if (!el || !isMobileDrawer) return;
+      const t = Math.max(1, dismissThresholdPx());
+      const p = Math.min(1, Math.max(0, y) / t);
+      el.style.animation = "none";
+      el.style.opacity = String(1 - p);
+    },
+    [dismissThresholdPx, isMobileDrawer]
+  );
+
+  /** After canceling a drag, fade scrim back to full strength without leaving inline opacity stuck. */
+  const restoreScrimAfterDragCancel = React.useCallback(() => {
+    const el = overlayRef.current;
+    if (!el || !isMobileDrawer) return;
+    el.style.animation = "none";
+    el.style.transition = "opacity 0.22s cubic-bezier(0.2, 0, 0, 1)";
+    el.style.opacity = "1";
+    window.setTimeout(() => {
+      if (!el.isConnected) return;
+      el.style.transition = "";
+      el.style.animation = "";
+      el.style.opacity = "";
+    }, 240);
+  }, [isMobileDrawer]);
+
+  React.useEffect(() => {
+    if (!isMobileDrawer || !isClosing) return;
+    const el = overlayRef.current;
+    if (!el) return;
+    el.style.animation = "none";
+    el.style.transition = `opacity ${DRAWER_CLOSE_DURATION_MS}ms cubic-bezier(0.2, 0, 0, 1)`;
+    el.style.opacity = "0";
+  }, [isClosing, isMobileDrawer]);
+
+  const runBeforeDismiss = React.useCallback(async (): Promise<boolean> => {
+    if (!onBeforeDismiss) return true;
+    try {
+      return await Promise.resolve(onBeforeDismiss());
+    } catch {
+      return false;
+    }
+  }, [onBeforeDismiss]);
 
   /** Animated close: run slide-down then notify parent. Used for Close button and Escape. */
   const handleClose = React.useCallback(() => {
-    if (isClosing) return;
-    setIsClosing(true);
-    closeTimeoutRef.current = setTimeout(() => {
-      onClose?.();
-      closeTimeoutRef.current = null;
-    }, DRAWER_CLOSE_DURATION_MS);
-  }, [isClosing, onClose]);
+    if (isClosing || closeInFlightRef.current) return;
+    void (async () => {
+      closeInFlightRef.current = true;
+      try {
+        const ok = await runBeforeDismiss();
+        if (!ok) {
+          restoreScrimAfterDragCancel();
+          return;
+        }
+        setIsClosing(true);
+        closeTimeoutRef.current = setTimeout(() => {
+          onClose?.();
+          closeTimeoutRef.current = null;
+        }, DRAWER_CLOSE_DURATION_MS);
+      } finally {
+        closeInFlightRef.current = false;
+      }
+    })();
+  }, [isClosing, onClose, restoreScrimAfterDragCancel, runBeforeDismiss]);
 
   /** Close immediately so overlay and content unmount together. Used for overlay/outside click to avoid stuck layer on mobile. */
   const closeImmediately = React.useCallback(() => {
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
-    }
-    onClose?.();
-  }, [onClose]);
+    if (closeInFlightRef.current) return;
+    void (async () => {
+      closeInFlightRef.current = true;
+      try {
+        const ok = await runBeforeDismiss();
+        if (!ok) {
+          restoreScrimAfterDragCancel();
+          return;
+        }
+        if (closeTimeoutRef.current) {
+          clearTimeout(closeTimeoutRef.current);
+          closeTimeoutRef.current = null;
+        }
+        onClose?.();
+      } finally {
+        closeInFlightRef.current = false;
+      }
+    })();
+  }, [onClose, restoreScrimAfterDragCancel, runBeforeDismiss]);
 
   React.useEffect(() => {
     onReady?.(handleClose, closeImmediately);
@@ -120,22 +211,20 @@ const DrawerContent = React.forwardRef<
   });
 
   React.useEffect(() => {
-    if (isClosing) resetDragPanelStyles();
-  }, [isClosing, resetDragPanelStyles]);
-
-  const dismissThresholdPx = React.useCallback(
-    () =>
-      typeof window !== "undefined"
-        ? Math.max(DISMISS_MIN_PX, window.innerHeight * DISMISS_FRACTION_OF_VH)
-        : DISMISS_MIN_PX,
-    []
-  );
+    if (isClosing) resetDragSurfaceStyles();
+  }, [isClosing, resetDragSurfaceStyles]);
 
   const onSwipeHandlePointerDown = React.useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!isMobileDrawer || isClosing) return;
       if (e.button !== 0) return;
       e.preventDefault();
+      const surface = dragSurfaceRef.current;
+      if (surface) {
+        /* Open animation uses fill-mode both; without this, transform stays on the animation layer and drag translate is invisible. */
+        surface.style.animation = "none";
+        surface.style.willChange = "transform";
+      }
       swipeDraggingRef.current = true;
       swipeStartYRef.current = e.clientY;
       swipeStartTimeRef.current = performance.now();
@@ -146,14 +235,15 @@ const DrawerContent = React.forwardRef<
 
   const onSwipeHandlePointerMove = React.useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!swipeDraggingRef.current || !dragPanelRef.current) return;
+      const surface = dragSurfaceRef.current;
+      if (!swipeDraggingRef.current || !surface) return;
       const dy = e.clientY - swipeStartYRef.current;
       const y = Math.max(0, dy);
-      const panel = dragPanelRef.current;
-      panel.style.transition = "none";
-      panel.style.transform = `translate3d(0, ${y}px, 0)`;
+      surface.style.transition = "none";
+      surface.style.transform = `translate3d(0, ${y}px, 0)`;
+      setScrimOpacityForDragY(y);
     },
-    []
+    [setScrimOpacityForDragY]
   );
 
   const finishSwipeDrag = React.useCallback(
@@ -165,8 +255,8 @@ const DrawerContent = React.forwardRef<
       } catch {
         /* already released */
       }
-      const panel = dragPanelRef.current;
-      if (!panel) return;
+      const surface = dragSurfaceRef.current;
+      if (!surface) return;
       const y = Math.max(0, e.clientY - swipeStartYRef.current);
       const elapsed = Math.max(1, performance.now() - swipeStartTimeRef.current);
       const velocity = y / elapsed;
@@ -174,29 +264,37 @@ const DrawerContent = React.forwardRef<
       const flickDismiss =
         y >= DISMISS_VELOCITY_MIN_OFFSET_PX && velocity >= DISMISS_VELOCITY_PX_PER_MS;
       if (y >= threshold || flickDismiss) {
-        resetDragPanelStyles();
+        resetDragSurfaceStyles();
         handleClose();
         return;
       }
-      panel.style.transition = "transform 0.32s cubic-bezier(0.2, 0, 0, 1)";
-      panel.style.transform = "translate3d(0, 0, 0)";
+      restoreScrimAfterDragCancel();
+      surface.style.transition = "transform 0.32s cubic-bezier(0.2, 0, 0, 1)";
+      surface.style.transform = "translate3d(0, 0, 0)";
       window.setTimeout(() => {
-        if (panel.isConnected) {
-          panel.style.transition = "";
-          panel.style.transform = "";
+        if (surface.isConnected) {
+          surface.style.transition = "";
+          surface.style.transform = "";
+          surface.style.willChange = "";
+          /* Keep animation: none so reopening slide-in does not re-fire from stylesheet on this open cycle. */
         }
       }, 340);
     },
-    [dismissThresholdPx, handleClose, resetDragPanelStyles]
+    [dismissThresholdPx, handleClose, resetDragSurfaceStyles, restoreScrimAfterDragCancel]
   );
 
   const heightClass =
     mobileHeight === "30%"
       ? "max-md:!h-[30%] max-md:!min-h-[30%]"
-      : "max-md:!h-[95dvh] max-md:!min-h-[95dvh]";
+      : mobileHeight === "auto"
+        ? "max-md:!h-auto max-md:!min-h-0 max-md:!max-h-[95dvh]"
+        : "max-md:!h-[95dvh] max-md:!min-h-[95dvh]";
+  /** `h-auto` + inner `flex-1 h-full` collapses body height; use intrinsic column layout on mobile. */
+  const isAutoMobileHeight = mobileHeight === "auto";
   return (
     <DialogPortal>
       <DialogOverlay
+        ref={overlayRef}
         onClick={closeOnInteractOutside ? closeImmediately : undefined}
         onPointerDown={closeOnInteractOutside ? closeImmediately : undefined}
       />
@@ -253,10 +351,11 @@ const DrawerContent = React.forwardRef<
           const contentChildren = hasFooter ? childArray.filter((_, i) => i !== footerIndex) : childArray;
           return (
             <div
-              ref={dragPanelRef}
               className={cn(
-                "flex min-h-0 w-full flex-col",
-                "max-md:flex-1 max-md:h-full",
+                "flex w-full flex-col min-h-0",
+                isAutoMobileHeight
+                  ? "max-md:h-auto max-md:min-h-0"
+                  : "max-md:flex-1 max-md:h-full",
                 "md:contents"
               )}
             >
@@ -274,8 +373,15 @@ const DrawerContent = React.forwardRef<
               >
                 <span className="block h-1 w-10 shrink-0 rounded-full bg-[var(--color-mid)]/80" />
               </div>
-              {/* Scrollable body: takes all remaining space; only this area scrolls */}
-              <div className="min-h-0 flex-1 basis-0 overflow-x-hidden overflow-y-auto overscroll-contain">
+              {/* Scrollable body: fixed-height sheets use flex-1; auto-height sheets size to content (cap scroll). */}
+              <div
+                className={cn(
+                  "min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain",
+                  isAutoMobileHeight
+                    ? "max-md:max-h-[min(72dvh,620px)] max-md:flex-shrink-0"
+                    : "flex-1 basis-0"
+                )}
+              >
                 {contentChildren}
               </div>
               {/* Fixed footer: always at bottom, same position, never scrolls */}

@@ -33,7 +33,7 @@ export function Tiers() {
     setPageTitle?.(t("tiers.title"));
     return () => setPageTitle?.(null);
   }, [t, setPageTitle]);
-  const [interval, setInterval] = useState<"monthly" | "yearly">("monthly");
+  const [interval, setInterval] = useState<"monthly" | "yearly">("yearly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -339,7 +339,7 @@ export function Tiers() {
                   {t("tiers.redirecting")}
                 </>
               ) : (
-                t("tiers.subscribeWithStripe")
+                t("tiers.upgradeToPro")
               )}
             </Button>
           )}

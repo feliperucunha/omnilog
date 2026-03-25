@@ -5,6 +5,8 @@ export const FEATURE_FLAG_KEYS = {
   DISABLE_API_KEY_REQUIREMENTS: "disable_api_key_requirements",
   /** When enabled, POST /auth/register assigns tier `beta` instead of `free`. */
   REGISTER_NEW_USERS_AS_BETA: "register_new_users_as_beta",
+  /** When enabled, show the beta welcome / announcement banner to beta users (client-side dismissal persists per message). */
+  BETA_BANNER_ENABLED: "beta_banner_enabled",
 } as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[keyof typeof FEATURE_FLAG_KEYS];
@@ -32,6 +34,16 @@ export async function isRegisterNewUsersAsBetaEnabled(): Promise<boolean> {
     select: { enabled: true },
   });
   if (row == null) return false;
+  return row.enabled;
+}
+
+/** Default: show (row missing) so existing behavior remains until admin disables. */
+export async function isBetaBannerEnabled(): Promise<boolean> {
+  const row = await prisma.featureFlag.findUnique({
+    where: { key: FEATURE_FLAG_KEYS.BETA_BANNER_ENABLED },
+    select: { enabled: true },
+  });
+  if (row == null) return true;
   return row.enabled;
 }
 

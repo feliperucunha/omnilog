@@ -123,6 +123,11 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   );
   /** BGG box art is landscape; a shorter card + hero keeps the modal from feeling overly tall on web and native. */
   const bggShorterCard = bggBoardFraming;
+  /**
+   * BGG blur+contain stack letterboxes landscape art in a portrait slot; empty bands use `color-darkest` and read as
+   * black behind the top controls. Ludopedia uses plain cover and fills the frame. Here we use cover for BGG too.
+   */
+  const heroImgClassName = bggBoardFraming ? "h-full w-full object-cover object-center" : undefined;
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [shareInProgress, setShareInProgress] = useState(false);
   const [cachedHeroDataUrl, setCachedHeroDataUrl] = useState<string | null>(null);
@@ -313,6 +318,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
           className="absolute inset-0 h-full w-full"
           mediaType={mediaType}
           activeBoardGameProvider={me?.boardGameProvider ?? null}
+          imgClassName={heroImgClassName}
           fitContent={false}
           loading="eager"
           referrerPolicy="no-referrer"
@@ -343,6 +349,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
           className="absolute inset-0 h-full w-full"
           mediaType={mediaType}
           activeBoardGameProvider={me?.boardGameProvider ?? null}
+          imgClassName={heroImgClassName}
           fitContent={false}
           loading="eager"
           referrerPolicy="no-referrer"

@@ -140,7 +140,7 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
         {open && options.length > 0 && !dropdownInPortal && (
           <ul
             role="listbox"
-            className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto overflow-x-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] py-1 shadow-[var(--shadow-lg)] [-webkit-overflow-scrolling:touch] [touch-action:manipulation]"
+            className="absolute z-50 mt-1 w-full overflow-x-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] py-1 shadow-[var(--shadow-lg)] [touch-action:manipulation]"
           >
             {options.map((n) => (
               <li
@@ -170,7 +170,7 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
               id={listIdRef.current ?? undefined}
               role="listbox"
               data-dropdown-portal
-              className="fixed z-[100] max-h-48 overflow-y-auto overflow-x-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] py-1 shadow-[var(--shadow-lg)] [-webkit-overflow-scrolling:touch] [touch-action:manipulation]"
+              className="fixed z-[100] overflow-x-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] py-1 shadow-[var(--shadow-lg)] [touch-action:manipulation]"
               style={{
                 top: dropdownRect.top + 4,
                 left: dropdownRect.left,

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Capacitor } from "@capacitor/core";
 import * as storage from "@/lib/storage";
+import { applyThemeColorMeta } from "@/lib/themeChromeSync";
 
 type ColorScheme = "light" | "dark";
 
@@ -46,6 +47,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", colorScheme);
     document.documentElement.classList.toggle("dark", colorScheme === "dark");
+    applyThemeColorMeta(document, colorScheme);
     void storage.setItem(STORAGE_KEY, colorScheme);
     const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (link) link.href = colorScheme === "dark" ? "/logo-dark.png" : "/logo.png";

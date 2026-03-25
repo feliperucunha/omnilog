@@ -148,7 +148,7 @@ export function SearchRecommendationsCarousel({
               />
               {token && status && (
                 <span
-                  className={`absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] font-medium ${badgeClass}`}
+                  className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium ${badgeClass}`}
                   title={getStatusLabel(t, status, mediaType)}
                 >
                   {getStatusLabel(t, status, mediaType)}

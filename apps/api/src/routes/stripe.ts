@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { Prisma } from "@prisma/client";
 import Stripe from "stripe";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/auth.js";
@@ -27,6 +28,18 @@ function normalizeCountry(country: string | null | undefined): "BR" | "default" 
 function getStripe(): Stripe | null {
   if (!stripeSecretKey) return null;
   return new Stripe(stripeSecretKey);
+}
+
+function subscriptionPeriodEndDate(sub: { current_period_end?: number }): Date | null {
+  const t = sub.current_period_end;
+  return t != null ? new Date(t * 1000) : null;
+}
+
+function stripeCustomerIdString(
+  customer: string | { id?: string } | null | undefined
+): string | null {
+  if (typeof customer === "string") return customer;
+  return customer?.id ?? null;
 }
 
 export const stripeRouter = Router();
@@ -206,6 +219,22 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
     return;
   }
 
+  let claim: { id: string };
+  try {
+    claim = await prisma.stripeWebhookEvent.create({
+      data: { stripeEventId: event.id },
+      select: { id: true },
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      res.sendStatus(200);
+      return;
+    }
+    console.error("Stripe webhook claim error:", e);
+    res.status(500).send("Webhook claim failed");
+    return;
+  }
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
@@ -219,16 +248,16 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
           customer: string | { id?: string } | null;
           current_period_end?: number;
         };
-        const customerId = typeof subscription.customer === "string"
-          ? subscription.customer
-          : subscription.customer?.id ?? null;
-        const periodEnd = subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000)
-          : null;
+        const customerId = stripeCustomerIdString(subscription.customer);
+        const periodEnd = subscriptionPeriodEndDate(subscription);
+        const existing = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { tier: true },
+        });
         await prisma.user.update({
           where: { id: userId },
           data: {
-            tier: "pro",
+            ...(existing?.tier !== "admin" ? { tier: "pro" as const } : {}),
             stripeSubscriptionId: subscriptionId,
             stripeCustomerId: customerId ?? undefined,
             subscriptionEndsAt: periodEnd ?? undefined,
@@ -238,20 +267,23 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
       }
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription & { current_period_end?: number };
-        const periodEnd = subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000)
-          : null;
+        const periodEnd = subscriptionPeriodEndDate(subscription);
         const user = await prisma.user.findFirst({
           where: { stripeSubscriptionId: subscription.id },
-          select: { id: true },
+          select: { id: true, tier: true },
         });
         if (user) {
+          const inactive =
+            subscription.status !== "active" && subscription.status !== "trialing";
           await prisma.user.update({
             where: { id: user.id },
             data: {
               subscriptionEndsAt: periodEnd ?? undefined,
-              ...(subscription.status !== "active" && subscription.status !== "trialing"
-                ? { tier: "free" as const, stripeSubscriptionId: null }
+              ...(inactive
+                ? {
+                    stripeSubscriptionId: null,
+                    ...(user.tier !== "admin" ? { tier: "free" as const } : {}),
+                  }
                 : {}),
             },
           });
@@ -262,28 +294,29 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
         const subscription = event.data.object as Stripe.Subscription & { current_period_end?: number };
         const user = await prisma.user.findFirst({
           where: { stripeSubscriptionId: subscription.id },
-          select: { id: true },
+          select: { id: true, tier: true },
         });
         if (user) {
-          const periodEnd = subscription.current_period_end
-            ? new Date(subscription.current_period_end * 1000)
-            : new Date();
+          const periodEnd = subscriptionPeriodEndDate(subscription) ?? new Date();
           await prisma.user.update({
             where: { id: user.id },
             data: {
               stripeSubscriptionId: null,
               subscriptionEndsAt: periodEnd,
+              ...(user.tier !== "admin" ? { tier: "free" as const } : {}),
             },
           });
         }
         break;
       }
       default:
-        // ignore other events
         break;
     }
-  } catch (e) {
-    console.error("Stripe webhook handler error:", e);
+  } catch (handlerErr) {
+    console.error("Stripe webhook handler error:", handlerErr);
+    await prisma.stripeWebhookEvent.delete({ where: { id: claim.id } }).catch(() => {
+      /* best-effort release so Stripe retry can reprocess */
+    });
     res.status(500).send("Webhook handler failed");
     return;
   }
