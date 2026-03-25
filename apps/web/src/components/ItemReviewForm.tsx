@@ -19,6 +19,9 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useMe } from "@/contexts/MeContext";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars, starsToGrade } from "@/lib/gradeStars";
+import { BoardGameOwnershipSwitch } from "@/components/BoardGameOwnershipSwitch";
+import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/lib/boardGameOwnership";
+import { mediaTypeHasBoardGameOnlyFields, mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
 const HAS_CHAPTER_VOLUME: MediaType[] = ["comics", "manga"];
@@ -32,11 +35,11 @@ export interface LogCompleteState {
   id?: string;
   /** User's review/comment when available (for complete modal). */
   review?: string | null;
-  /** Boardgames only: user owns a copy. */
+  /** Board games and video games: user owns a copy. */
   own?: boolean | null;
-  /** Boardgames only: user wants to buy a copy. */
+  /** Board games and video games: user wants to buy a copy. */
   wantToBuy?: boolean | null;
-  /** Boardgames only: number of matches/sessions played. */
+  /** Board games only: number of matches/sessions played. */
   matchesPlayed?: number | null;
 }
 
@@ -103,7 +106,8 @@ export function ItemReviewForm({
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
   const showHoursToBeat = mediaType === "games";
-  const showBoardGameFields = mediaType === "boardgames";
+  const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
+  const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
 
   useEffect(() => {
     if (!showSeasonEpisode && !showChapterVolume) return;
@@ -200,9 +204,11 @@ export function ItemReviewForm({
         contentHours,
       };
       if (showHoursToBeat) payload.hoursToBeat = toNum(hoursToBeat);
-      if (showBoardGameFields) {
+      if (showCollectionOwnership) {
         payload.own = own;
         payload.wantToBuy = wantToBuy;
+      }
+      if (showBoardGameFields) {
         payload.matchesPlayed = toNum(matchesPlayed);
       }
       if (genreList.length > 0) payload.genres = genreList;
@@ -235,10 +241,9 @@ export function ItemReviewForm({
           sameStringList(genreList, myLog.genres ?? []) &&
           mechanicsMatch &&
           affinityMatch &&
-          (!showBoardGameFields ||
-            (own === (myLog.own ?? false) &&
-              wantToBuy === (myLog.wantToBuy ?? false) &&
-              toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)));
+          (!showCollectionOwnership ||
+            (own === (myLog.own ?? false) && wantToBuy === (myLog.wantToBuy ?? false))) &&
+          (!showBoardGameFields || toNum(matchesPlayed) === (myLog.matchesPlayed ?? null));
         if (noChange) {
           setSaving(false);
           return;
@@ -261,7 +266,8 @@ export function ItemReviewForm({
             mediaType,
             id: externalId,
             review: review.trim() || null,
-            ...(showBoardGameFields && { own, wantToBuy, matchesPlayed: toNum(matchesPlayed) }),
+            ...(showCollectionOwnership && { own, wantToBuy }),
+            ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
           });
         }
       } else {
@@ -291,7 +297,8 @@ export function ItemReviewForm({
           mediaType,
           id: externalId,
           review: review.trim() || null,
-          ...(showBoardGameFields && { own, wantToBuy, matchesPlayed: toNum(matchesPlayed) }),
+          ...(showCollectionOwnership && { own, wantToBuy }),
+          ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
         });
       }
     } catch (err) {
@@ -328,11 +335,11 @@ export function ItemReviewForm({
         <h2 className="mb-4 text-xl font-semibold text-[var(--color-lightest)]">
           {myLog ? t("itemReviewForm.yourReview") : t("itemReviewForm.addReview")}
         </h2>
-        {showBoardGameFields &&
+        {showCollectionOwnership &&
           myLog &&
           (myLog.own === true ||
             myLog.wantToBuy === true ||
-            (myLog.matchesPlayed != null && myLog.matchesPlayed > 0)) && (
+            (showBoardGameFields && myLog.matchesPlayed != null && myLog.matchesPlayed > 0)) && (
           <div className="mb-4 flex flex-wrap items-center gap-2">
             {myLog.own === true && (
               <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
@@ -344,7 +351,7 @@ export function ItemReviewForm({
                 {t("itemReviewForm.wantToBuy")}
               </span>
             )}
-            {myLog.matchesPlayed != null && myLog.matchesPlayed > 0 && (
+            {showBoardGameFields && myLog.matchesPlayed != null && myLog.matchesPlayed > 0 && (
               <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
                 {t("itemReviewForm.matchesPlayed")}: {myLog.matchesPlayed}
               </span>
@@ -472,40 +479,20 @@ export function ItemReviewForm({
               </div>
             )}
 
-            {showBoardGameFields && (
+            {showCollectionOwnership && (
               <>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="item-review-own"
-                      checked={own}
-                      onChange={(e) => setOwn(e.target.checked)}
-                      className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
-                      aria-describedby="item-review-own-desc"
-                    />
-                    <Label htmlFor="item-review-own" id="item-review-own-desc" className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]">
-                      {t("itemReviewForm.own")}
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="item-review-want-to-buy"
-                      checked={wantToBuy}
-                      onChange={(e) => setWantToBuy(e.target.checked)}
-                      className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
-                      aria-describedby="item-review-want-to-buy-desc"
-                    />
-                    <Label
-                      htmlFor="item-review-want-to-buy"
-                      id="item-review-want-to-buy-desc"
-                      className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]"
-                    >
-                      {t("itemReviewForm.wantToBuy")}
-                    </Label>
-                  </div>
-                </div>
+                <BoardGameOwnershipSwitch
+                  value={boardGameOwnershipFromBooleans(own, wantToBuy)}
+                  onChange={(mode) => {
+                    const next = boardGameOwnershipToBooleans(mode);
+                    setOwn(next.own);
+                    setWantToBuy(next.wantToBuy);
+                  }}
+                  disabled={saving}
+                />
+              </>
+            )}
+            {showBoardGameFields && (
                 <div className="space-y-2">
                   <Label className="text-sm text-[var(--color-lightest)]">
                     {t("itemReviewForm.matchesPlayed")}
@@ -528,7 +515,6 @@ export function ItemReviewForm({
                     aria-label={t("itemReviewForm.matchesPlayed")}
                   />
                 </div>
-              </>
             )}
 
             <div>

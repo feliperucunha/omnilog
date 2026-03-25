@@ -311,9 +311,9 @@ export interface Log {
   contentHours: number | null;
   /** Games only: how long it took the user to beat (hours). */
   hoursToBeat: number | null;
-  /** Boardgames only: user owns a copy. */
+  /** Board games and video games: user owns a copy. */
   own: boolean | null;
-  /** Boardgames only: user wants to buy a copy. */
+  /** Board games and video games: user wants to buy a copy. */
   wantToBuy: boolean | null;
   /** Boardgames only: number of matches/sessions played. */
   matchesPlayed: number | null;
@@ -358,11 +358,11 @@ export interface CreateLogInput {
   affinityContext?: LogAffinityContext | null;
   /** When mediaType is boardgames: which API this id came from (bgg | ludopedia). Stored so details are fetched from the correct API. */
   boardGameSource?: BoardGameProvider | null;
-  /** Boardgames only: user owns a copy. */
+  /** Board games and video games: user owns a copy. */
   own?: boolean | null;
-  /** Boardgames only: user wants to buy a copy. */
+  /** Board games and video games: user wants to buy a copy. */
   wantToBuy?: boolean | null;
-  /** Boardgames only: number of matches/sessions played. */
+  /** Board games only: number of matches/sessions played. */
   matchesPlayed?: number | null;
 }
 
@@ -382,11 +382,11 @@ export interface UpdateLogInput {
   genres?: string[] | null;
   mechanics?: string[] | null;
   affinityContext?: LogAffinityContext | null;
-  /** Boardgames only: user owns a copy. */
+  /** Board games and video games: user owns a copy. */
   own?: boolean | null;
-  /** Boardgames only: user wants to buy a copy. */
+  /** Board games and video games: user wants to buy a copy. */
   wantToBuy?: boolean | null;
-  /** Boardgames only: number of matches/sessions played. */
+  /** Board games only: number of matches/sessions played. */
   matchesPlayed?: number | null;
 }
 

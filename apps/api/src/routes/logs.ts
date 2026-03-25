@@ -184,7 +184,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       where.status = status;
     }
   }
-  if (mediaType === "boardgames") {
+  if (mediaType === "boardgames" || mediaType === "games") {
     if (ownFilter) where.own = true;
     if (wantToBuyFilter) where.wantToBuy = true;
   }
@@ -577,7 +577,7 @@ const EXPORT_COLUMNS_BY_MEDIA: Record<MediaType, readonly string[]> = {
   books: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   manga: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   comics: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
-  games: ["externalId", "title", "grade", "status", "contentHours", "hoursToBeat", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+  games: ["externalId", "title", "grade", "status", "contentHours", "hoursToBeat", "own", "wantToBuy", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   boardgames: ["externalId", "title", "grade", "status", "own", "wantToBuy", "matchesPlayed", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
 };
 
@@ -805,9 +805,15 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       if (genresJson !== undefined) updateData.genres = genresJson;
       if (mechanicsJson !== undefined) updateData.mechanics = mechanicsJson;
       if (affinityStored !== undefined) updateData.affinityContext = affinityStored;
-      if (bodyOwn !== undefined) updateData.own = bodyOwn ?? null;
-      if (bodyWantToBuy !== undefined) updateData.wantToBuy = bodyWantToBuy ?? null;
-      if (bodyMatchesPlayed !== undefined) updateData.matchesPlayed = bodyMatchesPlayed ?? null;
+      if (bodyOwn !== undefined && (mediaType === "boardgames" || mediaType === "games")) {
+        updateData.own = bodyOwn ?? null;
+      }
+      if (bodyWantToBuy !== undefined && (mediaType === "boardgames" || mediaType === "games")) {
+        updateData.wantToBuy = bodyWantToBuy ?? null;
+      }
+      if (bodyMatchesPlayed !== undefined && mediaType === "boardgames") {
+        updateData.matchesPlayed = bodyMatchesPlayed ?? null;
+      }
       if (isInProgress(status) && existing.startedAt == null) updateData.startedAt = now;
       if (isCompleted(status)) updateData.completedAt = now;
       log = await prisma.log.update({
@@ -876,8 +882,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           mechanics: mechanicsJson,
           affinityContext: affinityStored !== undefined ? affinityStored : null,
           boardGameSource,
-          own: mediaType === "boardgames" ? (bodyOwn ?? null) : null,
-          wantToBuy: mediaType === "boardgames" ? (bodyWantToBuy ?? null) : null,
+          own: mediaType === "boardgames" || mediaType === "games" ? (bodyOwn ?? null) : null,
+          wantToBuy: mediaType === "boardgames" || mediaType === "games" ? (bodyWantToBuy ?? null) : null,
           matchesPlayed: mediaType === "boardgames" ? (bodyMatchesPlayed ?? null) : null,
         },
       });
@@ -980,9 +986,16 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
         ? null
         : stringifyLogAffinityContext(parsed.data.affinityContext);
   }
-  if (parsed.data.own !== undefined) data.own = parsed.data.own ?? null;
-  if (parsed.data.wantToBuy !== undefined) data.wantToBuy = parsed.data.wantToBuy ?? null;
-  if (parsed.data.matchesPlayed !== undefined) data.matchesPlayed = parsed.data.matchesPlayed ?? null;
+  const logMediaType = log.mediaType as MediaType;
+  if (parsed.data.own !== undefined && (logMediaType === "boardgames" || logMediaType === "games")) {
+    data.own = parsed.data.own ?? null;
+  }
+  if (parsed.data.wantToBuy !== undefined && (logMediaType === "boardgames" || logMediaType === "games")) {
+    data.wantToBuy = parsed.data.wantToBuy ?? null;
+  }
+  if (parsed.data.matchesPlayed !== undefined && logMediaType === "boardgames") {
+    data.matchesPlayed = parsed.data.matchesPlayed ?? null;
+  }
   if (isInProgress(parsed.data.status)) data.grade = null;
   const updated = await prisma.log.update({
     where: { id: log.id },

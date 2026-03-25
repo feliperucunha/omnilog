@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useParams, useSearchParams, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,12 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { MEDIA_TYPES, type MediaType, toMediaType } from "@geeklogs/shared";
-import { MediaLogs, type MediaLogsSort, type CategoryMilestoneProgress } from "@/pages/MediaLogs";
+import {
+  MediaLogs,
+  type CollectionListFilter,
+  type MediaLogsSort,
+  type CategoryMilestoneProgress,
+} from "@/pages/MediaLogs";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
@@ -168,22 +173,26 @@ export function PublicProfile() {
     "dateAsc", "dateDesc", "gradeAsc", "gradeDesc",
     "matchesPlayedAsc", "matchesPlayedDesc", "timeToBeatAsc", "timeToBeatDesc",
   ];
-  const statusParam = searchParams.get("status") ?? "";
-  const sortParamRaw = searchParams.get("sort") ?? "dateDesc";
-  const sortParam = VALID_SORTS.includes(sortParamRaw as MediaLogsSort) ? (sortParamRaw as MediaLogsSort) : "dateDesc";
-  const qParam = searchParams.get("q") ?? "";
-  const ownParam = searchParams.get("own") === "true" ? "owned" : "";
-  const wantToBuyParam = searchParams.get("wantToBuy") === "true" ? "wantToBuy" : "";
-  const initialFilters =
-    statusParam || sortParam !== "dateDesc" || qParam || ownParam || wantToBuyParam
-      ? {
-          status: statusParam,
-          sort: sortParam,
-          search: qParam,
-          own: ownParam as "" | "owned",
-          wantToBuy: wantToBuyParam as "" | "wantToBuy",
-        }
-      : undefined;
+  const searchParamsKey = searchParams.toString();
+  const initialFilters = useMemo(() => {
+    const params = new URLSearchParams(searchParamsKey);
+    const statusParam = params.get("status") ?? "";
+    const sortParamRaw = params.get("sort") ?? "dateDesc";
+    const sortParam = VALID_SORTS.includes(sortParamRaw as MediaLogsSort) ? (sortParamRaw as MediaLogsSort) : "dateDesc";
+    const qParam = params.get("q") ?? "";
+    const ownQ = params.get("own") === "true";
+    const wtbQ = params.get("wantToBuy") === "true";
+    let collection: CollectionListFilter = "";
+    if (ownQ) collection = "owned";
+    else if (wtbQ) collection = "wantToBuy";
+    if (!statusParam && sortParam === "dateDesc" && !qParam && !collection) return undefined;
+    return {
+      status: statusParam,
+      sort: sortParam,
+      search: qParam,
+      collection,
+    };
+  }, [searchParamsKey]);
 
   const byType = Object.fromEntries(
     MEDIA_TYPES.map((type) => [type, counts?.[type] ?? 0])
@@ -338,6 +347,7 @@ export function PublicProfile() {
             embedded
             publicUserId={userId}
             initialFilters={initialFilters}
+            initialFiltersSyncKey={searchParamsKey}
           />
         </section>
       )}

@@ -42,6 +42,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
 
@@ -78,12 +79,14 @@ export type MediaLogsSort =
   | "timeToBeatAsc"
   | "timeToBeatDesc";
 
+/** List filter for board games + video games (maps to API `own` / `wantToBuy` query params). */
+export type CollectionListFilter = "" | "owned" | "wantToBuy";
+
 export interface SharedFilters {
   status: string;
   sort: MediaLogsSort;
   search: string;
-  own: "" | "owned";
-  wantToBuy: "" | "wantToBuy";
+  collection: CollectionListFilter;
 }
 
 interface MediaLogsProps {
@@ -99,13 +102,25 @@ interface MediaLogsProps {
   initialNextCursor?: string | null;
   /** Initial filter values (e.g. from shared profile URL). */
   initialFilters?: Partial<SharedFilters>;
+  /** When this string changes (e.g. `searchParams.toString()`), re-apply `initialFilters` from the URL. */
+  initialFiltersSyncKey?: string;
   /** When embedded, called when filters change so parent can include them in share URL. */
   onFiltersChange?: (filters: SharedFilters) => void;
 }
 
 const DEFAULT_SORT: MediaLogsSort = "dateDesc";
 
-export function MediaLogs({ mediaType, embedded = false, publicUserId, milestoneProgress: milestoneProgressProp, initialLogs: initialLogsProp, initialNextCursor: initialNextCursorProp, initialFilters, onFiltersChange }: MediaLogsProps) {
+export function MediaLogs({
+  mediaType,
+  embedded = false,
+  publicUserId,
+  milestoneProgress: milestoneProgressProp,
+  initialLogs: initialLogsProp,
+  initialNextCursor: initialNextCursorProp,
+  initialFilters,
+  initialFiltersSyncKey,
+  onFiltersChange,
+}: MediaLogsProps) {
   const { t } = useLocale();
   const navigate = useNavigate();
   const { showLogComplete } = useLogComplete();
@@ -120,6 +135,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
     provider != null &&
     (mediaType === "boardgames" ? !hasBoardGameKey : me?.apiKeys && !me.apiKeys[provider]);
   const readOnly = !!publicUserId;
+  const showCollectionOwnershipFilters = mediaTypeHasCollectionOwnership(mediaType);
   const hasInitialData = embedded && initialLogsProp !== undefined;
   const [logs, setLogs] = useState<Log[]>(() => (hasInitialData && initialLogsProp) ? initialLogsProp : []);
   const [nextCursor, setNextCursor] = useState<string | null>(() => (hasInitialData && initialNextCursorProp !== undefined) ? initialNextCursorProp : null);
@@ -131,9 +147,8 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>(() => initialFilters?.status ?? "");
   const [statusCounts, setStatusCounts] = useState<{ total: number; byStatus: Record<string, number> } | null>(null);
-  const [ownedFilter, setOwnedFilter] = useState<"" | "owned">(() => initialFilters?.own ?? "");
-  const [wantToBuyFilter, setWantToBuyFilter] = useState<"" | "wantToBuy">(
-    () => initialFilters?.wantToBuy ?? ""
+  const [collectionFilter, setCollectionFilter] = useState<CollectionListFilter>(
+    () => initialFilters?.collection ?? ""
   );
   const [sortBy, setSortBy] = useState<MediaLogsSort>(() => (initialFilters?.sort as MediaLogsSort) ?? DEFAULT_SORT);
   const [showCustomEntry, setShowCustomEntry] = useState(false);
@@ -155,11 +170,18 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         status: statusFilter,
         sort: sortBy,
         search: categorySearchQuery,
-        own: ownedFilter,
-        wantToBuy: wantToBuyFilter,
+        collection: collectionFilter,
       });
     }
-  }, [embedded, onFiltersChange, statusFilter, sortBy, categorySearchQuery, ownedFilter, wantToBuyFilter]);
+  }, [embedded, onFiltersChange, statusFilter, sortBy, categorySearchQuery, collectionFilter]);
+
+  useEffect(() => {
+    if (initialFiltersSyncKey == null) return;
+    setStatusFilter(initialFilters?.status ?? "");
+    setSortBy((initialFilters?.sort as MediaLogsSort) ?? DEFAULT_SORT);
+    setCategorySearchQuery(initialFilters?.search ?? "");
+    setCollectionFilter((initialFilters?.collection as CollectionListFilter) ?? "");
+  }, [initialFiltersSyncKey, initialFilters]);
 
   useEffect(() => {
     if (readOnly || milestoneProgressProp != null || !me) return;
@@ -221,8 +243,8 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         limit: String(LOGS_PAGE_SIZE),
       });
       if (statusFilter) params.set("status", statusFilter);
-      if (mediaType === "boardgames" && ownedFilter === "owned") params.set("own", "true");
-      if (mediaType === "boardgames" && wantToBuyFilter === "wantToBuy") params.set("wantToBuy", "true");
+      if (showCollectionOwnershipFilters && collectionFilter === "owned") params.set("own", "true");
+      if (showCollectionOwnershipFilters && collectionFilter === "wantToBuy") params.set("wantToBuy", "true");
       if (!reset && nextCursor) params.set("cursor", nextCursor);
       const path = publicUserId
         ? `/users/${publicUserId}/logs?${params.toString()}`
@@ -249,7 +271,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           setLoadingMore(false);
         });
     },
-    [mediaType, statusFilter, ownedFilter, wantToBuyFilter, sortBy, nextCursor, loadingMore, t, publicUserId]
+    [mediaType, statusFilter, collectionFilter, sortBy, nextCursor, loadingMore, t, publicUserId, showCollectionOwnershipFilters]
   );
 
   const fetchStatusCounts = useCallback(() => {
@@ -266,9 +288,10 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
 
   useEffect(() => {
     setCategorySearchQuery("");
+    if (!mediaTypeHasCollectionOwnership(mediaType)) {
+      setCollectionFilter("");
+    }
     if (mediaType !== "boardgames") {
-      setOwnedFilter("");
-      setWantToBuyFilter("");
       setSortBy((prev) => (prev === "matchesPlayedAsc" || prev === "matchesPlayedDesc" ? "dateDesc" : prev));
     }
     if (mediaType !== "games") {
@@ -278,7 +301,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
 
   useEffect(() => {
     const defaultsMatch =
-      sortBy === "dateDesc" && statusFilter === "" && ownedFilter === "" && wantToBuyFilter === "";
+      sortBy === "dateDesc" && statusFilter === "" && collectionFilter === "";
     const useInitial = embedded && initialLogsProp !== undefined && defaultsMatch;
     if (useInitial) {
       setLogs(initialLogsProp ?? []);
@@ -295,8 +318,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   }, [
     mediaType,
     statusFilter,
-    ownedFilter,
-    wantToBuyFilter,
+    collectionFilter,
     sortBy,
     publicUserId,
     embedded,
@@ -307,7 +329,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   /** When embedded, start with Load more again when category or filters change. */
   useEffect(() => {
     if (embedded) setInfiniteScrollEnabled(false);
-  }, [embedded, mediaType, statusFilter, ownedFilter, wantToBuyFilter, sortBy]);
+  }, [embedded, mediaType, statusFilter, collectionFilter, sortBy]);
 
   useEffect(() => {
     setStatusCounts(null);
@@ -399,6 +421,15 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
     if (!q) return logs;
     return logs.filter((log) => log.title.toLowerCase().includes(q));
   }, [logs, categorySearchQuery]);
+
+  const collectionOwnershipSelectOptions = useMemo(
+    () => [
+      { value: "" as CollectionListFilter, label: t("mediaLogs.filterAll") },
+      { value: "owned" as const, label: t("mediaLogs.filterOwned") },
+      { value: "wantToBuy" as const, label: t("mediaLogs.filterWantToBuy") },
+    ],
+    [t]
+  );
 
   const handleCategorySearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -526,31 +557,15 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                 className="min-w-0 w-[11rem]"
                 triggerClassName="w-full min-w-0"
               />
-              {mediaType === "boardgames" && (
-                <>
-                  <Select
-                    value={ownedFilter}
-                    onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
-                    options={[
-                      { value: "", label: t("mediaLogs.filterAll") },
-                      { value: "owned", label: t("mediaLogs.filterOwned") },
-                    ]}
-                    aria-label={t("itemReviewForm.own")}
-                    className="min-w-0 w-[8rem]"
-                    triggerClassName="w-full min-w-0"
-                  />
-                  <Select
-                    value={wantToBuyFilter}
-                    onValueChange={(v) => setWantToBuyFilter((v as "" | "wantToBuy") || "")}
-                    options={[
-                      { value: "", label: t("mediaLogs.filterAll") },
-                      { value: "wantToBuy", label: t("mediaLogs.filterWantToBuy") },
-                    ]}
-                    aria-label={t("itemReviewForm.wantToBuy")}
-                    className="min-w-0 w-[9rem]"
-                    triggerClassName="w-full min-w-0"
-                  />
-                </>
+              {showCollectionOwnershipFilters && (
+                <Select
+                  value={collectionFilter}
+                  onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
+                  options={collectionOwnershipSelectOptions}
+                  aria-label={t("mediaLogs.filterCollection")}
+                  className="min-w-0 w-[12rem]"
+                  triggerClassName="w-full min-w-0"
+                />
               )}
               <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
               <Select
@@ -700,31 +715,15 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
             className="min-w-0 w-full"
             triggerClassName="w-full max-w-none min-w-0"
           />
-          {mediaType === "boardgames" && (
-            <>
-              <Select
-                value={ownedFilter}
-                onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
-                options={[
-                  { value: "", label: t("mediaLogs.filterAll") },
-                  { value: "owned", label: t("mediaLogs.filterOwned") },
-                ]}
-                aria-label={t("itemReviewForm.own")}
-                className="min-w-0 w-full"
-                triggerClassName="w-full max-w-none min-w-0"
-              />
-              <Select
-                value={wantToBuyFilter}
-                onValueChange={(v) => setWantToBuyFilter((v as "" | "wantToBuy") || "")}
-                options={[
-                  { value: "", label: t("mediaLogs.filterAll") },
-                  { value: "wantToBuy", label: t("mediaLogs.filterWantToBuy") },
-                ]}
-                aria-label={t("itemReviewForm.wantToBuy")}
-                className="min-w-0 w-full"
-                triggerClassName="w-full max-w-none min-w-0"
-              />
-            </>
+          {showCollectionOwnershipFilters && (
+            <Select
+              value={collectionFilter}
+              onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
+              options={collectionOwnershipSelectOptions}
+              aria-label={t("mediaLogs.filterCollection")}
+              className="min-w-0 w-full"
+              triggerClassName="w-full max-w-none min-w-0"
+            />
           )}
           <Select
             value={sortBy}
@@ -759,31 +758,15 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           className="min-w-0 w-[11rem]"
           triggerClassName="w-full min-w-0"
         />
-        {mediaType === "boardgames" && (
-          <>
-            <Select
-              value={ownedFilter}
-              onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
-              options={[
-                { value: "", label: t("mediaLogs.filterAll") },
-                { value: "owned", label: t("mediaLogs.filterOwned") },
-              ]}
-              aria-label={t("itemReviewForm.own")}
-              className="min-w-0 w-[8rem]"
-              triggerClassName="w-full min-w-0"
-            />
-            <Select
-              value={wantToBuyFilter}
-              onValueChange={(v) => setWantToBuyFilter((v as "" | "wantToBuy") || "")}
-              options={[
-                { value: "", label: t("mediaLogs.filterAll") },
-                { value: "wantToBuy", label: t("mediaLogs.filterWantToBuy") },
-              ]}
-              aria-label={t("itemReviewForm.wantToBuy")}
-              className="min-w-0 w-[9rem]"
-              triggerClassName="w-full min-w-0"
-            />
-          </>
+        {showCollectionOwnershipFilters && (
+          <Select
+            value={collectionFilter}
+            onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
+            options={collectionOwnershipSelectOptions}
+            aria-label={t("mediaLogs.filterCollection")}
+            className="min-w-0 w-[12rem]"
+            triggerClassName="w-full min-w-0"
+          />
         )}
         <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
         <Select
@@ -801,7 +784,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           className="min-w-0 w-[11rem]"
           triggerClassName="w-full min-w-0"
         />
-        </div>
+      </div>
       </div>
 
       {/* 2. Header: left = title + experience bar; right = action buttons; bar shorter on mobile to fit one line */}
@@ -1047,10 +1030,12 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                             </span>
                           ) : null;
                         })()}
-                        {mediaType === "boardgames" &&
+                        {showCollectionOwnershipFilters &&
                           (log.own === true ||
                             log.wantToBuy === true ||
-                            (log.matchesPlayed != null && log.matchesPlayed > 0)) && (
+                            (mediaType === "boardgames" &&
+                              log.matchesPlayed != null &&
+                              log.matchesPlayed > 0)) && (
                           <>
                             {log.own === true && (
                               <span className="text-[10px] sm:text-xs text-[var(--color-light)]">{t("itemReviewForm.own")}</span>
@@ -1060,8 +1045,12 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                                 {t("itemReviewForm.wantToBuy")}
                               </span>
                             )}
-                            {log.matchesPlayed != null && log.matchesPlayed > 0 && (
-                              <span className="text-[10px] sm:text-xs text-[var(--color-light)]">{t("itemReviewForm.matchesPlayed")}: {log.matchesPlayed}</span>
+                            {mediaType === "boardgames" &&
+                              log.matchesPlayed != null &&
+                              log.matchesPlayed > 0 && (
+                              <span className="text-[10px] sm:text-xs text-[var(--color-light)]">
+                                {t("itemReviewForm.matchesPlayed")}: {log.matchesPlayed}
+                              </span>
                             )}
                           </>
                         )}

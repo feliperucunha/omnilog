@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Share2, AlertTriangle, User, ChevronDown, ChevronRight } from "lucide-react";
@@ -22,7 +22,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/useMediaQuery";
-import { MediaLogs, type SharedFilters } from "@/pages/MediaLogs";
+import {
+  MediaLogs,
+  type CollectionListFilter,
+  type MediaLogsSort,
+  type SharedFilters,
+} from "@/pages/MediaLogs";
 import { Select } from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
@@ -67,6 +72,17 @@ interface MilestoneProgressResponse {
 type LogsPayload = { data: Log[]; nextCursor: string | null } | Log[];
 const LOGS_PAGE_SIZE = 24;
 
+const VALID_LOGS_SORTS: MediaLogsSort[] = [
+  "dateAsc",
+  "dateDesc",
+  "gradeAsc",
+  "gradeDesc",
+  "matchesPlayedAsc",
+  "matchesPlayedDesc",
+  "timeToBeatAsc",
+  "timeToBeatDesc",
+];
+
 export function Dashboard() {
   const { t } = useLocale();
   const { token } = useAuth();
@@ -74,6 +90,21 @@ export function Dashboard() {
   const { visibleTypes } = useVisibleMediaTypes();
   const { setPageTitle, setRightSlot, setBelowNavbar } = usePageTitle() ?? {};
   const [searchParams, setSearchParams] = useSearchParams();
+  const searchParamsKey = searchParams.toString();
+  const logsInitialFilters = useMemo((): Partial<SharedFilters> | undefined => {
+    const params = new URLSearchParams(searchParamsKey);
+    const status = params.get("status") ?? "";
+    const sortRaw = params.get("sort") ?? "dateDesc";
+    const sort = VALID_LOGS_SORTS.includes(sortRaw as MediaLogsSort) ? (sortRaw as MediaLogsSort) : "dateDesc";
+    const q = params.get("q") ?? "";
+    const ownQ = params.get("own") === "true";
+    const wtbQ = params.get("wantToBuy") === "true";
+    let collection: CollectionListFilter = "";
+    if (ownQ) collection = "owned";
+    else if (wtbQ) collection = "wantToBuy";
+    if (!status && sort === "dateDesc" && !q && !collection) return undefined;
+    return { status, sort, search: q, collection };
+  }, [searchParamsKey]);
   const categoryParam = searchParams.get("category");
   const defaultCategory: MediaType = visibleTypes.length > 0 ? toMediaType(visibleTypes[0]) : "movies";
   const [selectedCategory, setSelectedCategory] = useState<MediaType>(() => {
@@ -105,8 +136,7 @@ export function Dashboard() {
     status: "",
     sort: "dateDesc",
     search: "",
-    own: "",
-    wantToBuy: "",
+    collection: "",
   });
 
   /** Load collapsed prefs from persistent storage (Android/Capacitor). */
@@ -138,14 +168,22 @@ export function Dashboard() {
     if (visibleTypes.length > 0 && !visibleTypes.includes(selectedCategory)) {
       const fallback = toMediaType(visibleTypes[0]);
       setSelectedCategory(fallback);
-      setSearchParams({ category: fallback }, { replace: true });
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("category", fallback);
+        return next;
+      }, { replace: true });
     }
   }, [visibleTypes, selectedCategory, setSearchParams]);
 
   const setCategory = useCallback(
     (type: MediaType) => {
       setSelectedCategory(type);
-      setSearchParams({ category: type }, { replace: true });
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("category", type);
+        return next;
+      }, { replace: true });
     },
     [setSearchParams]
   );
@@ -266,8 +304,8 @@ export function Dashboard() {
       if (f.status) params.set("status", f.status);
       if (f.sort && f.sort !== "dateDesc") params.set("sort", f.sort);
       if (f.search.trim()) params.set("q", f.search.trim());
-      if (f.own === "owned") params.set("own", "true");
-      if (f.wantToBuy === "wantToBuy") params.set("wantToBuy", "true");
+      if (f.collection === "owned") params.set("own", "true");
+      else if (f.collection === "wantToBuy") params.set("wantToBuy", "true");
     }
     const query = params.toString();
     const url = query ? `${base}?${query}` : base;
@@ -471,8 +509,25 @@ export function Dashboard() {
             initialNextCursor={
               initialLogsData?.mediaType === selectedCategory ? initialLogsData.nextCursor : undefined
             }
+            initialFilters={logsInitialFilters}
+            initialFiltersSyncKey={searchParamsKey}
             onFiltersChange={(f) => {
               shareFiltersRef.current = f;
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.set("category", selectedCategory);
+                if (f.status) next.set("status", f.status);
+                else next.delete("status");
+                if (f.sort !== "dateDesc") next.set("sort", f.sort);
+                else next.delete("sort");
+                if (f.search.trim()) next.set("q", f.search.trim());
+                else next.delete("q");
+                next.delete("own");
+                next.delete("wantToBuy");
+                if (f.collection === "owned") next.set("own", "true");
+                else if (f.collection === "wantToBuy") next.set("wantToBuy", "true");
+                return next;
+              }, { replace: true });
             }}
           />
         </section>
@@ -633,10 +688,12 @@ export function Dashboard() {
                               <span className="whitespace-nowrap">{t("dashboard.finishedIn", { duration })}</span>
                             ) : null;
                           })()}
-                          {log.mediaType === "boardgames" &&
+                          {(log.mediaType === "boardgames" || log.mediaType === "games") &&
                             (log.own === true ||
                               log.wantToBuy === true ||
-                              (log.matchesPlayed != null && log.matchesPlayed > 0)) && (
+                              (log.mediaType === "boardgames" &&
+                                log.matchesPlayed != null &&
+                                log.matchesPlayed > 0)) && (
                             <>
                               {log.own === true && (
                                 <span className="whitespace-nowrap">{t("itemReviewForm.own")}</span>
@@ -644,8 +701,12 @@ export function Dashboard() {
                               {log.wantToBuy === true && (
                                 <span className="whitespace-nowrap">{t("itemReviewForm.wantToBuy")}</span>
                               )}
-                              {log.matchesPlayed != null && log.matchesPlayed > 0 && (
-                                <span className="whitespace-nowrap">{t("itemReviewForm.matchesPlayed")}: {log.matchesPlayed}</span>
+                              {log.mediaType === "boardgames" &&
+                                log.matchesPlayed != null &&
+                                log.matchesPlayed > 0 && (
+                                <span className="whitespace-nowrap">
+                                  {t("itemReviewForm.matchesPlayed")}: {log.matchesPlayed}
+                                </span>
                               )}
                             </>
                           )}

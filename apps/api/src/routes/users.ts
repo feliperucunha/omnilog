@@ -237,7 +237,7 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
       where.status = status;
     }
   }
-  if (mediaType === "boardgames") {
+  if (mediaType === "boardgames" || mediaType === "games") {
     if (ownFilter) where.own = true;
     if (wantToBuyFilter) where.wantToBuy = true;
   }

@@ -22,6 +22,9 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { StarRating } from "@/components/StarRating";
 import { starsToGrade } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
+import { BoardGameOwnershipSwitch } from "@/components/BoardGameOwnershipSwitch";
+import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/lib/boardGameOwnership";
+import { mediaTypeHasBoardGameOnlyFields, mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
 const HAS_CHAPTER_VOLUME: MediaType[] = ["comics", "manga"];
@@ -69,13 +72,15 @@ export function CustomEntryForm({
   const [chapter, setChapter] = useState<number | "">("");
   const [volume, setVolume] = useState<number | "">("");
   const [own, setOwn] = useState(false);
+  const [wantToBuy, setWantToBuy] = useState(false);
   const [matchesPlayed, setMatchesPlayed] = useState<number | "">("");
   const [loading, setLoading] = useState(false);
 
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
-  const showBoardGameFields = mediaType === "boardgames";
+  const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
+  const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
   const showMediaTypeSelector = initialMediaType == null;
 
   const toNum = (v: number | ""): number | null => (v === "" ? null : v);
@@ -111,7 +116,8 @@ export function CustomEntryForm({
           episode: showSeasonEpisode ? toNum(episode) : null,
           chapter: showChapterVolume ? toNum(chapter) : null,
           volume: showChapterVolume ? toNum(volume) : null,
-          ...(showBoardGameFields && { own, matchesPlayed: toNum(matchesPlayed) }),
+          ...(showCollectionOwnership && { own, wantToBuy }),
+          ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
         }),
       });
       if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
@@ -155,7 +161,14 @@ export function CustomEntryForm({
                   </Label>
                   <Select
                     value={mediaType}
-                    onValueChange={(v) => setMediaType(v as MediaType)}
+                    onValueChange={(v) => {
+                      const next = v as MediaType;
+                      setMediaType(next);
+                      if (!mediaTypeHasCollectionOwnership(next)) {
+                        setOwn(false);
+                        setWantToBuy(false);
+                      }
+                    }}
                     options={MEDIA_TYPES.map((type) => ({
                       value: type,
                       label: t(`nav.${type}`),
@@ -275,22 +288,21 @@ export function CustomEntryForm({
                   </div>
                 </div>
               )}
-              {showBoardGameFields && (
+              {showCollectionOwnership && (
                 <>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="custom-entry-own"
-                      checked={own}
-                      onChange={(e) => setOwn(e.target.checked)}
-                      className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
-                      aria-describedby="custom-entry-own-desc"
-                    />
-                    <Label htmlFor="custom-entry-own" id="custom-entry-own-desc" className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]">
-                      {t("itemReviewForm.own")}
-                    </Label>
-                  </div>
-                  <div className="space-y-2">
+                  <BoardGameOwnershipSwitch
+                    value={boardGameOwnershipFromBooleans(own, wantToBuy)}
+                    onChange={(mode) => {
+                      const next = boardGameOwnershipToBooleans(mode);
+                      setOwn(next.own);
+                      setWantToBuy(next.wantToBuy);
+                    }}
+                    disabled={loading}
+                  />
+                </>
+              )}
+              {showBoardGameFields && (
+                <div className="space-y-2">
                     <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.matchesPlayed")}</Label>
                     <Input
                       type="number"
@@ -309,8 +321,7 @@ export function CustomEntryForm({
                       className="w-full max-w-[8rem] bg-[var(--color-darkest)]"
                       aria-label={t("itemReviewForm.matchesPlayed")}
                     />
-                  </div>
-                </>
+                </div>
               )}
               <div>
                 <Label className="mb-1 block text-sm font-medium text-[var(--color-lightest)]">

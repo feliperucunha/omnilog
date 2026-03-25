@@ -29,6 +29,9 @@ import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars, starsToGrade } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
+import { BoardGameOwnershipSwitch } from "@/components/BoardGameOwnershipSwitch";
+import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/lib/boardGameOwnership";
+import { mediaTypeHasBoardGameOnlyFields, mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
 const HAS_CHAPTER_VOLUME: MediaType[] = ["comics", "manga"];
@@ -103,7 +106,8 @@ export function LogForm(props: LogFormProps) {
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
-  const showBoardGameFields = mediaType === "boardgames";
+  const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
+  const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
   const showHoursToBeat = mediaType === "games";
 
   useEffect(() => {
@@ -166,9 +170,11 @@ export function LogForm(props: LogFormProps) {
           volume: toNum(volume),
         };
         if (showHoursToBeat) payload.hoursToBeat = toNum(hoursToBeat);
-        if (showBoardGameFields) {
+        if (showCollectionOwnership) {
           payload.own = own;
           payload.wantToBuy = wantToBuy;
+        }
+        if (showBoardGameFields) {
           payload.matchesPlayed = toNum(matchesPlayed);
         }
         const currentStatus = props.log.status ?? props.log.listType ?? null;
@@ -182,10 +188,9 @@ export function LogForm(props: LogFormProps) {
           toNum(chapter) === (props.log.chapter ?? null) &&
           toNum(volume) === (props.log.volume ?? null) &&
           (!showHoursToBeat || toNum(hoursToBeat) === (props.log.hoursToBeat ?? null)) &&
-          (!showBoardGameFields ||
-            (own === (props.log.own ?? false) &&
-              wantToBuy === (props.log.wantToBuy ?? false) &&
-              toNum(matchesPlayed) === (props.log.matchesPlayed ?? null)));
+          (!showCollectionOwnership ||
+            (own === (props.log.own ?? false) && wantToBuy === (props.log.wantToBuy ?? false))) &&
+          (!showBoardGameFields || toNum(matchesPlayed) === (props.log.matchesPlayed ?? null));
         if (noChange) {
           setLoading(false);
           props.onCancel();
@@ -207,7 +212,8 @@ export function LogForm(props: LogFormProps) {
             mediaType: props.log.mediaType as MediaType,
             id: props.log.externalId,
             review: review.trim() || null,
-            ...(showBoardGameFields && { own, wantToBuy, matchesPlayed: toNum(matchesPlayed) }),
+            ...(showCollectionOwnership && { own, wantToBuy }),
+            ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
           };
           props.onSaved(completion);
         } else {
@@ -227,7 +233,8 @@ export function LogForm(props: LogFormProps) {
               review,
               status: status ?? null,
               ...(showHoursToBeat && { hoursToBeat: toNum(hoursToBeat) }),
-              ...(showBoardGameFields && { own, wantToBuy, matchesPlayed: toNum(matchesPlayed) }),
+              ...(showCollectionOwnership && { own, wantToBuy }),
+              ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
             }),
           }
         );
@@ -242,7 +249,8 @@ export function LogForm(props: LogFormProps) {
           mediaType: props.mediaType,
           id: props.externalId,
           review: review.trim() || null,
-          ...(showBoardGameFields && { own, wantToBuy, matchesPlayed: toNum(matchesPlayed) }),
+          ...(showCollectionOwnership && { own, wantToBuy }),
+          ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
         };
         props.onSaved(completion);
       }
@@ -398,41 +406,21 @@ export function LogForm(props: LogFormProps) {
                   />
                 </div>
               )}
-              {showBoardGameFields && (
+              {showCollectionOwnership && (
                 <>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="log-form-own"
-                        checked={own}
-                        onChange={(e) => setOwn(e.target.checked)}
-                        className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
-                        aria-describedby="log-form-own-desc"
-                      />
-                      <Label htmlFor="log-form-own" id="log-form-own-desc" className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]">
-                        {t("itemReviewForm.own")}
-                      </Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="log-form-want-to-buy"
-                        checked={wantToBuy}
-                        onChange={(e) => setWantToBuy(e.target.checked)}
-                        className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
-                        aria-describedby="log-form-want-to-buy-desc"
-                      />
-                      <Label
-                        htmlFor="log-form-want-to-buy"
-                        id="log-form-want-to-buy-desc"
-                        className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]"
-                      >
-                        {t("itemReviewForm.wantToBuy")}
-                      </Label>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
+                  <BoardGameOwnershipSwitch
+                    value={boardGameOwnershipFromBooleans(own, wantToBuy)}
+                    onChange={(mode) => {
+                      const next = boardGameOwnershipToBooleans(mode);
+                      setOwn(next.own);
+                      setWantToBuy(next.wantToBuy);
+                    }}
+                    disabled={loading || deleting}
+                  />
+                </>
+              )}
+              {showBoardGameFields && (
+                <div className="space-y-2">
                     <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.matchesPlayed")}</Label>
                     <Input
                       type="number"
@@ -451,8 +439,7 @@ export function LogForm(props: LogFormProps) {
                       className="w-full max-w-[8rem]"
                       aria-label={t("itemReviewForm.matchesPlayed")}
                     />
-                  </div>
-                </>
+                </div>
               )}
               <div>
                 <Label className="mb-1 block text-sm font-medium text-[var(--color-lightest)]">
