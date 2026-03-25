@@ -23,6 +23,10 @@ const config: CapacitorConfig = {
       launchAutoHide: false,
       launchShowDuration: 0,
     },
+    /** Android: WebView resizes with IME when edge-to-edge / status bar overlays. */
+    Keyboard: {
+      resizeOnFullScreen: true,
+    },
   },
 };
 

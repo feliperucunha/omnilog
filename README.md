@@ -92,7 +92,7 @@ Equivalent filters:
 
 Native projects live under **`apps/android`** (not inside `apps/web`). App id: **`com.geeklogs.app`**.
 
-1. Set **`VITE_API_URL`** to your **production** API when building the bundle (no dev proxy in the WebView). Example:
+1. Set **`VITE_API_URL`** to your **production** API when building the bundle (no dev proxy in the WebView). Optionally set **`VITE_APP_WEB_ORIGIN`** to your deployed web URL (same host as Android `app_link_host`) so HTTPS links and App Links route in-app. See **`docs/android-app-links.md`**.
 
    ```bash
    cd apps/web

@@ -13,17 +13,25 @@
     "ios": "pnpm --filter @geeklogs/web build:android && cap sync ios && cap open ios"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.0.0",
     "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
     "@capacitor/ios": "^7.0.0",
     "@capacitor/splash-screen": "^7.0.0"
   },
   "dependencies": {
-    "@geeklogs/web": "workspace:*",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/browser": "^7.0.0",
     "@capacitor/filesystem": "^7.0.0",
-    "@capacitor/share": "^7.0.0"
+    "@capacitor/haptics": "^7.0.0",
+    "@capacitor/keyboard": "^7.0.0",
+    "@capacitor/share": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0",
+    "@geeklogs/web": "workspace:*"
   },
   "capacitor": {
-    "platforms": ["android", "ios"]
+    "platforms": [
+      "android",
+      "ios"
+    ]
   }
 }

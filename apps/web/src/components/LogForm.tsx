@@ -19,6 +19,7 @@ import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@g
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
+import { triggerImpact } from "@/lib/capacitorHaptics";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
@@ -202,6 +203,7 @@ export function LogForm(props: LogFormProps) {
         );
         if (updated.newBadges?.length) showAchievementToasts(updated.newBadges, t("dashboard.badgesAchievementUnlocked"));
         toast.success(t("toast.logUpdated"));
+        triggerImpact("medium");
         invalidateLogsAndItemsCache();
         if (statusChanged) {
           const completion: LogCompleteState = {
@@ -240,6 +242,7 @@ export function LogForm(props: LogFormProps) {
         );
         if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
         toast.success(t("toast.logSaved"));
+        triggerImpact("medium");
         invalidateLogsAndItemsCache();
         const completion: LogCompleteState = {
           image,

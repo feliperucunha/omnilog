@@ -102,23 +102,65 @@
   [class*="backdrop-blur"] {
     -webkit-backdrop-filter: var(--tw-backdrop-blur, blur(12px));
   }
-  /* Bottom drawer (mobile only): slide up on open, slide down on close */
+  /* Bottom drawer (mobile): sheet + scrim share duration/easing so motion reads as one surface (not “fast fade + slow slide”). */
   @media (max-width: 767px) {
     @keyframes drawer-slide-in {
       from {
-        transform: translateY(100%);
+        transform: translate3d(0, 100%, 0);
       }
       to {
-        transform: translateY(0);
+        transform: translate3d(0, 0, 0);
       }
     }
+    @keyframes drawer-scrim-in {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    @keyframes drawer-scrim-out {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0;
+      }
+    }
+    /* Material-style standard deceleration; same curve on scrim + sheet */
+    .drawer-scrim[data-state="open"] {
+      animation: drawer-scrim-in 0.38s cubic-bezier(0.2, 0, 0, 1) both;
+    }
+    .drawer-scrim[data-state="closed"] {
+      animation: drawer-scrim-out 0.35s cubic-bezier(0.2, 0, 0, 1) both;
+    }
     .drawer-panel[data-state="open"]:not([data-closing="true"]) {
-      animation: drawer-slide-in 0.4s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+      animation: drawer-slide-in 0.38s cubic-bezier(0.2, 0, 0, 1) both;
     }
     .drawer-panel[data-closing="true"] {
       animation: none;
-      transform: translateY(100%);
-      transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+      transform: translate3d(0, 100%, 0);
+      transition: transform 0.35s cubic-bezier(0.2, 0, 0, 1);
+    }
+  }
+  @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+    .drawer-scrim[data-state="open"],
+    .drawer-scrim[data-state="closed"] {
+      animation: none;
+    }
+    .drawer-scrim[data-state="open"] {
+      opacity: 1;
+    }
+    .drawer-scrim[data-state="closed"] {
+      opacity: 0;
+    }
+    .drawer-panel[data-state="open"]:not([data-closing="true"]) {
+      animation: none;
+      transform: translate3d(0, 0, 0);
+    }
+    .drawer-panel[data-closing="true"] {
+      transition-duration: 0.15s;
     }
   }
 }

@@ -1,5 +1,7 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
+import { mergeRefs, useRadixDataStateOpenRef } from "@/hooks/useRadixDataStateOpen";
 import { cn } from "@/lib/utils";
 
 const Dialog = DialogPrimitive.Root;
@@ -31,14 +33,26 @@ const DialogContent = React.forwardRef<
     /** When false, outside clicks / overlay won't call onClose (use while a nested dialog is open). */
     closeOnInteractOutside?: boolean;
   }
->(({ className, children, onClose, overlayClassName, closeOnInteractOutside = true, ...props }, ref) => (
+>(function DialogContent(
+  { className, children, onClose, overlayClassName, closeOnInteractOutside = true, ...props },
+  ref
+) {
+  const [dataStateRef, radixOpen] = useRadixDataStateOpenRef<HTMLDivElement>();
+  const mergedRef = React.useMemo(() => mergeRefs(ref, dataStateRef), [ref, dataStateRef]);
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+  useAndroidOverlayBack(Boolean(onClose) && radixOpen, () => {
+    onCloseRef.current?.();
+  });
+
+  return (
   <DialogPortal>
     <DialogOverlay
       className={overlayClassName}
       onClick={closeOnInteractOutside ? onClose : undefined}
     />
     <DialogPrimitive.Content
-      ref={ref}
+      ref={mergedRef}
       className={cn(
         "fixed inset-0 z-50 grid w-full h-full min-h-[100dvh] max-h-[100dvh] translate-x-0 translate-y-0 gap-4 overflow-auto rounded-none border-0 bg-[var(--color-dark)] p-6 shadow-[var(--shadow-modal)] duration-200",
         "max-md:pt-[max(1.5rem,env(safe-area-inset-top))] max-md:pb-[max(1.5rem,env(safe-area-inset-bottom))] max-md:pl-[max(1rem,env(safe-area-inset-left))] max-md:pr-[max(1rem,env(safe-area-inset-right))]",
@@ -70,7 +84,8 @@ const DialogContent = React.forwardRef<
       {children}
     </DialogPrimitive.Content>
   </DialogPortal>
-));
+  );
+});
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({

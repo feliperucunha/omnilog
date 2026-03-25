@@ -1,4 +1,4 @@
-import { NavLink, Link, useLocation } from "react-router-dom";
+import { NavLink, Link } from "react-router-dom";
 import {
   Home,
   BarChart3,
@@ -20,7 +20,6 @@ function NavLinkItem({
   to,
   label,
   icon,
-  active,
   iconOnly,
   bottomBar,
   className,
@@ -28,7 +27,6 @@ function NavLinkItem({
   to: string;
   label: string;
   icon: React.ReactNode;
-  active?: boolean;
   iconOnly?: boolean;
   /** Mobile bottom bar: icon + text stacked. */
   bottomBar?: boolean;
@@ -37,16 +35,19 @@ function NavLinkItem({
   return (
     <NavLink
       to={to}
-      className={cn(
-        "flex rounded-lg text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/50",
-        bottomBar
-          ? "flex-1 flex-col items-center justify-center gap-0.5 py-2 px-1 min-w-0"
-          : iconOnly
-            ? "flex-1 justify-center py-4 items-center"
-            : "items-center gap-3 px-3 py-2.5 text-sm font-medium",
-        active && "bg-[var(--color-mid)]/50",
-        className
-      )}
+      end
+      className={({ isActive }) =>
+        cn(
+          "flex rounded-lg text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/50",
+          bottomBar
+            ? "flex-1 flex-col items-center justify-center gap-0.5 py-2 px-1 min-w-0"
+            : iconOnly
+              ? "flex-1 justify-center py-4 items-center"
+              : "items-center gap-3 px-3 py-2.5 text-sm font-medium",
+          isActive && "bg-[var(--color-mid)]/50",
+          className
+        )
+      }
       aria-label={label}
     >
       <span
@@ -72,7 +73,6 @@ function NavLinkItem({
 export function Nav() {
   const { t } = useLocale();
   const { token } = useAuth();
-  const location = useLocation();
 
   const navItems: { to: string; labelKey: string; icon: React.ReactNode }[] = [
     { to: "/", labelKey: "nav.dashboard", icon: <Home size={iconSize} /> },
@@ -107,7 +107,6 @@ export function Nav() {
                   to={item.to}
                   label={t(item.labelKey)}
                   icon={item.icon}
-                  active={location.pathname === item.to}
                 />
               ))}
             </>
@@ -117,16 +116,14 @@ export function Nav() {
                 to="/"
                 label={t("nav.dashboard")}
                 icon={<Home size={iconSize} />}
-                active={location.pathname === "/"}
               />
               <NavLinkItem
                 to="/search"
                 label={t("nav.search")}
                 icon={<Search size={iconSize} />}
-                active={location.pathname === "/search"}
               />
               <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} />
-              <NavLinkItem to="/tiers" label={t("nav.plans")} icon={<CreditCard size={iconSize} />} active={location.pathname === "/tiers"} />
+              <NavLinkItem to="/tiers" label={t("nav.plans")} icon={<CreditCard size={iconSize} />} />
               <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} />
               <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} />
             </>
@@ -145,18 +142,17 @@ export function Nav() {
               to={item.to}
               label={t(item.labelKey)}
               icon={item.icon}
-              active={location.pathname === item.to}
               bottomBar
             />
           ))
         ) : (
           <>
-            <NavLinkItem to="/" label={t("nav.dashboard")} icon={<Home size={iconSize} />} active={location.pathname === "/"} bottomBar />
-            <NavLinkItem to="/search" label={t("nav.search")} icon={<Search size={iconSize} />} active={location.pathname === "/search"} bottomBar />
-            <NavLinkItem to="/tiers" label={t("nav.plans")} icon={<CreditCard size={iconSize} />} active={location.pathname === "/tiers"} bottomBar />
-            <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} active={location.pathname === "/about"} bottomBar />
-            <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} active={location.pathname === "/login"} bottomBar />
-            <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} active={location.pathname === "/register"} bottomBar />
+            <NavLinkItem to="/" label={t("nav.dashboard")} icon={<Home size={iconSize} />} bottomBar />
+            <NavLinkItem to="/search" label={t("nav.search")} icon={<Search size={iconSize} />} bottomBar />
+            <NavLinkItem to="/tiers" label={t("nav.plans")} icon={<CreditCard size={iconSize} />} bottomBar />
+            <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} bottomBar />
+            <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} bottomBar />
+            <NavLinkItem to="/register" label={t("nav.register")} icon={<UserPlus size={iconSize} />} bottomBar />
           </>
         )}
       </nav>

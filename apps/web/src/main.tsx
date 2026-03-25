@@ -15,6 +15,7 @@ import { ColdStartLoader } from "@/components/ColdStartLoader";
 import { AppVersionModal } from "@/components/AppVersionModal";
 import { AppVersionProvider } from "@/contexts/AppVersionContext";
 import App from "./App";
+import { CapacitorAndroidIntegration } from "@/components/CapacitorAndroidIntegration";
 import "./fonts.css";
 import "./index.css";
 
@@ -29,6 +30,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <MeProvider>
                   <VisibleMediaTypesProvider>
                     <LogCompleteProvider>
+                      <CapacitorAndroidIntegration />
                       <ThemeSync />
                       <LocaleSync />
                       <ColdStartLoader />

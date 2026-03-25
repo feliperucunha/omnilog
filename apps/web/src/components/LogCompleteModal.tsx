@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useIsPresent } from "framer-motion";
 import { Loader2, Share2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StarRating } from "@/components/StarRating";
@@ -16,7 +16,9 @@ import { overlayVariants, modalContentVariants } from "@/lib/animations";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { showErrorToast } from "@/lib/errorToast";
+import { triggerImpact } from "@/lib/capacitorHaptics";
 import { cn } from "@/lib/utils";
+import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
 
 /**
  * Real-device WebView can report isNativePlatform() later than the emulator, and animated
@@ -98,6 +100,8 @@ const NATIVE_DARK = {
 const NATIVE_LIGHT = { cardBg: "#ffffff", text: "#0f172a", textMuted: "#64748b", border: "#e2e8f0", overlay: "rgba(255,255,255,0.82)" } as const;
 
 export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
+  const overlayPresent = useIsPresent();
+  useAndroidOverlayBack(overlayPresent, onClose);
   const { t } = useLocale();
   const { me } = useMe();
   const theme = useTheme();
@@ -242,6 +246,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
           files: [file],
           title: dialogTitle,
         });
+        triggerImpact("light");
         return;
       }
 
@@ -259,6 +264,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
         dialogTitle,
         text: " ",
       });
+      triggerImpact("light");
     } catch (err) {
       showErrorToast(t, "E015", { originalError: err });
     } finally {

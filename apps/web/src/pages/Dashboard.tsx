@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
-import { apiFetch, apiFetchCached, LOGS_INVALIDATED_EVENT } from "@/lib/api";
+import { apiFetch, apiFetchCached, invalidateApiCache, LOGS_INVALIDATED_EVENT } from "@/lib/api";
+import { APP_PTR_REFRESH_EVENT } from "@/lib/appPtrRefresh";
 import { FullPageLoader } from "@/components/FullPageLoader";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -281,6 +282,29 @@ export function Dashboard() {
       .then(setMilestoneProgress)
       .catch(() => setMilestoneProgress(null));
   }, [token]);
+
+  useEffect(() => {
+    const onPtr = () => {
+      fetchCounts();
+      if (!token) return;
+      apiFetch<MilestoneProgressResponse>("/me/milestones/progress")
+        .then(setMilestoneProgress)
+        .catch(() => setMilestoneProgress(null));
+      setFeedLoading(true);
+      const feedUrl =
+        feedFriendFilter === "all"
+          ? "/logs/feed"
+          : `/logs/feed?userId=${encodeURIComponent(feedFriendFilter)}`;
+      apiFetch<{ data: FeedEntry[] }>(feedUrl)
+        .then((res) => setFeed(res.data ?? []))
+        .catch(() => setFeed([]))
+        .finally(() => setFeedLoading(false));
+      invalidateApiCache("/logs");
+      window.dispatchEvent(new CustomEvent(LOGS_INVALIDATED_EVENT));
+    };
+    window.addEventListener(APP_PTR_REFRESH_EVENT, onPtr);
+    return () => window.removeEventListener(APP_PTR_REFRESH_EVENT, onPtr);
+  }, [token, fetchCounts, feedFriendFilter]);
 
   useEffect(() => {
     const refetchMilestones = () => {

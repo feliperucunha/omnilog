@@ -1,18 +1,28 @@
-import { Outlet } from "react-router-dom";
+import { useRef } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import { Nav } from "@/components/Nav";
 import { Topbar } from "@/components/Topbar";
 import { AdBanner } from "@/components/AdBanner";
 import { InvalidApiKeyBanner } from "@/components/InvalidApiKeyBanner";
 import { PageTitleProvider, usePageTitle } from "@/contexts/PageTitleContext";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 function AppLayoutContent() {
   const pageTitle = usePageTitle();
   const belowNavbar = pageTitle?.belowNavbar;
+  const location = useLocation();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const ptrEnabled =
+    location.pathname === "/" || location.pathname === "/search";
+  usePullToRefresh({ enabled: ptrEnabled, scrollRef });
 
   return (
     <>
       <Topbar />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+      <div
+        ref={scrollRef}
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto"
+      >
         {belowNavbar != null && belowNavbar !== false && (
           <div className="sticky top-0 z-20 w-full shrink-0 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
             {belowNavbar}

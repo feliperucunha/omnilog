@@ -10,6 +10,7 @@ import { getStatusLabel } from "@/lib/statusLabel";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { apiFetch, apiFetchCached, invalidateApiCache } from "@/lib/api";
+import { APP_PTR_REFRESH_EVENT } from "@/lib/appPtrRefresh";
 import { SearchSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
 import { ApiKeyPrompt, type ApiKeyProvider } from "@/components/ApiKeyPrompt";
@@ -33,6 +34,7 @@ import { Select } from "@/components/ui/select";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { SearchRecommendationsCarousel } from "@/components/SearchRecommendationsCarousel";
 import * as storage from "@/lib/storage";
+import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
 import type { Log } from "@geeklogs/shared";
 
 const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
@@ -152,6 +154,7 @@ export function Search() {
     void storage.getItem(FREE_SEARCH_USAGE_STORAGE_KEY);
   }, []);
   const [drawerItem, setDrawerItem] = useState<{ mediaType: MediaType; id: string } | null>(null);
+  useAndroidOverlayBack(drawerItem != null, () => setDrawerItem(null));
   const [logsByExternalId, setLogsByExternalId] = useState<Map<string, string>>(new Map());
   const [recResults, setRecResults] = useState<SearchResult[]>([]);
   const [recLoading, setRecLoading] = useState(false);
@@ -403,6 +406,19 @@ export function Search() {
     if (!query.trim()) return;
     await runSearch(query);
   };
+
+  useEffect(() => {
+    const onPtr = () => {
+      invalidateApiCache("/search");
+      if (hasSearched && query.trim()) {
+        void runSearch(query);
+      } else {
+        setRecRefreshNonce((n) => n + 1);
+      }
+    };
+    window.addEventListener(APP_PTR_REFRESH_EVENT, onPtr);
+    return () => window.removeEventListener(APP_PTR_REFRESH_EVENT, onPtr);
+  }, [hasSearched, query, runSearch]);
 
   const handleApiKeySaved = useCallback(() => {
     setRequiresApiKey(null);
