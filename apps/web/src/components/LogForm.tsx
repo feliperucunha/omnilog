@@ -79,6 +79,7 @@ export function LogForm(props: LogFormProps) {
   const [volume, setVolume] = useState<number | "">(isEdit ? (log!.volume ?? "") : "");
   const [hoursToBeat, setHoursToBeat] = useState<number | "">(isEdit ? (log!.hoursToBeat ?? "") : "");
   const [own, setOwn] = useState(isEdit ? (log!.own ?? false) : false);
+  const [wantToBuy, setWantToBuy] = useState(isEdit ? (log!.wantToBuy ?? false) : false);
   const [matchesPlayed, setMatchesPlayed] = useState<number | "">(
     isEdit
       ? (log!.matchesPlayed ?? (log!.status === "played" ? 1 : mediaType === "boardgames" ? 0 : ""))
@@ -131,6 +132,7 @@ export function LogForm(props: LogFormProps) {
       setVolume(log.volume ?? "");
       setHoursToBeat(log.hoursToBeat ?? "");
       setOwn(log.own ?? false);
+      setWantToBuy(log.wantToBuy ?? false);
       const defaultMatches = showBoardGameFields
         ? (log.status === "played" ? 1 : log.status === "plan to play" ? 0 : "")
         : "";
@@ -166,6 +168,7 @@ export function LogForm(props: LogFormProps) {
         if (showHoursToBeat) payload.hoursToBeat = toNum(hoursToBeat);
         if (showBoardGameFields) {
           payload.own = own;
+          payload.wantToBuy = wantToBuy;
           payload.matchesPlayed = toNum(matchesPlayed);
         }
         const currentStatus = props.log.status ?? props.log.listType ?? null;
@@ -180,7 +183,9 @@ export function LogForm(props: LogFormProps) {
           toNum(volume) === (props.log.volume ?? null) &&
           (!showHoursToBeat || toNum(hoursToBeat) === (props.log.hoursToBeat ?? null)) &&
           (!showBoardGameFields ||
-            (own === (props.log.own ?? false) && toNum(matchesPlayed) === (props.log.matchesPlayed ?? null)));
+            (own === (props.log.own ?? false) &&
+              wantToBuy === (props.log.wantToBuy ?? false) &&
+              toNum(matchesPlayed) === (props.log.matchesPlayed ?? null)));
         if (noChange) {
           setLoading(false);
           props.onCancel();
@@ -202,7 +207,7 @@ export function LogForm(props: LogFormProps) {
             mediaType: props.log.mediaType as MediaType,
             id: props.log.externalId,
             review: review.trim() || null,
-            ...(showBoardGameFields && { own, matchesPlayed: toNum(matchesPlayed) }),
+            ...(showBoardGameFields && { own, wantToBuy, matchesPlayed: toNum(matchesPlayed) }),
           };
           props.onSaved(completion);
         } else {
@@ -222,7 +227,7 @@ export function LogForm(props: LogFormProps) {
               review,
               status: status ?? null,
               ...(showHoursToBeat && { hoursToBeat: toNum(hoursToBeat) }),
-              ...(showBoardGameFields && { own, matchesPlayed: toNum(matchesPlayed) }),
+              ...(showBoardGameFields && { own, wantToBuy, matchesPlayed: toNum(matchesPlayed) }),
             }),
           }
         );
@@ -237,6 +242,7 @@ export function LogForm(props: LogFormProps) {
           mediaType: props.mediaType,
           id: props.externalId,
           review: review.trim() || null,
+          ...(showBoardGameFields && { own, wantToBuy, matchesPlayed: toNum(matchesPlayed) }),
         };
         props.onSaved(completion);
       }
@@ -394,18 +400,37 @@ export function LogForm(props: LogFormProps) {
               )}
               {showBoardGameFields && (
                 <>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="log-form-own"
-                      checked={own}
-                      onChange={(e) => setOwn(e.target.checked)}
-                      className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
-                      aria-describedby="log-form-own-desc"
-                    />
-                    <Label htmlFor="log-form-own" id="log-form-own-desc" className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]">
-                      {t("itemReviewForm.own")}
-                    </Label>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="log-form-own"
+                        checked={own}
+                        onChange={(e) => setOwn(e.target.checked)}
+                        className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                        aria-describedby="log-form-own-desc"
+                      />
+                      <Label htmlFor="log-form-own" id="log-form-own-desc" className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]">
+                        {t("itemReviewForm.own")}
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="log-form-want-to-buy"
+                        checked={wantToBuy}
+                        onChange={(e) => setWantToBuy(e.target.checked)}
+                        className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                        aria-describedby="log-form-want-to-buy-desc"
+                      />
+                      <Label
+                        htmlFor="log-form-want-to-buy"
+                        id="log-form-want-to-buy-desc"
+                        className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]"
+                      >
+                        {t("itemReviewForm.wantToBuy")}
+                      </Label>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.matchesPlayed")}</Label>

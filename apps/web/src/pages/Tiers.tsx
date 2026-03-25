@@ -13,6 +13,7 @@ import { apiFetch } from "@/lib/api";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { TiersSkeleton } from "@/components/skeletons";
+import { tierHasUnlimitedLogs } from "@/lib/userTier";
 
 const FREE_LOG_LIMIT = 500;
 
@@ -53,9 +54,10 @@ export function Tiers() {
   const tier = me?.tier ?? "free";
   const logCount = me?.logCount ?? 0;
   const daysRemaining = me?.daysRemaining ?? null;
-  const isPro = tier === "pro";
+  const isPayingPro = tier === "pro";
+  const isBeta = tier === "beta";
   const isAdmin = tier === "admin";
-  const hasUnlimitedLogs = isPro || isAdmin;
+  const hasUnlimitedLogs = tierHasUnlimitedLogs(tier);
   const isBrazil = me?.country === "BR";
   const proPriceMonthlyLabel = isBrazil ? t("tiers.proPriceBrMonthly") : t("tiers.proPriceMonthly");
   const proPriceYearlyLabel = isBrazil ? t("tiers.proPriceBrYearly") : t("tiers.proPriceYearly");
@@ -147,10 +149,14 @@ export function Tiers() {
               <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-500">
                 {t("tiers.admin")}
               </span>
-            ) : isPro ? (
+            ) : isPayingPro ? (
               <span className="inline-flex items-center gap-1 rounded bg-[var(--btn-gradient-start)]/20 px-2 py-0.5 text-xs font-semibold text-[var(--btn-gradient-start)]">
                 <Sparkles className="h-3 w-3" aria-hidden />
                 {t("tiers.pro")}
+              </span>
+            ) : isBeta ? (
+              <span className="inline-flex items-center gap-1 rounded bg-sky-500/20 px-2 py-0.5 text-xs font-semibold text-sky-400">
+                {t("tiers.beta")}
               </span>
             ) : (
               t("tiers.free")
@@ -161,14 +167,14 @@ export function Tiers() {
               ? t("tiers.usageUnlimited", { count: String(logCount) })
               : t("tiers.usage", { count: String(logCount), limit: String(FREE_LOG_LIMIT) })}
           </p>
-          {token && isPro && !isAdmin && daysRemaining != null && (
+          {token && isPayingPro && !isAdmin && daysRemaining != null && (
             <p className="mt-1 text-sm text-[var(--color-light)]">
               {daysRemaining === 1
                 ? t("tiers.daysLeftOne")
                 : t("tiers.daysLeft", { count: String(daysRemaining) })}
             </p>
           )}
-          {token && isPro && !isAdmin && (
+          {token && isPayingPro && !isAdmin && (
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -236,7 +242,7 @@ export function Tiers() {
           <h2 className="text-lg font-semibold text-[var(--color-lightest)]">
             {t("tiers.pro")}
           </h2>
-          {token && !isPro && (
+          {token && !isPayingPro && !isAdmin && (
             <div className="mt-2 flex flex-col gap-2">
               <p className="text-xs text-[var(--color-light)]">{t("tiers.billingInterval")}</p>
               <ToggleGroup
@@ -284,7 +290,7 @@ export function Tiers() {
               </div>
             </div>
           )}
-          {token && isPro && (
+          {token && isPayingPro && (
             <p className="mt-2 text-lg font-bold text-[var(--color-lightest)]">
               {proPriceMonthlyLabel}
             </p>
@@ -320,7 +326,7 @@ export function Tiers() {
               {t("tiers.proNoAds")}
             </li>
           </ul>
-          {token && !isPro && (
+          {token && !isPayingPro && !isAdmin && (
             <Button
               type="button"
               className="btn-gradient mt-4 w-full"

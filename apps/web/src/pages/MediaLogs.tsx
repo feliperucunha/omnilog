@@ -32,6 +32,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { skipApiKeyMissingUi } from "@/lib/featureFlags";
+import { tierHasProFeatures } from "@/lib/userTier";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Select } from "@/components/ui/select";
 import {
@@ -82,6 +83,7 @@ export interface SharedFilters {
   sort: MediaLogsSort;
   search: string;
   own: "" | "owned";
+  wantToBuy: "" | "wantToBuy";
 }
 
 interface MediaLogsProps {
@@ -130,6 +132,9 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   const [statusFilter, setStatusFilter] = useState<string>(() => initialFilters?.status ?? "");
   const [statusCounts, setStatusCounts] = useState<{ total: number; byStatus: Record<string, number> } | null>(null);
   const [ownedFilter, setOwnedFilter] = useState<"" | "owned">(() => initialFilters?.own ?? "");
+  const [wantToBuyFilter, setWantToBuyFilter] = useState<"" | "wantToBuy">(
+    () => initialFilters?.wantToBuy ?? ""
+  );
   const [sortBy, setSortBy] = useState<MediaLogsSort>(() => (initialFilters?.sort as MediaLogsSort) ?? DEFAULT_SORT);
   const [showCustomEntry, setShowCustomEntry] = useState(false);
   const [categorySearchQuery, setCategorySearchQuery] = useState(() => initialFilters?.search ?? "");
@@ -151,9 +156,10 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         sort: sortBy,
         search: categorySearchQuery,
         own: ownedFilter,
+        wantToBuy: wantToBuyFilter,
       });
     }
-  }, [embedded, onFiltersChange, statusFilter, sortBy, categorySearchQuery, ownedFilter]);
+  }, [embedded, onFiltersChange, statusFilter, sortBy, categorySearchQuery, ownedFilter, wantToBuyFilter]);
 
   useEffect(() => {
     if (readOnly || milestoneProgressProp != null || !me) return;
@@ -216,6 +222,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       });
       if (statusFilter) params.set("status", statusFilter);
       if (mediaType === "boardgames" && ownedFilter === "owned") params.set("own", "true");
+      if (mediaType === "boardgames" && wantToBuyFilter === "wantToBuy") params.set("wantToBuy", "true");
       if (!reset && nextCursor) params.set("cursor", nextCursor);
       const path = publicUserId
         ? `/users/${publicUserId}/logs?${params.toString()}`
@@ -242,7 +249,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           setLoadingMore(false);
         });
     },
-    [mediaType, statusFilter, ownedFilter, sortBy, nextCursor, loadingMore, t, publicUserId]
+    [mediaType, statusFilter, ownedFilter, wantToBuyFilter, sortBy, nextCursor, loadingMore, t, publicUserId]
   );
 
   const fetchStatusCounts = useCallback(() => {
@@ -261,6 +268,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
     setCategorySearchQuery("");
     if (mediaType !== "boardgames") {
       setOwnedFilter("");
+      setWantToBuyFilter("");
       setSortBy((prev) => (prev === "matchesPlayedAsc" || prev === "matchesPlayedDesc" ? "dateDesc" : prev));
     }
     if (mediaType !== "games") {
@@ -269,7 +277,8 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   }, [mediaType]);
 
   useEffect(() => {
-    const defaultsMatch = sortBy === "dateDesc" && statusFilter === "" && ownedFilter === "";
+    const defaultsMatch =
+      sortBy === "dateDesc" && statusFilter === "" && ownedFilter === "" && wantToBuyFilter === "";
     const useInitial = embedded && initialLogsProp !== undefined && defaultsMatch;
     if (useInitial) {
       setLogs(initialLogsProp ?? []);
@@ -283,12 +292,22 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       setLoading(true);
       fetchLogsRef.current(true);
     }
-  }, [mediaType, statusFilter, ownedFilter, sortBy, publicUserId, embedded, initialLogsProp, initialNextCursorProp]);
+  }, [
+    mediaType,
+    statusFilter,
+    ownedFilter,
+    wantToBuyFilter,
+    sortBy,
+    publicUserId,
+    embedded,
+    initialLogsProp,
+    initialNextCursorProp,
+  ]);
 
   /** When embedded, start with Load more again when category or filters change. */
   useEffect(() => {
     if (embedded) setInfiniteScrollEnabled(false);
-  }, [embedded, mediaType, statusFilter, ownedFilter, sortBy]);
+  }, [embedded, mediaType, statusFilter, ownedFilter, wantToBuyFilter, sortBy]);
 
   useEffect(() => {
     setStatusCounts(null);
@@ -296,6 +315,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
   }, [fetchStatusCounts]);
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const categorySearchInputRef = useRef<HTMLInputElement>(null);
   const fetchLogsRef = useRef(fetchLogs);
   fetchLogsRef.current = fetchLogs;
   useEffect(() => {
@@ -388,7 +408,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
     }
   };
 
-  const hasProFeatures = me?.tier === "pro" || me?.tier === "admin";
+  const hasProFeatures = tierHasProFeatures(me?.tier);
   const handleExportCategory = async () => {
     if (!hasProFeatures) {
       setShowProModal(true);
@@ -507,17 +527,30 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                 triggerClassName="w-full min-w-0"
               />
               {mediaType === "boardgames" && (
-                <Select
-                  value={ownedFilter}
-                  onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
-                  options={[
-                    { value: "", label: t("mediaLogs.filterAll") },
-                    { value: "owned", label: t("mediaLogs.filterOwned") },
-                  ]}
-                  aria-label={t("itemReviewForm.own")}
-                  className="min-w-0 w-[8rem]"
-                  triggerClassName="w-full min-w-0"
-                />
+                <>
+                  <Select
+                    value={ownedFilter}
+                    onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
+                    options={[
+                      { value: "", label: t("mediaLogs.filterAll") },
+                      { value: "owned", label: t("mediaLogs.filterOwned") },
+                    ]}
+                    aria-label={t("itemReviewForm.own")}
+                    className="min-w-0 w-[8rem]"
+                    triggerClassName="w-full min-w-0"
+                  />
+                  <Select
+                    value={wantToBuyFilter}
+                    onValueChange={(v) => setWantToBuyFilter((v as "" | "wantToBuy") || "")}
+                    options={[
+                      { value: "", label: t("mediaLogs.filterAll") },
+                      { value: "wantToBuy", label: t("mediaLogs.filterWantToBuy") },
+                    ]}
+                    aria-label={t("itemReviewForm.wantToBuy")}
+                    className="min-w-0 w-[9rem]"
+                    triggerClassName="w-full min-w-0"
+                  />
+                </>
               )}
               <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
               <Select
@@ -539,6 +572,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
             <div className="relative min-w-0 w-full max-w-xs shrink-0">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
               <Input
+                ref={categorySearchInputRef}
                 type="search"
                 placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
                 value={categorySearchQuery}
@@ -552,7 +586,11 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
               {categorySearchQuery.trim() !== "" && (
                 <button
                   type="button"
-                  onClick={() => setCategorySearchQuery("")}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setCategorySearchQuery("");
+                    categorySearchInputRef.current?.focus();
+                  }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
                   aria-label={t("search.clearSearch")}
                 >
@@ -647,7 +685,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
       {/* 1. Filters row */}
       <div className="flex min-w-0 flex-wrap items-center gap-3 overflow-hidden">
         {/* Mobile (< md): custom dropdowns, no labels */}
-        <div className={cn("grid w-full gap-2 md:hidden", mediaType === "boardgames" ? "grid-cols-3" : "grid-cols-2")}>
+        <div className={cn("grid w-full gap-2 md:hidden", mediaType === "boardgames" ? "grid-cols-2" : "grid-cols-2")}>
           <Select
             value={statusFilter}
             onValueChange={setStatusFilter}
@@ -663,17 +701,30 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
             triggerClassName="w-full max-w-none min-w-0"
           />
           {mediaType === "boardgames" && (
-            <Select
-              value={ownedFilter}
-              onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
-              options={[
-                { value: "", label: t("mediaLogs.filterAll") },
-                { value: "owned", label: t("mediaLogs.filterOwned") },
-              ]}
-              aria-label={t("itemReviewForm.own")}
-              className="min-w-0 w-full"
-              triggerClassName="w-full max-w-none min-w-0"
-            />
+            <>
+              <Select
+                value={ownedFilter}
+                onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
+                options={[
+                  { value: "", label: t("mediaLogs.filterAll") },
+                  { value: "owned", label: t("mediaLogs.filterOwned") },
+                ]}
+                aria-label={t("itemReviewForm.own")}
+                className="min-w-0 w-full"
+                triggerClassName="w-full max-w-none min-w-0"
+              />
+              <Select
+                value={wantToBuyFilter}
+                onValueChange={(v) => setWantToBuyFilter((v as "" | "wantToBuy") || "")}
+                options={[
+                  { value: "", label: t("mediaLogs.filterAll") },
+                  { value: "wantToBuy", label: t("mediaLogs.filterWantToBuy") },
+                ]}
+                aria-label={t("itemReviewForm.wantToBuy")}
+                className="min-w-0 w-full"
+                triggerClassName="w-full max-w-none min-w-0"
+              />
+            </>
           )}
           <Select
             value={sortBy}
@@ -709,17 +760,30 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           triggerClassName="w-full min-w-0"
         />
         {mediaType === "boardgames" && (
-          <Select
-            value={ownedFilter}
-            onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
-            options={[
-              { value: "", label: t("mediaLogs.filterAll") },
-              { value: "owned", label: t("mediaLogs.filterOwned") },
-            ]}
-            aria-label={t("itemReviewForm.own")}
-            className="min-w-0 w-[8rem]"
-            triggerClassName="w-full min-w-0"
-          />
+          <>
+            <Select
+              value={ownedFilter}
+              onValueChange={(v) => setOwnedFilter((v as "" | "owned") || "")}
+              options={[
+                { value: "", label: t("mediaLogs.filterAll") },
+                { value: "owned", label: t("mediaLogs.filterOwned") },
+              ]}
+              aria-label={t("itemReviewForm.own")}
+              className="min-w-0 w-[8rem]"
+              triggerClassName="w-full min-w-0"
+            />
+            <Select
+              value={wantToBuyFilter}
+              onValueChange={(v) => setWantToBuyFilter((v as "" | "wantToBuy") || "")}
+              options={[
+                { value: "", label: t("mediaLogs.filterAll") },
+                { value: "wantToBuy", label: t("mediaLogs.filterWantToBuy") },
+              ]}
+              aria-label={t("itemReviewForm.wantToBuy")}
+              className="min-w-0 w-[9rem]"
+              triggerClassName="w-full min-w-0"
+            />
+          </>
         )}
         <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
         <Select
@@ -848,6 +912,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
         <div className="relative min-w-0 max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
           <Input
+            ref={categorySearchInputRef}
             type="search"
             placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
             value={categorySearchQuery}
@@ -861,7 +926,11 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           {categorySearchQuery.trim() !== "" && (
             <button
               type="button"
-              onClick={() => setCategorySearchQuery("")}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setCategorySearchQuery("");
+                categorySearchInputRef.current?.focus();
+              }}
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
               aria-label={t("search.clearSearch")}
             >
@@ -978,10 +1047,18 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
                             </span>
                           ) : null;
                         })()}
-                        {mediaType === "boardgames" && (log.own === true || (log.matchesPlayed != null && log.matchesPlayed > 0)) && (
+                        {mediaType === "boardgames" &&
+                          (log.own === true ||
+                            log.wantToBuy === true ||
+                            (log.matchesPlayed != null && log.matchesPlayed > 0)) && (
                           <>
                             {log.own === true && (
                               <span className="text-[10px] sm:text-xs text-[var(--color-light)]">{t("itemReviewForm.own")}</span>
+                            )}
+                            {log.wantToBuy === true && (
+                              <span className="text-[10px] sm:text-xs text-[var(--color-light)]">
+                                {t("itemReviewForm.wantToBuy")}
+                              </span>
                             )}
                             {log.matchesPlayed != null && log.matchesPlayed > 0 && (
                               <span className="text-[10px] sm:text-xs text-[var(--color-light)]">{t("itemReviewForm.matchesPlayed")}: {log.matchesPlayed}</span>
@@ -1143,6 +1220,7 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
             <Search className="size-5" />
           </span>
           <Input
+            ref={categorySearchInputRef}
             type="search"
             placeholder={t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })}
             value={categorySearchQuery}
@@ -1156,7 +1234,11 @@ export function MediaLogs({ mediaType, embedded = false, publicUserId, milestone
           {categorySearchQuery.trim() !== "" && (
             <button
               type="button"
-              onClick={() => setCategorySearchQuery("")}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setCategorySearchQuery("");
+                categorySearchInputRef.current?.focus();
+              }}
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
               aria-label={t("search.clearSearch")}
             >

@@ -125,6 +125,7 @@ export function Search() {
   );
   const [loadingFollowId, setLoadingFollowId] = useState<string | null>(null);
   const [query, setQuery] = useState(stateQuery);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -573,6 +574,7 @@ export function Search() {
                 aria-hidden
               />
               <Input
+                ref={searchInputRef}
                 className="w-full pl-10 pr-10"
                 placeholder={
                   searchFilter === USERS_SEARCH_TYPE
@@ -587,7 +589,11 @@ export function Search() {
               {query.trim() !== "" && (
                 <button
                   type="button"
-                  onClick={() => setQuery("")}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setQuery("");
+                    searchInputRef.current?.focus();
+                  }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
                   aria-label={t("search.clearSearch")}
                 >

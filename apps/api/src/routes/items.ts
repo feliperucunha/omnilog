@@ -15,6 +15,7 @@ import { getBoardGameByIdLudopedia } from "../services/ludopedia.js";
 import { getVolumeById } from "../services/comicvine.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
+import { tierHasProFeatures } from "../lib/userTier.js";
 import { getAllReviewerMilestonesForMediumBatch } from "../services/milestone.service.js";
 
 export const itemsRouter = Router();
@@ -243,7 +244,7 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
       id: l.id,
       userEmail: l.user.email,
       reviewerUsername: l.user.username ?? null,
-      isPro: l.user.tier === "pro",
+      isPro: tierHasProFeatures(l.user.tier),
       isAdmin: l.user.tier === "admin",
       reviewerBadges: last ? [last] : [],
       reviewerLevel: last?.level ?? undefined,
@@ -441,7 +442,7 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
       id: l.id,
       userEmail: l.user.email,
       reviewerUsername: l.user.username ?? null,
-      isPro: l.user.tier === "pro",
+      isPro: tierHasProFeatures(l.user.tier),
       isAdmin: l.user.tier === "admin",
       reviewerBadges: last ? [last] : [],
       reviewerLevel: last?.level ?? undefined,

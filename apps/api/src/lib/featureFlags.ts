@@ -3,6 +3,8 @@ import { prisma } from "./prisma.js";
 /** Known keys; admin may only update these. */
 export const FEATURE_FLAG_KEYS = {
   DISABLE_API_KEY_REQUIREMENTS: "disable_api_key_requirements",
+  /** When enabled, POST /auth/register assigns tier `beta` instead of `free`. */
+  REGISTER_NEW_USERS_AS_BETA: "register_new_users_as_beta",
 } as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[keyof typeof FEATURE_FLAG_KEYS];
@@ -20,6 +22,16 @@ export async function isDisableApiKeyRequirementsEnabled(): Promise<boolean> {
   });
   // No row (pre-migration DB): default relaxed UX. Row present: honor explicit enabled value.
   if (row == null) return true;
+  return row.enabled;
+}
+
+/** New registrations use tier `beta` when true, `free` when false or flag row missing. */
+export async function isRegisterNewUsersAsBetaEnabled(): Promise<boolean> {
+  const row = await prisma.featureFlag.findUnique({
+    where: { key: FEATURE_FLAG_KEYS.REGISTER_NEW_USERS_AS_BETA },
+    select: { enabled: true },
+  });
+  if (row == null) return false;
   return row.enabled;
 }
 

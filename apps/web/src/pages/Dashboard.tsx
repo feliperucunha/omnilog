@@ -106,6 +106,7 @@ export function Dashboard() {
     sort: "dateDesc",
     search: "",
     own: "",
+    wantToBuy: "",
   });
 
   /** Load collapsed prefs from persistent storage (Android/Capacitor). */
@@ -266,6 +267,7 @@ export function Dashboard() {
       if (f.sort && f.sort !== "dateDesc") params.set("sort", f.sort);
       if (f.search.trim()) params.set("q", f.search.trim());
       if (f.own === "owned") params.set("own", "true");
+      if (f.wantToBuy === "wantToBuy") params.set("wantToBuy", "true");
     }
     const query = params.toString();
     const url = query ? `${base}?${query}` : base;
@@ -631,10 +633,16 @@ export function Dashboard() {
                               <span className="whitespace-nowrap">{t("dashboard.finishedIn", { duration })}</span>
                             ) : null;
                           })()}
-                          {log.mediaType === "boardgames" && (log.own === true || (log.matchesPlayed != null && log.matchesPlayed > 0)) && (
+                          {log.mediaType === "boardgames" &&
+                            (log.own === true ||
+                              log.wantToBuy === true ||
+                              (log.matchesPlayed != null && log.matchesPlayed > 0)) && (
                             <>
                               {log.own === true && (
                                 <span className="whitespace-nowrap">{t("itemReviewForm.own")}</span>
+                              )}
+                              {log.wantToBuy === true && (
+                                <span className="whitespace-nowrap">{t("itemReviewForm.wantToBuy")}</span>
                               )}
                               {log.matchesPlayed != null && log.matchesPlayed > 0 && (
                                 <span className="whitespace-nowrap">{t("itemReviewForm.matchesPlayed")}: {log.matchesPlayed}</span>

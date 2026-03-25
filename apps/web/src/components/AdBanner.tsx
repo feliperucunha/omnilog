@@ -20,7 +20,7 @@ export function AdBanner() {
   const clientId = (import.meta.env.VITE_ADSENSE_CLIENT_ID as string)?.trim();
   const slotId = (import.meta.env.VITE_ADSENSE_SLOT_ID as string)?.trim() || undefined;
 
-  const isFreeUser = me && me.tier !== "pro" && me.tier !== "admin";
+  const isFreeUser = me && me.tier === "free";
   const showAd = Boolean(clientId && isFreeUser);
 
   useEffect(() => {

@@ -91,10 +91,17 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
   }
 
   const boardGameProvider = user.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
-  const tier = user.tier === "admin" ? "admin" : user.tier === "pro" ? "pro" : "free";
+  const tier =
+    user.tier === "admin"
+      ? "admin"
+      : user.tier === "pro"
+        ? "pro"
+        : user.tier === "beta"
+          ? "beta"
+          : "free";
   const subscriptionEndsAt = user.subscriptionEndsAt?.toISOString() ?? null;
   const daysRemaining =
-    subscriptionEndsAt && tier === "pro"
+    subscriptionEndsAt && user.tier === "pro"
       ? Math.max(
           0,
           Math.ceil(

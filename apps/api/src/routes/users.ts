@@ -215,12 +215,19 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
   if (mediaType === "boardgames" && boardgameSorts.includes(sortParam as (typeof boardgameSorts)[number])) sort = sortParam;
   else if (mediaType === "games" && gameSorts.includes(sortParam as (typeof gameSorts)[number])) sort = sortParam;
   const ownFilter = req.query.own === "true";
+  const wantToBuyFilter = req.query.wantToBuy === "true";
   const limitParam = req.query.limit != null ? parseInt(String(req.query.limit), 10) : NaN;
   const usePagination = Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= PAGINATION_LIMIT_MAX;
   const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
   const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
-  const where = { userId: user.id } as { userId: string; mediaType?: string; status?: string; own?: boolean };
+  const where = { userId: user.id } as {
+    userId: string;
+    mediaType?: string;
+    status?: string;
+    own?: boolean;
+    wantToBuy?: boolean;
+  };
   if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
   if (status != null && status !== "") {
     if (mediaType && MEDIA_TYPES.includes(mediaType)) {
@@ -230,7 +237,10 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
       where.status = status;
     }
   }
-  if (mediaType === "boardgames" && ownFilter) where.own = true;
+  if (mediaType === "boardgames") {
+    if (ownFilter) where.own = true;
+    if (wantToBuyFilter) where.wantToBuy = true;
+  }
 
   const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =
     sort === "matchesPlayedDesc"

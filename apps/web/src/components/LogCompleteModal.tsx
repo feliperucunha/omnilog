@@ -104,7 +104,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const isCapacitorNative = useIsNative();
   const nativeUi = USE_NATIVE_LOG_COMPLETE_LAYOUT_ON_WEB || isCapacitorNative;
   const nativeColors = theme.colorScheme === "light" ? NATIVE_LIGHT : NATIVE_DARK;
-  const { image, title, grade, status, review, own, matchesPlayed, mediaType } = state;
+  const { image, title, grade, status, review, own, wantToBuy, matchesPlayed, mediaType } = state;
   const showBoardGameMeta = mediaType === "boardgames";
   const stars = grade != null ? gradeToStars(grade) : 0;
   const statusLabel = status ? getStatusLabel(t, status, state.mediaType) : t("logComplete.logged");
@@ -374,10 +374,14 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
           <StarRating value={stars} readOnly size="lg" />
         </div>
       )}
-      {showBoardGameMeta && (own != null || (matchesPlayed != null && matchesPlayed > 0)) && (
+      {showBoardGameMeta &&
+        (own != null || wantToBuy != null || (matchesPlayed != null && matchesPlayed > 0)) && (
         <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-light)] md:mb-3">
           {own != null && (
             <span>{t("itemReviewForm.own")}: {own ? t("common.yes") : t("common.no")}</span>
+          )}
+          {wantToBuy != null && (
+            <span>{t("itemReviewForm.wantToBuy")}: {wantToBuy ? t("common.yes") : t("common.no")}</span>
           )}
           {matchesPlayed != null && matchesPlayed > 0 && (
             <span>{t("itemReviewForm.matchesPlayed")}: {matchesPlayed}</span>
@@ -643,10 +647,16 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                   {"★".repeat(Math.round(stars))}{"☆".repeat(5 - Math.round(stars))}
                 </div>
               )}
-              {showBoardGameMeta && (own != null || (matchesPlayed != null && matchesPlayed > 0)) && (
+              {showBoardGameMeta &&
+                (own != null || wantToBuy != null || (matchesPlayed != null && matchesPlayed > 0)) && (
                 <div style={{ marginBottom: sz(6), fontSize: sz(11), color: nativeColors.textMuted }}>
                   {own != null && (
                     <span>{t("itemReviewForm.own")}: {own ? t("common.yes") : t("common.no")}</span>
+                  )}
+                  {wantToBuy != null && (
+                    <span style={{ marginLeft: 10 }}>
+                      {t("itemReviewForm.wantToBuy")}: {wantToBuy ? t("common.yes") : t("common.no")}
+                    </span>
                   )}
                   {matchesPlayed != null && matchesPlayed > 0 && (
                     <span style={{ marginLeft: 10 }}>{t("itemReviewForm.matchesPlayed")}: {matchesPlayed}</span>

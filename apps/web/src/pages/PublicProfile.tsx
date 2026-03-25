@@ -173,9 +173,16 @@ export function PublicProfile() {
   const sortParam = VALID_SORTS.includes(sortParamRaw as MediaLogsSort) ? (sortParamRaw as MediaLogsSort) : "dateDesc";
   const qParam = searchParams.get("q") ?? "";
   const ownParam = searchParams.get("own") === "true" ? "owned" : "";
+  const wantToBuyParam = searchParams.get("wantToBuy") === "true" ? "wantToBuy" : "";
   const initialFilters =
-    statusParam || sortParam !== "dateDesc" || qParam || ownParam
-      ? { status: statusParam, sort: sortParam, search: qParam, own: ownParam as "" | "owned" }
+    statusParam || sortParam !== "dateDesc" || qParam || ownParam || wantToBuyParam
+      ? {
+          status: statusParam,
+          sort: sortParam,
+          search: qParam,
+          own: ownParam as "" | "owned",
+          wantToBuy: wantToBuyParam as "" | "wantToBuy",
+        }
       : undefined;
 
   const byType = Object.fromEntries(

@@ -23,6 +23,7 @@ import * as storage from "@/lib/storage";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
 import { cn } from "@/lib/utils";
+import { tierHasProFeatures } from "@/lib/userTier";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import {
@@ -410,6 +411,13 @@ export function Settings() {
                     <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
                       {t("tiers.admin")}
                     </Link>
+                  ) : me.tier === "beta" ? (
+                    <>
+                      {t("settings.subscriptionBeta")}{" "}
+                      <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
+                        {t("settings.viewPlans")}
+                      </Link>
+                    </>
                   ) : (
                     <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
                       {t("settings.viewPlans")}
@@ -486,7 +494,7 @@ export function Settings() {
             <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
               {t("settings.publicProfileCustomization")}
             </h3>
-            {me?.tier === "pro" || me?.tier === "admin" ? (
+            {me && tierHasProFeatures(me.tier) ? (
               <>
                 <p className="text-sm text-[var(--color-light)]">
                   {t("settings.visibleMediaTypesIntro")}
@@ -560,7 +568,7 @@ export function Settings() {
           <Card
             className={cn(
               "border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]",
-              me.tier !== "pro" && me.tier !== "admin" && "opacity-75"
+              !tierHasProFeatures(me.tier) && "opacity-75"
             )}
           >
             <div className="flex flex-col gap-4">
@@ -570,7 +578,7 @@ export function Settings() {
               <p className="text-sm text-[var(--color-light)]">
                 {t("tiers.proExportDesc")}
               </p>
-              {me.tier === "pro" || me.tier === "admin" ? (
+              {tierHasProFeatures(me.tier) ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -596,7 +604,7 @@ export function Settings() {
           </Card>
         )}
 
-        {me && (me.tier === "pro" || me.tier === "admin") && (
+        {me && tierHasProFeatures(me.tier) && (
           <>
             {isMobile ? (
               <Drawer open={exportModalOpen} onOpenChange={(open) => !open && setExportModalOpen(false)}>
@@ -829,110 +837,147 @@ export function Settings() {
               <span className="font-semibold">{t("settings.adminSection")}</span>
             </button>
             {adminOpen && (
-              <div className="border-t border-[var(--color-surface-border)] px-4 pb-4 pt-2">
-                <p className="mb-3 text-sm text-[var(--color-light)]">
-                  {t("settings.adminUsersIntro")}
-                </p>
-                {adminUsersLoading && (
-                  <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
-                )}
-                {adminUsersError && (
-                  <p className="text-sm text-red-400">{adminUsersError}</p>
-                )}
-                {!adminUsersLoading && !adminUsersError && adminUsers.length > 0 && (
-                  <div className="overflow-x-auto rounded-lg border border-[var(--color-mid)]/30">
-                    <table className="w-full min-w-[600px] text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50">
-                          <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">{t("settings.adminTableEmail")}</th>
-                          <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">{t("settings.adminTableUsername")}</th>
-                          <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">{t("settings.adminTableLogins")}</th>
-                          <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">{t("settings.adminTableLogs")}</th>
-                          <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">{t("settings.adminTableLastLogin")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {adminUsers.map((u) => (
-                          <tr key={u.id} className="border-b border-[var(--color-mid)]/20">
-                            <td className="px-3 py-2 text-[var(--color-lightest)]">{u.email}</td>
-                            <td className="px-3 py-2 text-[var(--color-light)]">{u.username ?? "—"}</td>
-                            <td className="px-3 py-2 text-[var(--color-light)]">{u.loginCount}</td>
-                            <td className="px-3 py-2 text-[var(--color-light)]">{u.logsCount}</td>
-                            <td className="px-3 py-2 text-[var(--color-light)]">
-                              {u.lastLoginAt
-                                ? new Date(u.lastLoginAt).toLocaleString(locale, {
-                                    dateStyle: "short",
-                                    timeStyle: "short",
-                                  })
-                                : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                {!adminUsersLoading && !adminUsersError && adminUsers.length === 0 && adminOpen && (
-                  <p className="text-sm text-[var(--color-light)]">{t("settings.adminNoUsers")}</p>
-                )}
-
-                <div className="mt-8 border-t border-[var(--color-surface-border)] pt-6">
-                  <h3 className="mb-1 text-base font-semibold text-[var(--color-lightest)]">
-                    {t("settings.adminFeatureFlagsTitle")}
-                  </h3>
-                  <p className="mb-4 text-sm text-[var(--color-light)]">
-                    {t("settings.adminFeatureFlagsIntro")}
-                  </p>
-                  {adminFeatureFlagsLoading && (
-                    <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
-                  )}
-                  {adminFeatureFlagsError && (
-                    <p className="text-sm text-red-400">{adminFeatureFlagsError}</p>
-                  )}
-                  {!adminFeatureFlagsLoading &&
-                    !adminFeatureFlagsError &&
-                    adminFeatureFlags.length === 0 && (
-                      <p className="text-sm text-[var(--color-light)]">
-                        {t("settings.adminFeatureFlagsEmpty")}
-                      </p>
+              <div className="border-t border-[var(--color-surface-border)] px-4 pb-4 pt-4">
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-6 lg:items-start">
+                  <section
+                    className="min-w-0 lg:col-span-8"
+                    aria-labelledby="admin-users-heading"
+                  >
+                    <h3
+                      id="admin-users-heading"
+                      className="mb-2 text-base font-semibold text-[var(--color-lightest)]"
+                    >
+                      {t("settings.adminUsersTitle")}
+                    </h3>
+                    <p className="mb-3 text-sm text-[var(--color-light)]">
+                      {t("settings.adminUsersIntro")}
+                    </p>
+                    {adminUsersLoading && (
+                      <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
                     )}
-                  <ul className="flex flex-col gap-4">
-                    {adminFeatureFlags.map((f) => (
-                      <li
-                        key={f.key}
-                        className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/30 p-4"
-                      >
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <p className="font-medium text-[var(--color-lightest)]">
-                            {t(`settings.adminFlag_${f.key}` as "settings.adminFlag_disable_api_key_requirements")}
-                          </p>
-                          <p className="text-xs leading-relaxed text-[var(--color-light)]">
-                            {t(
-                              `settings.adminFlag_${f.key}_hint` as "settings.adminFlag_disable_api_key_requirements_hint"
+                    {adminUsersError && (
+                      <p className="text-sm text-red-400">{adminUsersError}</p>
+                    )}
+                    {!adminUsersLoading && !adminUsersError && adminUsers.length > 0 && (
+                      <div className="overflow-x-auto rounded-lg border border-[var(--color-mid)]/30">
+                        <table className="w-full min-w-[600px] text-left text-sm">
+                          <thead>
+                            <tr className="border-b border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50">
+                              <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">
+                                {t("settings.adminTableEmail")}
+                              </th>
+                              <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">
+                                {t("settings.adminTableUsername")}
+                              </th>
+                              <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">
+                                {t("settings.adminTableLogins")}
+                              </th>
+                              <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">
+                                {t("settings.adminTableLogs")}
+                              </th>
+                              <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">
+                                {t("settings.adminTableLastLogin")}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {adminUsers.map((u) => (
+                              <tr key={u.id} className="border-b border-[var(--color-mid)]/20">
+                                <td className="px-3 py-2 text-[var(--color-lightest)]">{u.email}</td>
+                                <td className="px-3 py-2 text-[var(--color-light)]">{u.username ?? "—"}</td>
+                                <td className="px-3 py-2 text-[var(--color-light)]">{u.loginCount}</td>
+                                <td className="px-3 py-2 text-[var(--color-light)]">{u.logsCount}</td>
+                                <td className="px-3 py-2 text-[var(--color-light)]">
+                                  {u.lastLoginAt
+                                    ? new Date(u.lastLoginAt).toLocaleString(locale, {
+                                        dateStyle: "short",
+                                        timeStyle: "short",
+                                      })
+                                    : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    {!adminUsersLoading && !adminUsersError && adminUsers.length === 0 && adminOpen && (
+                      <p className="text-sm text-[var(--color-light)]">{t("settings.adminNoUsers")}</p>
+                    )}
+                  </section>
+
+                  <section
+                    className="min-w-0 border-t border-[var(--color-surface-border)] pt-8 lg:col-span-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
+                    aria-labelledby="admin-feature-flags-heading"
+                  >
+                    <h3
+                      id="admin-feature-flags-heading"
+                      className="mb-2 text-base font-semibold text-[var(--color-lightest)]"
+                    >
+                      {t("settings.adminFeatureFlagsTitle")}
+                    </h3>
+                    <p className="mb-4 text-sm text-[var(--color-light)]">
+                      {t("settings.adminFeatureFlagsIntro")}
+                    </p>
+                    {adminFeatureFlagsLoading && (
+                      <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
+                    )}
+                    {adminFeatureFlagsError && (
+                      <p className="text-sm text-red-400">{adminFeatureFlagsError}</p>
+                    )}
+                    {!adminFeatureFlagsLoading &&
+                      !adminFeatureFlagsError &&
+                      adminFeatureFlags.length === 0 && (
+                        <p className="text-sm text-[var(--color-light)]">
+                          {t("settings.adminFeatureFlagsEmpty")}
+                        </p>
+                      )}
+                    <ul className="flex flex-col gap-4">
+                      {adminFeatureFlags.map((f) => (
+                        <li
+                          key={f.key}
+                          className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/30 p-4"
+                        >
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="font-medium text-[var(--color-lightest)]">
+                              {t(
+                                `settings.adminFlag_${f.key}` as
+                                  | "settings.adminFlag_disable_api_key_requirements"
+                                  | "settings.adminFlag_register_new_users_as_beta"
+                              )}
+                            </p>
+                            <p className="text-xs leading-relaxed text-[var(--color-light)]">
+                              {t(
+                                `settings.adminFlag_${f.key}_hint` as
+                                  | "settings.adminFlag_disable_api_key_requirements_hint"
+                                  | "settings.adminFlag_register_new_users_as_beta_hint"
+                              )}
+                            </p>
+                            <p className="font-mono text-[10px] text-[var(--color-mid)]">{f.key}</p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            {adminFlagSavingKey === f.key && (
+                              <span className="text-xs text-[var(--color-light)]">
+                                {t("settings.adminFeatureFlagsSaving")}
+                              </span>
                             )}
-                          </p>
-                          <p className="font-mono text-[10px] text-[var(--color-mid)]">{f.key}</p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {adminFlagSavingKey === f.key && (
-                            <span className="text-xs text-[var(--color-light)]">
-                              {t("settings.adminFeatureFlagsSaving")}
-                            </span>
-                          )}
-                          <Switch
-                            checked={f.enabled}
-                            disabled={adminFlagSavingKey === f.key}
-                            onCheckedChange={(v) => {
-                              void handleToggleAdminFeatureFlag(f.key, v);
-                            }}
-                            aria-label={t(
-                              `settings.adminFlag_${f.key}` as "settings.adminFlag_disable_api_key_requirements"
-                            )}
-                          />
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                            <Switch
+                              checked={f.enabled}
+                              disabled={adminFlagSavingKey === f.key}
+                              onCheckedChange={(v) => {
+                                void handleToggleAdminFeatureFlag(f.key, v);
+                              }}
+                              aria-label={t(
+                                `settings.adminFlag_${f.key}` as
+                                  | "settings.adminFlag_disable_api_key_requirements"
+                                  | "settings.adminFlag_register_new_users_as_beta"
+                              )}
+                            />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
                 </div>
               </div>
             )}

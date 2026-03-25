@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import { isRegisterNewUsersAsBetaEnabled } from "../lib/featureFlags.js";
 import { sanitizeEmail, sanitizeText } from "../lib/sanitize.js";
 import { sendPasswordResetEmail } from "../lib/email.js";
 import { setAuthCookie, clearAuthCookie } from "../lib/authCookie.js";
@@ -77,14 +78,14 @@ authRouter.post("/register", async (req, res) => {
   const country = parsed.data.country && parsed.data.country.trim().length === 2
     ? String(parsed.data.country).toUpperCase().slice(0, 2)
     : null;
+  const useBetaTier = await isRegisterNewUsersAsBetaEnabled();
   const user = await prisma.user.create({
     data: {
       username,
       email,
       password: hashed,
       ...(country && { country }),
-      tier: "pro",
-      subscriptionEndsAt: null, // beta: all new accounts get Pro with no expiry
+      tier: useBetaTier ? "beta" : "free",
     },
     select: { id: true, username: true, email: true, onboarded: true },
   });

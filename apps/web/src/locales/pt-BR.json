@@ -100,6 +100,7 @@
     "subscription": "Assinatura",
     "subscriptionDaysLeft": "{{count}} dias restantes",
     "subscriptionDaysLeftOne": "1 dia restante",
+    "subscriptionBeta": "Você está no Beta: recursos Pro com limite de 500 registros. Faça upgrade para Pro para registros ilimitados.",
     "viewPlans": "Ver planos",
     "advanced": "Avançado",
     "apiKeys": "Chaves de API",
@@ -154,6 +155,7 @@
       "comicvine": "1. Acesse comicvine.gamespot.com e crie uma conta gratuita ou faça login.\n2. Abra o link da documentação da API abaixo.\n3. Solicite uma chave de API (gratuita) na página da Comic Vine API.\n4. Copie sua chave de API e cole abaixo."
     },
     "adminSection": "Admin",
+    "adminUsersTitle": "Usuários",
     "adminUsersIntro": "Todos os usuários registrados e sua atividade.",
     "adminUsersError": "Não foi possível carregar os usuários.",
     "adminNoUsers": "Nenhum usuário ainda.",
@@ -169,7 +171,9 @@
     "adminFeatureFlagsSaving": "Salvando…",
     "adminFeatureFlagUpdated": "Feature flag atualizada.",
     "adminFlag_disable_api_key_requirements": "Relaxar exigência de chaves de API",
-    "adminFlag_disable_api_key_requirements_hint": "Oculta avisos de chave ausente, limites de busca e alertas de chave inválida. As APIs externas ainda precisam de chaves no servidor ou do usuário para retornar dados."
+    "adminFlag_disable_api_key_requirements_hint": "Oculta avisos de chave ausente, limites de busca e alertas de chave inválida. As APIs externas ainda precisam de chaves no servidor ou do usuário para retornar dados.",
+    "adminFlag_register_new_users_as_beta": "Registrar novos usuários como Beta",
+    "adminFlag_register_new_users_as_beta_hint": "Quando ativo, novos cadastros ficam no plano Beta (recursos Pro, limite de 500 registros). Quando desligado, novos usuários são Free."
   },
   "common": {
     "required": "obrigatório",
@@ -348,6 +352,7 @@
     "couldntLoadLogs": "Não foi possível carregar os logs",
     "filterAll": "Todos",
     "filterOwned": "Na minha coleção",
+    "filterWantToBuy": "Quero comprar",
     "sortLabel": "Ordenar:",
     "sortByDateAsc": "Data (mais antiga primeiro)",
     "sortByDateDesc": "Data (mais recente primeiro)",
@@ -420,6 +425,7 @@
     "volume": "Volume",
     "hoursToBeat": "Horas para zerar",
     "own": "Tenho",
+    "wantToBuy": "Quero comprar",
     "matchesPlayed": "Partidas jogadas",
     "grade": "Nota (0–10)",
     "rating": "Avaliação",
@@ -554,6 +560,7 @@
     "title": "Planos",
     "subtitle": "Escolha o plano que combina com a forma como você registra.",
     "admin": "Admin",
+    "beta": "Beta",
     "free": "Grátis",
     "freePrice": "R$ 0",
     "freeLogs": "Até 500 logs",

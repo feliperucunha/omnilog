@@ -100,6 +100,7 @@
     "subscription": "Subscription",
     "subscriptionDaysLeft": "{{count}} days left",
     "subscriptionDaysLeftOne": "1 day left",
+    "subscriptionBeta": "You're on Beta: Pro features with a 500-log limit. Upgrade to Pro for unlimited logs.",
     "viewPlans": "View plans",
     "advanced": "Advanced",
     "apiKeys": "API Keys",
@@ -155,6 +156,7 @@
       "comicvine": "1. Go to comicvine.gamespot.com and create a free account or log in.\n2. Open the API documentation link below.\n3. Request an API key (free) from the Comic Vine API page.\n4. Copy your API key and paste it below."
     },
     "adminSection": "Admin",
+    "adminUsersTitle": "Users",
     "adminUsersIntro": "All registered users and their activity.",
     "adminUsersError": "Could not load users.",
     "adminNoUsers": "No users yet.",
@@ -170,7 +172,9 @@
     "adminFeatureFlagsSaving": "Saving…",
     "adminFeatureFlagUpdated": "Feature flag updated.",
     "adminFlag_disable_api_key_requirements": "Relax API key requirements",
-    "adminFlag_disable_api_key_requirements_hint": "Hides missing-key banners, search limits, and invalid-key warnings. External APIs still need server or user keys to return data."
+    "adminFlag_disable_api_key_requirements_hint": "Hides missing-key banners, search limits, and invalid-key warnings. External APIs still need server or user keys to return data.",
+    "adminFlag_register_new_users_as_beta": "Register new users as Beta",
+    "adminFlag_register_new_users_as_beta_hint": "When on, new signups get the Beta tier (Pro features, 500-log cap). When off, new signups are Free."
   },
   "common": {
     "required": "required",
@@ -349,6 +353,7 @@
     "couldntLoadLogs": "Couldn't load logs",
     "filterAll": "All",
     "filterOwned": "Games owned",
+    "filterWantToBuy": "Want to buy",
     "sortLabel": "Sort:",
     "sortByDateAsc": "Date (oldest first)",
     "sortByDateDesc": "Date (newest first)",
@@ -421,6 +426,7 @@
     "volume": "Volume",
     "hoursToBeat": "Hours to beat",
     "own": "Own",
+    "wantToBuy": "Want to buy",
     "matchesPlayed": "Matches played",
     "grade": "Grade (0–10)",
     "rating": "Rating",
@@ -555,6 +561,7 @@
     "title": "Plans",
     "subtitle": "Choose the plan that fits how you log.",
     "admin": "Admin",
+    "beta": "Beta",
     "free": "Free",
     "freePrice": "$0",
     "freeLogs": "Up to 500 logs",

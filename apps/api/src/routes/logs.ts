@@ -51,6 +51,7 @@ const createLogSchema = z.object({
   affinityContext: affinityContextSchema,
   boardGameSource: z.enum(["bgg", "ludopedia"]).nullable().optional(),
   own: z.boolean().nullable().optional(),
+  wantToBuy: z.boolean().nullable().optional(),
   matchesPlayed: z.number().int().min(0).nullable().optional(),
 });
 
@@ -70,6 +71,7 @@ const updateLogSchema = z.object({
   mechanics: mechanicsSchema,
   affinityContext: affinityContextSchema,
   own: z.boolean().nullable().optional(),
+  wantToBuy: z.boolean().nullable().optional(),
   matchesPlayed: z.number().int().min(0).nullable().optional(),
 });
 
@@ -90,6 +92,7 @@ function isCompleted(status: string | null | undefined): boolean {
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
 import { stringifyLogAffinityContext, logAffinityContextSchema } from "../lib/logAffinityContext.js";
 import { hoursFromCompletedLogForStats, rollupHoursFromCompletedLogs } from "../lib/completedLogHours.js";
+import { tierHasProFeatures, tierHasUnlimitedLogs } from "../lib/userTier.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
 import {
   handleLogCreated,
@@ -154,12 +157,20 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   if (mediaType === "boardgames" && boardgameSorts.includes(sortParam as (typeof boardgameSorts)[number])) sort = sortParam;
   else if (mediaType === "games" && gameSorts.includes(sortParam as (typeof gameSorts)[number])) sort = sortParam;
   const ownFilter = req.query.own === "true";
+  const wantToBuyFilter = req.query.wantToBuy === "true";
   const limitParam = req.query.limit != null ? parseInt(String(req.query.limit), 10) : NaN;
   const usePagination = Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= PAGINATION_LIMIT_MAX;
   const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
   const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
-  const where = { userId } as { userId: string; mediaType?: string; externalId?: string; status?: string; own?: boolean };
+  const where = { userId } as {
+    userId: string;
+    mediaType?: string;
+    externalId?: string;
+    status?: string;
+    own?: boolean;
+    wantToBuy?: boolean;
+  };
   if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
   if (externalId) {
     const safe = sanitizeText(externalId, EXTERNAL_ID_MAX_LENGTH);
@@ -173,7 +184,10 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       where.status = status;
     }
   }
-  if (mediaType === "boardgames" && ownFilter) where.own = true;
+  if (mediaType === "boardgames") {
+    if (ownFilter) where.own = true;
+    if (wantToBuyFilter) where.wantToBuy = true;
+  }
 
   const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =
     sort === "matchesPlayedDesc"
@@ -461,7 +475,7 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
     where: { id: userId },
     select: { tier: true },
   });
-  const hasProAccess = user?.tier === "pro" || user?.tier === "admin";
+  const hasProAccess = user != null && tierHasProFeatures(user.tier);
   if (!hasProAccess) {
     res.json({ data: [] });
     return;
@@ -505,7 +519,7 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
     where: { id: userId },
     select: { tier: true },
   });
-  const hasProAccess = user?.tier === "pro" || user?.tier === "admin";
+  const hasProAccess = user != null && tierHasProFeatures(user.tier);
   if (!hasProAccess) {
     const year = typeof req.query.year === "string" ? parseInt(req.query.year, 10) : new Date().getFullYear();
     const month = typeof req.query.month === "string" ? parseInt(req.query.month, 10) : new Date().getMonth() + 1;
@@ -554,7 +568,7 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
 /** Column keys for CSV export. When single category, only relevant columns; when all, include mediaType. */
 const EXPORT_COLUMNS_ALL: readonly string[] = [
   "mediaType", "externalId", "title", "grade", "status", "season", "episode", "chapter", "volume",
-  "startedAt", "completedAt", "contentHours", "hoursToBeat", "own", "matchesPlayed", "review", "createdAt", "updatedAt",
+  "startedAt", "completedAt", "contentHours", "hoursToBeat", "own", "wantToBuy", "matchesPlayed", "review", "createdAt", "updatedAt",
 ];
 const EXPORT_COLUMNS_BY_MEDIA: Record<MediaType, readonly string[]> = {
   movies: ["externalId", "title", "grade", "status", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
@@ -564,11 +578,31 @@ const EXPORT_COLUMNS_BY_MEDIA: Record<MediaType, readonly string[]> = {
   manga: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   comics: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   games: ["externalId", "title", "grade", "status", "contentHours", "hoursToBeat", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
-  boardgames: ["externalId", "title", "grade", "status", "own", "matchesPlayed", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+  boardgames: ["externalId", "title", "grade", "status", "own", "wantToBuy", "matchesPlayed", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
 };
 
 function getExportValue(
-  log: { mediaType: string; externalId: string; title: string; grade: number | null; status: string | null; season: number | null; episode: number | null; chapter: number | null; volume: number | null; startedAt: Date | null; completedAt: Date | null; contentHours: number | null; hoursToBeat: number | null; own: boolean | null; matchesPlayed: number | null; review: string | null; createdAt: Date; updatedAt: Date },
+  log: {
+    mediaType: string;
+    externalId: string;
+    title: string;
+    grade: number | null;
+    status: string | null;
+    season: number | null;
+    episode: number | null;
+    chapter: number | null;
+    volume: number | null;
+    startedAt: Date | null;
+    completedAt: Date | null;
+    contentHours: number | null;
+    hoursToBeat: number | null;
+    own: boolean | null;
+    wantToBuy: boolean | null;
+    matchesPlayed: number | null;
+    review: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
   key: string
 ): string | number | null | undefined {
   switch (key) {
@@ -586,6 +620,7 @@ function getExportValue(
     case "contentHours": return log.contentHours;
     case "hoursToBeat": return log.hoursToBeat;
     case "own": return log.own == null ? null : log.own ? "true" : "false";
+    case "wantToBuy": return log.wantToBuy == null ? null : log.wantToBuy ? "true" : "false";
     case "matchesPlayed": return log.matchesPlayed;
     case "review": return log.review;
     case "createdAt": return log.createdAt.toISOString();
@@ -601,7 +636,7 @@ logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
     where: { id: userId },
     select: { tier: true },
   });
-  const hasProAccess = user?.tier === "pro" || user?.tier === "admin";
+  const hasProAccess = user != null && tierHasProFeatures(user.tier);
   if (!hasProAccess) {
     res.status(403).json({ error: "Export is available on Pro only", code: "PRO_REQUIRED" });
     return;
@@ -665,6 +700,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     affinityContext: affinityInput,
     boardGameSource: bodyBoardGameSource,
     own: bodyOwn,
+    wantToBuy: bodyWantToBuy,
     matchesPlayed: bodyMatchesPlayed,
   } = parsed.data;
   const genresJson =
@@ -716,8 +752,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         where: { id: userId },
         select: { tier: true },
       });
-      const tier = user?.tier === "admin" || user?.tier === "pro" ? "pro" : "free";
-      if (tier === "free") {
+      if (!tierHasUnlimitedLogs(user?.tier ?? "free")) {
         const count = await prisma.log.count({ where: { userId } });
         if (count >= FREE_LOG_LIMIT) {
           res.status(403).json({
@@ -751,6 +786,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         mechanics?: string | null;
         affinityContext?: string | null;
         own?: boolean | null;
+        wantToBuy?: boolean | null;
         matchesPlayed?: number | null;
       } = {
         title: sanitizedTitle,
@@ -770,6 +806,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       if (mechanicsJson !== undefined) updateData.mechanics = mechanicsJson;
       if (affinityStored !== undefined) updateData.affinityContext = affinityStored;
       if (bodyOwn !== undefined) updateData.own = bodyOwn ?? null;
+      if (bodyWantToBuy !== undefined) updateData.wantToBuy = bodyWantToBuy ?? null;
       if (bodyMatchesPlayed !== undefined) updateData.matchesPlayed = bodyMatchesPlayed ?? null;
       if (isInProgress(status) && existing.startedAt == null) updateData.startedAt = now;
       if (isCompleted(status)) updateData.completedAt = now;
@@ -805,8 +842,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         where: { id: userId },
         select: { tier: true },
       });
-      const tierForCreate = userForCreate?.tier === "admin" || userForCreate?.tier === "pro" ? "pro" : "free";
-      if (tierForCreate === "free") {
+      if (!tierHasUnlimitedLogs(userForCreate?.tier ?? "free")) {
         const countBeforeCreate = await prisma.log.count({ where: { userId } });
         if (countBeforeCreate >= FREE_LOG_LIMIT) {
           res.status(403).json({
@@ -841,6 +877,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           affinityContext: affinityStored !== undefined ? affinityStored : null,
           boardGameSource,
           own: mediaType === "boardgames" ? (bodyOwn ?? null) : null,
+          wantToBuy: mediaType === "boardgames" ? (bodyWantToBuy ?? null) : null,
           matchesPlayed: mediaType === "boardgames" ? (bodyMatchesPlayed ?? null) : null,
         },
       });
@@ -909,6 +946,7 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     mechanics?: string | null;
     affinityContext?: string | null;
     own?: boolean | null;
+    wantToBuy?: boolean | null;
     matchesPlayed?: number | null;
   } = {};
   if (parsed.data.image !== undefined) data.image = sanitizeUrl(parsed.data.image) ?? null;
@@ -943,6 +981,7 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
         : stringifyLogAffinityContext(parsed.data.affinityContext);
   }
   if (parsed.data.own !== undefined) data.own = parsed.data.own ?? null;
+  if (parsed.data.wantToBuy !== undefined) data.wantToBuy = parsed.data.wantToBuy ?? null;
   if (parsed.data.matchesPlayed !== undefined) data.matchesPlayed = parsed.data.matchesPlayed ?? null;
   if (isInProgress(parsed.data.status)) data.grade = null;
   const updated = await prisma.log.update({

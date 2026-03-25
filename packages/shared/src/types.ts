@@ -245,7 +245,7 @@ export interface ItemReview {
   userEmail: string;
   /** Reviewer's username when set; use this for display instead of email when present. */
   reviewerUsername?: string | null;
-  /** True when the review author is on the Pro tier */
+  /** True when the review author has Pro-tier features (Pro, Beta, or Admin). */
   isPro?: boolean;
   /** True when the review author is an Admin */
   isAdmin?: boolean;
@@ -313,6 +313,8 @@ export interface Log {
   hoursToBeat: number | null;
   /** Boardgames only: user owns a copy. */
   own: boolean | null;
+  /** Boardgames only: user wants to buy a copy. */
+  wantToBuy: boolean | null;
   /** Boardgames only: number of matches/sessions played. */
   matchesPlayed: number | null;
   /** Genre names (for stats and badges). Stored when logging. */
@@ -358,6 +360,8 @@ export interface CreateLogInput {
   boardGameSource?: BoardGameProvider | null;
   /** Boardgames only: user owns a copy. */
   own?: boolean | null;
+  /** Boardgames only: user wants to buy a copy. */
+  wantToBuy?: boolean | null;
   /** Boardgames only: number of matches/sessions played. */
   matchesPlayed?: number | null;
 }
@@ -380,6 +384,8 @@ export interface UpdateLogInput {
   affinityContext?: LogAffinityContext | null;
   /** Boardgames only: user owns a copy. */
   own?: boolean | null;
+  /** Boardgames only: user wants to buy a copy. */
+  wantToBuy?: boolean | null;
   /** Boardgames only: number of matches/sessions played. */
   matchesPlayed?: number | null;
 }

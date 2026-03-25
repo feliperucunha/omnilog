@@ -17,6 +17,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
+import { tierHasProFeatures } from "@/lib/userTier";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, type Log } from "@geeklogs/shared";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
@@ -76,7 +77,7 @@ export function Statistics() {
   const { me } = useMe();
   const { visibleTypes } = useVisibleMediaTypes();
   const { setPageTitle, setRightSlot } = usePageTitle() ?? {};
-  const isPro = me?.tier === "pro" || me?.tier === "admin";
+  const isPro = tierHasProFeatures(me?.tier);
   const [logs, setLogs] = useState<Log[]>([]);
   const [summary, setSummary] = useState<LogStatsSummary | null>(null);
   const [loading, setLoading] = useState(true);

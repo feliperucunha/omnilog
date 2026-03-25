@@ -34,6 +34,8 @@ export interface LogCompleteState {
   review?: string | null;
   /** Boardgames only: user owns a copy. */
   own?: boolean | null;
+  /** Boardgames only: user wants to buy a copy. */
+  wantToBuy?: boolean | null;
   /** Boardgames only: number of matches/sessions played. */
   matchesPlayed?: number | null;
 }
@@ -83,6 +85,7 @@ export function ItemReviewForm({
   const [volume, setVolume] = useState<number | "">("");
   const [hoursToBeat, setHoursToBeat] = useState<number | "">("");
   const [own, setOwn] = useState(false);
+  const [wantToBuy, setWantToBuy] = useState(false);
   const [matchesPlayed, setMatchesPlayed] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
 
@@ -133,6 +136,7 @@ export function ItemReviewForm({
           setVolume(log.volume ?? "");
           setHoursToBeat(log.hoursToBeat != null ? log.hoursToBeat : "");
           setOwn(log.own ?? false);
+          setWantToBuy(log.wantToBuy ?? false);
           const defaultMatches = showBoardGameFields
             ? (log.status === "played" ? 1 : log.status === "plan to play" ? 0 : "")
             : "";
@@ -147,6 +151,7 @@ export function ItemReviewForm({
           setVolume("");
           setHoursToBeat("");
           setOwn(false);
+          setWantToBuy(false);
           setMatchesPlayed(showBoardGameFields ? 1 : "");
         }
       })
@@ -197,6 +202,7 @@ export function ItemReviewForm({
       if (showHoursToBeat) payload.hoursToBeat = toNum(hoursToBeat);
       if (showBoardGameFields) {
         payload.own = own;
+        payload.wantToBuy = wantToBuy;
         payload.matchesPlayed = toNum(matchesPlayed);
       }
       if (genreList.length > 0) payload.genres = genreList;
@@ -230,7 +236,9 @@ export function ItemReviewForm({
           mechanicsMatch &&
           affinityMatch &&
           (!showBoardGameFields ||
-            (own === (myLog.own ?? false) && toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)));
+            (own === (myLog.own ?? false) &&
+              wantToBuy === (myLog.wantToBuy ?? false) &&
+              toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)));
         if (noChange) {
           setSaving(false);
           return;
@@ -253,7 +261,7 @@ export function ItemReviewForm({
             mediaType,
             id: externalId,
             review: review.trim() || null,
-            ...(showBoardGameFields && { own, matchesPlayed: toNum(matchesPlayed) }),
+            ...(showBoardGameFields && { own, wantToBuy, matchesPlayed: toNum(matchesPlayed) }),
           });
         }
       } else {
@@ -283,7 +291,7 @@ export function ItemReviewForm({
           mediaType,
           id: externalId,
           review: review.trim() || null,
-          ...(showBoardGameFields && { own, matchesPlayed: toNum(matchesPlayed) }),
+          ...(showBoardGameFields && { own, wantToBuy, matchesPlayed: toNum(matchesPlayed) }),
         });
       }
     } catch (err) {
@@ -320,11 +328,20 @@ export function ItemReviewForm({
         <h2 className="mb-4 text-xl font-semibold text-[var(--color-lightest)]">
           {myLog ? t("itemReviewForm.yourReview") : t("itemReviewForm.addReview")}
         </h2>
-        {showBoardGameFields && myLog && (myLog.own === true || (myLog.matchesPlayed != null && myLog.matchesPlayed > 0)) && (
+        {showBoardGameFields &&
+          myLog &&
+          (myLog.own === true ||
+            myLog.wantToBuy === true ||
+            (myLog.matchesPlayed != null && myLog.matchesPlayed > 0)) && (
           <div className="mb-4 flex flex-wrap items-center gap-2">
             {myLog.own === true && (
               <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
                 {t("itemReviewForm.own")}
+              </span>
+            )}
+            {myLog.wantToBuy === true && (
+              <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+                {t("itemReviewForm.wantToBuy")}
               </span>
             )}
             {myLog.matchesPlayed != null && myLog.matchesPlayed > 0 && (
@@ -457,18 +474,37 @@ export function ItemReviewForm({
 
             {showBoardGameFields && (
               <>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="item-review-own"
-                    checked={own}
-                    onChange={(e) => setOwn(e.target.checked)}
-                    className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
-                    aria-describedby="item-review-own-desc"
-                  />
-                  <Label htmlFor="item-review-own" id="item-review-own-desc" className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]">
-                    {t("itemReviewForm.own")}
-                  </Label>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="item-review-own"
+                      checked={own}
+                      onChange={(e) => setOwn(e.target.checked)}
+                      className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                      aria-describedby="item-review-own-desc"
+                    />
+                    <Label htmlFor="item-review-own" id="item-review-own-desc" className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]">
+                      {t("itemReviewForm.own")}
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="item-review-want-to-buy"
+                      checked={wantToBuy}
+                      onChange={(e) => setWantToBuy(e.target.checked)}
+                      className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
+                      aria-describedby="item-review-want-to-buy-desc"
+                    />
+                    <Label
+                      htmlFor="item-review-want-to-buy"
+                      id="item-review-want-to-buy-desc"
+                      className="cursor-pointer text-sm font-medium text-[var(--color-lightest)]"
+                    >
+                      {t("itemReviewForm.wantToBuy")}
+                    </Label>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm text-[var(--color-lightest)]">
