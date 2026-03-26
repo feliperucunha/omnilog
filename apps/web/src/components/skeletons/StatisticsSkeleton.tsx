@@ -36,10 +36,13 @@ export function StatisticsBarsSkeleton({ rows = 6 }: { rows?: number }) {
       aria-hidden
     >
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex min-w-0 items-center gap-3">
-          <Skeleton className="h-3 w-14 shrink-0 rounded sm:w-20" />
-          <Skeleton className="h-6 min-w-0 flex-1 rounded bg-[var(--color-darkest)]" />
-          <Skeleton className="h-3 w-10 shrink-0 rounded sm:w-12" />
+        <div
+          key={i}
+          className="grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto]"
+        >
+          <Skeleton className="h-3 w-full max-w-full rounded" />
+          <Skeleton className="h-6 min-w-0 rounded bg-[var(--color-darkest)]" />
+          <Skeleton className="h-3 w-10 shrink-0 justify-self-end rounded sm:w-12" />
         </div>
       ))}
     </div>
@@ -54,10 +57,13 @@ export function StatisticsCategoryOverTimeSkeleton() {
         <div key={block} className="flex min-w-0 flex-col gap-2">
           <Skeleton className="h-3 w-20 rounded" />
           {Array.from({ length: 3 }).map((_, row) => (
-            <div key={row} className="flex min-w-0 items-center gap-3 pl-0">
-              <Skeleton className="h-3 w-20 max-w-[7rem] shrink-0 rounded" />
-              <Skeleton className="h-5 min-w-0 flex-1 rounded bg-[var(--color-darkest)]" />
-              <Skeleton className="h-3 w-8 shrink-0 rounded" />
+            <div
+              key={row}
+              className="grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto]"
+            >
+              <Skeleton className="h-3 w-full max-w-full rounded" />
+              <Skeleton className="h-6 min-w-0 rounded bg-[var(--color-darkest)]" />
+              <Skeleton className="h-3 w-8 shrink-0 justify-self-end rounded" />
             </div>
           ))}
         </div>

@@ -1,5 +1,7 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
+import { useLocale } from "@/contexts/LocaleContext";
 import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
 import { mergeRefs, useRadixDataStateOpenRef } from "@/hooks/useRadixDataStateOpen";
 import { cn } from "@/lib/utils";
@@ -37,6 +39,7 @@ const DialogContent = React.forwardRef<
   { className, children, onClose, overlayClassName, closeOnInteractOutside = true, ...props },
   ref
 ) {
+  const { t } = useLocale();
   const [dataStateRef, radixOpen] = useRadixDataStateOpenRef<HTMLDivElement>();
   const mergedRef = React.useMemo(() => mergeRefs(ref, dataStateRef), [ref, dataStateRef]);
   const onCloseRef = React.useRef(onClose);
@@ -81,6 +84,20 @@ const DialogContent = React.forwardRef<
       }}
       {...props}
     >
+      {onClose ? (
+        <button
+          type="button"
+          onClick={() => onCloseRef.current?.()}
+          className={cn(
+            "absolute right-3 top-3 z-10 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--color-light)] transition-colors",
+            "hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]",
+            "hidden sm:inline-flex"
+          )}
+          aria-label={t("common.close")}
+        >
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+      ) : null}
       {children}
     </DialogPrimitive.Content>
   </DialogPortal>

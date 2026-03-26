@@ -11,6 +11,10 @@ export const MEDIA_TYPES = [
   "comics",
 ] as const;
 
+/** Categories where optional purchase / spend amount is tracked. */
+export const SPEND_TRACKED_MEDIA_TYPES = ["games", "boardgames", "manga", "comics"] as const;
+export type SpendTrackedMediaType = (typeof SPEND_TRACKED_MEDIA_TYPES)[number];
+
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
 /** Narrow a string to MediaType; returns "movies" if not a valid media type. */
@@ -327,6 +331,10 @@ export interface Log {
   updatedAt: string;
   /** Board games: which API this log’s externalId came from (affects image aspect handling for BGG). */
   boardGameSource?: BoardGameProvider | null;
+  /** Optional amount paid, in minor units (e.g. cents), with purchaseCurrency. */
+  purchaseAmountMinor?: number | null;
+  /** ISO 4217 currency code when purchaseAmountMinor is set. */
+  purchaseCurrency?: string | null;
   /** Number of like reactions (feed/reviews). */
   likesCount?: number;
   /** Number of dislike reactions (feed/reviews). */
@@ -364,6 +372,9 @@ export interface CreateLogInput {
   wantToBuy?: boolean | null;
   /** Board games only: number of matches/sessions played. */
   matchesPlayed?: number | null;
+  /** Optional purchase amount (minor units); requires purchaseCurrency for eligible media types. */
+  purchaseAmountMinor?: number | null;
+  purchaseCurrency?: string | null;
 }
 
 export interface UpdateLogInput {
@@ -388,6 +399,8 @@ export interface UpdateLogInput {
   wantToBuy?: boolean | null;
   /** Board games only: number of matches/sessions played. */
   matchesPlayed?: number | null;
+  purchaseAmountMinor?: number | null;
+  purchaseCurrency?: string | null;
 }
 
 export interface AuthRegisterInput {

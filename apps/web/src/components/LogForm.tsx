@@ -32,8 +32,14 @@ import { StarRating } from "@/components/StarRating";
 import { gradeToStars, starsToGrade } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { BoardGameOwnershipSwitch } from "@/components/BoardGameOwnershipSwitch";
+import { MoneyAmountInput } from "@/components/MoneyAmountInput";
 import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/lib/boardGameOwnership";
-import { mediaTypeHasBoardGameOnlyFields, mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
+import {
+  mediaTypeHasBoardGameOnlyFields,
+  mediaTypeHasCollectionOwnership,
+  mediaTypeHasPurchaseAmount,
+} from "@/lib/mediaTypeFeatures";
+import { DEFAULT_PURCHASE_CURRENCY } from "@/lib/currencies";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
 const HAS_CHAPTER_VOLUME: MediaType[] = ["comics", "manga"];
@@ -111,6 +117,13 @@ export function LogForm(props: LogFormProps) {
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
   const showHoursToBeat = mediaType === "games";
+  const showPurchaseAmount = mediaTypeHasPurchaseAmount(mediaType);
+  const [purchaseCurrency, setPurchaseCurrency] = useState(
+    () => (isEdit && log?.purchaseCurrency ? log.purchaseCurrency : DEFAULT_PURCHASE_CURRENCY)
+  );
+  const [purchaseAmountMinor, setPurchaseAmountMinor] = useState<number | null>(
+    () => (isEdit && log?.purchaseAmountMinor != null ? log.purchaseAmountMinor : null)
+  );
 
   useEffect(() => {
     if (!isEdit || !log) return;
@@ -143,6 +156,8 @@ export function LogForm(props: LogFormProps) {
         ? (log.status === "played" ? 1 : log.status === "plan to play" ? 0 : "")
         : "";
       setMatchesPlayed(log.matchesPlayed ?? defaultMatches);
+      setPurchaseCurrency(log.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY);
+      setPurchaseAmountMinor(log.purchaseAmountMinor ?? null);
     }
   }, [isEdit, log?.id]);
 
@@ -171,7 +186,11 @@ export function LogForm(props: LogFormProps) {
         (!showHoursToBeat || toNum(hoursToBeat) === (log.hoursToBeat ?? null)) &&
         (!showCollectionOwnership ||
           (own === (log.own ?? false) && wantToBuy === (log.wantToBuy ?? false))) &&
-        (!showBoardGameFields || toNum(matchesPlayed) === (log.matchesPlayed ?? null));
+        (!showBoardGameFields || toNum(matchesPlayed) === (log.matchesPlayed ?? null)) &&
+        (!showPurchaseAmount ||
+          (purchaseAmountMinor === (log.purchaseAmountMinor ?? null) &&
+            (purchaseCurrency || DEFAULT_PURCHASE_CURRENCY) ===
+              (log.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY)));
       return !noChange;
     }
     const p = props as LogFormCreateProps;
@@ -188,7 +207,8 @@ export function LogForm(props: LogFormProps) {
       (showHoursToBeat && hoursToBeat !== "") ||
       (showCollectionOwnership && (own || wantToBuy)) ||
       (showBoardGameFields &&
-        toNum(matchesPlayed) !== (typeof defaultMatches === "number" ? defaultMatches : null))
+        toNum(matchesPlayed) !== (typeof defaultMatches === "number" ? defaultMatches : null)) ||
+      (showPurchaseAmount && purchaseAmountMinor != null)
     );
   }, [
     isEdit,
@@ -209,6 +229,9 @@ export function LogForm(props: LogFormProps) {
     showHoursToBeat,
     showCollectionOwnership,
     showBoardGameFields,
+    showPurchaseAmount,
+    purchaseAmountMinor,
+    purchaseCurrency,
   ]);
 
   const performSave = useCallback(async (): Promise<boolean> => {
@@ -241,6 +264,15 @@ export function LogForm(props: LogFormProps) {
         if (showBoardGameFields) {
           payload.matchesPlayed = toNum(matchesPlayed);
         }
+        if (showPurchaseAmount) {
+          if (purchaseAmountMinor == null) {
+            payload.purchaseAmountMinor = null;
+            payload.purchaseCurrency = null;
+          } else {
+            payload.purchaseAmountMinor = purchaseAmountMinor;
+            payload.purchaseCurrency = purchaseCurrency || DEFAULT_PURCHASE_CURRENCY;
+          }
+        }
         const currentStatus = props.log.status ?? props.log.listType ?? null;
         const statusChanged = (status ?? null) !== currentStatus;
         const noChange =
@@ -254,7 +286,11 @@ export function LogForm(props: LogFormProps) {
           (!showHoursToBeat || toNum(hoursToBeat) === (props.log.hoursToBeat ?? null)) &&
           (!showCollectionOwnership ||
             (own === (props.log.own ?? false) && wantToBuy === (props.log.wantToBuy ?? false))) &&
-          (!showBoardGameFields || toNum(matchesPlayed) === (props.log.matchesPlayed ?? null));
+          (!showBoardGameFields || toNum(matchesPlayed) === (props.log.matchesPlayed ?? null)) &&
+          (!showPurchaseAmount ||
+            (purchaseAmountMinor === (props.log.purchaseAmountMinor ?? null) &&
+              (purchaseCurrency || DEFAULT_PURCHASE_CURRENCY) ===
+                (props.log.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY)));
         if (noChange) {
           setLoading(false);
           props.onCancel();
@@ -301,6 +337,13 @@ export function LogForm(props: LogFormProps) {
             ...(showHoursToBeat && { hoursToBeat: toNum(hoursToBeat) }),
             ...(showCollectionOwnership && { own, wantToBuy }),
             ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
+            ...(showPurchaseAmount &&
+              (purchaseAmountMinor == null
+                ? { purchaseAmountMinor: null, purchaseCurrency: null }
+                : {
+                    purchaseAmountMinor,
+                    purchaseCurrency: purchaseCurrency || DEFAULT_PURCHASE_CURRENCY,
+                  })),
           }),
         }
       );
@@ -354,6 +397,9 @@ export function LogForm(props: LogFormProps) {
     showHoursToBeat,
     showCollectionOwnership,
     showBoardGameFields,
+    showPurchaseAmount,
+    purchaseAmountMinor,
+    purchaseCurrency,
     t,
   ]);
 
@@ -540,6 +586,18 @@ export function LogForm(props: LogFormProps) {
                       aria-label={t("itemReviewForm.matchesPlayed")}
                     />
                 </div>
+              )}
+              {showPurchaseAmount && (
+                <MoneyAmountInput
+                  label={t("money.spentOnItem")}
+                  currency={purchaseCurrency}
+                  onCurrencyChange={setPurchaseCurrency}
+                  amountMinor={purchaseAmountMinor}
+                  onAmountMinorChange={setPurchaseAmountMinor}
+                  disabled={loading || deleting}
+                  t={t}
+                  className="w-full max-w-full sm:max-w-md"
+                />
               )}
               <div>
                 <Label className="mb-1 block text-sm font-medium text-[var(--color-lightest)]">

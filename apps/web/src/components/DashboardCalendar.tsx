@@ -20,6 +20,7 @@ import {
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { IN_PROGRESS_STATUSES, type Log } from "@geeklogs/shared";
 import { paperShadow } from "@/lib/paperShadow";
+import { cn } from "@/lib/utils";
 
 const WEEKDAY_KEYS = [
   "dashboard.calendarMon",
@@ -47,7 +48,14 @@ function formatCalendarDayDate(dateKey: string, locale: string): string {
   return date.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
 
-export function DashboardCalendar({ isPro }: { isPro: boolean }) {
+export function DashboardCalendar({
+  isPro,
+  fillColumnHeight,
+}: {
+  isPro: boolean;
+  /** When set (e.g. Statistics desktop two-column row), the card stretches to match the sibling column height. */
+  fillColumnHeight?: boolean;
+}) {
   const { t, locale } = useLocale();
   const isMobile = useIsMobile();
   const [year, setYear] = useState(() => new Date().getFullYear());
@@ -151,7 +159,11 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
   return (
     <>
       <Card
-        className={`relative min-w-0 w-full max-w-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)] overflow-hidden ${!isPro ? "select-none" : ""}`}
+        className={cn(
+          "relative min-w-0 w-full max-w-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)] overflow-hidden",
+          !isPro && "select-none",
+          fillColumnHeight && "md:flex md:h-full md:min-h-0 md:flex-col"
+        )}
         style={paperShadow}
       >
         {!isPro && (
@@ -167,8 +179,13 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
             </Button>
           </div>
         )}
-        <div className={!isPro ? "pointer-events-none blur-sm" : ""}>
-          <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[var(--color-mid)]/30 px-4 py-3">
+        <div
+          className={cn(
+            !isPro && "pointer-events-none blur-sm",
+            fillColumnHeight && "flex min-h-0 min-w-0 flex-1 flex-col"
+          )}
+        >
+          <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-[var(--color-mid)]/30 px-4 py-3">
             <h3 className="shrink-0 text-sm font-semibold uppercase tracking-wide text-[var(--color-light)]">
               {t("dashboard.calendarTitle")}
             </h3>
@@ -200,7 +217,12 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
               </div>
             )}
           </div>
-          <div className="relative min-h-[16rem]">
+          <div
+            className={cn(
+              "relative min-h-[16rem]",
+              fillColumnHeight && "min-h-0 flex-1"
+            )}
+          >
             <div className="grid grid-cols-7 text-center [&>*:nth-child(7n)]:border-r-0">
               {WEEKDAY_KEYS.map((key) => (
                 <div
@@ -346,7 +368,7 @@ export function DashboardCalendar({ isPro }: { isPro: boolean }) {
               className="max-h-[85vh] flex flex-col max-w-md"
               onClose={() => setSelectedDate(null)}
             >
-              <DialogHeader>
+              <DialogHeader className="shrink-0 space-y-0 pr-8 text-left sm:pr-10">
                 <DialogTitle className="text-[var(--color-lightest)]">
                   {t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) })}
                 </DialogTitle>

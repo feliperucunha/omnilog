@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { Sentry } from "../instrument-sentry.js";
 
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = parseInt(process.env.SMTP_PORT ?? "587", 10);
@@ -17,26 +18,43 @@ function getTransporter(): nodemailer.Transporter | null {
   });
 }
 
+function captureEmailError(err: unknown): void {
+  console.error("[email] Password reset send failed:", err);
+  if (process.env.SENTRY_DSN?.trim() && err instanceof Error) {
+    Sentry.captureException(err);
+  }
+}
+
 /**
  * Sends a password reset email with the given link.
- * If SMTP is not configured, logs the link to console (dev) and resolves without sending.
+ * Returns true if mail was accepted by SMTP; false if SMTP is not configured or send failed.
+ * If SMTP is not configured, logs the reset URL on the server (no email is sent).
  */
-export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
+export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<boolean> {
   const transporter = getTransporter();
   const subject = "Reset your Geeklogs password";
   const text = `You requested a password reset. Open this link to set a new password:\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, ignore this email.`;
   const html = `<p>You requested a password reset. <a href="${resetUrl}">Click here to set a new password</a>.</p><p>Or copy this link: ${resetUrl}</p><p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>`;
 
   if (!transporter) {
-    console.log("[email] SMTP not configured. Password reset link:", resetUrl);
-    return;
+    console.warn(
+      "[email] SMTP not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS). Reset link (copy from server logs only):",
+      resetUrl
+    );
+    return false;
   }
 
-  await transporter.sendMail({
-    from: SMTP_FROM,
-    to,
-    subject,
-    text,
-    html,
-  });
+  try {
+    await transporter.sendMail({
+      from: SMTP_FROM,
+      to,
+      subject,
+      text,
+      html,
+    });
+    return true;
+  } catch (err) {
+    captureEmailError(err);
+    return false;
+  }
 }

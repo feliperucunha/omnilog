@@ -192,6 +192,9 @@ model Log {
   genres         String?  // JSON array of genre names (for stats and badges)
   mechanics       String?  // JSON array of board-game mechanic names (BGG / Ludopedia); optional
   affinityContext String?  // JSON: recommendation snapshot (board stats, book subjects, manga themes, …)
+  // purchaseAmountMinor + purchaseCurrency: optional spend (minor units + ISO 4217) for games/boardgames/manga/comics
+  purchaseAmountMinor Int?
+  purchaseCurrency    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   reactions   LogReaction[]

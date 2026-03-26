@@ -31,10 +31,15 @@ const SelectTrigger = React.forwardRef<
 ));
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
+type SelectContentProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
+  /** Scroll long lists inside the panel (e.g. currency). Does not affect other selects unless set. */
+  viewportClassName?: string;
+};
+
 const SelectContent = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
+  SelectContentProps
+>(({ className, children, position = "popper", viewportClassName, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -53,7 +58,8 @@ const SelectContent = React.forwardRef<
       <SelectPrimitive.Viewport
         className={cn(
           "p-1",
-          position === "popper" && "w-full min-w-[var(--radix-select-trigger-width)]"
+          position === "popper" && "w-full min-w-[var(--radix-select-trigger-width)]",
+          viewportClassName
         )}
       >
         {children}
@@ -101,6 +107,14 @@ export interface SelectProps {
   className?: string;
   triggerClassName?: string;
   "aria-label"?: string;
+  /** When set, shown in the closed trigger instead of the selected option label (e.g. ISO code only). */
+  triggerLabel?: string;
+  /** Optional native tooltip on the trigger (e.g. full currency name). */
+  triggerTitle?: string;
+  /** Overrides `aria-label` on the trigger (use with `triggerLabel` so screen readers get the full option). */
+  triggerAriaLabel?: string;
+  /** Limit dropdown height and scroll inside (e.g. long currency lists); mobile and desktop. */
+  contentScrollable?: boolean;
 }
 
 /** Styled select dropdown; use for form fields. Replaces native &lt;select&gt;. */
@@ -113,7 +127,16 @@ export function Select({
   className,
   triggerClassName,
   "aria-label": ariaLabel,
+  triggerLabel,
+  triggerTitle,
+  triggerAriaLabel,
+  contentScrollable,
 }: SelectProps) {
+  const triggerA11y = triggerAriaLabel ?? ariaLabel;
+  const scrollViewportClass =
+    contentScrollable === true
+      ? "max-h-[min(50dvh,20rem)] overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+      : undefined;
   return (
     <div className={className}>
       <SelectRoot
@@ -121,10 +144,18 @@ export function Select({
         onValueChange={(v) => onValueChange(v === "__empty" ? "" : v)}
         disabled={disabled}
       >
-        <SelectTrigger className={cn("max-w-xs", triggerClassName)} aria-label={ariaLabel}>
-          <SelectValue placeholder={placeholder} />
+        <SelectTrigger
+          className={cn("max-w-xs", triggerClassName)}
+          aria-label={triggerA11y}
+          title={triggerTitle}
+        >
+          {triggerLabel != null ? (
+            <span className="truncate text-left">{triggerLabel}</span>
+          ) : (
+            <SelectValue placeholder={placeholder} />
+          )}
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent viewportClassName={scrollViewportClass}>
           {options.map((opt) => (
             <SelectItem key={opt.value === "" ? "__empty" : opt.value} value={opt.value === "" ? "__empty" : opt.value}>
               {opt.label}

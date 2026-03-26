@@ -104,7 +104,12 @@ export function Dashboard() {
     if (ownQ) collection = "owned";
     else if (wtbQ) collection = "wantToBuy";
     if (!status && sort === "dateDesc" && !q && !collection) return undefined;
-    return { status, sort, search: q, collection };
+    return {
+      status,
+      sort,
+      search: q,
+      collection,
+    };
   }, [searchParamsKey]);
   const categoryParam = searchParams.get("category");
   const defaultCategory: MediaType = visibleTypes.length > 0 ? toMediaType(visibleTypes[0]) : "movies";
@@ -558,6 +563,8 @@ export function Dashboard() {
                 next.delete("wantToBuy");
                 if (f.collection === "owned") next.set("own", "true");
                 else if (f.collection === "wantToBuy") next.set("wantToBuy", "true");
+                next.delete("purchased");
+                next.delete("purchaseDate");
                 return next;
               }, { replace: true });
             }}

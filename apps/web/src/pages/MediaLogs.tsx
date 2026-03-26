@@ -271,7 +271,17 @@ export function MediaLogs({
           setLoadingMore(false);
         });
     },
-    [mediaType, statusFilter, collectionFilter, sortBy, nextCursor, loadingMore, t, publicUserId, showCollectionOwnershipFilters]
+    [
+      mediaType,
+      statusFilter,
+      collectionFilter,
+      sortBy,
+      nextCursor,
+      loadingMore,
+      t,
+      publicUserId,
+      showCollectionOwnershipFilters,
+    ]
   );
 
   const fetchStatusCounts = useCallback(() => {

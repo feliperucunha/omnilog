@@ -6,6 +6,11 @@ import { prisma } from "../lib/prisma.js";
 import { LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { serializeLog } from "../lib/serializeLog.js";
 import { getMilestoneProgress } from "../services/milestone.service.js";
+import {
+  localDayBoundsFromDateString,
+  purchaseLogCreatedAtRange,
+  type PurchasePeriod,
+} from "../lib/purchaseFields.js";
 
 /** Public (no auth) read-only profile and logs for sharing. */
 
@@ -216,18 +221,13 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
   else if (mediaType === "games" && gameSorts.includes(sortParam as (typeof gameSorts)[number])) sort = sortParam;
   const ownFilter = req.query.own === "true";
   const wantToBuyFilter = req.query.wantToBuy === "true";
+  const purchasedFilter = req.query.purchased === "true" || req.query.purchased === "1";
   const limitParam = req.query.limit != null ? parseInt(String(req.query.limit), 10) : NaN;
   const usePagination = Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= PAGINATION_LIMIT_MAX;
   const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
   const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
-  const where = { userId: user.id } as {
-    userId: string;
-    mediaType?: string;
-    status?: string;
-    own?: boolean;
-    wantToBuy?: boolean;
-  };
+  const where: Prisma.LogWhereInput = { userId: user.id };
   if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
   if (status != null && status !== "") {
     if (mediaType && MEDIA_TYPES.includes(mediaType)) {
@@ -240,6 +240,32 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
   if (mediaType === "boardgames" || mediaType === "games") {
     if (ownFilter) where.own = true;
     if (wantToBuyFilter) where.wantToBuy = true;
+  }
+  if (purchasedFilter) {
+    where.purchaseAmountMinor = { not: null };
+    where.purchaseCurrency = { not: null };
+    const dateRaw = typeof req.query.purchaseDate === "string" ? req.query.purchaseDate.trim() : "";
+    if (dateRaw !== "") {
+      const tzRaw = req.query.timezoneOffsetMinutes;
+      const tzOffsetMinutes =
+        typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
+          ? parseInt(tzRaw, 10)
+          : 0;
+      const bounds = localDayBoundsFromDateString(dateRaw, tzOffsetMinutes);
+      if (bounds) where.createdAt = { gte: bounds.gte, lte: bounds.lte };
+    } else {
+      const spendPeriodRaw = typeof req.query.spendPeriod === "string" ? req.query.spendPeriod.trim() : "";
+      const validPeriods: PurchasePeriod[] = ["month", "year", "all"];
+      if (validPeriods.includes(spendPeriodRaw as PurchasePeriod)) {
+        const tzRaw = req.query.timezoneOffsetMinutes;
+        const tzOffsetMinutes =
+          typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
+            ? parseInt(tzRaw, 10)
+            : 0;
+        const range = purchaseLogCreatedAtRange(spendPeriodRaw as PurchasePeriod, tzOffsetMinutes);
+        if (range) where.createdAt = { gte: range.gte, lte: range.lte };
+      }
+    }
   }
 
   const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =

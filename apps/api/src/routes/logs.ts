@@ -6,6 +6,7 @@ import {
   LIST_TYPES,
   LOG_STATUS_OPTIONS,
   MEDIA_TYPES,
+  SPEND_TRACKED_MEDIA_TYPES,
 } from "@geeklogs/shared";
 import type { MediaType } from "@geeklogs/shared";
 import type { Prisma } from "@prisma/client";
@@ -53,6 +54,14 @@ const createLogSchema = z.object({
   own: z.boolean().nullable().optional(),
   wantToBuy: z.boolean().nullable().optional(),
   matchesPlayed: z.number().int().min(0).nullable().optional(),
+  purchaseAmountMinor: z.number().int().min(0).max(999_999_999_999).nullable().optional(),
+  purchaseCurrency: z
+    .string()
+    .length(3)
+    .regex(/^[A-Za-z]{3}$/)
+    .nullable()
+    .optional()
+    .transform((s) => (s == null ? null : s.toUpperCase())),
 });
 
 const updateLogSchema = z.object({
@@ -73,6 +82,14 @@ const updateLogSchema = z.object({
   own: z.boolean().nullable().optional(),
   wantToBuy: z.boolean().nullable().optional(),
   matchesPlayed: z.number().int().min(0).nullable().optional(),
+  purchaseAmountMinor: z.number().int().min(0).max(999_999_999_999).nullable().optional(),
+  purchaseCurrency: z
+    .string()
+    .length(3)
+    .regex(/^[A-Za-z]{3}$/)
+    .nullable()
+    .optional()
+    .transform((s) => (s == null ? null : s.toUpperCase())),
 });
 
 function validateStatus(mediaType: MediaType, status: string | null | undefined): boolean {
@@ -101,6 +118,12 @@ import {
   handleReviewLiked,
   countsAsReviewForGamification,
 } from "../services/gamification.service.js";
+import {
+  normalizePurchaseFields,
+  purchaseLogCreatedAtRange,
+  localDayBoundsFromDateString,
+  type PurchasePeriod,
+} from "../lib/purchaseFields.js";
 
 const FREE_LOG_LIMIT = 500;
 
@@ -158,19 +181,13 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   else if (mediaType === "games" && gameSorts.includes(sortParam as (typeof gameSorts)[number])) sort = sortParam;
   const ownFilter = req.query.own === "true";
   const wantToBuyFilter = req.query.wantToBuy === "true";
+  const purchasedFilter = req.query.purchased === "true" || req.query.purchased === "1";
   const limitParam = req.query.limit != null ? parseInt(String(req.query.limit), 10) : NaN;
   const usePagination = Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= PAGINATION_LIMIT_MAX;
   const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
   const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
-  const where = { userId } as {
-    userId: string;
-    mediaType?: string;
-    externalId?: string;
-    status?: string;
-    own?: boolean;
-    wantToBuy?: boolean;
-  };
+  const where: Prisma.LogWhereInput = { userId };
   if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
   if (externalId) {
     const safe = sanitizeText(externalId, EXTERNAL_ID_MAX_LENGTH);
@@ -187,6 +204,32 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   if (mediaType === "boardgames" || mediaType === "games") {
     if (ownFilter) where.own = true;
     if (wantToBuyFilter) where.wantToBuy = true;
+  }
+  if (purchasedFilter) {
+    where.purchaseAmountMinor = { not: null };
+    where.purchaseCurrency = { not: null };
+    const dateRaw = typeof req.query.purchaseDate === "string" ? req.query.purchaseDate.trim() : "";
+    if (dateRaw !== "") {
+      const tzRaw = req.query.timezoneOffsetMinutes;
+      const tzOffsetMinutes =
+        typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
+          ? parseInt(tzRaw, 10)
+          : 0;
+      const bounds = localDayBoundsFromDateString(dateRaw, tzOffsetMinutes);
+      if (bounds) where.createdAt = { gte: bounds.gte, lte: bounds.lte };
+    } else {
+      const spendPeriodRaw = typeof req.query.spendPeriod === "string" ? req.query.spendPeriod.trim() : "";
+      const validPeriods: PurchasePeriod[] = ["month", "year", "all"];
+      if (validPeriods.includes(spendPeriodRaw as PurchasePeriod)) {
+        const tzRaw = req.query.timezoneOffsetMinutes;
+        const tzOffsetMinutes =
+          typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
+            ? parseInt(tzRaw, 10)
+            : 0;
+        const range = purchaseLogCreatedAtRange(spendPeriodRaw as PurchasePeriod, tzOffsetMinutes);
+        if (range) where.createdAt = { gte: range.gte, lte: range.lte };
+      }
+    }
   }
 
   const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =
@@ -316,7 +359,7 @@ logsRouter.delete("/:id/reaction", async (req: AuthenticatedRequest, res) => {
   res.status(204).end();
 });
 
-/** GET /logs/stats?group=summary|category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear - summary = account totals; categoryBy* returns { period, mediaType, hours }[] */
+/** GET /logs/stats?group=summary|category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear - summary = account totals; category/month/year rows include { hours, count }; genre uses unique log counts per genre name */
 logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const groupParam = req.query.group as string;
@@ -337,9 +380,57 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
                   ? "categoryByYear"
                   : groupParam === "categoryByMonth"
                     ? "categoryByMonth"
-                    : groupParam === "month"
-                      ? "month"
-                      : "month";
+                    : groupParam === "purchaseSpending"
+                      ? "purchaseSpending"
+                      : groupParam === "month"
+                        ? "month"
+                        : "month";
+
+  if (group === "purchaseSpending") {
+    const periodRaw = typeof req.query.period === "string" ? req.query.period.trim() : "month";
+    const period: PurchasePeriod =
+      periodRaw === "year" || periodRaw === "all" ? periodRaw : "month";
+    const tzRaw = req.query.timezoneOffsetMinutes;
+    const tzOffsetMinutes =
+      typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
+        ? parseInt(tzRaw, 10)
+        : 0;
+    const range = purchaseLogCreatedAtRange(period, tzOffsetMinutes);
+    const logs = await prisma.log.findMany({
+      where: {
+        userId,
+        purchaseAmountMinor: { not: null },
+        purchaseCurrency: { not: null },
+        mediaType: { in: [...SPEND_TRACKED_MEDIA_TYPES] },
+        ...(range ? { createdAt: { gte: range.gte, lte: range.lte } } : {}),
+      },
+      select: { mediaType: true, purchaseAmountMinor: true, purchaseCurrency: true },
+    });
+    const data: Record<string, Record<string, number>> = {
+      games: {},
+      boardgames: {},
+      manga: {},
+      comics: {},
+    };
+    const counts: Record<string, number> = {
+      games: 0,
+      boardgames: 0,
+      manga: 0,
+      comics: 0,
+    };
+    for (const row of logs) {
+      const n = row.purchaseAmountMinor;
+      const cur = row.purchaseCurrency;
+      if (n == null || cur == null) continue;
+      const k = row.mediaType as string;
+      if (!(k in data)) continue;
+      const bucket = data[k];
+      bucket[cur] = (bucket[cur] ?? 0) + n;
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    res.json({ group: "purchaseSpending", period, data, counts });
+    return;
+  }
 
   if (group === "summary") {
     const [totalLogs, completedLogCount, reviewedLogs, completedLogs] = await Promise.all([
@@ -375,20 +466,25 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   if (group === "genre") {
     const logs = await prisma.log.findMany({
       where: { userId, genres: { not: null } },
-      select: { genres: true },
+      select: { id: true, genres: true },
     });
-    const byGenre: Record<string, number> = {};
+    const byGenre: Record<string, Set<string>> = {};
     for (const log of logs) {
       const genres = parseGenresJson(log.genres);
       if (!genres) continue;
       for (const g of genres) {
         const name = g.trim();
-        if (name) byGenre[name] = (byGenre[name] ?? 0) + 1;
+        if (!name) continue;
+        if (!byGenre[name]) byGenre[name] = new Set();
+        byGenre[name].add(log.id);
       }
     }
     const entries = Object.entries(byGenre)
-      .sort(([, a], [, b]) => b - a)
-      .map(([period, count]) => ({ period, hours: count }));
+      .sort(([, a], [, b]) => b.size - a.size)
+      .map(([period, set]) => {
+        const count = set.size;
+        return { period, hours: count, count };
+      });
     res.json({ group: "genre", data: entries });
     return;
   }
@@ -409,7 +505,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     }
     const entries = Object.entries(byPeriod)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([period, count]) => ({ period, hours: count }));
+      .map(([period, count]) => ({ period, hours: count, count }));
     res.json({ group, data: entries });
     return;
   }
@@ -430,10 +526,10 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       if (!byPeriodCategory[period]) byPeriodCategory[period] = {};
       byPeriodCategory[period][mt] = (byPeriodCategory[period][mt] ?? 0) + 1;
     }
-    const entries: Array<{ period: string; mediaType: string; hours: number }> = [];
+    const entries: Array<{ period: string; mediaType: string; hours: number; count: number }> = [];
     for (const [period, byCat] of Object.entries(byPeriodCategory)) {
       for (const [mediaType, count] of Object.entries(byCat)) {
-        entries.push({ period, mediaType, hours: count });
+        entries.push({ period, mediaType, hours: count, count });
       }
     }
     entries.sort((a, b) => a.period.localeCompare(b.period) || a.mediaType.localeCompare(b.mediaType));
@@ -448,7 +544,8 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     },
     select: { completedAt: true, contentHours: true, startedAt: true, mediaType: true, hoursToBeat: true, matchesPlayed: true },
   });
-  const byKey: Record<string, number> = {};
+  const byKeyHours: Record<string, number> = {};
+  const byKeyCount: Record<string, number> = {};
   for (const log of logs) {
     const hours = hoursFromCompletedLogForStats(log);
     if (hours === null) continue;
@@ -460,11 +557,16 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
         : group === "year"
           ? `${completedAt.getUTCFullYear()}`
           : `${completedAt.getUTCFullYear()}-${String(completedAt.getUTCMonth() + 1).padStart(2, "0")}`;
-    byKey[key] = (byKey[key] ?? 0) + hours;
+    byKeyHours[key] = (byKeyHours[key] ?? 0) + hours;
+    byKeyCount[key] = (byKeyCount[key] ?? 0) + 1;
   }
-  const entries = Object.entries(byKey)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([period, hours]) => ({ period, hours: Math.round(hours * 10) / 10 }));
+  const entries = Object.keys(byKeyHours)
+    .sort((a, b) => a.localeCompare(b))
+    .map((period) => ({
+      period,
+      hours: Math.round((byKeyHours[period] ?? 0) * 10) / 10,
+      count: byKeyCount[period] ?? 0,
+    }));
   res.json({ group, data: entries });
 });
 
@@ -481,24 +583,15 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
     return;
   }
   const dateParam = typeof req.query.date === "string" ? req.query.date.trim() : "";
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateParam);
-  if (!match) {
-    res.status(400).json({ error: "Invalid date; use YYYY-MM-DD" });
-    return;
-  }
-  const y = parseInt(match[1], 10);
-  const m = parseInt(match[2], 10);
-  const d = parseInt(match[3], 10);
-  if (m < 1 || m > 12 || d < 1 || d > 31) {
-    res.status(400).json({ error: "Invalid date" });
-    return;
-  }
   const tzOffsetMinutes = typeof req.query.timezoneOffsetMinutes === "string"
     ? parseInt(req.query.timezoneOffsetMinutes, 10)
     : 0;
-  const offsetMs = Number.isFinite(tzOffsetMinutes) ? tzOffsetMinutes * 60 * 1000 : 0;
-  const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - offsetMs);
-  const end = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999) - offsetMs);
+  const bounds = localDayBoundsFromDateString(dateParam, Number.isFinite(tzOffsetMinutes) ? tzOffsetMinutes : 0);
+  if (!bounds) {
+    res.status(400).json({ error: "Invalid date; use YYYY-MM-DD" });
+    return;
+  }
+  const { gte: start, lte: end } = bounds;
   const logs = await prisma.log.findMany({
     where: {
       userId,
@@ -568,17 +661,30 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
 /** Column keys for CSV export. When single category, only relevant columns; when all, include mediaType. */
 const EXPORT_COLUMNS_ALL: readonly string[] = [
   "mediaType", "externalId", "title", "grade", "status", "season", "episode", "chapter", "volume",
-  "startedAt", "completedAt", "contentHours", "hoursToBeat", "own", "wantToBuy", "matchesPlayed", "review", "createdAt", "updatedAt",
+  "startedAt", "completedAt", "contentHours", "hoursToBeat", "own", "wantToBuy", "matchesPlayed",
+  "purchaseAmountMinor", "purchaseCurrency", "review", "createdAt", "updatedAt",
 ];
 const EXPORT_COLUMNS_BY_MEDIA: Record<MediaType, readonly string[]> = {
   movies: ["externalId", "title", "grade", "status", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   tv: ["externalId", "title", "grade", "status", "season", "episode", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   anime: ["externalId", "title", "grade", "status", "season", "episode", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   books: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
-  manga: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
-  comics: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
-  games: ["externalId", "title", "grade", "status", "contentHours", "hoursToBeat", "own", "wantToBuy", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
-  boardgames: ["externalId", "title", "grade", "status", "own", "wantToBuy", "matchesPlayed", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+  manga: [
+    "externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "purchaseAmountMinor",
+    "purchaseCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
+  ],
+  comics: [
+    "externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "purchaseAmountMinor",
+    "purchaseCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
+  ],
+  games: [
+    "externalId", "title", "grade", "status", "contentHours", "hoursToBeat", "own", "wantToBuy",
+    "purchaseAmountMinor", "purchaseCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
+  ],
+  boardgames: [
+    "externalId", "title", "grade", "status", "own", "wantToBuy", "matchesPlayed",
+    "purchaseAmountMinor", "purchaseCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
+  ],
 };
 
 function getExportValue(
@@ -602,6 +708,8 @@ function getExportValue(
     review: string | null;
     createdAt: Date;
     updatedAt: Date;
+    purchaseAmountMinor?: number | null;
+    purchaseCurrency?: string | null;
   },
   key: string
 ): string | number | null | undefined {
@@ -625,6 +733,8 @@ function getExportValue(
     case "review": return log.review;
     case "createdAt": return log.createdAt.toISOString();
     case "updatedAt": return log.updatedAt.toISOString();
+    case "purchaseAmountMinor": return log.purchaseAmountMinor ?? null;
+    case "purchaseCurrency": return log.purchaseCurrency ?? null;
     default: return undefined;
   }
 }
@@ -702,6 +812,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     own: bodyOwn,
     wantToBuy: bodyWantToBuy,
     matchesPlayed: bodyMatchesPlayed,
+    purchaseAmountMinor: bodyPurchaseAmountMinor,
+    purchaseCurrency: bodyPurchaseCurrency,
   } = parsed.data;
   const genresJson =
     genresInput && genresInput.length > 0
@@ -764,6 +876,31 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         }
       }
     }
+
+    let purchaseResolved: { purchaseAmountMinor: number | null; purchaseCurrency: string | null };
+    if (!existing) {
+      const pn = normalizePurchaseFields(mediaType, bodyPurchaseAmountMinor, bodyPurchaseCurrency);
+      if (!pn.ok) {
+        res.status(400).json({ error: pn.error });
+        return;
+      }
+      purchaseResolved = pn;
+    } else {
+      if (bodyPurchaseAmountMinor !== undefined || bodyPurchaseCurrency !== undefined) {
+        const pn = normalizePurchaseFields(mediaType, bodyPurchaseAmountMinor, bodyPurchaseCurrency);
+        if (!pn.ok) {
+          res.status(400).json({ error: pn.error });
+          return;
+        }
+        purchaseResolved = pn;
+      } else {
+        purchaseResolved = {
+          purchaseAmountMinor: existing.purchaseAmountMinor,
+          purchaseCurrency: existing.purchaseCurrency,
+        };
+      }
+    }
+
     let log;
     if (existing) {
       const hadStatsReview = countsAsReviewForGamification(existing.grade, existing.review);
@@ -788,6 +925,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         own?: boolean | null;
         wantToBuy?: boolean | null;
         matchesPlayed?: number | null;
+        purchaseAmountMinor?: number | null;
+        purchaseCurrency?: string | null;
       } = {
         title: sanitizedTitle,
         grade: grade ?? null,
@@ -800,6 +939,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         episode: episode ?? null,
         chapter: chapter ?? null,
         volume: volume ?? null,
+        purchaseAmountMinor: purchaseResolved.purchaseAmountMinor,
+        purchaseCurrency: purchaseResolved.purchaseCurrency,
       };
       if (image !== undefined) updateData.image = sanitizedImage ?? null;
       if (genresJson !== undefined) updateData.genres = genresJson;
@@ -885,6 +1026,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           own: mediaType === "boardgames" || mediaType === "games" ? (bodyOwn ?? null) : null,
           wantToBuy: mediaType === "boardgames" || mediaType === "games" ? (bodyWantToBuy ?? null) : null,
           matchesPlayed: mediaType === "boardgames" ? (bodyMatchesPlayed ?? null) : null,
+          purchaseAmountMinor: purchaseResolved.purchaseAmountMinor,
+          purchaseCurrency: purchaseResolved.purchaseCurrency,
         },
       });
       const newBadges: NewBadge[] = [];
@@ -954,6 +1097,8 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     own?: boolean | null;
     wantToBuy?: boolean | null;
     matchesPlayed?: number | null;
+    purchaseAmountMinor?: number | null;
+    purchaseCurrency?: string | null;
   } = {};
   if (parsed.data.image !== undefined) data.image = sanitizeUrl(parsed.data.image) ?? null;
   if (parsed.data.grade !== undefined) data.grade = parsed.data.grade;
@@ -995,6 +1140,19 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
   }
   if (parsed.data.matchesPlayed !== undefined && logMediaType === "boardgames") {
     data.matchesPlayed = parsed.data.matchesPlayed ?? null;
+  }
+  if (parsed.data.purchaseAmountMinor !== undefined || parsed.data.purchaseCurrency !== undefined) {
+    const pn = normalizePurchaseFields(
+      logMediaType,
+      parsed.data.purchaseAmountMinor,
+      parsed.data.purchaseCurrency
+    );
+    if (!pn.ok) {
+      res.status(400).json({ error: pn.error });
+      return;
+    }
+    data.purchaseAmountMinor = pn.purchaseAmountMinor;
+    data.purchaseCurrency = pn.purchaseCurrency;
   }
   if (isInProgress(parsed.data.status)) data.grade = null;
   const updated = await prisma.log.update({

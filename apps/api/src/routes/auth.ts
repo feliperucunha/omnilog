@@ -185,7 +185,12 @@ authRouter.post("/forgot-password", async (req, res) => {
     data: { passwordResetToken: token, passwordResetExpires: expires },
   });
   const resetUrl = `${WEB_ORIGIN}/reset-password?token=${encodeURIComponent(token)}`;
-  await sendPasswordResetEmail(user.email, resetUrl);
+  const sent = await sendPasswordResetEmail(user.email, resetUrl);
+  if (!sent) {
+    console.warn(
+      "[auth] Password reset email was not sent (missing SMTP or provider error). User still gets the same client message."
+    );
+  }
   res.json({ message: "If that email is registered, you will receive a reset link." });
 });
 

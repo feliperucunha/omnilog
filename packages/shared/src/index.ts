@@ -16,10 +16,12 @@ export type {
   AuthRegisterInput,
   AuthLoginInput,
   AuthResponse,
+  SpendTrackedMediaType,
 } from "./types.js";
 export { APP_VERSION } from "./version.js";
 export {
   MEDIA_TYPES,
+  SPEND_TRACKED_MEDIA_TYPES,
   toMediaType,
   BOARD_GAME_PROVIDERS,
   LIST_TYPES,

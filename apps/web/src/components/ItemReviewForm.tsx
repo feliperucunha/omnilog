@@ -21,7 +21,13 @@ import { StarRating } from "@/components/StarRating";
 import { gradeToStars, starsToGrade } from "@/lib/gradeStars";
 import { BoardGameOwnershipSwitch } from "@/components/BoardGameOwnershipSwitch";
 import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/lib/boardGameOwnership";
-import { mediaTypeHasBoardGameOnlyFields, mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
+import {
+  mediaTypeHasBoardGameOnlyFields,
+  mediaTypeHasCollectionOwnership,
+  mediaTypeHasPurchaseAmount,
+} from "@/lib/mediaTypeFeatures";
+import { MoneyAmountInput } from "@/components/MoneyAmountInput";
+import { DEFAULT_PURCHASE_CURRENCY } from "@/lib/currencies";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
 const HAS_CHAPTER_VOLUME: MediaType[] = ["comics", "manga"];
@@ -90,6 +96,8 @@ export function ItemReviewForm({
   const [own, setOwn] = useState(false);
   const [wantToBuy, setWantToBuy] = useState(false);
   const [matchesPlayed, setMatchesPlayed] = useState<number | "">("");
+  const [purchaseCurrency, setPurchaseCurrency] = useState(DEFAULT_PURCHASE_CURRENCY);
+  const [purchaseAmountMinor, setPurchaseAmountMinor] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   type ProgressOptions = {
@@ -107,6 +115,7 @@ export function ItemReviewForm({
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
   const showHoursToBeat = mediaType === "games";
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
+  const showPurchaseAmount = mediaTypeHasPurchaseAmount(mediaType);
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
 
   useEffect(() => {
@@ -145,6 +154,8 @@ export function ItemReviewForm({
             ? (log.status === "played" ? 1 : log.status === "plan to play" ? 0 : "")
             : "";
           setMatchesPlayed(log.matchesPlayed != null ? log.matchesPlayed : defaultMatches);
+          setPurchaseCurrency(log.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY);
+          setPurchaseAmountMinor(log.purchaseAmountMinor ?? null);
         } else {
           setStars(null);
           setReview("");
@@ -157,6 +168,8 @@ export function ItemReviewForm({
           setOwn(false);
           setWantToBuy(false);
           setMatchesPlayed(showBoardGameFields ? 1 : "");
+          setPurchaseCurrency(DEFAULT_PURCHASE_CURRENCY);
+          setPurchaseAmountMinor(null);
         }
       })
       .catch(() => {
@@ -211,6 +224,15 @@ export function ItemReviewForm({
       if (showBoardGameFields) {
         payload.matchesPlayed = toNum(matchesPlayed);
       }
+      if (showPurchaseAmount) {
+        if (purchaseAmountMinor == null) {
+          payload.purchaseAmountMinor = null;
+          payload.purchaseCurrency = null;
+        } else {
+          payload.purchaseAmountMinor = purchaseAmountMinor;
+          payload.purchaseCurrency = purchaseCurrency || DEFAULT_PURCHASE_CURRENCY;
+        }
+      }
       if (genreList.length > 0) payload.genres = genreList;
       if (showBoardGameFields && mechanicList.length > 0) payload.mechanics = mechanicList;
       if (
@@ -243,7 +265,11 @@ export function ItemReviewForm({
           affinityMatch &&
           (!showCollectionOwnership ||
             (own === (myLog.own ?? false) && wantToBuy === (myLog.wantToBuy ?? false))) &&
-          (!showBoardGameFields || toNum(matchesPlayed) === (myLog.matchesPlayed ?? null));
+          (!showBoardGameFields || toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)) &&
+          (!showPurchaseAmount ||
+            (purchaseAmountMinor === (myLog.purchaseAmountMinor ?? null) &&
+              (purchaseCurrency || DEFAULT_PURCHASE_CURRENCY) ===
+                (myLog.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY)));
         if (noChange) {
           setSaving(false);
           return;
@@ -515,6 +541,19 @@ export function ItemReviewForm({
                     aria-label={t("itemReviewForm.matchesPlayed")}
                   />
                 </div>
+            )}
+
+            {showPurchaseAmount && (
+              <MoneyAmountInput
+                label={t("money.spentOnItem")}
+                currency={purchaseCurrency}
+                onCurrencyChange={setPurchaseCurrency}
+                amountMinor={purchaseAmountMinor}
+                onAmountMinorChange={setPurchaseAmountMinor}
+                disabled={saving}
+                t={t}
+                className="w-full max-w-full sm:max-w-md"
+              />
             )}
 
             <div>
