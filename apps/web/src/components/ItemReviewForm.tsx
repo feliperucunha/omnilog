@@ -41,9 +41,9 @@ export interface LogCompleteState {
   id?: string;
   /** User's review/comment when available (for complete modal). */
   review?: string | null;
-  /** Board games and video games: user owns a copy. */
+  /** Games, board games, books, manga, comics: user owns a copy. */
   own?: boolean | null;
-  /** Board games and video games: user wants to buy a copy. */
+  /** Same categories: user wants to buy a copy. */
   wantToBuy?: boolean | null;
   /** Board games only: number of matches/sessions played. */
   matchesPlayed?: number | null;
@@ -117,6 +117,8 @@ export function ItemReviewForm({
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
   const showPurchaseAmount = mediaTypeHasPurchaseAmount(mediaType);
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
+  /** Spend field only when "Own" is selected (games / board games); manga & comics have no ownership switch. */
+  const showPurchaseAmountField = showPurchaseAmount && (!showCollectionOwnership || own);
 
   useEffect(() => {
     if (!showSeasonEpisode && !showChapterVolume) return;
@@ -225,7 +227,8 @@ export function ItemReviewForm({
         payload.matchesPlayed = toNum(matchesPlayed);
       }
       if (showPurchaseAmount) {
-        if (purchaseAmountMinor == null) {
+        const includePurchase = !showCollectionOwnership || own;
+        if (!includePurchase || purchaseAmountMinor == null) {
           payload.purchaseAmountMinor = null;
           payload.purchaseCurrency = null;
         } else {
@@ -267,9 +270,17 @@ export function ItemReviewForm({
             (own === (myLog.own ?? false) && wantToBuy === (myLog.wantToBuy ?? false))) &&
           (!showBoardGameFields || toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)) &&
           (!showPurchaseAmount ||
-            (purchaseAmountMinor === (myLog.purchaseAmountMinor ?? null) &&
-              (purchaseCurrency || DEFAULT_PURCHASE_CURRENCY) ===
-                (myLog.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY)));
+            (() => {
+              const includePurchase = !showCollectionOwnership || own;
+              if (!includePurchase) {
+                return (myLog.purchaseAmountMinor ?? null) == null;
+              }
+              return (
+                purchaseAmountMinor === (myLog.purchaseAmountMinor ?? null) &&
+                (purchaseCurrency || DEFAULT_PURCHASE_CURRENCY) ===
+                  (myLog.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY)
+              );
+            })());
         if (noChange) {
           setSaving(false);
           return;
@@ -543,7 +554,7 @@ export function ItemReviewForm({
                 </div>
             )}
 
-            {showPurchaseAmount && (
+            {showPurchaseAmountField && (
               <MoneyAmountInput
                 label={t("money.spentOnItem")}
                 currency={purchaseCurrency}

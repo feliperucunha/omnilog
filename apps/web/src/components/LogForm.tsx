@@ -118,6 +118,8 @@ export function LogForm(props: LogFormProps) {
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
   const showHoursToBeat = mediaType === "games";
   const showPurchaseAmount = mediaTypeHasPurchaseAmount(mediaType);
+  /** Spend field only when "Own" is selected (games / board games); manga & comics have no ownership switch. */
+  const showPurchaseAmountField = showPurchaseAmount && (!showCollectionOwnership || own);
   const [purchaseCurrency, setPurchaseCurrency] = useState(
     () => (isEdit && log?.purchaseCurrency ? log.purchaseCurrency : DEFAULT_PURCHASE_CURRENCY)
   );
@@ -188,9 +190,17 @@ export function LogForm(props: LogFormProps) {
           (own === (log.own ?? false) && wantToBuy === (log.wantToBuy ?? false))) &&
         (!showBoardGameFields || toNum(matchesPlayed) === (log.matchesPlayed ?? null)) &&
         (!showPurchaseAmount ||
-          (purchaseAmountMinor === (log.purchaseAmountMinor ?? null) &&
-            (purchaseCurrency || DEFAULT_PURCHASE_CURRENCY) ===
-              (log.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY)));
+          (() => {
+            const includePurchase = !showCollectionOwnership || own;
+            if (!includePurchase) {
+              return (log.purchaseAmountMinor ?? null) == null;
+            }
+            return (
+              purchaseAmountMinor === (log.purchaseAmountMinor ?? null) &&
+              (purchaseCurrency || DEFAULT_PURCHASE_CURRENCY) ===
+                (log.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY)
+            );
+          })());
       return !noChange;
     }
     const p = props as LogFormCreateProps;
@@ -208,7 +218,7 @@ export function LogForm(props: LogFormProps) {
       (showCollectionOwnership && (own || wantToBuy)) ||
       (showBoardGameFields &&
         toNum(matchesPlayed) !== (typeof defaultMatches === "number" ? defaultMatches : null)) ||
-      (showPurchaseAmount && purchaseAmountMinor != null)
+      (showPurchaseAmountField && purchaseAmountMinor != null)
     );
   }, [
     isEdit,
@@ -230,6 +240,7 @@ export function LogForm(props: LogFormProps) {
     showCollectionOwnership,
     showBoardGameFields,
     showPurchaseAmount,
+    showPurchaseAmountField,
     purchaseAmountMinor,
     purchaseCurrency,
   ]);
@@ -265,7 +276,8 @@ export function LogForm(props: LogFormProps) {
           payload.matchesPlayed = toNum(matchesPlayed);
         }
         if (showPurchaseAmount) {
-          if (purchaseAmountMinor == null) {
+          const includePurchase = !showCollectionOwnership || own;
+          if (!includePurchase || purchaseAmountMinor == null) {
             payload.purchaseAmountMinor = null;
             payload.purchaseCurrency = null;
           } else {
@@ -288,9 +300,17 @@ export function LogForm(props: LogFormProps) {
             (own === (props.log.own ?? false) && wantToBuy === (props.log.wantToBuy ?? false))) &&
           (!showBoardGameFields || toNum(matchesPlayed) === (props.log.matchesPlayed ?? null)) &&
           (!showPurchaseAmount ||
-            (purchaseAmountMinor === (props.log.purchaseAmountMinor ?? null) &&
-              (purchaseCurrency || DEFAULT_PURCHASE_CURRENCY) ===
-                (props.log.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY)));
+            (() => {
+              const includePurchase = !showCollectionOwnership || own;
+              if (!includePurchase) {
+                return (props.log.purchaseAmountMinor ?? null) == null;
+              }
+              return (
+                purchaseAmountMinor === (props.log.purchaseAmountMinor ?? null) &&
+                (purchaseCurrency || DEFAULT_PURCHASE_CURRENCY) ===
+                  (props.log.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY)
+              );
+            })());
         if (noChange) {
           setLoading(false);
           props.onCancel();
@@ -338,12 +358,16 @@ export function LogForm(props: LogFormProps) {
             ...(showCollectionOwnership && { own, wantToBuy }),
             ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
             ...(showPurchaseAmount &&
-              (purchaseAmountMinor == null
-                ? { purchaseAmountMinor: null, purchaseCurrency: null }
-                : {
-                    purchaseAmountMinor,
-                    purchaseCurrency: purchaseCurrency || DEFAULT_PURCHASE_CURRENCY,
-                  })),
+              (() => {
+                const includePurchase = !showCollectionOwnership || own;
+                if (!includePurchase || purchaseAmountMinor == null) {
+                  return { purchaseAmountMinor: null, purchaseCurrency: null };
+                }
+                return {
+                  purchaseAmountMinor,
+                  purchaseCurrency: purchaseCurrency || DEFAULT_PURCHASE_CURRENCY,
+                };
+              })()),
           }),
         }
       );
@@ -398,6 +422,8 @@ export function LogForm(props: LogFormProps) {
     showCollectionOwnership,
     showBoardGameFields,
     showPurchaseAmount,
+    showCollectionOwnership,
+    own,
     purchaseAmountMinor,
     purchaseCurrency,
     t,
@@ -587,7 +613,7 @@ export function LogForm(props: LogFormProps) {
                     />
                 </div>
               )}
-              {showPurchaseAmount && (
+              {showPurchaseAmountField && (
                 <MoneyAmountInput
                   label={t("money.spentOnItem")}
                   currency={purchaseCurrency}

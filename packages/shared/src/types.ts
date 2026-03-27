@@ -11,8 +11,8 @@ export const MEDIA_TYPES = [
   "comics",
 ] as const;
 
-/** Categories where optional purchase / spend amount is tracked. */
-export const SPEND_TRACKED_MEDIA_TYPES = ["games", "boardgames", "manga", "comics"] as const;
+/** Categories where optional purchase / spend amount is tracked (also use own / want-to-buy collection UI). */
+export const SPEND_TRACKED_MEDIA_TYPES = ["games", "boardgames", "books", "manga", "comics"] as const;
 export type SpendTrackedMediaType = (typeof SPEND_TRACKED_MEDIA_TYPES)[number];
 
 export type MediaType = (typeof MEDIA_TYPES)[number];

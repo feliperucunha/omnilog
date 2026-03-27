@@ -20,7 +20,7 @@ export function normalizePurchaseFields(
     if (purchaseAmountMinor != null || (purchaseCurrency != null && purchaseCurrency !== "")) {
       return {
         ok: false,
-        error: "Purchase amount is only supported for games, board games, manga, and comics.",
+        error: "Purchase amount is only supported for games, board games, books, manga, and comics.",
       };
     }
     return { ok: true, purchaseAmountMinor: null, purchaseCurrency: null };

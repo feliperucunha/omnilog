@@ -160,6 +160,25 @@ settingsRouter.put("/locale", async (req: AuthenticatedRequest, res) => {
   res.json({ ok: true, locale: parsed.data.locale });
 });
 
+const recapEmailsSchema = z.object({
+  enabled: z.boolean(),
+});
+
+/** Save whether to receive monthly recap emails. */
+settingsRouter.put("/recap-emails", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const parsed = recapEmailsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+  await prisma.user.update({
+    where: { id: req.user.userId },
+    data: { recapEmailsEnabled: parsed.data.enabled },
+  });
+  res.json({ ok: true, enabled: parsed.data.enabled });
+});
+
 const visibleMediaTypesSchema = z.object({
   types: z.array(z.enum(MEDIA_TYPES as unknown as [string, ...string[]])),
 });

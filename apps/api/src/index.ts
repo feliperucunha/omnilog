@@ -18,6 +18,7 @@ import { feedbackRouter } from "./routes/feedback.js";
 import { followsRouter } from "./routes/follows.js";
 import { adminRouter } from "./routes/admin.js";
 import { prisma } from "./lib/prisma.js";
+import { runMonthlyDigestIfDue } from "./lib/monthlyDigest.js";
 import { runSeedBadges } from "./scripts/seedBadges.js";
 import { runSeedMilestones } from "./scripts/seedMilestones.js";
 import { APP_VERSION } from "@geeklogs/shared";
@@ -137,6 +138,16 @@ app.listen(PORT, () => {
   setInterval(() => {
     void runSubscriptionExpiry().then((n) => {
       if (n > 0) console.log(`Subscription expiry: ${n} user(s) downgraded to free`);
+    });
+  }, TWENTY_FOUR_HOURS_MS);
+
+  // Monthly recap emails: in-process on startup and every 24h (no external cron). See runMonthlyDigestIfDue.
+  void runMonthlyDigestIfDue().then((r) => {
+    if (r.ran) console.log(`Monthly digest auto: period ${r.periodKey} (sent ${r.result.sent})`);
+  });
+  setInterval(() => {
+    void runMonthlyDigestIfDue().then((r) => {
+      if (r.ran) console.log(`Monthly digest auto: period ${r.periodKey} (sent ${r.result.sent})`);
     });
   }, TWENTY_FOUR_HOURS_MS);
 });

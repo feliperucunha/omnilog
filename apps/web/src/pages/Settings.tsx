@@ -77,6 +77,8 @@ export function Settings() {
   const [adminFeatureFlagsLoading, setAdminFeatureFlagsLoading] = useState(false);
   const [adminFeatureFlagsError, setAdminFeatureFlagsError] = useState<string | null>(null);
   const [adminFlagSavingKey, setAdminFlagSavingKey] = useState<string | null>(null);
+  const [digestSending, setDigestSending] = useState(false);
+  const [recapSaving, setRecapSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportSelectedCategories, setExportSelectedCategories] = useState<Set<MediaType>>(() => new Set(MEDIA_TYPES));
@@ -121,6 +123,27 @@ export function Settings() {
       setAdminFeatureFlagsLoading(false);
     });
   }, [me?.tier, adminOpen, t]);
+
+  const handleSendMonthlyDigest = async () => {
+    setDigestSending(true);
+    try {
+      const res = await apiFetch<{
+        data: { sent: boolean; period: { monthLabel: string }; to: string; statsUserId: string };
+      }>("/admin/monthly-digest/send", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      if (res.data.sent) {
+        toast.success(t("settings.adminDigestSent", { month: res.data.period.monthLabel }));
+      } else {
+        toast.error(t("settings.adminDigestFailed"));
+      }
+    } catch (err) {
+      showErrorToast(t, "E008", { originalError: err });
+    } finally {
+      setDigestSending(false);
+    }
+  };
 
   const handleToggleAdminFeatureFlag = async (flagKey: string, enabled: boolean) => {
     setAdminFlagSavingKey(flagKey);
@@ -236,6 +259,25 @@ export function Settings() {
         method: "PUT",
         body: JSON.stringify({ locale: newLocale }),
       }).catch(() => {});
+    }
+  };
+
+  const recapEmailsEnabled = me?.recapEmailsEnabled !== false;
+
+  const handleRecapEmailsChange = async (enabled: boolean) => {
+    if (!token) return;
+    setRecapSaving(true);
+    try {
+      await apiFetch("/settings/recap-emails", {
+        method: "PUT",
+        body: JSON.stringify({ enabled }),
+      });
+      await refetchMe();
+      toast.success(t("settings.recapEmailsSaved"));
+    } catch (err) {
+      showErrorToast(t, "E008", { originalError: err });
+    } finally {
+      setRecapSaving(false);
     }
   };
 
@@ -475,6 +517,22 @@ export function Settings() {
               </div>
               <div className="shrink-0">
                 <ThemeSwitcher />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-[var(--color-lightest)]">
+                  {t("settings.recapEmailsTitle")}
+                </span>
+                <p className="mt-1 max-w-xl text-xs text-[var(--color-light)]">{t("settings.recapEmailsIntro")}</p>
+              </div>
+              <div className="shrink-0 pt-0.5">
+                <Switch
+                  checked={recapEmailsEnabled}
+                  disabled={recapSaving || !me}
+                  onCheckedChange={(v) => void handleRecapEmailsChange(v)}
+                  aria-label={t("settings.recapEmailsTitle")}
+                />
               </div>
             </div>
             <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 last:pb-0">
@@ -916,6 +974,34 @@ export function Settings() {
                     {!adminUsersLoading && !adminUsersError && adminUsers.length === 0 && adminOpen && (
                       <p className="text-sm text-[var(--color-light)]">{t("settings.adminNoUsers")}</p>
                     )}
+
+                    <section className="mt-8" aria-labelledby="admin-digest-heading">
+                      <h3
+                        id="admin-digest-heading"
+                        className="mb-2 text-base font-semibold text-[var(--color-lightest)]"
+                      >
+                        {t("settings.adminDigestTitle")}
+                      </h3>
+                      <p className="mb-3 max-w-xl text-sm text-[var(--color-light)]">
+                        {t("settings.adminDigestIntro")}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={digestSending}
+                        onClick={() => void handleSendMonthlyDigest()}
+                        className="max-md:min-h-[44px]"
+                      >
+                        {digestSending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                            {t("common.loading")}
+                          </>
+                        ) : (
+                          t("settings.adminDigestSend")
+                        )}
+                      </Button>
+                    </section>
                   </section>
 
                   <section

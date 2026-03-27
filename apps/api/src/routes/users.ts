@@ -1,9 +1,8 @@
 import { Router, type Request, type Response } from "express";
-import { MEDIA_TYPES } from "@geeklogs/shared";
+import { LOG_STATUS_OPTIONS, MEDIA_TYPES, SPEND_TRACKED_MEDIA_TYPES } from "@geeklogs/shared";
 import type { MediaType } from "@geeklogs/shared";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { serializeLog } from "../lib/serializeLog.js";
 import { getMilestoneProgress } from "../services/milestone.service.js";
 import {
@@ -237,7 +236,10 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
       where.status = status;
     }
   }
-  if (mediaType === "boardgames" || mediaType === "games") {
+  if (
+    mediaType &&
+    (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mediaType)
+  ) {
     if (ownFilter) where.own = true;
     if (wantToBuyFilter) where.wantToBuy = true;
   }

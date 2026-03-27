@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronDown } from "lucide-react";
 import {
   COMPLETED_STATUSES,
   IN_PROGRESS_STATUSES,
@@ -37,8 +37,10 @@ import {
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
 import { paperShadow } from "@/lib/paperShadow";
+import { cn } from "@/lib/utils";
 
 function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType: MediaType; t: (key: string, params?: Record<string, string>) => string }) {
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
   const hasDescription = item.description && item.description.length > 0;
   const hasTagline = item.tagline && item.tagline.length > 0;
   const hasGenres = item.genres && item.genres.length > 0;
@@ -127,12 +129,37 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
       )}
       {hasDescription && (
         <div className="min-w-0 overflow-hidden">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-light)] mb-2">
-            {t("itemPage.description")}
-          </h3>
-          <p className="text-[var(--color-lightest)] text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words">
-            {item.description}
-          </p>
+          <button
+            type="button"
+            id="item-description-heading"
+            className="flex w-full max-md:min-h-[44px] items-center justify-between gap-2 rounded-lg py-1 text-left transition-colors hover:bg-[var(--color-mid)]/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+            onClick={() => setDescriptionOpen((o) => !o)}
+            aria-expanded={descriptionOpen}
+            aria-controls="item-description-panel"
+          >
+            <h3 className="mb-0 text-xs font-semibold uppercase tracking-wider text-[var(--color-light)]">
+              {t("itemPage.description")}
+            </h3>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 shrink-0 text-[var(--color-light)] transition-transform duration-200",
+                descriptionOpen && "rotate-180"
+              )}
+              aria-hidden
+            />
+          </button>
+          {descriptionOpen && (
+            <div
+              id="item-description-panel"
+              role="region"
+              aria-labelledby="item-description-heading"
+              className="mt-2 min-w-0"
+            >
+              <p className="break-words whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)] sm:text-base">
+                {item.description}
+              </p>
+            </div>
+          )}
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">

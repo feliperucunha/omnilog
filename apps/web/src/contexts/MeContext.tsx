@@ -14,6 +14,8 @@ export interface MeResponse {
   user: { id: string; username?: string; email: string; onboarded: boolean };
   theme: "light" | "dark";
   locale: "en" | "pt-BR" | "es";
+  /** Monthly activity recap email (default on). */
+  recapEmailsEnabled?: boolean;
   visibleMediaTypes: string[];
   boardGameProvider: "bgg" | "ludopedia";
   tier: "free" | "beta" | "pro" | "admin";

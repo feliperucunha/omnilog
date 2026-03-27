@@ -106,6 +106,10 @@ function isCompleted(status: string | null | undefined): boolean {
   return status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
 }
 
+function isSpendTrackedMediaType(mt: MediaType): boolean {
+  return (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mt);
+}
+
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
 import { stringifyLogAffinityContext, logAffinityContextSchema } from "../lib/logAffinityContext.js";
 import { hoursFromCompletedLogForStats, rollupHoursFromCompletedLogs } from "../lib/completedLogHours.js";
@@ -201,7 +205,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       where.status = status;
     }
   }
-  if (mediaType === "boardgames" || mediaType === "games") {
+  if (mediaType && isSpendTrackedMediaType(mediaType)) {
     if (ownFilter) where.own = true;
     if (wantToBuyFilter) where.wantToBuy = true;
   }
@@ -406,18 +410,12 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       },
       select: { mediaType: true, purchaseAmountMinor: true, purchaseCurrency: true },
     });
-    const data: Record<string, Record<string, number>> = {
-      games: {},
-      boardgames: {},
-      manga: {},
-      comics: {},
-    };
-    const counts: Record<string, number> = {
-      games: 0,
-      boardgames: 0,
-      manga: 0,
-      comics: 0,
-    };
+    const data: Record<string, Record<string, number>> = Object.fromEntries(
+      SPEND_TRACKED_MEDIA_TYPES.map((mt) => [mt, {} as Record<string, number>])
+    );
+    const counts: Record<string, number> = Object.fromEntries(
+      SPEND_TRACKED_MEDIA_TYPES.map((mt) => [mt, 0])
+    );
     for (const row of logs) {
       const n = row.purchaseAmountMinor;
       const cur = row.purchaseCurrency;
@@ -946,10 +944,10 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       if (genresJson !== undefined) updateData.genres = genresJson;
       if (mechanicsJson !== undefined) updateData.mechanics = mechanicsJson;
       if (affinityStored !== undefined) updateData.affinityContext = affinityStored;
-      if (bodyOwn !== undefined && (mediaType === "boardgames" || mediaType === "games")) {
+      if (bodyOwn !== undefined && isSpendTrackedMediaType(mediaType)) {
         updateData.own = bodyOwn ?? null;
       }
-      if (bodyWantToBuy !== undefined && (mediaType === "boardgames" || mediaType === "games")) {
+      if (bodyWantToBuy !== undefined && isSpendTrackedMediaType(mediaType)) {
         updateData.wantToBuy = bodyWantToBuy ?? null;
       }
       if (bodyMatchesPlayed !== undefined && mediaType === "boardgames") {
@@ -1023,8 +1021,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           mechanics: mechanicsJson,
           affinityContext: affinityStored !== undefined ? affinityStored : null,
           boardGameSource,
-          own: mediaType === "boardgames" || mediaType === "games" ? (bodyOwn ?? null) : null,
-          wantToBuy: mediaType === "boardgames" || mediaType === "games" ? (bodyWantToBuy ?? null) : null,
+          own: isSpendTrackedMediaType(mediaType) ? (bodyOwn ?? null) : null,
+          wantToBuy: isSpendTrackedMediaType(mediaType) ? (bodyWantToBuy ?? null) : null,
           matchesPlayed: mediaType === "boardgames" ? (bodyMatchesPlayed ?? null) : null,
           purchaseAmountMinor: purchaseResolved.purchaseAmountMinor,
           purchaseCurrency: purchaseResolved.purchaseCurrency,
@@ -1132,10 +1130,10 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
         : stringifyLogAffinityContext(parsed.data.affinityContext);
   }
   const logMediaType = log.mediaType as MediaType;
-  if (parsed.data.own !== undefined && (logMediaType === "boardgames" || logMediaType === "games")) {
+  if (parsed.data.own !== undefined && isSpendTrackedMediaType(logMediaType)) {
     data.own = parsed.data.own ?? null;
   }
-  if (parsed.data.wantToBuy !== undefined && (logMediaType === "boardgames" || logMediaType === "games")) {
+  if (parsed.data.wantToBuy !== undefined && isSpendTrackedMediaType(logMediaType)) {
     data.wantToBuy = parsed.data.wantToBuy ?? null;
   }
   if (parsed.data.matchesPlayed !== undefined && logMediaType === "boardgames") {

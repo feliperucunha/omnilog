@@ -13,7 +13,7 @@ import { Logo, getLogoSrc } from "@/components/Logo";
 import { getHeroImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
 import { isBggBoardGameImageContext } from "@/lib/boardGameImageFit";
 import { overlayVariants, modalContentVariants } from "@/lib/animations";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
+import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, SPEND_TRACKED_MEDIA_TYPES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { showErrorToast } from "@/lib/errorToast";
 import { triggerImpact } from "@/lib/capacitorHaptics";
@@ -110,7 +110,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const nativeColors = theme.colorScheme === "light" ? NATIVE_LIGHT : NATIVE_DARK;
   const { image, title, grade, status, review, own, wantToBuy, matchesPlayed, mediaType } = state;
   const showCollectionOwnershipMeta =
-    mediaType === "boardgames" || mediaType === "games";
+    mediaType != null && (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mediaType);
   const showBoardGameMatchesMeta = mediaType === "boardgames";
   const stars = grade != null ? gradeToStars(grade) : 0;
   const statusLabel = status ? getStatusLabel(t, status, state.mediaType) : t("logComplete.logged");

@@ -135,6 +135,9 @@
     "bggApprovalBadge": "Suele tardar ~5 días en aprobar la clave",
     "apiKeysSupport": "Contactar con soporte",
     "language": "Idioma",
+    "recapEmailsTitle": "Correos de resumen mensual",
+    "recapEmailsIntro": "Recibe un resumen mensual de tus registros, horas y gastos (si aplica). Desactívalo si no quieres estos mensajes.",
+    "recapEmailsSaved": "Preferencia de correo guardada.",
     "keySaved": "Clave guardada",
     "getApiKey": "Obtener clave de API →",
     "pasteKey": "Pega tu clave {{name}}",
@@ -187,7 +190,12 @@
     "adminFlag_disable_api_key_requirements": "Relajar requisitos de claves API",
     "adminFlag_disable_api_key_requirements_hint": "Oculta avisos de clave faltante, límites de búsqueda y alertas de clave inválida. Las APIs externas siguen necesitando claves en el servidor o del usuario para devolver datos.",
     "adminFlag_register_new_users_as_beta": "Registrar nuevos usuarios como Beta",
-    "adminFlag_register_new_users_as_beta_hint": "Si está activo, los nuevos registros tienen el plan Beta (funciones Pro, límite de 500 registros). Si no, son Free."
+    "adminFlag_register_new_users_as_beta_hint": "Si está activo, los nuevos registros tienen el plan Beta (funciones Pro, límite de 500 registros). Si no, son Free.",
+    "adminDigestTitle": "Correo de resumen mensual",
+    "adminDigestIntro": "Envía un resumen del mes civil anterior (UTC) a tu correo de la cuenta. La API debe tener SMTP configurado.",
+    "adminDigestSend": "Enviar resumen a mi correo",
+    "adminDigestSent": "Correo de resumen enviado — {{month}}.",
+    "adminDigestFailed": "No se envió el correo. Revisa el SMTP de la API."
   },
   "common": {
     "tryAgain": "Reintentar",
@@ -308,7 +316,7 @@
     "purchasePeriodYear": "Este año",
     "purchasePeriodAll": "Todo el tiempo",
     "purchaseCurrencyLabel": "Moneda",
-    "purchaseEmpty": "No hay gastos registrados en este período. Añade importes al registrar juegos, juegos de mesa, manga o cómics.",
+    "purchaseEmpty": "No hay gastos registrados en este período. Añade importes al registrar juegos, juegos de mesa, libros, manga o cómics.",
     "sectionChartsTitle": "Registros",
     "timeGranularityLabel": "Agrupación temporal",
     "purchaseItemsTotal_one": "{{count}} artículo con compra registrada",
@@ -367,6 +375,17 @@
     "recommendationsTitle": "Recomendado para ti",
     "recommendationsNav": "Carrusel de recomendaciones",
     "recommendationsDotLabel": "Ir a la página {{index}}"
+  },
+  "searchSort": {
+    "relevance": "Relevancia",
+    "titleAsc": "Título (A–Z)",
+    "titleDesc": "Título (Z–A)",
+    "yearNewest": "Más recientes",
+    "yearOldest": "Más antiguos",
+    "releasedNewest": "Lanzamiento más reciente",
+    "releasedOldest": "Lanzamiento más antiguo",
+    "ratingHighest": "Mejor valoración",
+    "scoreHighest": "Mejor puntuación"
   },
   "mediaLogs": {
     "addOne": "Añadir uno",

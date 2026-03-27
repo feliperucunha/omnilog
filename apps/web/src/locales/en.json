@@ -135,6 +135,9 @@
     "bggApprovalBadge": "Typically ~5 days for key approval",
     "apiKeysSupport": "Contact support",
     "language": "Language",
+    "recapEmailsTitle": "Monthly recap emails",
+    "recapEmailsIntro": "Receive a monthly summary of your logs, hours, and spending (when applicable). Turn off if you prefer not to get these messages.",
+    "recapEmailsSaved": "Email preference saved.",
     "keySaved": "Key saved",
     "getApiKey": "Get your API key →",
     "apiKeyLabel": "API key",
@@ -188,7 +191,12 @@
     "adminFlag_disable_api_key_requirements": "Relax API key requirements",
     "adminFlag_disable_api_key_requirements_hint": "Hides missing-key banners, search limits, and invalid-key warnings. External APIs still need server or user keys to return data.",
     "adminFlag_register_new_users_as_beta": "Register new users as Beta",
-    "adminFlag_register_new_users_as_beta_hint": "When on, new signups get the Beta tier (Pro features, 500-log cap). When off, new signups are Free."
+    "adminFlag_register_new_users_as_beta_hint": "When on, new signups get the Beta tier (Pro features, 500-log cap). When off, new signups are Free.",
+    "adminDigestTitle": "Monthly recap email",
+    "adminDigestIntro": "Sends a digest for the previous calendar month (UTC) to your account email. The API must have SMTP configured.",
+    "adminDigestSend": "Send recap to my email",
+    "adminDigestSent": "Recap email sent for {{month}}.",
+    "adminDigestFailed": "Email was not sent. Check API SMTP settings."
   },
   "common": {
     "tryAgain": "Try again",
@@ -309,7 +317,7 @@
     "purchasePeriodYear": "This year",
     "purchasePeriodAll": "All time",
     "purchaseCurrencyLabel": "Currency",
-    "purchaseEmpty": "No spending recorded for this period. Add purchase amounts when logging games, board games, manga, or comics.",
+    "purchaseEmpty": "No spending recorded for this period. Add purchase amounts when logging games, board games, books, manga, or comics.",
     "sectionChartsTitle": "Logs",
     "timeGranularityLabel": "Time grouping",
     "purchaseItemsTotal_one": "{{count}} item with a purchase",
@@ -368,6 +376,17 @@
     "recommendationsTitle": "Recommended for you",
     "recommendationsNav": "Recommended titles carousel",
     "recommendationsDotLabel": "Go to page {{index}}"
+  },
+  "searchSort": {
+    "relevance": "Relevance",
+    "titleAsc": "Title (A–Z)",
+    "titleDesc": "Title (Z–A)",
+    "yearNewest": "Newest first",
+    "yearOldest": "Oldest first",
+    "releasedNewest": "Newest release",
+    "releasedOldest": "Oldest release",
+    "ratingHighest": "Highest rating",
+    "scoreHighest": "Highest score"
   },
   "mediaLogs": {
     "addOne": "Add one",

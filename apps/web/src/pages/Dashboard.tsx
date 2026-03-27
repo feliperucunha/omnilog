@@ -17,7 +17,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { skipApiKeyMissingUi } from "@/lib/featureFlags";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, MEDIA_TYPES, type MediaType, toMediaType } from "@geeklogs/shared";
+import {
+  COMPLETED_STATUSES,
+  IN_PROGRESS_STATUSES,
+  MEDIA_TYPES,
+  SPEND_TRACKED_MEDIA_TYPES,
+  type MediaType,
+  toMediaType,
+} from "@geeklogs/shared";
 import type { Log } from "@geeklogs/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -727,7 +734,7 @@ export function Dashboard() {
                               <span className="whitespace-nowrap">{t("dashboard.finishedIn", { duration })}</span>
                             ) : null;
                           })()}
-                          {(log.mediaType === "boardgames" || log.mediaType === "games") &&
+                          {(SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(log.mediaType) &&
                             (log.own === true ||
                               log.wantToBuy === true ||
                               (log.mediaType === "boardgames" &&

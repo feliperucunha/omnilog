@@ -3,6 +3,8 @@ import { prisma } from "./prisma.js";
 export const APP_SETTING_KEYS = {
   /** Body text for the beta welcome / announcement banner. */
   BETA_BANNER_MESSAGE: "beta_banner_message",
+  /** ISO month `YYYY-MM` (UTC) of the last auto-sent monthly digest period (previous calendar month). */
+  MONTHLY_DIGEST_LAST_SENT_PERIOD: "monthly_digest_last_sent_period",
 } as const;
 
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[keyof typeof APP_SETTING_KEYS];

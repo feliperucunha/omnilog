@@ -8,12 +8,28 @@ import {
   setFeatureFlagEnabled,
 } from "../lib/featureFlags.js";
 import { APP_SETTING_KEYS, upsertAppSettingValue } from "../lib/appSettings.js";
+import { formatDigestMonthLabel } from "../lib/digestI18n.js";
+import {
+  broadcastMonthlyDigest,
+  getPreviousCalendarMonthUtc,
+  sendDigestForUser,
+} from "../lib/monthlyDigest.js";
 
 export const adminRouter = Router();
 adminRouter.use(authMiddleware);
 
 const patchFeatureFlagSchema = z.object({ enabled: z.boolean() });
 const patchBetaBannerSchema = z.object({ message: z.string().trim().min(1).max(4000) });
+const sendMonthlyDigestSchema = z
+  .object({
+    /** If set, send only to this address (for testing). Otherwise uses the stats user’s account email. */
+    testEmail: z.string().email().optional(),
+    /** Whose activity to summarize (default: you). Ignored when broadcast is true. */
+    statsUserId: z.string().optional(),
+    /** Send every user their own digest for the previous UTC calendar month. */
+    broadcast: z.boolean().optional(),
+  })
+  .strict();
 
 async function requireAdmin(req: AuthenticatedRequest, res: Response): Promise<boolean> {
   const userId = req.user!.userId;
@@ -113,6 +129,57 @@ adminRouter.get("/beta-banner", async (req: AuthenticatedRequest, res) => {
     data: {
       message: row?.value ?? null,
       updatedAt: row?.updatedAt.toISOString() ?? null,
+    },
+  });
+});
+
+/**
+ * POST /admin/monthly-digest/send
+ * Body: { testEmail?, statsUserId?, broadcast? }. Admin only.
+ * Default: send previous UTC month’s digest for the caller to their own email.
+ * With testEmail: same stats (or statsUserId) but delivered to testEmail.
+ * With broadcast: true — email all users (heavy; use cron in production).
+ */
+adminRouter.post("/monthly-digest/send", async (req: AuthenticatedRequest, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const parsed = sendMonthlyDigestSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body", code: "VALIDATION_ERROR" });
+    return;
+  }
+  const { testEmail, statsUserId, broadcast } = parsed.data;
+  const period = getPreviousCalendarMonthUtc();
+
+  if (broadcast) {
+    const result = await broadcastMonthlyDigest(period);
+    res.json({ data: result });
+    return;
+  }
+
+  const targetStatsUserId = statsUserId ?? req.user!.userId;
+  const target = await prisma.user.findUnique({
+    where: { id: targetStatsUserId },
+    select: { email: true },
+  });
+  if (!target) {
+    res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+    return;
+  }
+
+  const to = testEmail ?? target.email;
+  const outcome = await sendDigestForUser(targetStatsUserId, to, period, { force: true });
+  const monthLabelEn = formatDigestMonthLabel(period.start, "en");
+  res.json({
+    data: {
+      period: {
+        monthLabel: monthLabelEn,
+        start: period.start.toISOString(),
+        endExclusive: period.endExclusive.toISOString(),
+      },
+      to,
+      statsUserId: targetStatsUserId,
+      sent: outcome.ok && outcome.kind === "sent",
+      skipped: outcome.ok && outcome.kind === "skipped",
     },
   });
 });

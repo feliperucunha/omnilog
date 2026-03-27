@@ -135,6 +135,9 @@
     "bggApprovalBadge": "Geralmente ~5 dias para aprovação da chave",
     "apiKeysSupport": "Falar com o suporte",
     "language": "Idioma",
+    "recapEmailsTitle": "E-mails de resumo mensal",
+    "recapEmailsIntro": "Receba um resumo mensal dos seus registros, horas e gastos (quando houver). Desative se não quiser essas mensagens.",
+    "recapEmailsSaved": "Preferência de e-mail salva.",
     "keySaved": "Chave salva",
     "getApiKey": "Obter chave de API →",
     "pasteKey": "Cole sua chave {{name}}",
@@ -187,7 +190,12 @@
     "adminFlag_disable_api_key_requirements": "Relaxar exigência de chaves de API",
     "adminFlag_disable_api_key_requirements_hint": "Oculta avisos de chave ausente, limites de busca e alertas de chave inválida. As APIs externas ainda precisam de chaves no servidor ou do usuário para retornar dados.",
     "adminFlag_register_new_users_as_beta": "Registrar novos usuários como Beta",
-    "adminFlag_register_new_users_as_beta_hint": "Quando ativo, novos cadastros ficam no plano Beta (recursos Pro, limite de 500 registros). Quando desligado, novos usuários são Free."
+    "adminFlag_register_new_users_as_beta_hint": "Quando ativo, novos cadastros ficam no plano Beta (recursos Pro, limite de 500 registros). Quando desligado, novos usuários são Free.",
+    "adminDigestTitle": "E-mail de resumo mensal",
+    "adminDigestIntro": "Envia um resumo do mês civil anterior (UTC) para o seu e-mail da conta. A API precisa ter SMTP configurado.",
+    "adminDigestSend": "Enviar resumo para meu e-mail",
+    "adminDigestSent": "E-mail de resumo enviado — {{month}}.",
+    "adminDigestFailed": "E-mail não enviado. Verifique o SMTP da API."
   },
   "common": {
     "tryAgain": "Tentar novamente",
@@ -308,7 +316,7 @@
     "purchasePeriodYear": "Este ano",
     "purchasePeriodAll": "Todo o período",
     "purchaseCurrencyLabel": "Moeda",
-    "purchaseEmpty": "Nenhum valor registrado neste período. Adicione valores ao registrar jogos, board games, mangá ou quadrinhos.",
+    "purchaseEmpty": "Nenhum valor registrado neste período. Adicione valores ao registrar jogos, board games, livros, mangá ou quadrinhos.",
     "sectionChartsTitle": "Logs",
     "timeGranularityLabel": "Agrupamento no tempo",
     "purchaseItemsTotal_one": "{{count}} item com compra registrada",
@@ -367,6 +375,17 @@
     "recommendationsTitle": "Recomendados para você",
     "recommendationsNav": "Carrossel de recomendações",
     "recommendationsDotLabel": "Ir para a página {{index}}"
+  },
+  "searchSort": {
+    "relevance": "Relevância",
+    "titleAsc": "Título (A–Z)",
+    "titleDesc": "Título (Z–A)",
+    "yearNewest": "Mais novos",
+    "yearOldest": "Mais antigos",
+    "releasedNewest": "Lançamento mais recente",
+    "releasedOldest": "Lançamento mais antigo",
+    "ratingHighest": "Melhor avaliação",
+    "scoreHighest": "Maior nota"
   },
   "mediaLogs": {
     "addOne": "Adicionar um",

@@ -1,9 +1,9 @@
 import type { MediaType } from "@geeklogs/shared";
 import { SPEND_TRACKED_MEDIA_TYPES } from "@geeklogs/shared";
 
-/** Own / want-to-buy triple switch and list filters (not matches played). */
+/** Own / want-to-buy triple switch and list filters (same categories as optional spend). */
 export const mediaTypeHasCollectionOwnership = (m: MediaType): boolean =>
-  m === "boardgames" || m === "games";
+  (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(m);
 
 export const mediaTypeHasBoardGameOnlyFields = (m: MediaType): boolean => m === "boardgames";
 

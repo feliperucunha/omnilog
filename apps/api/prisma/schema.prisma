@@ -61,6 +61,7 @@ model User {
   comicVineApiKey    String?
   preferredTheme       String?  // "light" | "dark"
   preferredLocale      String?  // "en" | "pt-BR" | "es"
+  recapEmailsEnabled   Boolean  @default(true) // monthly activity digest email
   visibleMediaTypes    String?  // JSON array of media type strings; null = all
   boardGameProvider   String?  // "bgg" | "ludopedia"; null = bgg
   tier                Tier     @default(free)
@@ -186,13 +187,13 @@ model Log {
   chapter      Int?     // anime, manga, comics
   volume       Int?     // anime, manga, comics
   boardGameSource String?  // "bgg" | "ludopedia" when mediaType = boardgames; which API this externalId came from
-  own            Boolean? // boardgames only: user owns a physical/digital copy
-  wantToBuy      Boolean? // boardgames only: user wants to buy a copy
+  own            Boolean? // games, board games, books, manga, comics: user owns a copy
+  wantToBuy      Boolean? // same categories: user wants to buy a copy
   matchesPlayed  Int?     // boardgames only: number of matches/sessions played
   genres         String?  // JSON array of genre names (for stats and badges)
   mechanics       String?  // JSON array of board-game mechanic names (BGG / Ludopedia); optional
   affinityContext String?  // JSON: recommendation snapshot (board stats, book subjects, manga themes, …)
-  // purchaseAmountMinor + purchaseCurrency: optional spend (minor units + ISO 4217) for games/boardgames/manga/comics
+  // purchaseAmountMinor + purchaseCurrency: optional spend (minor units + ISO 4217) for games/boardgames/books/manga/comics
   purchaseAmountMinor Int?
   purchaseCurrency    String?
   createdAt    DateTime @default(now())

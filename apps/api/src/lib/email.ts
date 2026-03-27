@@ -18,8 +18,13 @@ function getTransporter(): nodemailer.Transporter | null {
   });
 }
 
-function captureEmailError(err: unknown): void {
-  console.error("[email] Password reset send failed:", err);
+/** True when SMTP env vars are set so digests and password reset can send mail. */
+export function isSmtpConfigured(): boolean {
+  return !!(SMTP_HOST?.trim() && SMTP_USER?.trim() && SMTP_PASS?.trim());
+}
+
+function captureEmailError(err: unknown, context: string): void {
+  console.error(`[email] ${context}:`, err);
   if (process.env.SENTRY_DSN?.trim() && err instanceof Error) {
     Sentry.captureException(err);
   }
@@ -54,7 +59,41 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
     });
     return true;
   } catch (err) {
-    captureEmailError(err);
+    captureEmailError(err, "Password reset send failed");
+    return false;
+  }
+}
+
+/**
+ * Monthly activity digest (HTML + plain text). Same SMTP config as password reset.
+ * Returns false if SMTP is not configured or send failed.
+ */
+export async function sendMonthlyDigestEmail(
+  to: string,
+  subject: string,
+  html: string,
+  text: string,
+  attachments?: { filename: string; content: Buffer; cid: string }[]
+): Promise<boolean> {
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.warn(
+      "[email] SMTP not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS). Monthly digest not sent."
+    );
+    return false;
+  }
+  try {
+    await transporter.sendMail({
+      from: SMTP_FROM,
+      to,
+      subject,
+      text,
+      html,
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
+    });
+    return true;
+  } catch (err) {
+    captureEmailError(err, "Monthly digest send failed");
     return false;
   }
 }
