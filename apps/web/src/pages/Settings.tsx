@@ -1042,6 +1042,7 @@ export function Settings() {
                                 `settings.adminFlag_${f.key}` as
                                   | "settings.adminFlag_disable_api_key_requirements"
                                   | "settings.adminFlag_register_new_users_as_beta"
+                                  | "settings.adminFlag_wake_api_ping"
                               )}
                             </p>
                             <p className="text-xs leading-relaxed text-[var(--color-light)]">
@@ -1049,6 +1050,7 @@ export function Settings() {
                                 `settings.adminFlag_${f.key}_hint` as
                                   | "settings.adminFlag_disable_api_key_requirements_hint"
                                   | "settings.adminFlag_register_new_users_as_beta_hint"
+                                  | "settings.adminFlag_wake_api_ping_hint"
                               )}
                             </p>
                             <p className="font-mono text-[10px] text-[var(--color-mid)]">{f.key}</p>
@@ -1069,6 +1071,7 @@ export function Settings() {
                                 `settings.adminFlag_${f.key}` as
                                   | "settings.adminFlag_disable_api_key_requirements"
                                   | "settings.adminFlag_register_new_users_as_beta"
+                                  | "settings.adminFlag_wake_api_ping"
                               )}
                             />
                           </div>

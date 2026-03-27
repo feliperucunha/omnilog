@@ -7,6 +7,11 @@ export const FEATURE_FLAG_KEYS = {
   REGISTER_NEW_USERS_AS_BETA: "register_new_users_as_beta",
   /** When enabled, show the beta welcome / announcement banner to beta users (client-side dismissal persists per message). */
   BETA_BANNER_ENABLED: "beta_banner_enabled",
+  /**
+   * When enabled, the web app periodically requests /api/health to reduce cold starts on free hosts
+   * that sleep after idle (e.g. Koyeb). Temporary ops toggle; remove when on a paid always-on plan.
+   */
+  WAKE_API_PING: "wake_api_ping",
 } as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[keyof typeof FEATURE_FLAG_KEYS];
@@ -44,6 +49,16 @@ export async function isBetaBannerEnabled(): Promise<boolean> {
     select: { enabled: true },
   });
   if (row == null) return true;
+  return row.enabled;
+}
+
+/** Default off — enable in admin when using a sleep-prone free API tier. */
+export async function isWakeApiPingEnabled(): Promise<boolean> {
+  const row = await prisma.featureFlag.findUnique({
+    where: { key: FEATURE_FLAG_KEYS.WAKE_API_PING },
+    select: { enabled: true },
+  });
+  if (row == null) return false;
   return row.enabled;
 }
 

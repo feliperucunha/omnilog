@@ -11,6 +11,7 @@ import { MeProvider } from "@/contexts/MeContext";
 import { VisibleMediaTypesProvider } from "@/contexts/VisibleMediaTypesContext";
 import { LogCompleteProvider } from "@/contexts/LogCompleteContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ApiWakePing } from "@/components/ApiWakePing";
 import { ColdStartLoader } from "@/components/ColdStartLoader";
 import { AppVersionModal } from "@/components/AppVersionModal";
 import { AppVersionProvider } from "@/contexts/AppVersionContext";
@@ -37,6 +38,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       <ThemeSync />
                       <LocaleSync />
                       <ColdStartLoader />
+                      <ApiWakePing />
                       <App />
                       <AppVersionModal />
                     </LogCompleteProvider>

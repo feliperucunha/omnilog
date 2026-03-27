@@ -192,6 +192,8 @@
     "adminFlag_disable_api_key_requirements_hint": "Hides missing-key banners, search limits, and invalid-key warnings. External APIs still need server or user keys to return data.",
     "adminFlag_register_new_users_as_beta": "Register new users as Beta",
     "adminFlag_register_new_users_as_beta_hint": "When on, new signups get the Beta tier (Pro features, 500-log cap). When off, new signups are Free.",
+    "adminFlag_wake_api_ping": "Keep API awake (wake ping)",
+    "adminFlag_wake_api_ping_hint": "While the app is open, periodically pings the API so free hosts that sleep after idle (e.g. Koyeb) stay warm. Turn off when you move to a paid always-on plan.",
     "adminDigestTitle": "Monthly recap email",
     "adminDigestIntro": "Sends a digest for the previous calendar month (UTC) to your account email. The API must have SMTP configured.",
     "adminDigestSend": "Send recap to my email",

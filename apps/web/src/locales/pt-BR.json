@@ -191,6 +191,8 @@
     "adminFlag_disable_api_key_requirements_hint": "Oculta avisos de chave ausente, limites de busca e alertas de chave inválida. As APIs externas ainda precisam de chaves no servidor ou do usuário para retornar dados.",
     "adminFlag_register_new_users_as_beta": "Registrar novos usuários como Beta",
     "adminFlag_register_new_users_as_beta_hint": "Quando ativo, novos cadastros ficam no plano Beta (recursos Pro, limite de 500 registros). Quando desligado, novos usuários são Free.",
+    "adminFlag_wake_api_ping": "Manter API acordada (ping)",
+    "adminFlag_wake_api_ping_hint": "Com o app aberto, faz pings periódicos na API para reduzir cold start em hosts gratuitos que dormem (ex.: Koyeb). Desligue ao usar um plano sempre ligado.",
     "adminDigestTitle": "E-mail de resumo mensal",
     "adminDigestIntro": "Envia um resumo do mês civil anterior (UTC) para o seu e-mail da conta. A API precisa ter SMTP configurado.",
     "adminDigestSend": "Enviar resumo para meu e-mail",

@@ -19,6 +19,7 @@ import { followsRouter } from "./routes/follows.js";
 import { adminRouter } from "./routes/admin.js";
 import { prisma } from "./lib/prisma.js";
 import { runMonthlyDigestIfDue } from "./lib/monthlyDigest.js";
+import { isWakeApiPingEnabled } from "./lib/featureFlags.js";
 import { runSeedBadges } from "./scripts/seedBadges.js";
 import { runSeedMilestones } from "./scripts/seedMilestones.js";
 import { APP_VERSION } from "@geeklogs/shared";
@@ -54,9 +55,14 @@ app.post(
 
 app.use(express.json());
 
-/** Require X-App-Version to match API version for all /api routes except /api/health. Returns 401 when out of sync. */
+/** Require X-App-Version to match API version for all /api routes except /api/health and /api/wake-ping-config. Returns 401 when out of sync. */
 app.use("/api", (req, res, next) => {
-  if (req.path === "/health" || req.path === "/health/") {
+  if (
+    req.path === "/health" ||
+    req.path === "/health/" ||
+    req.path === "/wake-ping-config" ||
+    req.path === "/wake-ping-config/"
+  ) {
     return next();
   }
   const clientVersion = req.headers["x-app-version"];
@@ -94,6 +100,15 @@ app.use("/api/admin", adminRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, version: APP_VERSION });
+});
+
+/** Public: whether clients should ping /api/health on an interval (free-tier sleep). No auth / no app version header. */
+app.get("/api/wake-ping-config", async (_req, res) => {
+  const enabled = await isWakeApiPingEnabled();
+  const raw = Number(process.env.WAKE_PING_INTERVAL_MS);
+  const intervalMs =
+    Number.isFinite(raw) && raw >= 60_000 ? Math.floor(raw) : 5 * 60 * 1000;
+  res.json({ enabled, intervalMs });
 });
 
 /** Global error handler: log and return 500 JSON. */
