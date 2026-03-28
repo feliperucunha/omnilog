@@ -11,6 +11,7 @@ import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
 import { apiFetch, invalidateApiCache } from "@/lib/api";
 import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 import { trackProductEvent } from "@/lib/productAnalytics";
 
@@ -113,8 +114,8 @@ export function Onboarding() {
         className="w-full max-w-xl flex flex-col gap-8 border border-border rounded-2xl p-6"
       >
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
-            {t("onboarding.title")}
+          <h1 className="min-w-0 text-2xl font-bold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("onboarding.title")}</OverflowMarquee>
           </h1>
           <p className="mt-2 text-sm text-[var(--color-light)]">
             {t("onboarding.subtitle")}

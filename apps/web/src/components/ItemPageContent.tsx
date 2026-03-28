@@ -37,9 +37,25 @@ import {
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
 import { paperShadow } from "@/lib/paperShadow";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
+import { isCapacitorAndroid, isCapacitorNative } from "@/lib/androidOverlayBack";
 import { cn } from "@/lib/utils";
 
-function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType: MediaType; t: (key: string, params?: Record<string, string>) => string }) {
+/** Android WebView: `filter: blur()` on the BGG backdrop can break compositing so body text never paints. */
+const BGG_BACKDROP_ANDROID_CLASS =
+  "pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover object-center opacity-[0.55]";
+
+function ItemDetailsBlock({
+  item,
+  mediaType,
+  t,
+  androidWebView,
+}: {
+  item: ItemDetail;
+  mediaType: MediaType;
+  t: (key: string, params?: Record<string, string>) => string;
+  androidWebView: boolean;
+}) {
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const hasDescription = item.description && item.description.length > 0;
   const hasTagline = item.tagline && item.tagline.length > 0;
@@ -119,7 +135,11 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
 
   return (
     <Card
-      className="min-w-0 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-5 sm:p-6 flex flex-col gap-5 overflow-hidden"
+      className={cn(
+        "flex min-w-0 flex-col gap-5 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-5 sm:p-6",
+        /* Android: `overflow-hidden` + long description has clipped the whole card’s text layer in WebView; keep horizontal clip only. */
+        androidWebView ? "overflow-x-hidden" : "overflow-hidden"
+      )}
       style={paperShadow}
     >
       {hasTagline && (
@@ -137,8 +157,8 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
             aria-expanded={descriptionOpen}
             aria-controls="item-description-panel"
           >
-            <h3 className="mb-0 text-xs font-semibold uppercase tracking-wider text-[var(--color-light)]">
-              {t("itemPage.description")}
+            <h3 className="mb-0 min-w-0 flex-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-light)]">
+              <OverflowMarquee>{t("itemPage.description")}</OverflowMarquee>
             </h3>
             <ChevronDown
               className={cn(
@@ -153,7 +173,7 @@ function ItemDetailsBlock({ item, mediaType, t }: { item: ItemDetail; mediaType:
               id="item-description-panel"
               role="region"
               aria-labelledby="item-description-heading"
-              className="mt-2 min-w-0"
+              className="mt-2 min-w-0 [-webkit-overflow-scrolling:touch] [overflow-wrap:anywhere]"
             >
               <p className="break-words whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)] sm:text-base">
                 {item.description}
@@ -395,6 +415,8 @@ interface ReviewsResponse {
 }
 
 export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps) {
+  const nativeApp = isCapacitorNative();
+  const androidWebView = isCapacitorAndroid();
   const { t, locale } = useLocale();
   const { showLogComplete } = useLogComplete();
   const [data, setData] = useState<ItemPageData | null>(null);
@@ -566,9 +588,9 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+      initial={nativeApp ? false : { opacity: 0, y: 8 }}
+      animate={nativeApp ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      transition={nativeApp ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 25 }}
       className="min-w-0 overflow-x-hidden"
     >
       <div className="flex min-w-0 flex-col gap-8">
@@ -581,7 +603,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                 src={heroUrl}
                 alt=""
                 aria-hidden
-                className={BGG_BLUR_BACKDROP_IMG_CLASS}
+                className={androidWebView ? BGG_BACKDROP_ANDROID_CLASS : BGG_BLUR_BACKDROP_IMG_CLASS}
                 referrerPolicy="no-referrer"
               />
               <img
@@ -625,13 +647,17 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             </Button>
           </div>
           {/* Title and meta: always light text on dark scrim (readable in both themes) */}
-          <div className="absolute bottom-0 left-0 right-0 z-10 flex flex-col gap-1.5 p-4 pb-6 sm:p-6 sm:pb-8 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
-            <p className="text-sm font-medium uppercase tracking-wide text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-              {label}
-            </p>
-            <h1 className="text-xl font-bold text-white break-words sm:text-2xl md:text-3xl [text-shadow:0_2px_8px_rgba(0,0,0,0.95)]">
-              {item.title}
-            </h1>
+          <div className="absolute bottom-0 left-0 right-0 z-10 flex min-w-0 flex-col gap-1.5 p-4 pb-6 sm:p-6 sm:pb-8 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
+            <div className="min-w-0">
+              <OverflowMarquee className="text-sm font-medium uppercase tracking-wide text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+                {label}
+              </OverflowMarquee>
+            </div>
+            <div role="heading" aria-level={1} className="min-w-0">
+              <OverflowMarquee className="text-xl font-bold text-white sm:text-2xl md:text-3xl [text-shadow:0_2px_8px_rgba(0,0,0,0.95)]">
+                {item.title}
+              </OverflowMarquee>
+            </div>
             {(item.year || item.subtitle) && (
               <p className="text-sm text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
                 {[item.year, item.subtitle].filter(Boolean).join(" · ")}
@@ -665,7 +691,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
           </div>
         </header>
 
-        <ItemDetailsBlock item={item} mediaType={mediaType} t={t} />
+        <ItemDetailsBlock item={item} mediaType={mediaType} t={t} androidWebView={androidWebView} />
 
         {token && (
           <ItemReviewForm
@@ -708,26 +734,29 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
         )}
 
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-xl font-semibold text-[var(--color-lightest)]">
-              {t("common.reviews")}
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <h2 className="min-w-0 shrink-0 text-xl font-semibold text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("common.reviews")}</OverflowMarquee>
             </h2>
             {reviews.length > 0 && (
-              <Select
-                value={reviewsSort}
-                onValueChange={(v) => {
-                  setReviewsSort(v as ReviewSortKey);
-                  setReviewsPage(1);
-                }}
-                options={[
-                  { value: "recent", label: t("reviews.sortRecent") },
-                  { value: "oldest", label: t("reviews.sortOldest") },
-                  { value: "likes", label: t("reviews.sortLikes") },
-                  { value: "dislikes", label: t("reviews.sortDislikes") },
-                ]}
-                triggerClassName="w-[10rem]"
-                aria-label={t("reviews.sortBy")}
-              />
+              <div className="min-w-0 w-full sm:min-w-[12rem] sm:max-w-lg sm:flex-1">
+                <Select
+                  value={reviewsSort}
+                  onValueChange={(v) => {
+                    setReviewsSort(v as ReviewSortKey);
+                    setReviewsPage(1);
+                  }}
+                  options={[
+                    { value: "recent", label: t("reviews.sortRecent") },
+                    { value: "oldest", label: t("reviews.sortOldest") },
+                    { value: "likes", label: t("reviews.sortLikes") },
+                    { value: "dislikes", label: t("reviews.sortDislikes") },
+                  ]}
+                  className="min-w-0 w-full"
+                  triggerClassName="h-10 w-full min-w-0 max-w-none"
+                  aria-label={t("reviews.sortBy")}
+                />
+              </div>
             )}
           </div>
           {reviewsLoading ? (
@@ -778,12 +807,12 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                       >
                         <div className="flex flex-col gap-4 p-4 sm:p-5">
                           {/* Author + all level badges */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <OverflowMarquee
                               className={`text-base font-semibold ${r.isAdmin ? "admin-username-fire" : r.isPro ? "pro-username-shine" : "text-[var(--color-lightest)]"}`}
                             >
                               {r.reviewerUsername ?? r.userEmail}
-                            </span>
+                            </OverflowMarquee>
                             {(r.reviewerBadges?.length
                               ? r.reviewerBadges
                               : r.reviewerLevelIcon

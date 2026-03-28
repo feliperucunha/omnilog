@@ -41,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 import { mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
 
@@ -509,8 +510,8 @@ export function MediaLogs({
         <Dialog open={showProModal && !hasProFeatures} onOpenChange={setShowProModal}>
           <DialogContent onClose={() => setShowProModal(false)}>
             <DialogHeader>
-              <DialogTitle className="text-[var(--color-lightest)]">
-                {t("statistics.proOnlyTitle")}
+              <DialogTitle className="min-w-0 text-[var(--color-lightest)]">
+                <OverflowMarquee>{t("statistics.proOnlyTitle")}</OverflowMarquee>
               </DialogTitle>
             </DialogHeader>
             <p className="text-sm text-[var(--color-light)]">
@@ -536,12 +537,12 @@ export function MediaLogs({
           className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-3 max-md:min-h-[44px] text-left no-underline transition-colors text-[var(--color-warning-text)] hover:border-[var(--color-warning-hover-border)] hover:bg-[var(--color-warning-hover-bg)]"
         >
           <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)]" aria-hidden />
-          <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--color-warning-text)]">
+          <OverflowMarquee className="min-w-0 flex-1 text-sm font-medium text-[var(--color-warning-text)]">
             {t("apiKeyBanner.categoryMessage", {
               category: label,
               provider: API_KEY_META[provider!].name,
             })}
-          </p>
+          </OverflowMarquee>
           <span className="shrink-0 text-xs font-medium text-[var(--color-warning-text-muted)]">
             {t("apiKeyBanner.addKeyInSettings")} →
           </span>
@@ -551,7 +552,7 @@ export function MediaLogs({
       {embedded && (
         <div className="hidden md:flex flex-col gap-3 min-w-0">
           <div className="flex justify-between items-center gap-4 flex-wrap">
-            <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
               <span className="shrink-0 text-sm text-[var(--color-light)]">{t("itemReviewForm.status")}:</span>
               <Select
                 value={statusFilter}
@@ -564,8 +565,8 @@ export function MediaLogs({
                   })),
                 ]}
                 aria-label={t("itemReviewForm.status")}
-                className="min-w-0 w-[11rem]"
-                triggerClassName="w-full min-w-0"
+                className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
+                triggerClassName="w-full min-w-0 max-w-none"
               />
               {showCollectionOwnershipFilters && (
                 <Select
@@ -573,8 +574,8 @@ export function MediaLogs({
                   onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
                   options={collectionOwnershipSelectOptions}
                   aria-label={t("mediaLogs.filterCollection")}
-                  className="min-w-0 w-[12rem]"
-                  triggerClassName="w-full min-w-0"
+                  className="min-w-0 w-[12rem] max-w-[min(100%,18rem)] shrink-0"
+                  triggerClassName="w-full min-w-0 max-w-none"
                 />
               )}
               <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
@@ -590,8 +591,8 @@ export function MediaLogs({
                   ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
                 ]}
                 aria-label={t("mediaLogs.sortLabel")}
-                className="min-w-0 w-[11rem]"
-                triggerClassName="w-full min-w-0"
+                className="min-w-0 flex-1 basis-52 max-w-xl"
+                triggerClassName="w-full min-w-0 max-w-none"
               />
             </div>
             <div className="relative min-w-0 w-full max-w-xs shrink-0">
@@ -708,9 +709,9 @@ export function MediaLogs({
       {/* Mobile when embedded: wrapper shows filters, header (buttons+bar), search. Desktop when embedded uses the block above. When not embedded wrapper is always visible. */}
       <div className={cn("flex min-w-0 flex-col gap-3", embedded && "md:hidden")}>
       {/* 1. Filters row */}
-      <div className="flex min-w-0 flex-wrap items-center gap-3 overflow-hidden">
+      <div className="flex w-full min-w-0 flex-wrap items-center gap-3 overflow-hidden">
         {/* Mobile (< md): custom dropdowns, no labels */}
-        <div className={cn("grid w-full gap-2 md:hidden", mediaType === "boardgames" ? "grid-cols-2" : "grid-cols-2")}>
+        <div className={cn("grid w-full min-w-0 gap-2 md:hidden", mediaType === "boardgames" ? "grid-cols-2" : "grid-cols-2")}>
           <Select
             value={statusFilter}
             onValueChange={setStatusFilter}
@@ -747,12 +748,12 @@ export function MediaLogs({
               ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
             ]}
             aria-label={t("mediaLogs.sortLabel")}
-            className="min-w-0 w-full"
+            className="col-span-2 min-w-0 w-full"
             triggerClassName="w-full max-w-none min-w-0"
           />
         </div>
         {/* Desktop (md+): status and sort dropdowns */}
-        <div className="hidden md:flex min-w-0 flex-wrap items-center gap-3">
+        <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-3 md:flex">
         <span className="shrink-0 text-sm text-[var(--color-light)]">{t("itemReviewForm.status")}:</span>
         <Select
           value={statusFilter}
@@ -765,8 +766,8 @@ export function MediaLogs({
             })),
           ]}
           aria-label={t("itemReviewForm.status")}
-          className="min-w-0 w-[11rem]"
-          triggerClassName="w-full min-w-0"
+          className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
+          triggerClassName="w-full min-w-0 max-w-none"
         />
         {showCollectionOwnershipFilters && (
           <Select
@@ -774,8 +775,8 @@ export function MediaLogs({
             onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
             options={collectionOwnershipSelectOptions}
             aria-label={t("mediaLogs.filterCollection")}
-            className="min-w-0 w-[12rem]"
-            triggerClassName="w-full min-w-0"
+            className="min-w-0 w-[12rem] max-w-[min(100%,18rem)] shrink-0"
+            triggerClassName="w-full min-w-0 max-w-none"
           />
         )}
         <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
@@ -791,8 +792,8 @@ export function MediaLogs({
             ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
           ]}
           aria-label={t("mediaLogs.sortLabel")}
-          className="min-w-0 w-[11rem]"
-          triggerClassName="w-full min-w-0"
+          className="min-w-0 flex-1 basis-52 max-w-xl"
+          triggerClassName="w-full min-w-0 max-w-none"
         />
       </div>
       </div>
@@ -802,9 +803,9 @@ export function MediaLogs({
         {/* Left: title (when !embedded) + experience bar + badges */}
         <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden max-md:gap-1.5 sm:gap-3">
           {!embedded && (
-            <h1 className="min-w-0 shrink-0 truncate text-2xl font-bold text-[var(--color-lightest)]">
+            <OverflowMarquee className="min-w-0 text-2xl font-bold text-[var(--color-lightest)]">
               {label}
-            </h1>
+            </OverflowMarquee>
           )}
           {!readOnly && milestoneProgress && (() => {
             const scope = milestoneProgress.reviews.next ? milestoneProgress.reviews : milestoneProgress.logs;
@@ -1021,9 +1022,9 @@ export function MediaLogs({
                     <div className={`flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 sm:p-4 ${embedded && !isReviewExpanded ? "min-h-0" : ""}`}>
                       <Link
                         to={`/item/${log.mediaType}/${log.externalId}`}
-                        className="line-clamp-2 font-semibold text-[var(--color-lightest)] no-underline hover:underline text-sm sm:text-base"
+                        className="block min-w-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
                       >
-                        {log.title}
+                        <OverflowMarquee className="text-sm font-semibold sm:text-base">{log.title}</OverflowMarquee>
                       </Link>
                       <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                         {log.grade != null ? (

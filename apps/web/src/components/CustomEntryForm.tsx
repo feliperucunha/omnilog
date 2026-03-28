@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { forwardRef, useCallback, useImperativeHandle, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Dialog,
@@ -20,8 +20,10 @@ import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMe } from "@/contexts/MeContext";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import { trackProductEvent } from "@/lib/productAnalytics";
 import { StarRating } from "@/components/StarRating";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { starsToGrade } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { BoardGameOwnershipSwitch } from "@/components/BoardGameOwnershipSwitch";
@@ -41,6 +43,11 @@ function isValidUrl(s: string): boolean {
   }
 }
 
+export type CustomEntryFormHandle = {
+  trySubmit: (options?: { optimisticClose?: boolean }) => Promise<boolean>;
+  canDismissWithoutSave: () => boolean;
+};
+
 interface CustomEntryFormProps {
   /** When not provided (e.g. Dashboard), user selects media type in the form. */
   mediaType?: MediaType;
@@ -52,18 +59,25 @@ interface CustomEntryFormProps {
   buttonsInFooter?: boolean;
   /** Form id when buttonsInFooter, so footer submit button can use form="". */
   formId?: string;
+  /** Desktop dialog: hide Cancel/Save; parent closes via X and calls ref.trySubmit when needed. */
+  suppressActionButtons?: boolean;
 }
 
-export function CustomEntryForm({
-  mediaType: initialMediaType,
-  onSaved,
-  onCancel,
-  embedded = false,
-  buttonsInFooter = false,
-  formId: formIdProp,
-}: CustomEntryFormProps) {
+export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryFormProps>(function CustomEntryForm(
+  {
+    mediaType: initialMediaType,
+    onSaved,
+    onCancel,
+    embedded = false,
+    buttonsInFooter = false,
+    formId: formIdProp,
+    suppressActionButtons = false,
+  },
+  ref
+) {
   const { t } = useLocale();
   const { me } = useMe();
+  const isMobile = useIsMobile();
   const [mediaType, setMediaType] = useState<MediaType>(initialMediaType ?? "movies");
   const [title, setTitle] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -88,23 +102,27 @@ export function CustomEntryForm({
 
   const toNum = (v: number | ""): number | null => (v === "" ? null : v);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const performSave = useCallback(async (options?: { optimisticClose?: boolean }): Promise<boolean> => {
+    const optimisticClose = options?.optimisticClose === true;
+    if (!optimisticClose && loading) return false;
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       showErrorToast(t, "E021");
-      return;
+      return false;
     }
     if (imageUrl.trim() && !isValidUrl(imageUrl.trim())) {
       showErrorToast(t, "E022");
-      return;
+      return false;
     }
     const image = imageUrl.trim() ? imageUrl.trim() : null;
     const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
     const grade = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
     const wasFirstLog = (me?.logCount ?? 0) === 0;
-    setLoading(true);
+    if (!optimisticClose) setLoading(true);
     try {
+      if (optimisticClose) {
+        onCancel();
+      }
       const externalId = `custom-${crypto.randomUUID()}`;
       const created = await apiFetch<{ newBadges?: NewBadge[] }>("/logs", {
         method: "POST",
@@ -138,6 +156,7 @@ export function CustomEntryForm({
         review: review.trim() || null,
       };
       onSaved(completion);
+      return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       if (message === LOG_LIMIT_REACHED_CODE) {
@@ -145,16 +164,65 @@ export function CustomEntryForm({
       } else {
         showErrorToast(t, "E013", { originalError: err });
       }
+      return false;
     } finally {
-      setLoading(false);
+      if (!optimisticClose) setLoading(false);
     }
+  }, [
+    title,
+    imageUrl,
+    status,
+    stars,
+    review,
+    season,
+    episode,
+    chapter,
+    volume,
+    own,
+    wantToBuy,
+    matchesPlayed,
+    mediaType,
+    showSeasonEpisode,
+    showChapterVolume,
+    showCollectionOwnership,
+    showBoardGameFields,
+    me?.logCount,
+    loading,
+    onCancel,
+    onSaved,
+    t,
+  ]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      trySubmit: (opts) => performSave(opts),
+      canDismissWithoutSave: () => !title.trim(),
+    }),
+    [performSave, title]
+  );
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void performSave();
   };
+
+  const handleStandaloneDialogClose = useCallback(() => {
+    if (!title.trim()) {
+      onCancel();
+      return;
+    }
+    void performSave({ optimisticClose: true });
+  }, [title, onCancel, performSave]);
+
+  const showActionRow =
+    !(embedded && buttonsInFooter) && !suppressActionButtons && (embedded || isMobile);
 
   const formContent = (
     <>
       {!embedded && (
-        <h3 className="mb-4 text-lg font-semibold text-[var(--color-lightest)]">
-          {t("customEntry.dialogTitle")}
+        <h3 className="mb-4 min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+          <OverflowMarquee>{t("customEntry.dialogTitle")}</OverflowMarquee>
         </h3>
       )}
       <form id={embedded && buttonsInFooter ? formIdProp : undefined} onSubmit={handleSubmit}>
@@ -344,7 +412,7 @@ export function CustomEntryForm({
                   className="min-h-[80px] bg-[var(--color-darkest)]"
                 />
               </div>
-              {!(embedded && buttonsInFooter) && (
+              {showActionRow && (
                 <div className="flex gap-4">
                   <motion.div whileTap={tapScale} transition={tapTransition} className="flex-1">
                     <Button
@@ -377,12 +445,14 @@ export function CustomEntryForm({
   }
 
   return (
-    <Dialog open modal={false} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent onClose={onCancel}>
+    <Dialog open modal={false}>
+      <DialogContent onClose={handleStandaloneDialogClose}>
         <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
           {formContent}
         </motion.div>
       </DialogContent>
     </Dialog>
   );
-}
+});
+
+CustomEntryForm.displayName = "CustomEntryForm";

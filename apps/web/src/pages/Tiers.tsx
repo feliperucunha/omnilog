@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { TiersSkeleton } from "@/components/skeletons";
 import { tierHasUnlimitedLogs } from "@/lib/userTier";
 
@@ -204,8 +205,8 @@ export function Tiers() {
           className="relative flex flex-col border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-card)]"
           style={{ boxShadow: "var(--shadow-card)" }}
         >
-          <h2 className="text-lg font-semibold text-[var(--color-lightest)]">
-            {t("tiers.free")}
+          <h2 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("tiers.free")}</OverflowMarquee>
           </h2>
           <p className="mt-1 text-2xl font-bold text-[var(--color-lightest)]">
             {t("tiers.freePrice")}
@@ -239,8 +240,8 @@ export function Tiers() {
               {t("tiers.pro")}
             </span>
           </div>
-          <h2 className="text-lg font-semibold text-[var(--color-lightest)]">
-            {t("tiers.pro")}
+          <h2 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("tiers.pro")}</OverflowMarquee>
           </h2>
           {token && !isPayingPro && !isAdmin && (
             <div className="mt-2 flex flex-col gap-2">

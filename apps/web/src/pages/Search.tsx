@@ -31,6 +31,7 @@ import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Search as SearchIcon, UserCheck, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { SearchRecommendationsCarousel } from "@/components/SearchRecommendationsCarousel";
 import * as storage from "@/lib/storage";
@@ -539,8 +540,8 @@ export function Search() {
           className="relative z-10 flex w-full min-w-0 shrink-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
           style={paperShadow}
         >
-          <h2 className="text-base font-semibold text-[var(--color-lightest)] sm:text-lg">
-            {t("search.recommendationsTitle")}
+          <h2 className="min-w-0 text-base font-semibold text-[var(--color-lightest)] sm:text-lg">
+            <OverflowMarquee>{t("search.recommendationsTitle")}</OverflowMarquee>
           </h2>
           {recLoading && (
             <div
@@ -618,10 +619,8 @@ export function Search() {
               )}
             </div>
             {hasSearched && searchFilter !== USERS_SEARCH_TYPE && (
-              <div
-                className="flex flex-wrap items-center gap-4 min-w-0"
-              >
-                <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <div className="flex w-full min-w-0 flex-wrap items-center gap-4">
+                <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 sm:min-w-[12rem]">
                   <Select
                     value={sortBy}
                     onValueChange={(v) => {
@@ -632,7 +631,8 @@ export function Search() {
                       value: opt.value,
                       label: t(opt.labelKey),
                     }))}
-                    triggerClassName="min-w-0 w-full sm:min-w-[10rem] sm:w-auto h-9 max-w-none"
+                    className="min-w-0 w-full sm:max-w-lg sm:flex-1"
+                    triggerClassName="h-9 min-w-0 w-full max-w-none"
                     aria-label={t("search.sortBy")}
                   />
                 </div>
@@ -673,9 +673,9 @@ export function Search() {
                       {(user.username ?? user.id).slice(0, 1).toUpperCase()}
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="min-w-0 truncate font-medium text-[var(--color-lightest)]">
+                      <OverflowMarquee className="min-w-0 font-medium text-[var(--color-lightest)]">
                         {user.username ?? user.id}
-                      </span>
+                      </OverflowMarquee>
                       {user.logCount != null && (
                         <span className="text-xs text-[var(--color-light)]">
                           {t("search.userLogCount", { count: String(user.logCount) })}
@@ -778,16 +778,16 @@ export function Search() {
                       )}
                     </div>
                     <div className="flex flex-1 min-w-0 flex-col justify-center gap-0.5 p-3 overflow-hidden sm:justify-start sm:gap-1 sm:h-[5.5rem] sm:min-h-[5.5rem] sm:p-4 sm:pt-3 sm:flex-shrink-0">
-                      <p className="text-[10px] font-medium uppercase text-[var(--color-light)] truncate sm:text-xs">
+                      <OverflowMarquee className="text-[10px] font-medium uppercase text-[var(--color-light)] sm:text-xs">
                         {t(`nav.${mediaType}`)}
-                      </p>
-                      <p className="line-clamp-2 text-sm font-semibold text-[var(--color-lightest)] sm:line-clamp-1 sm:text-lg">
+                      </OverflowMarquee>
+                      <OverflowMarquee className="text-sm font-semibold text-[var(--color-lightest)] sm:text-lg">
                         {item.title}
-                      </p>
+                      </OverflowMarquee>
                       {item.genres && item.genres.length > 0 && (
                         <GenreBadges genres={item.genres} maxCount={1} />
                       )}
-                      <p className="line-clamp-1 text-xs text-[var(--color-light)] sm:line-clamp-2 sm:text-sm sm:leading-snug">
+                      <OverflowMarquee className="text-xs text-[var(--color-light)] sm:text-sm sm:leading-snug">
                         {(() => {
                           const parts: string[] = [item.year ?? "", item.subtitle ?? ""].filter(Boolean);
                           if (
@@ -807,7 +807,7 @@ export function Search() {
                           }
                           return parts.join(" · ") || "—";
                         })()}
-                      </p>
+                      </OverflowMarquee>
                     </div>
                   </button>
                 </motion.div>

@@ -19,6 +19,7 @@ import { showErrorToast } from "@/lib/errorToast";
 import { triggerImpact } from "@/lib/capacitorHaptics";
 import { cn } from "@/lib/utils";
 import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
+import { isCapacitorAndroid } from "@/lib/androidOverlayBack";
 
 /**
  * Real-device WebView can report isNativePlatform() later than the emulator, and animated
@@ -105,8 +106,9 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const { t } = useLocale();
   const { me } = useMe();
   const theme = useTheme();
-  const isCapacitorNative = useIsNative();
-  const nativeUi = USE_NATIVE_LOG_COMPLETE_LAYOUT_ON_WEB || isCapacitorNative;
+  const isCapacitorNativeShell = useIsNative();
+  const nativeUi = USE_NATIVE_LOG_COMPLETE_LAYOUT_ON_WEB || isCapacitorNativeShell;
+  const androidWebView = typeof window !== "undefined" && isCapacitorAndroid();
   const nativeColors = theme.colorScheme === "light" ? NATIVE_LIGHT : NATIVE_DARK;
   const { image, title, grade, status, review, own, wantToBuy, matchesPlayed, mediaType } = state;
   const showCollectionOwnershipMeta =
@@ -187,8 +189,9 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
     isLight
       ? "fixed inset-0 z-50 flex min-h-0 flex-col overflow-hidden overscroll-y-contain bg-white/90 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] h-[100dvh] max-h-[100dvh]"
       : "fixed inset-0 z-50 flex min-h-0 flex-col overflow-hidden overscroll-y-contain bg-black/90 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] h-[100dvh] max-h-[100dvh]";
+  /** `shrink` + `min-w-0` so the card fits the viewport and `contentBlock` scrolls; `flex-shrink-0` caused clipping (hero-only / zero scroll). */
   const cardClassNative =
-    "relative flex min-h-0 max-h-full w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border md:rounded-3xl mx-4 flex-shrink-0";
+    "relative mx-4 flex min-h-0 max-h-full w-full min-w-0 max-w-[400px] shrink flex-col overflow-hidden rounded-2xl border md:rounded-3xl";
 
   const closeButton = (
     <div className="absolute right-2 top-2 z-10 md:right-4 md:top-4">
@@ -334,11 +337,19 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
     </div>
   );
 
+  /**
+   * Android WebView often mis-resolves `vh` vs chrome/insets, yielding a tiny hero (sliver of image).
+   * Prefer aspect-ratio + `dvh` caps on Android; keep existing vh layout elsewhere.
+   */
   const heroNativeWrapperClass = cn(
     "relative w-full md:h-auto md:min-h-0",
-    bggShorterCard
-      ? "h-[32vh] min-h-[124px] max-h-[40dvh] md:max-h-[min(38vh,340px)] md:aspect-[7/8]"
-      : "h-[48vh] min-h-[156px] max-h-[56dvh] md:max-h-none md:aspect-[2/3]"
+    androidWebView
+      ? bggShorterCard
+        ? "aspect-[7/8] min-h-[132px] max-h-[min(44dvh,360px)] w-full md:aspect-[7/8] md:max-h-[min(38vh,340px)]"
+        : "aspect-[2/3] min-h-[200px] max-h-[min(52dvh,440px)] w-full md:aspect-[2/3] md:max-h-none"
+      : bggShorterCard
+        ? "h-[32vh] min-h-[124px] max-h-[40dvh] md:max-h-[min(38vh,340px)] md:aspect-[7/8]"
+        : "h-[48vh] min-h-[156px] max-h-[56dvh] md:max-h-none md:aspect-[2/3]"
   );
 
   const imageSectionNative = (
@@ -369,7 +380,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   /** Modal card content. */
   const contentBlock = (
     <div
-      className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-3 md:px-6 md:pb-6 md:pt-5"
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain px-4 pb-4 pt-3 [-webkit-overflow-scrolling:touch] md:px-6 md:pb-6 md:pt-5"
       style={nativeUi ? { transform: "none", willChange: "auto" } : undefined}
     >
       <span
@@ -378,12 +389,14 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       >
         {statusLabel}
       </span>
-      <h1
+      <div
         id="log-complete-title"
-        className="mb-2 line-clamp-2 text-lg font-bold leading-tight text-[var(--color-lightest)] md:mb-4 md:line-clamp-3 md:text-[1.75rem]"
+        role="heading"
+        aria-level={1}
+        className="mb-2 min-w-0 break-words text-lg font-bold leading-tight text-[var(--color-lightest)] md:mb-4 md:text-[1.75rem]"
       >
         {title}
-      </h1>
+      </div>
       {grade != null && (
         <div className="mb-2 flex items-center gap-1 md:mb-3">
           <StarRating value={stars} readOnly size="lg" />
@@ -770,9 +783,14 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
           style={{
             backgroundImage: heroImageUrl ? cssBackgroundImageUrl(heroImageUrl) : undefined,
             backgroundSize: "cover",
-            filter: isLight ? "blur(4px)" : "blur(10px)",
-            WebkitFilter: isLight ? "blur(4px)" : "blur(10px)",
-            transform: "scale(1.25)",
+            /* Android WebView: full-screen `filter: blur` has caused hero/card compositing glitches. */
+            ...(androidWebView
+              ? { filter: "none", WebkitFilter: "none", transform: "none" }
+              : {
+                  filter: isLight ? "blur(4px)" : "blur(10px)",
+                  WebkitFilter: isLight ? "blur(4px)" : "blur(10px)",
+                  transform: "scale(1.25)",
+                }),
           }}
           aria-hidden
         />

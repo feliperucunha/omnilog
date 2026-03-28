@@ -23,7 +23,7 @@ import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { triggerImpact } from "@/lib/capacitorHaptics";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
-import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
+import { modalContentVariants } from "@/lib/animations";
 import { Loader2 } from "lucide-react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMe } from "@/contexts/MeContext";
@@ -72,6 +72,7 @@ const toNum = (v: number | ""): number | null => (v === "" ? null : v);
 export function LogForm(props: LogFormProps) {
   const { t } = useLocale();
   const { me } = useMe();
+  const onCancel = props.onCancel;
   const isEdit = props.mode === "edit";
   const log = isEdit ? props.log : null;
   const mediaType = isEdit ? (log!.mediaType as MediaType) : (props as LogFormCreateProps).mediaType;
@@ -245,11 +246,12 @@ export function LogForm(props: LogFormProps) {
     purchaseCurrency,
   ]);
 
-  const performSave = useCallback(async (): Promise<boolean> => {
+  const performSave = useCallback(async (options?: { optimisticClose?: boolean }): Promise<boolean> => {
+    const optimisticClose = options?.optimisticClose === true;
     const wasFirstLog = !isEdit && (me?.logCount ?? 0) === 0;
     const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
     const grade = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
-    setLoading(true);
+    if (!optimisticClose) setLoading(true);
     try {
       if (isEdit && log) {
         const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
@@ -312,9 +314,12 @@ export function LogForm(props: LogFormProps) {
               );
             })());
         if (noChange) {
-          setLoading(false);
-          props.onCancel();
+          if (!optimisticClose) setLoading(false);
+          onCancel();
           return true;
+        }
+        if (optimisticClose) {
+          onCancel();
         }
         const updated = await apiFetch<Log & { newBadges?: NewBadge[] }>(
           `/logs/${props.log.id}`,
@@ -341,6 +346,9 @@ export function LogForm(props: LogFormProps) {
           props.onSaved();
         }
         return true;
+      }
+      if (optimisticClose) {
+        onCancel();
       }
       const created = await apiFetch<Log & { newBadges?: NewBadge[] }>(
         "/logs",
@@ -398,7 +406,7 @@ export function LogForm(props: LogFormProps) {
       }
       return false;
     } finally {
-      setLoading(false);
+      if (!optimisticClose) setLoading(false);
     }
   }, [
     isEdit,
@@ -427,6 +435,7 @@ export function LogForm(props: LogFormProps) {
     purchaseAmountMinor,
     purchaseCurrency,
     t,
+    onCancel,
   ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -439,21 +448,33 @@ export function LogForm(props: LogFormProps) {
     return performSave();
   }, [isDirty, performSave]);
 
-  const includeButtonsInForm = !isMobile;
+  const handleDialogRequestClose = useCallback(() => {
+    if (confirmDeleteOpen) return;
+    if (!isDirty) {
+      onCancel();
+      return;
+    }
+    void performSave({ optimisticClose: true });
+  }, [confirmDeleteOpen, isDirty, performSave, onCancel]);
 
   const formContent = (
     <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
-      <div className="mb-4 flex gap-4">
+      <div className="mb-4 flex min-w-0 gap-4">
         <ItemImage
           src={image}
-          className="h-20 w-14 rounded"
+          className="h-20 w-14 shrink-0 rounded"
           mediaType={mediaType}
           boardGameSource={isEdit ? log?.boardGameSource : undefined}
           activeBoardGameProvider={!isEdit && mediaType === "boardgames" ? (me?.boardGameProvider ?? null) : undefined}
         />
-        <h3 className="line-clamp-2 text-lg font-semibold text-[var(--color-lightest)]">
+        <div
+          role="heading"
+          aria-level={3}
+          className="min-w-0 flex-1 truncate text-lg font-semibold text-[var(--color-lightest)]"
+          title={title}
+        >
           {title}
-        </h3>
+        </div>
       </div>
       <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-4">
@@ -641,53 +662,7 @@ export function LogForm(props: LogFormProps) {
                   className="min-h-[80px]"
                 />
               </div>
-              {includeButtonsInForm && (
-                <div className="flex flex-col gap-3">
-                  <div className="flex gap-4">
-                    <motion.div
-                      whileTap={tapScale}
-                      transition={tapTransition}
-                      className="flex-1"
-                    >
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        onClick={props.onCancel}
-                      >
-                        {t("common.cancel")}
-                      </Button>
-                    </motion.div>
-                    <motion.div
-                      whileTap={tapScale}
-                      transition={tapTransition}
-                      className="flex-1"
-                    >
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={loading}
-                      >
-                        {loading ? t("common.saving") : isEdit ? t("common.update") : t("common.save")}
-                      </Button>
-                    </motion.div>
-                  </div>
-                  {isEdit && "onDelete" in props && props.onDelete && (
-                    <div className="border-t border-[var(--color-surface-border)] pt-3">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="w-full text-red-400 hover:bg-red-500/20 hover:text-red-400"
-                        onClick={() => setConfirmDeleteOpen(true)}
-                        disabled={loading || deleting}
-                      >
-                        {t("common.delete")}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-              {isMobile && isEdit && "onDelete" in props && props.onDelete && (
+              {isEdit && "onDelete" in props && props.onDelete && (
                 <div className="border-t border-[var(--color-surface-border)] pt-3">
                   <Button
                     type="button"
@@ -711,10 +686,10 @@ export function LogForm(props: LogFormProps) {
         <Drawer
           open
           modal={false}
-          onOpenChange={(open) => !open && !confirmDeleteOpen && props.onCancel()}
+          onOpenChange={(open) => !open && !confirmDeleteOpen && onCancel()}
         >
           <DrawerContent
-            onClose={props.onCancel}
+            onClose={onCancel}
             onBeforeDismiss={handleDrawerBeforeDismiss}
             closeOnInteractOutside={!confirmDeleteOpen}
             mobileHeight="95%"
@@ -724,12 +699,8 @@ export function LogForm(props: LogFormProps) {
           </DrawerContent>
         </Drawer>
       ) : (
-        <Dialog
-          open
-          modal={false}
-          onOpenChange={(open) => !open && !confirmDeleteOpen && props.onCancel()}
-        >
-          <DialogContent onClose={props.onCancel} closeOnInteractOutside={!confirmDeleteOpen}>
+        <Dialog open modal={false}>
+          <DialogContent onClose={handleDialogRequestClose} closeOnInteractOutside={!confirmDeleteOpen}>
             {formContent}
           </DialogContent>
         </Dialog>
@@ -743,9 +714,7 @@ export function LogForm(props: LogFormProps) {
           onClose={() => setConfirmDeleteOpen(false)}
         >
           <DialogHeader>
-            <DialogTitle className="text-[var(--color-lightest)]">
-              {t("common.delete")}
-            </DialogTitle>
+            <DialogTitle className="text-[var(--color-lightest)]">{t("common.delete")}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-[var(--color-light)]">
             {t("common.deleteLogConfirm")}

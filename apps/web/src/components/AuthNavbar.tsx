@@ -27,7 +27,7 @@ export function AuthNavbar() {
         aria-label={t("nav.dashboard")}
       >
         <Logo alt={t("app.name")} className="h-9 w-auto flex-shrink-0" />
-        <span className="brand-title -ml-3 text-lg font-bold text-(--btn-gradient-end) dark:text-(--btn-gradient-start) sm:-ml-4 sm:text-xl">
+        <span className="brand-title ml-1 text-lg font-bold text-(--btn-gradient-end) dark:text-(--btn-gradient-start) sm:text-xl">
           {t("app.name")}
         </span>
       </Link>

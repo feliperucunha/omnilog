@@ -16,6 +16,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 
@@ -79,18 +80,18 @@ export function Topbar() {
             <Logo alt={t("app.name")} className="h-9 w-auto flex-shrink-0 sm:h-11" />
           </Link>
           {displayTitle ? (
-            <span className="min-w-0 truncate text-lg font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee className="min-w-0 flex-1 text-lg font-semibold text-[var(--color-lightest)]">
               {displayTitle}
-            </span>
+            </OverflowMarquee>
           ) : (
             <span className="brand-title -ml-1 text-lg font-bold text-(--btn-gradient-end) dark:text-(--btn-gradient-start)">{t("app.name")}</span>
           )}
         </div>
         {/* Desktop: page title only */}
         {displayTitle && (
-          <span className="min-w-0 truncate text-lg font-semibold text-[var(--color-lightest)] hidden md:block md:text-xl">
+          <OverflowMarquee className="hidden min-w-0 flex-1 text-lg font-semibold text-[var(--color-lightest)] md:block md:text-xl">
             {displayTitle}
-          </span>
+          </OverflowMarquee>
         )}
       </div>
 

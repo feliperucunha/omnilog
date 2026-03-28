@@ -387,3 +387,21 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Single-line overflow: horizontal marquee (see OverflowMarquee.tsx) */
+@keyframes overflow-marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.animate-overflow-marquee {
+  animation: overflow-marquee-scroll var(--overflow-marquee-duration, 18s) linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-overflow-marquee {
+    animation: none;
+  }
+}

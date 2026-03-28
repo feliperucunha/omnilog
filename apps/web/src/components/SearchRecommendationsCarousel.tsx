@@ -13,6 +13,7 @@ import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ItemImage } from "@/components/ItemImage";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { GenreBadges } from "@/components/GenreBadges";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { tapScale, tapTransition } from "@/lib/animations";
@@ -156,13 +157,13 @@ export function SearchRecommendationsCarousel({
               )}
             </div>
             <div className="flex min-h-[3.5rem] flex-col gap-0.5 p-2.5">
-              <p className="line-clamp-2 text-xs font-semibold leading-snug text-[var(--color-lightest)]">
+              <OverflowMarquee className="text-xs font-semibold leading-snug text-[var(--color-lightest)]">
                 {item.title}
-              </p>
+              </OverflowMarquee>
               {item.genres && item.genres.length > 0 && (
                 <GenreBadges genres={item.genres} maxCount={1} />
               )}
-              <p className="line-clamp-2 text-[10px] text-[var(--color-light)]">
+              <OverflowMarquee className="text-[10px] text-[var(--color-light)]">
                 {(() => {
                   const parts: string[] = [item.year ?? "", item.subtitle ?? ""].filter(Boolean);
                   if (
@@ -182,7 +183,7 @@ export function SearchRecommendationsCarousel({
                   }
                   return parts.join(" · ") || "—";
                 })()}
-              </p>
+              </OverflowMarquee>
             </div>
           </button>
         </motion.div>

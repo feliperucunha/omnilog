@@ -95,11 +95,13 @@ export function MoneyAmountInput({
               "shadow-none ring-0 ring-offset-0 outline-none",
               "focus:ring-0 focus-visible:ring-0",
               "hover:bg-[var(--color-mid)]/10 data-[state=open]:bg-[var(--color-mid)]/12",
-              "[&>span]:max-w-[3.25rem] [&>span]:truncate [&>span]:text-left",
+              "[&>div]:max-w-[3.25rem] [&>div]:min-w-0 [&>div]:text-left",
               "[&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 [&>svg]:opacity-45"
             )}
           >
-            <span>{cur}</span>
+            <span className="block truncate text-sm font-semibold tabular-nums tracking-wide text-[var(--color-light)]">
+              {cur}
+            </span>
           </SelectTrigger>
           <SelectContent viewportClassName={CURRENCY_SCROLL_VIEWPORT}>
             {currencyOptions.map((opt) => (

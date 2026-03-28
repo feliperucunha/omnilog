@@ -5,6 +5,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAppVersion } from "@/contexts/AppVersionContext";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { useLocale } from "@/contexts/LocaleContext";
 
 /**
@@ -30,8 +31,8 @@ export function AppVersionModal() {
         className="max-w-sm"
       >
         <DialogHeader>
-          <DialogTitle className="text-[var(--color-lightest)]">
-            {t("appVersion.title")}
+          <DialogTitle className="min-w-0 text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("appVersion.title")}</OverflowMarquee>
           </DialogTitle>
         </DialogHeader>
         <p className="text-sm text-[var(--color-light)]">

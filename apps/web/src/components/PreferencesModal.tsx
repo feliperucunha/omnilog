@@ -3,6 +3,7 @@ import { useLocale, LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useMediaQuery";
@@ -47,7 +48,9 @@ export function PreferencesModal({ open, onOpenChange }: PreferencesModalProps) 
     <div className="flex flex-col gap-8 max-md:gap-7">
       <section className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-semibold text-[var(--color-lightest)]">{t("nav.theme")}</h3>
+          <h3 className="min-w-0 text-sm font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("nav.theme")}</OverflowMarquee>
+          </h3>
           <p className="text-xs text-[var(--color-light)]">{t("topbar.preferencesThemeHint")}</p>
         </div>
         <div className="flex min-h-[48px] items-center justify-between rounded-xl border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/40 px-4 py-3">
@@ -58,7 +61,9 @@ export function PreferencesModal({ open, onOpenChange }: PreferencesModalProps) 
 
       <section className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-semibold text-[var(--color-lightest)]">{t("settings.language")}</h3>
+          <h3 className="min-w-0 text-sm font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("settings.language")}</OverflowMarquee>
+          </h3>
           <p className="text-xs text-[var(--color-light)]">{t("topbar.preferencesLanguageHint")}</p>
         </div>
         <ToggleGroup
@@ -92,8 +97,11 @@ export function PreferencesModal({ open, onOpenChange }: PreferencesModalProps) 
         <SlidersHorizontal className="h-5 w-5" aria-hidden />
       </div>
       <div className="min-w-0 flex-1">
-        <h2 id="preferences-modal-title" className="text-lg font-semibold text-[var(--color-lightest)] max-md:text-xl">
-          {t("topbar.preferences")}
+        <h2
+          id="preferences-modal-title"
+          className="min-w-0 text-lg font-semibold text-[var(--color-lightest)] max-md:text-xl"
+        >
+          <OverflowMarquee>{t("topbar.preferences")}</OverflowMarquee>
         </h2>
         <p className="mt-1 text-sm leading-snug text-[var(--color-light)]">{t("topbar.preferencesSubtitle")}</p>
       </div>
@@ -131,7 +139,9 @@ export function PreferencesModal({ open, onOpenChange }: PreferencesModalProps) 
                 <SlidersHorizontal className="h-5 w-5" aria-hidden />
               </div>
               <div className="min-w-0 flex-1 space-y-1">
-                <DialogTitle className="text-lg text-[var(--color-lightest)]">{t("topbar.preferences")}</DialogTitle>
+                <DialogTitle className="min-w-0 text-lg text-[var(--color-lightest)]">
+                  <OverflowMarquee>{t("topbar.preferences")}</OverflowMarquee>
+                </DialogTitle>
                 <p className="text-sm leading-snug text-[var(--color-light)]">{t("topbar.preferencesSubtitle")}</p>
               </div>
             </div>

@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback, type ReactNode } from "react";
+import { useState, useRef, useCallback, type ReactNode, type Ref } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { CustomEntryForm } from "@/components/CustomEntryForm";
+import { CustomEntryForm, type CustomEntryFormHandle } from "@/components/CustomEntryForm";
 import { BatchEntryTab } from "@/components/BatchEntryTab";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useIsMobile } from "@/hooks/useMediaQuery";
@@ -59,14 +59,18 @@ const modalContent = (
   t: (key: string) => string,
   mediaType: MediaType,
   onSaved: (completion?: LogCompleteState) => void,
-  onCancel: () => void
+  onCancel: () => void,
+  customFormRef: Ref<CustomEntryFormHandle>,
+  suppressCustomEntryActions: boolean
 ) => (
   <>
     {tabButtons(tab, setTab, t)}
     <div className="min-h-0 flex-1 overflow-y-auto">
       {tab === "custom" ? (
         <CustomEntryForm
+          ref={customFormRef}
           embedded
+          suppressActionButtons={suppressCustomEntryActions}
           mediaType={mediaType}
           onSaved={onSaved}
           onCancel={onCancel}
@@ -88,18 +92,23 @@ export function CustomBatchEntryModal({
   const [batchFooter, setBatchFooter] = useState<ReactNode>(null);
   const isMobile = useIsMobile();
   const drawerRequestCloseRef = useRef<(() => void) | null>(null);
+  const customFormRef = useRef<CustomEntryFormHandle | null>(null);
   const handleDrawerClose = useCallback(() => {
     drawerRequestCloseRef.current?.() ?? onCancel();
   }, [onCancel]);
 
-  const content = modalContent(
-    tab,
-    setTab,
-    t,
-    mediaType,
-    onSaved,
-    isMobile ? handleDrawerClose : onCancel
-  );
+  const handleWebDialogClose = useCallback(() => {
+    if (tab === "batch") {
+      onCancel();
+      return;
+    }
+    const h = customFormRef.current;
+    if (!h || h.canDismissWithoutSave()) {
+      onCancel();
+      return;
+    }
+    void h.trySubmit({ optimisticClose: true });
+  }, [tab, onCancel]);
 
   if (isMobile) {
     return (
@@ -152,10 +161,21 @@ export function CustomBatchEntryModal({
     );
   }
 
+  const content = modalContent(
+    tab,
+    setTab,
+    t,
+    mediaType,
+    onSaved,
+    onCancel,
+    customFormRef,
+    true
+  );
+
   return (
-    <Dialog open modal={false} onOpenChange={(open) => !open && onCancel()}>
+    <Dialog open modal={false}>
       <DialogContent
-        onClose={onCancel}
+        onClose={handleWebDialogClose}
         className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg flex-col gap-0 overflow-hidden p-4 sm:p-6"
       >
         {content}

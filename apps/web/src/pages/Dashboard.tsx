@@ -38,6 +38,7 @@ import {
 } from "@/pages/MediaLogs";
 import { Select } from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
@@ -451,8 +452,8 @@ export function Dashboard() {
   const betaBody = (
     <div className="flex flex-col gap-4 max-md:gap-3">
       <DialogHeader className="max-md:space-y-2">
-        <DialogTitle className="text-[var(--color-lightest)] text-xl max-md:text-2xl">
-          {t("dashboard.betaModalTitle")}
+        <DialogTitle className="min-w-0 text-[var(--color-lightest)] text-xl max-md:text-2xl">
+          <OverflowMarquee>{t("dashboard.betaModalTitle")}</OverflowMarquee>
         </DialogTitle>
       </DialogHeader>
       <div className="flex flex-col gap-3 text-sm text-[var(--color-light)] max-md:text-base max-md:leading-relaxed">
@@ -530,12 +531,12 @@ export function Dashboard() {
               className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-3 max-md:min-h-[44px] text-left no-underline transition-colors text-[var(--color-warning-text)] hover:border-[var(--color-warning-hover-border)] hover:bg-[var(--color-warning-hover-bg)]"
             >
               <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)]" aria-hidden />
-              <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--color-warning-text)]">
+              <OverflowMarquee className="min-w-0 flex-1 text-sm font-medium text-[var(--color-warning-text)]">
                 {t("apiKeyBanner.categoryMessage", {
                   category: t(`nav.${selectedCategory}`),
                   provider: API_KEY_META[apiKeyProvider].name,
                 })}
-              </p>
+              </OverflowMarquee>
               <span className="shrink-0 text-xs font-medium text-[var(--color-warning-text-muted)]">
                 {t("apiKeyBanner.addKeyInSettings")} →
               </span>
@@ -595,7 +596,7 @@ export function Dashboard() {
               ) : (
                 <ChevronDown className="h-5 w-5 shrink-0" aria-hidden />
               )}
-              <span className="min-w-0 truncate">{t("social.sectionTitle")}</span>
+              <OverflowMarquee className="min-w-0 flex-1">{t("social.sectionTitle")}</OverflowMarquee>
               {(() => {
                 const now = Date.now();
                 const newCount = feed.filter((e) => now - new Date(e.log.createdAt).getTime() < ONE_WEEK_MS).length;
@@ -718,9 +719,11 @@ export function Dashboard() {
                       <div className={`flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 sm:p-4 ${!isExpanded ? "min-h-0" : ""}`}>
                         <Link
                           to={`/item/${log.mediaType}/${log.externalId}`}
-                          className="min-w-0 truncate font-semibold text-[var(--color-lightest)] no-underline hover:underline text-sm sm:text-base shrink-0"
+                          className="block min-w-0 shrink-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
                         >
-                          {log.title}
+                          <OverflowMarquee className="text-sm font-semibold sm:text-base">
+                            {log.title}
+                          </OverflowMarquee>
                         </Link>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-light)] shrink-0">
                           {log.grade != null ? (

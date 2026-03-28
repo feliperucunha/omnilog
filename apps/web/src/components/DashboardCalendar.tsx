@@ -20,6 +20,7 @@ import {
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { IN_PROGRESS_STATUSES, type Log } from "@geeklogs/shared";
 import { paperShadow } from "@/lib/paperShadow";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 
 const WEEKDAY_KEYS = [
@@ -186,8 +187,8 @@ export function DashboardCalendar({
           )}
         >
           <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-[var(--color-mid)]/30 px-4 py-3">
-            <h3 className="shrink-0 text-sm font-semibold uppercase tracking-wide text-[var(--color-light)]">
-              {t("dashboard.calendarTitle")}
+            <h3 className="min-w-0 flex-1 text-sm font-semibold uppercase tracking-wide text-[var(--color-light)]">
+              <OverflowMarquee>{t("dashboard.calendarTitle")}</OverflowMarquee>
             </h3>
             {isPro && (
               <div className="flex min-w-0 shrink items-center gap-0.5">
@@ -201,9 +202,9 @@ export function DashboardCalendar({
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="min-w-0 shrink text-center text-sm font-medium text-[var(--color-lightest)] truncate px-2">
+                <OverflowMarquee className="min-w-0 shrink px-2 text-center text-sm font-medium text-[var(--color-lightest)]">
                   {monthName}
-                </span>
+                </OverflowMarquee>
                 <Button
                   type="button"
                   variant="ghost"
@@ -309,9 +310,9 @@ export function DashboardCalendar({
               onClose={() => setSelectedDate(null)}
             >
               <div className="mt-6">
-                <h2 className="mb-4 min-w-0 truncate text-lg font-semibold text-[var(--color-lightest)]">
+                <OverflowMarquee className="mb-4 min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
                   {t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) })}
-                </h2>
+                </OverflowMarquee>
                 {dayLogsLoading ? (
                   <div className="py-8 flex justify-center">
                     <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
@@ -336,9 +337,9 @@ export function DashboardCalendar({
                           boardGameSource={log.boardGameSource}
                         />
                         <div className="min-w-0 flex-1 flex flex-col gap-0.5 justify-center">
-                          <p className="truncate font-medium text-[var(--color-lightest)] text-sm">
+                          <OverflowMarquee className="font-medium text-[var(--color-lightest)] text-sm">
                             {log.title}
-                          </p>
+                          </OverflowMarquee>
                           <p className="text-xs text-[var(--color-light)]">
                             {t(`nav.${log.mediaType}`)}
                             {(() => {
@@ -369,8 +370,10 @@ export function DashboardCalendar({
               onClose={() => setSelectedDate(null)}
             >
               <DialogHeader className="shrink-0 space-y-0 pr-8 text-left sm:pr-10">
-                <DialogTitle className="text-[var(--color-lightest)]">
-                  {t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) })}
+                <DialogTitle className="min-w-0 text-[var(--color-lightest)]">
+                  <OverflowMarquee>
+                    {t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) })}
+                  </OverflowMarquee>
                 </DialogTitle>
               </DialogHeader>
               <div className="min-h-0 overflow-y-auto -mx-1 px-1">
@@ -398,9 +401,9 @@ export function DashboardCalendar({
                           boardGameSource={log.boardGameSource}
                         />
                           <div className="min-w-0 flex-1 flex flex-col gap-0.5 justify-center">
-                            <p className="truncate font-medium text-[var(--color-lightest)] text-sm">
+                            <OverflowMarquee className="font-medium text-[var(--color-lightest)] text-sm">
                               {log.title}
-                            </p>
+                            </OverflowMarquee>
                             <p className="text-xs text-[var(--color-light)]">
                               {t(`nav.${log.mediaType}`)}
                               {(() => {

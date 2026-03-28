@@ -12,6 +12,7 @@ import { showErrorToast } from "@/lib/errorToast";
 import { apiFetch, ApiValidationError } from "@/lib/api";
 import type { AuthResponse } from "@geeklogs/shared";
 import { modalContentVariants } from "@/lib/animations";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 
 type ResetFieldErrors = Partial<Record<"password" | "confirmPassword", string>>;
@@ -114,8 +115,8 @@ export function ResetPassword() {
       >
         <Card className="w-full border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-modal)]">
           <CardHeader className="text-center">
-            <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
-              {t("resetPassword.title")}
+            <h1 className="min-w-0 text-2xl font-bold text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("resetPassword.title")}</OverflowMarquee>
             </h1>
           </CardHeader>
           <CardContent className="pt-0">

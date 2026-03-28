@@ -13,6 +13,7 @@ import * as storage from "@/lib/storage";
 import { ALL_ERROR_CODES, getErrorDocKey } from "@/lib/errorCodes";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { paperShadow } from "@/lib/paperShadow";
 
 const FEEDBACK_COOLDOWN_KEY = "geeklogs_feedback_cooldown";
@@ -70,8 +71,8 @@ function ErrorCodesCollapsible({ t }: { t: (key: string) => string }) {
         className="w-full flex items-center justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] rounded-md"
         aria-expanded={open}
       >
-        <h2 className="text-lg font-semibold text-[var(--color-lightest)]">
-          {t("errorCodes.docsTitle")}
+        <h2 className="min-w-0 flex-1 text-lg font-semibold text-[var(--color-lightest)]">
+          <OverflowMarquee>{t("errorCodes.docsTitle")}</OverflowMarquee>
         </h2>
         <ChevronDown
           className={`h-5 w-5 shrink-0 text-[var(--color-light)] transition-transform duration-200 ${open ? "rotate-180" : ""}`}
@@ -195,8 +196,8 @@ export function About() {
     >
       <section className="w-full">
         <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 sm:p-6" style={paperShadow}>
-          <h2 className="mb-3 text-lg font-semibold text-[var(--color-lightest)]">
-            {t("about.helpLegalTitle")}
+          <h2 className="mb-3 min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("about.helpLegalTitle")}</OverflowMarquee>
           </h2>
           <ul className="flex flex-col gap-2 text-sm text-[var(--color-light)] sm:flex-row sm:flex-wrap sm:gap-x-6">
             <li>
@@ -220,8 +221,8 @@ export function About() {
 
       {/* Team */}
       <section className="w-full">
-        <h2 className="mb-3 sm:mb-4 text-base font-semibold text-[var(--color-lightest)] sm:text-lg">
-          {t("about.teamTitle")}
+        <h2 className="mb-3 min-w-0 text-base font-semibold text-[var(--color-lightest)] sm:mb-4 sm:text-lg">
+          <OverflowMarquee>{t("about.teamTitle")}</OverflowMarquee>
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {TEAM_MEMBERS.map((member) => (
@@ -254,8 +255,8 @@ export function About() {
           className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"
           style={paperShadow}
         >
-          <h2 className="mb-3 text-lg font-semibold text-[var(--color-lightest)]">
-            {t("about.projectTitle")}
+          <h2 className="mb-3 min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("about.projectTitle")}</OverflowMarquee>
           </h2>
           <p className="whitespace-pre-wrap text-[var(--color-light)] flex-1 text-sm sm:text-base">
             {t("about.projectBody")}
@@ -268,8 +269,8 @@ export function About() {
           className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"
           style={paperShadow}
         >
-          <h2 className="mb-3 text-lg font-semibold text-[var(--color-lightest)]">
-            {t("about.donationTitle")}
+          <h2 className="mb-3 min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("about.donationTitle")}</OverflowMarquee>
           </h2>
           <p className="mb-4 text-[var(--color-light)] flex-1 text-sm sm:text-base">
             {t("about.donationIntro")}
@@ -302,8 +303,8 @@ export function About() {
             </p>
           )}
           <div className="mt-6 pt-4 border-t border-[var(--color-mid)]/20">
-            <h3 className="mb-2 text-sm font-semibold text-[var(--color-lightest)]">
-              {t("about.donatePixTitle")}
+            <h3 className="mb-2 min-w-0 text-sm font-semibold text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("about.donatePixTitle")}</OverflowMarquee>
             </h3>
             <p className="mb-3 text-sm text-[var(--color-light)]">
               {t("about.donatePixIntro")}
@@ -346,8 +347,8 @@ export function About() {
             {t("about.feedbackCooldownShort", { time: formatCooldown(secondsLeft) })}
           </div>
         )}
-        <h2 className="mb-3 text-lg font-semibold text-[var(--color-lightest)] pr-24">
-          {t("about.feedbackTitle")}
+        <h2 className="mb-3 min-w-0 pr-24 text-lg font-semibold text-[var(--color-lightest)]">
+          <OverflowMarquee>{t("about.feedbackTitle")}</OverflowMarquee>
         </h2>
         <p className="mb-3 text-[var(--color-light)] text-sm sm:text-base">
           {t("about.feedbackIntro")}

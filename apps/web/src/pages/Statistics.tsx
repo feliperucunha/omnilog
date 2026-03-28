@@ -24,6 +24,7 @@ import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToBeatHours, formatTimeToFinish } from "@/lib/formatDuration";
 import { getStatusLabel } from "@/lib/statusLabel";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { DashboardCalendar } from "@/components/DashboardCalendar";
@@ -193,7 +194,7 @@ export function Statistics() {
     "grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto]";
   const statBarTrackClass = "h-6 min-w-0 rounded bg-[var(--color-darkest)]";
   const statBarFillClass = "h-full rounded bg-[var(--color-mid)]";
-  const statBarLabelTextClass = "min-w-0 truncate text-xs text-[var(--color-light)]";
+  const statBarMarqueeClass = "block min-w-0 text-xs text-[var(--color-light)]";
   const statBarValueClass = "shrink-0 text-right text-xs tabular-nums text-[var(--color-lightest)]";
 
   const fetchStats = useCallback(async (group: StatsGroup) => {
@@ -423,8 +424,8 @@ export function Statistics() {
       <Dialog open={showProModal && !isPro} onOpenChange={setShowProModal}>
         <DialogContent onClose={() => setShowProModal(false)}>
           <DialogHeader>
-            <DialogTitle className="text-[var(--color-lightest)]">
-              {t("statistics.proOnlyTitle")}
+            <DialogTitle className="min-w-0 text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("statistics.proOnlyTitle")}</OverflowMarquee>
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-[var(--color-light)]">
@@ -567,8 +568,8 @@ export function Statistics() {
               <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
                 <div className="flex min-w-0 shrink-0 items-center gap-2">
                   <Wallet className="h-5 w-5 shrink-0 text-[var(--color-mid)]" aria-hidden />
-                  <h2 className="text-base font-semibold text-[var(--color-lightest)]">
-                    {t("statistics.purchaseSpendingTitle")}
+                  <h2 className="min-w-0 text-base font-semibold text-[var(--color-lightest)]">
+                    <OverflowMarquee>{t("statistics.purchaseSpendingTitle")}</OverflowMarquee>
                   </h2>
                 </div>
                 {!purchaseSpendingLoading && totalPurchaseItems > 0 && (
@@ -593,7 +594,7 @@ export function Statistics() {
                   ]}
                   aria-label={t("statistics.purchasePeriodLabel")}
                   className="w-full min-w-0"
-                  triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>span]:line-clamp-none [&>span]:whitespace-normal [&>span]:text-left [&>span]:leading-snug"
+                  triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
                 />
               </div>
             </div>
@@ -628,7 +629,7 @@ export function Statistics() {
                         const rowInner = (
                           <>
                             <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                              <span className={`block ${statBarLabelTextClass}`}>{t(`nav.${mt}`)}</span>
+                              <OverflowMarquee className={statBarMarqueeClass}>{t(`nav.${mt}`)}</OverflowMarquee>
                               {itemCount > 0 && (
                                 <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
                                   {t(
@@ -699,11 +700,11 @@ export function Statistics() {
               onClose={() => setSpendDetailMediaType(null)}
             >
               <div className="mt-6">
-                <h2 className="mb-4 min-w-0 truncate text-lg font-semibold text-[var(--color-lightest)]">
+                <OverflowMarquee className="mb-4 min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
                   {t("statistics.purchaseSpendingDetailTitle", {
                     category: t(`nav.${spendDetailMediaType}`),
                   })}
-                </h2>
+                </OverflowMarquee>
                 {spendDetailLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
@@ -728,7 +729,9 @@ export function Statistics() {
                             boardGameSource={log.boardGameSource}
                           />
                           <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-                            <p className="truncate text-sm font-medium text-[var(--color-lightest)]">{log.title}</p>
+                            <OverflowMarquee className="text-sm font-medium text-[var(--color-lightest)]">
+                              {log.title}
+                            </OverflowMarquee>
                             <p className="text-xs text-[var(--color-light)]">
                               {t(`nav.${log.mediaType}`)}
                               {(() => {
@@ -762,10 +765,12 @@ export function Statistics() {
               onClose={() => setSpendDetailMediaType(null)}
             >
               <DialogHeader className="shrink-0 space-y-0 pr-8 text-left sm:pr-10">
-                <DialogTitle className="text-[var(--color-lightest)]">
-                  {t("statistics.purchaseSpendingDetailTitle", {
-                    category: t(`nav.${spendDetailMediaType}`),
-                  })}
+                <DialogTitle className="min-w-0 text-[var(--color-lightest)]">
+                  <OverflowMarquee>
+                    {t("statistics.purchaseSpendingDetailTitle", {
+                      category: t(`nav.${spendDetailMediaType}`),
+                    })}
+                  </OverflowMarquee>
                 </DialogTitle>
               </DialogHeader>
               <div className="min-h-0 -mx-1 max-h-[min(60vh,520px)] overflow-y-auto px-1">
@@ -793,7 +798,9 @@ export function Statistics() {
                             boardGameSource={log.boardGameSource}
                           />
                           <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-                            <p className="truncate text-sm font-medium text-[var(--color-lightest)]">{log.title}</p>
+                            <OverflowMarquee className="text-sm font-medium text-[var(--color-lightest)]">
+                              {log.title}
+                            </OverflowMarquee>
                             <p className="text-xs text-[var(--color-light)]">
                               {t(`nav.${log.mediaType}`)}
                               {(() => {
@@ -922,7 +929,7 @@ export function Statistics() {
                     return (
                       <div key={period} className={statBarGridClass}>
                         <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                          <span className={`block ${statBarLabelTextClass}`}>{period}</span>
+                          <OverflowMarquee className={statBarMarqueeClass}>{period}</OverflowMarquee>
                           {itemCount > 0 && (
                             <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
                               {t(
@@ -965,9 +972,9 @@ export function Statistics() {
                     return (
                       <div key={period} className={statBarGridClass}>
                         <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                          <span className={`block ${statBarLabelTextClass}`}>
+                          <OverflowMarquee className={statBarMarqueeClass}>
                             {statusOverTimeGroup === "year" ? period : period.slice(0, 7)}
-                          </span>
+                          </OverflowMarquee>
                           {itemCount > 0 && (
                             <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
                               {t(
@@ -1016,7 +1023,9 @@ export function Statistics() {
                           return (
                             <div key={`${period}-${mediaType}`} className={statBarGridClass}>
                               <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                                <span className={`block ${statBarLabelTextClass}`}>{t(`nav.${mediaType}`)}</span>
+                                <OverflowMarquee className={statBarMarqueeClass}>
+                                  {t(`nav.${mediaType}`)}
+                                </OverflowMarquee>
                                 {itemCount > 0 && (
                                   <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
                                     {t(
@@ -1101,13 +1110,13 @@ export function Statistics() {
                         {displayedStats.map(({ period, hours, count }) => (
                           <div key={period} className={statBarGridClass}>
                             <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                              <span className={`block ${statBarLabelTextClass}`}>
+                              <OverflowMarquee className={statBarMarqueeClass}>
                                 {statsGroup === "category"
                                   ? t(`nav.${period}`)
                                   : statsGroup === "year"
                                     ? period
                                     : period.slice(0, 7)}
-                              </span>
+                              </OverflowMarquee>
                               {(count ?? 0) > 0 && (
                                 <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
                                   {t(
@@ -1235,19 +1244,19 @@ export function Statistics() {
                               )}
                             </div>
                             <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 overflow-hidden p-3">
-                              <p className="truncate text-[10px] font-medium uppercase text-[var(--color-light)]">
+                              <OverflowMarquee className="text-[10px] font-medium uppercase text-[var(--color-light)]">
                                 {t(`nav.${log.mediaType}`)}
-                              </p>
-                              <p className="line-clamp-2 text-sm font-semibold text-[var(--color-lightest)]">
+                              </OverflowMarquee>
+                              <OverflowMarquee className="text-sm font-semibold text-[var(--color-lightest)]">
                                 {log.title}
-                              </p>
+                              </OverflowMarquee>
                               {log.genres && log.genres.length > 0 && (
                                 <GenreBadges genres={log.genres} maxCount={1} />
                               )}
                               {!isInProgress && log.grade != null && (
                                 <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                               )}
-                              <p className="line-clamp-2 text-xs leading-snug text-[var(--color-light)]">
+                              <OverflowMarquee className="text-xs leading-snug text-[var(--color-light)]">
                                 {(() => {
                                   const parts: string[] = [];
                                   if (duration) {
@@ -1270,7 +1279,7 @@ export function Statistics() {
                                   }
                                   return parts.join(" · ") || "—";
                                 })()}
-                              </p>
+                              </OverflowMarquee>
                             </div>
                           </Link>
                         </motion.div>

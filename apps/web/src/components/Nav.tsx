@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { Logo } from "@/components/Logo";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 
 const iconSize = 18;
@@ -59,12 +60,13 @@ function NavLinkItem({
         {icon}
       </span>
       {(bottomBar || !iconOnly) && (
-        <span className={cn(
-          "min-w-0 truncate text-center",
-          bottomBar ? "text-[10px] font-medium leading-tight" : "min-w-0 flex-1 text-left"
-        )}>
+        <OverflowMarquee
+          className={cn(
+            bottomBar ? "text-[10px] font-medium leading-tight text-center" : "min-w-0 flex-1 text-left"
+          )}
+        >
           {label}
-        </span>
+        </OverflowMarquee>
       )}
     </NavLink>
   );
@@ -96,7 +98,9 @@ export function Nav() {
           className="flex h-14 min-w-0 items-center gap-3 border-b border-[var(--color-mid)]/30 px-4 text-[var(--color-lightest)] no-underline"
         >
           <Logo alt={t("app.name")} className="h-10 w-auto flex-shrink-0 md:h-10" />
-          <span className="brand-title truncate font-bold text-lg text-[var(--btn-gradient-end)] dark:text-[var(--btn-gradient-start)] md:text-xl">{t("app.name")}</span>
+          <OverflowMarquee className="brand-title min-w-0 flex-1 font-bold text-lg text-[var(--btn-gradient-end)] dark:text-[var(--btn-gradient-start)] md:text-xl">
+            {t("app.name")}
+          </OverflowMarquee>
         </Link>
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3 min-h-0" aria-label="Main navigation">
           {token ? (

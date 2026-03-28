@@ -11,6 +11,7 @@ import { apiFetch, invalidateApiCache } from "@/lib/api";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { API_KEY_META, type ApiKeyProvider } from "@/lib/apiKeyMeta";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 
 export type { ApiKeyProvider };
 
@@ -72,8 +73,8 @@ export function ApiKeyPrompt({
       <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
         <div className="flex flex-col gap-4">
           <CardHeader className="p-0">
-            <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
-              {t("apiKeyPrompt.apiKeyNeededFor", { name })}
+            <h3 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("apiKeyPrompt.apiKeyNeededFor", { name })}</OverflowMarquee>
             </h3>
           </CardHeader>
           <p className="whitespace-pre-wrap text-sm text-[var(--color-light)]">

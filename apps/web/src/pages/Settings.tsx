@@ -22,6 +22,7 @@ import { getShowCompleteModal, SHOW_COMPLETE_MODAL_STORAGE_KEY } from "@/context
 import * as storage from "@/lib/storage";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 import { tierHasProFeatures } from "@/lib/userTier";
 import { useIsMobile } from "@/hooks/useMediaQuery";
@@ -361,7 +362,9 @@ export function Settings() {
     () => (
       <div className="flex flex-col gap-4">
         <DialogHeader>
-          <DialogTitle>{t("settings.exportModalTitle")}</DialogTitle>
+          <DialogTitle className="min-w-0">
+            <OverflowMarquee>{t("settings.exportModalTitle")}</OverflowMarquee>
+          </DialogTitle>
         </DialogHeader>
         <p className="text-sm text-[var(--color-light)]">{t("settings.exportModalDesc")}</p>
         <div className="flex flex-col gap-2">
@@ -434,8 +437,8 @@ export function Settings() {
     >
       <div className="flex flex-col gap-8">
         <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
-          <h2 className="text-base font-semibold text-[var(--color-lightest)] mb-1">
-            {t("settings.general")}
+          <h2 className="mb-1 min-w-0 text-base font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("settings.general")}</OverflowMarquee>
           </h2>
           <p className="text-sm text-[var(--color-light)] mb-5">
             {t("settings.generalIntro")}
@@ -563,8 +566,8 @@ export function Settings() {
 
         <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
           <div className="flex flex-col gap-4">
-            <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
-              {t("settings.publicProfileCustomization")}
+            <h3 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("settings.publicProfileCustomization")}</OverflowMarquee>
             </h3>
             {me && tierHasProFeatures(me.tier) ? (
               <>
@@ -644,8 +647,8 @@ export function Settings() {
             )}
           >
             <div className="flex flex-col gap-4">
-              <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
-                {t("tiers.exportLogs")}
+              <h3 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+                <OverflowMarquee>{t("tiers.exportLogs")}</OverflowMarquee>
               </h3>
               <p className="text-sm text-[var(--color-light)]">
                 {t("tiers.proExportDesc")}
@@ -704,8 +707,8 @@ export function Settings() {
             className={cn("flex flex-col gap-4", savingBoardGameProvider && "pointer-events-none opacity-60")}
             aria-busy={savingBoardGameProvider}
           >
-            <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
-              {t("settings.boardGameProviderLabel")}
+            <h3 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("settings.boardGameProviderLabel")}</OverflowMarquee>
             </h3>
             <p className="text-sm text-[var(--color-light)]">
               {t("settings.boardGameProviderIntro")}
@@ -818,8 +821,8 @@ export function Settings() {
                         aria-busy={isBoardGameKeySaving}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
-                            {meta.name}
+                          <h3 className="min-w-0 flex-1 text-lg font-semibold text-[var(--color-lightest)]">
+                            <OverflowMarquee>{meta.name}</OverflowMarquee>
                           </h3>
                           <div className="flex flex-wrap items-center gap-2">
                             {provider === "bgg" && (

@@ -369,7 +369,7 @@ export function ItemReviewForm({
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
     >
       <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-card)]">
-        <h2 className="mb-4 text-xl font-semibold text-[var(--color-lightest)]">
+        <h2 className="mb-4 min-w-0 text-xl font-semibold text-[var(--color-lightest)]">
           {myLog ? t("itemReviewForm.yourReview") : t("itemReviewForm.addReview")}
         </h2>
         {showCollectionOwnership &&

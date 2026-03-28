@@ -13,6 +13,7 @@ import { AuthNavbar } from "@/components/AuthNavbar";
 import { toast } from "sonner";
 import { showErrorToast } from "@/lib/errorToast";
 import { apiFetch, ApiValidationError } from "@/lib/api";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 import * as storage from "@/lib/storage";
 import type { AuthResponse } from "@geeklogs/shared";
@@ -119,11 +120,11 @@ export function Login() {
         <Card className="w-full border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-modal)]">
           <CardHeader className="flex flex-col items-center gap-4 text-center">
             <Logo alt="" className="h-24! w-auto sm:h-16" />
-            <h1 className="flex flex-col gap-0.5 text-2xl -mt-6 font-bold text-[var(--color-lightest)]">
-              <span>{t("app.name")}</span>
-              <span className="text-lg font-normal text-[var(--color-light)]">
+            <h1 className="-mt-6 flex min-w-0 w-full flex-col gap-0.5 text-2xl font-bold text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("app.name")}</OverflowMarquee>
+              <OverflowMarquee className="text-lg font-normal text-[var(--color-light)]">
                 {t("app.subtitle")}
-              </span>
+              </OverflowMarquee>
             </h1>
           </CardHeader>
           <CardContent className="pt-0">

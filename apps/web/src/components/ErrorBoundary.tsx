@@ -2,6 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Sentry } from "@/lib/sentry";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
@@ -23,8 +24,8 @@ function ErrorFallback({ error, onRetry }: { error: Error; onRetry: () => void }
     >
       <Card className="max-w-[400px] border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-lg)]">
         <CardHeader>
-          <h3 className="text-lg font-semibold text-[var(--color-lightest)]">
-            {t("errorBoundary.title")}
+          <h3 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("errorBoundary.title")}</OverflowMarquee>
           </h3>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

@@ -10,6 +10,12 @@ export function isCapacitorAndroid(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
 }
 
+/** Any Capacitor native shell (Android or iOS). */
+export function isCapacitorNative(): boolean {
+  if (typeof window === "undefined") return false;
+  return Capacitor.isNativePlatform();
+}
+
 /**
  * Register a dismiss callback for the top-most Android back handling. Unregister on cleanup.
  * Order follows mount order (last mounted = closed first).

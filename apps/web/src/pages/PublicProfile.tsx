@@ -15,6 +15,7 @@ import {
   type MediaLogsSort,
   type CategoryMilestoneProgress,
 } from "@/pages/MediaLogs";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
@@ -258,7 +259,13 @@ export function PublicProfile() {
       <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden px-4 md:px-6 pt-4 md:pt-6 pb-4 md:pb-6">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="text-xl font-bold text-[var(--color-lightest)] sm:text-2xl">{title}</h1>
+          <div
+            role="heading"
+            aria-level={1}
+            className="min-w-0 text-xl font-bold text-[var(--color-lightest)] sm:text-2xl"
+          >
+            <OverflowMarquee>{title}</OverflowMarquee>
+          </div>
           {selectedBadges.length > 0 && (
             <div className="flex flex-wrap items-center gap-2" aria-label={t("settings.profileBadges")}>
               {selectedBadges.map((b) => (
@@ -268,7 +275,7 @@ export function PublicProfile() {
                   title={b.name}
                 >
                   <span aria-hidden>{b.icon}</span>
-                  <span className="truncate max-w-[140px]">{b.name}</span>
+                  <OverflowMarquee className="max-w-[140px]">{b.name}</OverflowMarquee>
                 </span>
               ))}
             </div>
@@ -303,8 +310,8 @@ export function PublicProfile() {
             aria-label={t("dashboard.badgesSectionTitle")}
             className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
           >
-            <h2 className="text-lg font-semibold text-[var(--color-lightest)]">
-              {t("dashboard.badgesSectionTitle")}
+            <h2 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("dashboard.badgesSectionTitle")}</OverflowMarquee>
             </h2>
             <div className="flex min-w-0 flex-wrap gap-4">
               {visibleTypes.map((type) => {

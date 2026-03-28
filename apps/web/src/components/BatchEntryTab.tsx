@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import type { MediaType, SearchResult } from "@geeklogs/shared";
@@ -332,7 +333,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
     if (renderFooterOutside && onFooterChange) {
       onFooterChange(batchFooterContent);
       return () => {
-        onFooterChange?.(null);
+        onFooterChange(null);
       };
     }
   }, [renderFooterOutside, onFooterChange, batchFooterContent]);
@@ -469,8 +470,10 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
             id="batch-file-input"
           />
         {(file || parseResult?.ok) && (
-          <div className="flex items-center gap-2 text-sm text-[var(--color-light)]">
-            {file && <span className="truncate">{file.name}</span>}
+          <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--color-light)]">
+            {file && (
+              <OverflowMarquee className="min-w-0 flex-1">{file.name}</OverflowMarquee>
+            )}
             {parseResult?.ok && (
               <span className="flex items-center gap-1.5">
                 <FileSpreadsheet className="size-4 shrink-0" aria-hidden />
@@ -508,9 +511,9 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
               activeBoardGameProvider={mediaType === "boardgames" ? boardGameProvider : undefined}
             />
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-[var(--color-lightest)]">
+              <OverflowMarquee className="font-medium text-[var(--color-lightest)]">
                 {previewResult.title}
-              </p>
+              </OverflowMarquee>
               <p className="mt-1 text-xs text-[var(--color-light)]">
                 {getStatusLabel(t, resolveRowStatus(previewRow, mediaType, defaultStatus), mediaType)}
               </p>

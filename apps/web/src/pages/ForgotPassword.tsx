@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { showErrorToast } from "@/lib/errorToast";
 import { apiFetch } from "@/lib/api";
 import { modalContentVariants } from "@/lib/animations";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 
 export function ForgotPassword() {
@@ -54,8 +55,8 @@ export function ForgotPassword() {
       >
         <Card className="w-full border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-modal)]">
           <CardHeader className="text-center">
-            <h1 className="text-2xl font-bold text-[var(--color-lightest)]">
-              {t("forgotPassword.title")}
+            <h1 className="min-w-0 text-2xl font-bold text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("forgotPassword.title")}</OverflowMarquee>
             </h1>
             <p className="mt-2 text-sm text-[var(--color-light)]">
               {t("forgotPassword.intro")}

@@ -1,6 +1,7 @@
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { ChevronDown } from "lucide-react";
+import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 
 const SelectRoot = SelectPrimitive.Root;
@@ -18,7 +19,7 @@ const SelectTrigger = React.forwardRef<
       "placeholder:text-[var(--color-light)]",
       "focus:outline-none",
       "disabled:cursor-not-allowed disabled:opacity-50",
-      "[&>span]:line-clamp-1 [&>span]:text-left",
+      "[&>:first-child]:min-w-0 [&>:first-child]:flex-1 [&>:first-child]:overflow-hidden [&>:first-child]:text-left",
       className
     )}
     {...props}
@@ -45,7 +46,7 @@ const SelectContent = React.forwardRef<
       ref={ref}
       data-dropdown-portal
       className={cn(
-        "relative z-[100] min-w-[8rem] overflow-x-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] text-[var(--color-lightest)] shadow-[var(--shadow-lg)]",
+        "relative z-[100] min-w-[8rem] max-w-[min(calc(100dvw-1rem),36rem)] overflow-x-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] text-[var(--color-lightest)] shadow-[var(--shadow-lg)]",
         "[touch-action:manipulation]",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         position === "popper" &&
@@ -58,7 +59,8 @@ const SelectContent = React.forwardRef<
       <SelectPrimitive.Viewport
         className={cn(
           "p-1",
-          position === "popper" && "w-full min-w-[var(--radix-select-trigger-width)]",
+          position === "popper" &&
+            "min-w-[var(--radix-select-trigger-width)] w-max max-w-[min(calc(100dvw-1rem),36rem)]",
           viewportClassName
         )}
       >
@@ -83,12 +85,16 @@ const SelectItem = React.forwardRef<
     )}
     {...props}
   >
-    <span className="absolute right-2 flex h-4 w-4 items-center justify-center">
+    <SelectPrimitive.ItemText asChild>
+      <span className="block min-w-0 flex-1 self-center pr-1">
+        <OverflowMarquee>{children}</OverflowMarquee>
+      </span>
+    </SelectPrimitive.ItemText>
+    <span className="pointer-events-none absolute right-2 flex h-4 w-4 shrink-0 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
         <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-lightest)]" />
       </SelectPrimitive.ItemIndicator>
     </span>
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
   </SelectPrimitive.Item>
 ));
 SelectItem.displayName = SelectPrimitive.Item.displayName;
@@ -132,27 +138,34 @@ export function Select({
   triggerAriaLabel,
   contentScrollable,
 }: SelectProps) {
-  const triggerA11y = triggerAriaLabel ?? ariaLabel;
+  const rootValue = value === "" || value == null ? "__empty" : value;
+  const selectedOption = options.find((opt) => (opt.value === "" ? "__empty" : opt.value) === rootValue);
+  const valueSummary = selectedOption?.label ?? placeholder;
+  const triggerAccessibleName = triggerAriaLabel ?? (ariaLabel ? `${ariaLabel}, ${valueSummary}` : valueSummary);
+
   const scrollViewportClass =
     contentScrollable === true
       ? "max-h-[min(50dvh,20rem)] overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
       : undefined;
   return (
-    <div className={className}>
+    <div className={cn("min-w-0", className)}>
       <SelectRoot
-        value={value === "" || value == null ? "__empty" : value}
+        value={rootValue}
         onValueChange={(v) => onValueChange(v === "__empty" ? "" : v)}
         disabled={disabled}
       >
         <SelectTrigger
-          className={cn("max-w-xs", triggerClassName)}
-          aria-label={triggerA11y}
-          title={triggerTitle}
+          className={cn("min-w-0 w-full max-w-full", triggerClassName)}
+          aria-label={triggerAccessibleName}
+          title={
+            triggerTitle ??
+            (triggerLabel != null ? undefined : typeof valueSummary === "string" ? valueSummary : undefined)
+          }
         >
           {triggerLabel != null ? (
-            <span className="truncate text-left">{triggerLabel}</span>
+            <OverflowMarquee className="text-left">{triggerLabel}</OverflowMarquee>
           ) : (
-            <SelectValue placeholder={placeholder} />
+            <OverflowMarquee className="text-left">{valueSummary}</OverflowMarquee>
           )}
         </SelectTrigger>
         <SelectContent viewportClassName={scrollViewportClass}>
