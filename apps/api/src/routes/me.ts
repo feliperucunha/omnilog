@@ -87,6 +87,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       visibleMediaTypes: true,
       boardGameProvider: true,
       country: true,
+      defaultPurchaseCurrency: true,
       tmdbApiKey: true,
       rawgApiKey: true,
       bggApiToken: true,
@@ -164,6 +165,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     subscriptionEndsAt,
     daysRemaining,
     country: user.country ?? undefined,
+    defaultPurchaseCurrency: user.defaultPurchaseCurrency ?? undefined,
     logCount,
     apiKeys: {
       tmdb: !!user.tmdbApiKey,

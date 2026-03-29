@@ -71,7 +71,7 @@ const toNum = (v: number | ""): number | null => (v === "" ? null : v);
 
 export function LogForm(props: LogFormProps) {
   const { t } = useLocale();
-  const { me } = useMe();
+  const { me, refetch: refetchMe } = useMe();
   const onCancel = props.onCancel;
   const isEdit = props.mode === "edit";
   const log = isEdit ? props.log : null;
@@ -127,6 +127,13 @@ export function LogForm(props: LogFormProps) {
   const [purchaseAmountMinor, setPurchaseAmountMinor] = useState<number | null>(
     () => (isEdit && log?.purchaseAmountMinor != null ? log.purchaseAmountMinor : null)
   );
+
+  useEffect(() => {
+    if (isEdit) return;
+    const d = me?.defaultPurchaseCurrency;
+    if (!d) return;
+    setPurchaseCurrency((prev) => (prev === DEFAULT_PURCHASE_CURRENCY ? d : prev));
+  }, [isEdit, me?.defaultPurchaseCurrency]);
 
   useEffect(() => {
     if (!isEdit || !log) return;
@@ -329,6 +336,13 @@ export function LogForm(props: LogFormProps) {
         toast.success(t("toast.logUpdated"));
         triggerImpact("medium");
         invalidateLogsAndItemsCache();
+        if (
+          showPurchaseAmount &&
+          (!showCollectionOwnership || own) &&
+          purchaseAmountMinor != null
+        ) {
+          void refetchMe();
+        }
         if (statusChanged) {
           const completion: LogCompleteState = {
             image,
@@ -383,6 +397,13 @@ export function LogForm(props: LogFormProps) {
       toast.success(t("toast.logSaved"));
       triggerImpact("medium");
       invalidateLogsAndItemsCache();
+      if (
+        showPurchaseAmount &&
+        (!showCollectionOwnership || own) &&
+        purchaseAmountMinor != null
+      ) {
+        void refetchMe();
+      }
       if (wasFirstLog) trackProductEvent("first_log_created");
       const completion: LogCompleteState = {
         image,
@@ -434,6 +455,7 @@ export function LogForm(props: LogFormProps) {
     own,
     purchaseAmountMinor,
     purchaseCurrency,
+    refetchMe,
     t,
     onCancel,
   ]);

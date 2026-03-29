@@ -110,6 +110,7 @@ function isSpendTrackedMediaType(mt: MediaType): boolean {
   return (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mt);
 }
 
+import { persistUserDefaultPurchaseCurrency } from "../lib/userPurchasePreference.js";
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
 import { stringifyLogAffinityContext, logAffinityContextSchema } from "../lib/logAffinityContext.js";
 import { hoursFromCompletedLogForStats, rollupHoursFromCompletedLogs } from "../lib/completedLogHours.js";
@@ -959,6 +960,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         where: { id: existing.id },
         data: updateData,
       });
+      await persistUserDefaultPurchaseCurrency(userId, log.purchaseAmountMinor, log.purchaseCurrency);
       let newBadges: NewBadge[] = [];
       const hasStatsReview = countsAsReviewForGamification(log.grade, log.review);
       if (!hadStatsReview && hasStatsReview) {
@@ -1028,6 +1030,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           purchaseCurrency: purchaseResolved.purchaseCurrency,
         },
       });
+      await persistUserDefaultPurchaseCurrency(userId, log.purchaseAmountMinor, log.purchaseCurrency);
       const newBadges: NewBadge[] = [];
       try {
         const fromLog = await handleLogCreated(userId);
@@ -1157,6 +1160,7 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     where: { id: log.id },
     data,
   });
+  await persistUserDefaultPurchaseCurrency(userId, updated.purchaseAmountMinor, updated.purchaseCurrency);
   const hadStatsReview = countsAsReviewForGamification(log.grade, log.review);
   const hasStatsReview = countsAsReviewForGamification(updated.grade, updated.review);
   let newBadges: NewBadge[] = [];

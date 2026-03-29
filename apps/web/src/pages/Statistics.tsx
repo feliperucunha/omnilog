@@ -1,8 +1,18 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronRight, CircleCheck, Clock, Download, Layers, Star, Wallet } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleCheck,
+  Clock,
+  Download,
+  Layers,
+  Star,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchCached, apiFetchFile, downloadFile } from "@/lib/api";
 import {
@@ -40,6 +50,7 @@ import { toast } from "sonner";
 import * as storage from "@/lib/storage";
 import { paperShadow } from "@/lib/paperShadow";
 import { currencyMinorDecimals } from "@/lib/moneyInput";
+import { cn } from "@/lib/utils";
 
 function formatMinorAsMoney(minor: number, currency: string): string {
   const d = currencyMinorDecimals(currency);
@@ -89,6 +100,81 @@ const EMPTY_SUMMARY: LogStatsSummary = {
   totalContentHours: 0,
   completedLogsWithHours: 0,
 };
+
+/** Desktop: icon column + gap — value lines up under label text. */
+const OVERVIEW_STAT_VALUE_INSET = "md:pl-[calc(2.5rem+0.75rem)]";
+
+function OverviewStatCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+}: {
+  icon: LucideIcon;
+  label: ReactNode;
+  value: ReactNode;
+  sub?: ReactNode;
+}) {
+  const iconBox = (compact: boolean) => (
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-lg border border-[var(--color-mid)]/25 bg-[var(--color-mid)]/10 text-[var(--color-lightest)]",
+        compact ? "h-9 w-9" : "h-10 w-10 rounded-xl border-[var(--color-mid)]/30 bg-[var(--color-mid)]/[0.12] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+      )}
+      aria-hidden
+    >
+      <Icon className={compact ? "h-4 w-4" : "h-[1.125rem] w-[1.125rem]"} strokeWidth={2.25} />
+    </div>
+  );
+
+  return (
+    <Card
+      className={cn(
+        "min-w-0 overflow-hidden border border-[var(--color-surface-border)]/90 bg-[var(--color-dark)]",
+        "rounded-xl p-3.5 shadow-none",
+        "md:relative md:rounded-2xl md:bg-gradient-to-b md:from-[var(--color-dark)] md:to-[var(--color-darkest)]/50 md:p-5 md:shadow-[var(--shadow-sm)] md:transition-[border-color] md:duration-200",
+        "md:min-h-[6.75rem] md:hover:border-[var(--color-mid)]/40",
+        "group"
+      )}
+    >
+      {/* Mobile: one full-width row — icon, then label / value / sub (no indent, no decoration). */}
+      <div className="flex items-center gap-3 md:hidden">
+        {iconBox(true)}
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">{label}</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums leading-none text-[var(--color-lightest)]">
+            {value}
+          </p>
+          {sub ? <div className="mt-1 text-[11px] leading-snug text-[var(--color-light)]">{sub}</div> : null}
+        </div>
+      </div>
+
+      {/* Desktop */}
+      <div className="relative hidden min-w-0 md:block">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+          aria-hidden
+        >
+          <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-[var(--color-mid)]/[0.07]" />
+        </div>
+        <div className="relative flex min-w-0 flex-col gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            {iconBox(false)}
+            <p className="min-w-0 flex-1 text-[11px] font-semibold uppercase leading-snug tracking-[0.1em] text-[var(--color-light)]">
+              {label}
+            </p>
+          </div>
+          <div className={cn("min-w-0", OVERVIEW_STAT_VALUE_INSET)}>
+            <p className="text-3xl font-semibold tabular-nums leading-none tracking-tight text-[var(--color-lightest)]">
+              {value}
+            </p>
+            {sub ? <div className="mt-2 text-xs leading-snug text-[var(--color-light)]">{sub}</div> : null}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export function Statistics() {
   const { t } = useLocale();
@@ -459,82 +545,40 @@ export function Statistics() {
           {!summaryCollapsed && (
         <section
           aria-label={t("statistics.summaryTitle")}
-          className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4 md:gap-4"
+          className="grid min-w-0 grid-cols-1 gap-2 md:grid-cols-4 md:gap-4"
         >
-          <Card
-            className="flex min-h-[5.5rem] min-w-0 flex-col justify-center border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
-            style={paperShadow}
-          >
-            <div className="flex items-start gap-2">
-              <Layers className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-mid)]" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
-                  {t("statistics.summaryTotalLogs")}
-                </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--color-lightest)] sm:text-2xl">
-                  {summaryData.totalLogs}
-                </p>
-              </div>
-            </div>
-          </Card>
-          <Card
-            className="flex min-h-[5.5rem] min-w-0 flex-col justify-center border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
-            style={paperShadow}
-          >
-            <div className="flex items-start gap-2">
-              <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-mid)]" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
-                  {t("statistics.summaryCompleted")}
-                </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--color-lightest)] sm:text-2xl">
-                  {summaryData.completedLogs}
-                </p>
-              </div>
-            </div>
-          </Card>
-          <Card
-            className="flex min-h-[5.5rem] min-w-0 flex-col justify-center border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
-            style={paperShadow}
-          >
-            <div className="flex items-start gap-2">
-              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-mid)]" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
-                  {t("statistics.summaryHours")}
-                </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--color-lightest)] sm:text-2xl">
-                  {summaryData.totalContentHours.toFixed(1)}
-                </p>
-                {summaryData.completedLogsWithHours > 0 && (
-                  <p className="mt-1 text-xs tabular-nums text-[var(--color-light)]">
-                    {t(
-                      summaryData.completedLogsWithHours === 1
-                        ? "statistics.summaryHoursItems_one"
-                        : "statistics.summaryHoursItems_other",
-                      { count: String(summaryData.completedLogsWithHours) }
-                    )}
-                  </p>
-                )}
-              </div>
-            </div>
-          </Card>
-          <Card
-            className="flex min-h-[5.5rem] min-w-0 flex-col justify-center border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
-            style={paperShadow}
-          >
-            <div className="flex items-start gap-2">
-              <Star className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-mid)]" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
-                  Com nota
-                </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--color-lightest)] sm:text-2xl">
-                  {summaryData.reviewedLogs}
-                </p>
-              </div>
-            </div>
-          </Card>
+          <OverviewStatCard
+            icon={Layers}
+            label={t("statistics.summaryTotalLogs")}
+            value={summaryData.totalLogs}
+          />
+          <OverviewStatCard
+            icon={CircleCheck}
+            label={t("statistics.summaryCompleted")}
+            value={summaryData.completedLogs}
+          />
+          <OverviewStatCard
+            icon={Clock}
+            label={t("statistics.summaryHours")}
+            value={summaryData.totalContentHours.toFixed(1)}
+            sub={
+              summaryData.completedLogsWithHours > 0 ? (
+                <span className="tabular-nums">
+                  {t(
+                    summaryData.completedLogsWithHours === 1
+                      ? "statistics.summaryHoursItems_one"
+                      : "statistics.summaryHoursItems_other",
+                    { count: String(summaryData.completedLogsWithHours) }
+                  )}
+                </span>
+              ) : undefined
+            }
+          />
+          <OverviewStatCard
+            icon={Star}
+            label={t("statistics.summaryReviewed")}
+            value={summaryData.reviewedLogs}
+          />
         </section>
           )}
         </div>

@@ -7,19 +7,27 @@ export function StatisticsSummarySkeleton() {
   return (
     <section
       aria-hidden
-      className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4 md:gap-4"
+      className="grid min-w-0 grid-cols-1 gap-2 md:grid-cols-4 md:gap-4"
     >
       {Array.from({ length: 4 }).map((_, i) => (
         <Card
           key={i}
-          className="flex min-h-[5.5rem] min-w-0 flex-col justify-center border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
-          style={paperShadow}
+          className="min-w-0 overflow-hidden rounded-xl border border-[var(--color-surface-border)]/90 bg-[var(--color-dark)] p-3.5 shadow-none md:min-h-[6.75rem] md:rounded-2xl md:bg-gradient-to-b md:from-[var(--color-dark)] md:to-[var(--color-darkest)]/55 md:p-5 md:shadow-[var(--shadow-sm)]"
         >
-          <div className="flex items-start gap-2">
-            <Skeleton className="mt-0.5 h-4 w-4 shrink-0 rounded" />
+          <div className="flex items-center gap-3 md:hidden">
+            <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
             <div className="min-w-0 flex-1 space-y-2">
-              <Skeleton className="h-2.5 w-24 rounded" />
-              <Skeleton className="h-7 w-16 max-w-full rounded" />
+              <Skeleton className="h-2 w-28 max-w-full rounded" />
+              <Skeleton className="h-7 w-16 rounded-md" />
+            </div>
+          </div>
+          <div className="hidden flex-col gap-3 md:flex">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+              <Skeleton className="h-2.5 w-24 max-w-[min(100%,8rem)] rounded" />
+            </div>
+            <div className="space-y-2 pl-[calc(2.5rem+0.75rem)]">
+              <Skeleton className="h-8 w-14 max-w-full rounded-md" />
             </div>
           </div>
         </Card>

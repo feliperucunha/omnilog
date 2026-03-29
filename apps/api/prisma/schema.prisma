@@ -69,6 +69,7 @@ model User {
   stripeCustomerId     String?  // Stripe customer ID (for billing portal)
   subscriptionEndsAt   DateTime?       // Pro access until this date; cron clears tier when past; null = endless (e.g. testing)
   country             String?  // ISO 3166-1 alpha-2 e.g. BR for pricing
+  defaultPurchaseCurrency String? // ISO 4217; last currency used when saving a purchase amount
   onboarded           Boolean  @default(false)
   currentStreak       Int      @default(0)
   lastReviewDate      DateTime?

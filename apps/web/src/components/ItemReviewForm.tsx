@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,9 @@ export function ItemReviewForm({
   onSavedComplete,
 }: ItemReviewFormProps) {
   const { t } = useLocale();
-  const { me } = useMe();
+  const { me, refetch: refetchMe } = useMe();
+  const meRef = useRef(me);
+  meRef.current = me;
   const [myLog, setMyLog] = useState<Log | null>(null);
   const [loadingLog, setLoadingLog] = useState(true);
   const [stars, setStars] = useState<number | null>(null);
@@ -99,6 +101,13 @@ export function ItemReviewForm({
   const [purchaseCurrency, setPurchaseCurrency] = useState(DEFAULT_PURCHASE_CURRENCY);
   const [purchaseAmountMinor, setPurchaseAmountMinor] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (loadingLog || myLog != null) return;
+    const d = me?.defaultPurchaseCurrency;
+    if (!d) return;
+    setPurchaseCurrency((prev) => (prev === DEFAULT_PURCHASE_CURRENCY ? d : prev));
+  }, [loadingLog, myLog, me?.defaultPurchaseCurrency]);
 
   type ProgressOptions = {
     seasons?: number[];
@@ -170,7 +179,7 @@ export function ItemReviewForm({
           setOwn(false);
           setWantToBuy(false);
           setMatchesPlayed(showBoardGameFields ? 1 : "");
-          setPurchaseCurrency(DEFAULT_PURCHASE_CURRENCY);
+          setPurchaseCurrency(meRef.current?.defaultPurchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY);
           setPurchaseAmountMinor(null);
         }
       })
@@ -293,6 +302,13 @@ export function ItemReviewForm({
         if (updated.newBadges?.length) showAchievementToasts(updated.newBadges, t("dashboard.badgesAchievementUnlocked"));
         toast.success(t("toast.reviewUpdated"));
         invalidateLogsAndItemsCache();
+        if (
+          showPurchaseAmount &&
+          (!showCollectionOwnership || own) &&
+          purchaseAmountMinor != null
+        ) {
+          void refetchMe();
+        }
         onSaved();
         if (statusChanged) {
           onSavedComplete?.({
@@ -325,6 +341,13 @@ export function ItemReviewForm({
         if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
         toast.success(t("toast.reviewSaved"));
         invalidateLogsAndItemsCache();
+        if (
+          showPurchaseAmount &&
+          (!showCollectionOwnership || own) &&
+          purchaseAmountMinor != null
+        ) {
+          void refetchMe();
+        }
         onSaved();
         onSavedComplete?.({
           image,

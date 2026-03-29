@@ -22,6 +22,8 @@ export interface MeResponse {
   subscriptionEndsAt: string | null;
   daysRemaining: number | null; // Pro subscription days left (null if not pro or no end date)
   country?: string; // ISO 3166-1 alpha-2 e.g. BR for pricing
+  /** Last ISO 4217 currency used when saving a purchase amount (default for spend fields). */
+  defaultPurchaseCurrency?: string;
   logCount: number;
   apiKeys: { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
   /** App-wide flags from server (e.g. admin-toggled UX). */
