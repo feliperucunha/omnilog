@@ -3,6 +3,12 @@
     "name": "Geeklogs",
     "subtitle": "Acompanhe tudo que você assiste, joga e lê."
   },
+  "cookies": {
+    "ariaLabel": "Aviso de cookies",
+    "banner": "Usamos cookies e armazenamento local para manter você conectado, lembrar preferências e melhorar o app.",
+    "learnMore": "Política de privacidade",
+    "accept": "OK"
+  },
   "nav": {
     "dashboard": "Início",
     "statistics": "Estatísticas",
@@ -109,10 +115,8 @@
   },
   "legal": {
     "privacyTitle": "Política de privacidade",
-    "privacyIntro": "O Geeklogs processa dados que você informa ao criar conta e usar o serviço (e-mail, usuário, logs, resenhas, configurações). Usamos isso para operar o produto, segurança e assinaturas Pro.\n\nEste texto é um resumo, não aconselhamento jurídico. Consulte um advogado antes de escalar em mercados regulados.",
-    "privacyData": "Os dados podem ficar com provedores de hospedagem e banco (ex.: Vercel, Render, Supabase). Não vendemos seus dados pessoais. Podemos usar estatísticas agregadas para confiabilidade.",
-    "privacyRights": "Conforme sua região, você pode ter direitos de acesso, correção, exportação ou exclusão. Fale conosco para exercê-los.",
-    "privacyContact": "Privacidade: {{email}}",
+    "privacyLastUpdated": "Última atualização: 27 de março de 2026",
+    "privacyLocaleNote": "A versão integral desta Política de Privacidade está em inglês nas seções abaixo (texto jurídico completo). Em caso de divergência com traduções futuras, prevalece o inglês até publicação de versão localizada revisada. Dúvidas: {{email}}.",
     "termsTitle": "Termos de uso",
     "termsIntro": "Ao usar o Geeklogs você aceita estes termos. Se não aceitar, não use o serviço. Podemos atualizar os termos; o uso contínuo após mudanças significa aceitação.",
     "termsAcceptable": "Você concorda em não abusar do serviço (scraping em massa, ataques, violar direitos de terceiros). Podemos suspender contas que prejudiquem a plataforma.",

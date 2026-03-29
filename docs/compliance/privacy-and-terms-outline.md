@@ -1,6 +1,8 @@
 # Privacy & terms (compliance checklist)
 
-The app ships **placeholder** legal copy on `/privacy` and `/terms` ([`Privacy.tsx`](../../apps/web/src/pages/Privacy.tsx), [`Terms.tsx`](../../apps/web/src/pages/Terms.tsx)) and a support email from `VITE_SUPPORT_EMAIL` (fallback `support@geeklogs.app`). Replace with counsel-reviewed text before scaling in the EU/UK/CCPA contexts.
+The `/privacy` page ([`Privacy.tsx`](../../apps/web/src/pages/Privacy.tsx)) renders a **long-form English Privacy Policy** from [`apps/web/src/locales/en.json`](../../apps/web/src/locales/en.json) (`legal.privacyS1Title` … `privacyS10Body`), aligned with current product behavior (auth, logs/reviews, Stripe, optional Sentry/AdSense, user API keys, etc.). Portuguese and Spanish locales show a short notice plus the English sections via fallback. **Have qualified privacy counsel review and localize** before relying on it in the EU/UK/CCPA contexts; substitute your operating **legal entity name** and jurisdiction-specific clauses as advised.
+
+`/terms` copy remains shorter ([`Terms.tsx`](../../apps/web/src/pages/Terms.tsx)); align with counsel as needed.
 
 ## Before you market paid Pro widely
 

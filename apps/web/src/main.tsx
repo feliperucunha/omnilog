@@ -14,6 +14,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ApiWakePing } from "@/components/ApiWakePing";
 import { ColdStartLoader } from "@/components/ColdStartLoader";
 import { AppVersionModal } from "@/components/AppVersionModal";
+import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import { AppVersionProvider } from "@/contexts/AppVersionContext";
 import App from "./App";
 import { CapacitorAndroidIntegration } from "@/components/CapacitorAndroidIntegration";
@@ -40,6 +41,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       <ColdStartLoader />
                       <ApiWakePing />
                       <App />
+                      <CookieConsentBanner />
                       <AppVersionModal />
                     </LogCompleteProvider>
                   </VisibleMediaTypesProvider>
