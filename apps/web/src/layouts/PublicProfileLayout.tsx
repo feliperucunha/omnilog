@@ -12,7 +12,7 @@ export function PublicProfileLayout() {
           className="flex items-center text-[var(--color-lightest)] no-underline hover:opacity-90 transition-opacity"
         >
           <Logo alt={t("app.name")} className="h-12 w-auto flex-shrink-0 sm:h-14" />
-          <span className="brand-title -ml-3 sm:-ml-4 font-bold text-xl sm:text-2xl text-(--btn-gradient-end) dark:text-(--btn-gradient-start)">
+          <span className="brand-title font-bold text-xl sm:text-2xl text-(--btn-gradient-end) dark:text-(--btn-gradient-start)">
             {t("app.name")}
           </span>
         </Link>
