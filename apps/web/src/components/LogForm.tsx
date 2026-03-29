@@ -42,6 +42,8 @@ import {
 import { DEFAULT_PURCHASE_CURRENCY } from "@/lib/currencies";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
+/** TV only; anime uses episode without season. */
+const HAS_SEASON_FIELD: MediaType[] = ["tv"];
 const HAS_CHAPTER_VOLUME: MediaType[] = ["comics", "manga"];
 
 interface LogFormCreateProps {
@@ -114,6 +116,7 @@ export function LogForm(props: LogFormProps) {
 
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
+  const showSeasonField = HAS_SEASON_FIELD.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
@@ -530,23 +533,29 @@ export function LogForm(props: LogFormProps) {
                     />
                   </div>
                   {showSeasonEpisode && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.season")}</Label>
-                        <NumberCombobox
-                          value={season}
-                          onChange={(next) => {
-                            setSeason(next);
-                            if (next !== "" && status != null && (COMPLETED_STATUSES as readonly string[]).includes(status))
-                              setStatus("watching");
-                          }}
-                          options={progressOptions?.seasons ?? []}
-                          placeholder="—"
-                          aria-label={t("itemReviewForm.season")}
-                          dropdownInPortal
-                          optionsLoading={progressOptionsLoading}
-                        />
-                      </div>
+                    <div
+                      className={
+                        showSeasonField ? "grid grid-cols-2 gap-4" : "grid grid-cols-1 gap-4"
+                      }
+                    >
+                      {showSeasonField && (
+                        <div className="space-y-2">
+                          <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.season")}</Label>
+                          <NumberCombobox
+                            value={season}
+                            onChange={(next) => {
+                              setSeason(next);
+                              if (next !== "" && status != null && (COMPLETED_STATUSES as readonly string[]).includes(status))
+                                setStatus("watching");
+                            }}
+                            options={progressOptions?.seasons ?? []}
+                            placeholder="—"
+                            aria-label={t("itemReviewForm.season")}
+                            dropdownInPortal
+                            optionsLoading={progressOptionsLoading}
+                          />
+                        </div>
+                      )}
                       <div className="space-y-2">
                         <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.episode")}</Label>
                         <NumberCombobox

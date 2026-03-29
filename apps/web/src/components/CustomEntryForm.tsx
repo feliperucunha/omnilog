@@ -31,6 +31,7 @@ import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/
 import { mediaTypeHasBoardGameOnlyFields, mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
+const HAS_SEASON_FIELD: MediaType[] = ["tv"];
 const HAS_CHAPTER_VOLUME: MediaType[] = ["comics", "manga"];
 
 function isValidUrl(s: string): boolean {
@@ -95,6 +96,7 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
 
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
+  const showSeasonField = HAS_SEASON_FIELD.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
@@ -134,7 +136,7 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
           grade,
           review: review.trim() || null,
           status: status || null,
-          season: showSeasonEpisode ? toNum(season) : null,
+          season: showSeasonField ? toNum(season) : null,
           episode: showSeasonEpisode ? toNum(episode) : null,
           chapter: showChapterVolume ? toNum(chapter) : null,
           volume: showChapterVolume ? toNum(volume) : null,
@@ -306,19 +308,25 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
                 />
               </div>
               {showSeasonEpisode && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm text-[var(--color-lightest)]">
-                      {t("itemReviewForm.season")}
-                    </Label>
-                    <NumberCombobox
-                      value={season}
-                      onChange={setSeason}
-                      options={[]}
-                      placeholder="—"
-                      aria-label={t("itemReviewForm.season")}
-                    />
-                  </div>
+                <div
+                  className={
+                    showSeasonField ? "grid grid-cols-2 gap-4" : "grid grid-cols-1 gap-4"
+                  }
+                >
+                  {showSeasonField && (
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[var(--color-lightest)]">
+                        {t("itemReviewForm.season")}
+                      </Label>
+                      <NumberCombobox
+                        value={season}
+                        onChange={setSeason}
+                        options={[]}
+                        placeholder="—"
+                        aria-label={t("itemReviewForm.season")}
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label className="text-sm text-[var(--color-lightest)]">
                       {t("itemReviewForm.episode")}
