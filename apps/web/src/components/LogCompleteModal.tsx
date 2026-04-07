@@ -14,6 +14,7 @@ import { getHeroImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
 import { isBggBoardGameImageContext } from "@/lib/boardGameImageFit";
 import { overlayVariants, modalContentVariants } from "@/lib/animations";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, SPEND_TRACKED_MEDIA_TYPES } from "@geeklogs/shared";
+import { boardGameOwnershipFromBooleans } from "@/lib/boardGameOwnership";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { showErrorToast } from "@/lib/errorToast";
 import { triggerImpact } from "@/lib/capacitorHaptics";
@@ -114,6 +115,27 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const showCollectionOwnershipMeta =
     mediaType != null && (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mediaType);
   const showBoardGameMatchesMeta = mediaType === "boardgames";
+  const hasOwnershipFields =
+    own != null || wantToBuy != null || sold != null;
+  const collectionOwnershipLabel: string | null = !hasOwnershipFields
+    ? null
+    : (() => {
+        const mode = boardGameOwnershipFromBooleans(own, wantToBuy, sold);
+        switch (mode) {
+          case "wantToBuy":
+            return t("itemReviewForm.wantToBuy");
+          case "own":
+            return t("itemReviewForm.own");
+          case "sold":
+            return t("itemReviewForm.sold");
+          default:
+            return t("itemReviewForm.doNotOwn");
+        }
+      })();
+  const showCollectionMetaBlock =
+    showCollectionOwnershipMeta &&
+    (hasOwnershipFields ||
+      (showBoardGameMatchesMeta && matchesPlayed != null && matchesPlayed > 0));
   const stars = grade != null ? gradeToStars(grade) : 0;
   const statusLabel = status ? getStatusLabel(t, status, state.mediaType) : t("logComplete.logged");
   const heroImageUrl = getHeroImageUrl(image) ?? image;
@@ -402,20 +424,10 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
           <StarRating value={stars} readOnly size="lg" />
         </div>
       )}
-      {showCollectionOwnershipMeta &&
-        (own != null ||
-          wantToBuy != null ||
-          sold != null ||
-          (showBoardGameMatchesMeta && matchesPlayed != null && matchesPlayed > 0)) && (
+      {showCollectionMetaBlock && (
         <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-light)] md:mb-3">
-          {own != null && (
-            <span>{t("itemReviewForm.own")}: {own ? t("common.yes") : t("common.no")}</span>
-          )}
-          {wantToBuy != null && (
-            <span>{t("itemReviewForm.wantToBuy")}: {wantToBuy ? t("common.yes") : t("common.no")}</span>
-          )}
-          {sold != null && (
-            <span>{t("itemReviewForm.sold")}: {sold ? t("common.yes") : t("common.no")}</span>
+          {collectionOwnershipLabel != null && (
+            <span>{collectionOwnershipLabel}</span>
           )}
           {showBoardGameMatchesMeta && matchesPlayed != null && matchesPlayed > 0 && (
             <span>{t("itemReviewForm.matchesPlayed")}: {matchesPlayed}</span>
@@ -681,27 +693,23 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                   {"★".repeat(Math.round(stars))}{"☆".repeat(5 - Math.round(stars))}
                 </div>
               )}
-              {showCollectionOwnershipMeta &&
-                (own != null ||
-                  wantToBuy != null ||
-                  sold != null ||
-                  (showBoardGameMatchesMeta && matchesPlayed != null && matchesPlayed > 0)) && (
-                <div style={{ marginBottom: sz(6), fontSize: sz(11), color: nativeColors.textMuted }}>
-                  {own != null && (
-                    <span>{t("itemReviewForm.own")}: {own ? t("common.yes") : t("common.no")}</span>
-                  )}
-                  {wantToBuy != null && (
-                    <span style={{ marginLeft: 10 }}>
-                      {t("itemReviewForm.wantToBuy")}: {wantToBuy ? t("common.yes") : t("common.no")}
-                    </span>
-                  )}
-                  {sold != null && (
-                    <span style={{ marginLeft: 10 }}>
-                      {t("itemReviewForm.sold")}: {sold ? t("common.yes") : t("common.no")}
-                    </span>
+              {showCollectionMetaBlock && (
+                <div
+                  style={{
+                    marginBottom: sz(6),
+                    fontSize: sz(11),
+                    color: nativeColors.textMuted,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: sz(8),
+                    alignItems: "center",
+                  }}
+                >
+                  {collectionOwnershipLabel != null && (
+                    <span>{collectionOwnershipLabel}</span>
                   )}
                   {showBoardGameMatchesMeta && matchesPlayed != null && matchesPlayed > 0 && (
-                    <span style={{ marginLeft: 10 }}>{t("itemReviewForm.matchesPlayed")}: {matchesPlayed}</span>
+                    <span>{t("itemReviewForm.matchesPlayed")}: {matchesPlayed}</span>
                   )}
                 </div>
               )}

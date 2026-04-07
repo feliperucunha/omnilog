@@ -56,6 +56,8 @@ export const STATUS_I18N_KEYS: Record<string, string> = {
   read: "read",
   "plan to read": "planToRead",
   reading: "reading",
+  favorites: "favorites",
+  pending: "pending",
 };
 
 /** Statuses that mean "in progress" - set startedAt when user picks these */

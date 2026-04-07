@@ -7,7 +7,12 @@ import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import type { MediaType, SearchResult } from "@geeklogs/shared";
-import { MEDIA_TYPES, COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
+import {
+  MEDIA_TYPES,
+  COMPLETED_STATUSES,
+  LOG_STATUS_OPTIONS,
+  SPEND_TRACKED_MEDIA_TYPES,
+} from "@geeklogs/shared";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
@@ -22,6 +27,8 @@ import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { Loader2, Upload, FileSpreadsheet, ChevronDown, ChevronRight } from "lucide-react";
 import { parseSheetFile, type ParsedRow, type SheetParseResult } from "@/lib/parseSheet";
+import { resolveStatusFromSheet } from "@/lib/batchSheetStatusResolve";
+import type { BoardGameOwnership } from "@/lib/boardGameOwnership";
 
 const DELAY_BETWEEN_REQUESTS_MS = 350;
 
@@ -31,42 +38,348 @@ function getDefaultCompletedStatus(mediaType: MediaType): string {
   return completed ?? options[0] ?? "completed";
 }
 
-/** Resolve status for a row: use row status from file if it matches an allowed option (case-insensitive), else default. */
+/** Map sheet status cell to API value; accepts English + localized labels (en / pt-BR / es). */
 function resolveRowStatus(row: ParsedRow, mediaType: MediaType, defaultStatus: string): string {
-  const raw = row.status?.trim();
-  if (!raw) return defaultStatus;
-  const allowed = LOG_STATUS_OPTIONS[mediaType];
-  const match = allowed.find((s) => s.toLowerCase() === raw.toLowerCase());
-  return match ?? defaultStatus;
+  return resolveStatusFromSheet(row.status, mediaType, defaultStatus);
 }
 
-/** Example titles per media type (one per status, so we can show one row per status). */
-const EXAMPLE_TITLES: Record<MediaType, string[]> = {
-  movies: ["The Shawshank Redemption", "Inception", "Interstellar", "Parasite"],
-  tv: ["Breaking Bad", "The Wire", "Succession", "Severance"],
-  boardgames: ["Catan", "Ticket to Ride", "Wingspan"],
-  games: ["The Legend of Zelda: Breath of the Wild", "Elden Ring", "Hades", "Celeste"],
-  books: ["1984", "The Great Gatsby", "Dune"],
-  anime: ["Fullmetal Alchemist: Brotherhood", "Steins;Gate", "Attack on Titan", "Spy x Family"],
-  manga: ["One Piece", "Death Note", "Berserk"],
-  comics: ["Watchmen", "Sandman", "Maus"],
+type ExampleCellSpec =
+  | { type: "i18n"; key: string }
+  | { type: "status"; canonical: string }
+  | { type: "listType"; value: "favorites" | "pending" }
+  | { type: "ownership"; mode: BoardGameOwnership }
+  | { type: "literal"; value: string };
+
+function renderExampleCell(
+  cell: ExampleCellSpec | undefined,
+  mediaType: MediaType,
+  t: (key: string, params?: Record<string, string>) => string
+): string {
+  if (!cell) return "";
+  switch (cell.type) {
+    case "i18n":
+      return t(cell.key);
+    case "status":
+      return getStatusLabel(t, cell.canonical, mediaType);
+    case "listType":
+      return getStatusLabel(t, cell.value, null);
+    case "ownership":
+      switch (cell.mode) {
+        case "doNotOwn":
+          return t("itemReviewForm.doNotOwn");
+        case "wantToBuy":
+          return t("itemReviewForm.wantToBuy");
+        case "own":
+          return t("itemReviewForm.own");
+        case "sold":
+          return t("itemReviewForm.sold");
+        default:
+          return "";
+      }
+    case "literal":
+      return cell.value;
+    default:
+      return "";
+  }
+}
+
+function buildBatchLogBody(
+  row: ParsedRow,
+  mediaType: MediaType,
+  hit: SearchResult,
+  status: string,
+  boardGameProvider: "bgg" | "ludopedia"
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    mediaType,
+    externalId: hit.id,
+    title: hit.title,
+    image: hit.image ?? null,
+    grade: row.grade ?? null,
+    review: row.review?.trim() || null,
+    status,
+  };
+
+  if (row.season != null) body.season = row.season;
+  if (row.episode != null) body.episode = row.episode;
+  if (row.chapter != null) body.chapter = row.chapter;
+  if (row.volume != null) body.volume = row.volume;
+  if (row.contentHours != null) body.contentHours = row.contentHours;
+  if (row.hoursToBeat != null) body.hoursToBeat = row.hoursToBeat;
+  if (row.listType != null) body.listType = row.listType;
+  if (row.genres != null && row.genres.length > 0) body.genres = row.genres;
+  if (mediaType === "boardgames" && row.mechanics != null && row.mechanics.length > 0) {
+    body.mechanics = row.mechanics;
+  }
+
+  const spendTracked = (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mediaType);
+  const hasSaleMoney = row.saleAmountMinor != null && row.saleCurrency != null;
+  if (spendTracked) {
+    if (row.own != null) body.own = row.own;
+    if (row.wantToBuy != null) body.wantToBuy = row.wantToBuy;
+    if (row.sold != null) body.sold = row.sold;
+    else if (hasSaleMoney) body.sold = true;
+    if (row.purchaseAmountMinor != null) body.purchaseAmountMinor = row.purchaseAmountMinor;
+    if (row.purchaseCurrency != null) body.purchaseCurrency = row.purchaseCurrency;
+    if (row.saleAmountMinor != null) body.saleAmountMinor = row.saleAmountMinor;
+    if (row.saleCurrency != null) body.saleCurrency = row.saleCurrency;
+  }
+
+  if (mediaType === "boardgames") {
+    if (row.matchesPlayed != null) body.matchesPlayed = row.matchesPlayed;
+    body.boardGameSource = boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
+  }
+
+  return body;
+}
+
+type ExampleColId =
+  | "name"
+  | "status"
+  | "review"
+  | "rate"
+  | "season"
+  | "episode"
+  | "chapter"
+  | "volume"
+  | "contentHours"
+  | "hoursToBeat"
+  | "ownership"
+  | "matchesPlayed"
+  | "purchaseAmount"
+  | "purchaseCurrency"
+  | "saleAmount"
+  | "saleCurrency"
+  | "listType"
+  | "genres"
+  | "mechanics";
+
+const EXAMPLE_COLUMNS_BY_MEDIA: Record<MediaType, ExampleColId[]> = {
+  movies: ["name", "status", "review", "rate", "listType", "genres"],
+  tv: ["name", "status", "season", "episode", "contentHours", "review", "rate", "listType"],
+  anime: ["name", "status", "season", "episode", "contentHours", "review", "rate", "listType"],
+  books: ["name", "status", "chapter", "volume", "contentHours", "review", "rate", "listType"],
+  manga: [
+    "name",
+    "status",
+    "chapter",
+    "volume",
+    "contentHours",
+    "ownership",
+    "purchaseAmount",
+    "purchaseCurrency",
+    "review",
+    "rate",
+  ],
+  comics: [
+    "name",
+    "status",
+    "chapter",
+    "volume",
+    "contentHours",
+    "ownership",
+    "purchaseAmount",
+    "purchaseCurrency",
+    "review",
+    "rate",
+  ],
+  games: [
+    "name",
+    "status",
+    "hoursToBeat",
+    "ownership",
+    "purchaseAmount",
+    "purchaseCurrency",
+    "saleAmount",
+    "saleCurrency",
+    "review",
+    "rate",
+  ],
+  boardgames: [
+    "name",
+    "status",
+    "matchesPlayed",
+    "ownership",
+    "purchaseAmount",
+    "purchaseCurrency",
+    "mechanics",
+    "review",
+    "rate",
+  ],
 };
 
-function getExampleRows(mediaType: MediaType): Array<{ name: string; status: string; review: string; rate: string }> {
-  const statuses = [...LOG_STATUS_OPTIONS[mediaType]];
-  const titles = EXAMPLE_TITLES[mediaType];
-  return statuses.map((status, i) => {
-    const name = titles[i % titles.length];
-    const hasReview = i % 2 === 0;
-    const rate = i === 0 ? "9" : i === 1 ? "8.5" : String(7 + (i % 3));
-    return {
-      name,
-      status,
-      review: hasReview ? (i === 0 ? "A masterpiece." : "Really enjoyed it.") : "",
-      rate,
-    };
-  });
-}
+const EXAMPLE_HEADER_KEYS: Record<ExampleColId, string> = {
+  name: "batchEntry.exampleColumnName",
+  status: "batchEntry.exampleColumnStatus",
+  review: "batchEntry.exampleColumnReview",
+  rate: "batchEntry.exampleColumnRate",
+  season: "batchEntry.exampleColumnSeason",
+  episode: "batchEntry.exampleColumnEpisode",
+  chapter: "batchEntry.exampleColumnChapter",
+  volume: "batchEntry.exampleColumnVolume",
+  contentHours: "batchEntry.exampleColumnContentHours",
+  hoursToBeat: "batchEntry.exampleColumnHoursToBeat",
+  ownership: "batchEntry.exampleColumnOwnership",
+  matchesPlayed: "batchEntry.exampleColumnMatchesPlayed",
+  purchaseAmount: "batchEntry.exampleColumnPurchaseAmount",
+  purchaseCurrency: "batchEntry.exampleColumnPurchaseCurrency",
+  saleAmount: "batchEntry.exampleColumnSaleAmount",
+  saleCurrency: "batchEntry.exampleColumnSaleCurrency",
+  listType: "batchEntry.exampleColumnListType",
+  genres: "batchEntry.exampleColumnGenres",
+  mechanics: "batchEntry.exampleColumnMechanics",
+};
+
+/** Two sample rows per category; cell text comes from locale strings + status/ownership labels. */
+const EXAMPLE_ROW_SPECS: Record<MediaType, Array<Partial<Record<ExampleColId, ExampleCellSpec>>>> = {
+  movies: [
+    {
+      name: { type: "i18n", key: "batchEntry.exMoviesR0Name" },
+      status: { type: "status", canonical: "watched" },
+      review: { type: "i18n", key: "batchEntry.exMoviesR0Review" },
+      rate: { type: "literal", value: "9.5" },
+      listType: { type: "listType", value: "favorites" },
+      genres: { type: "i18n", key: "batchEntry.exMoviesR0Genres" },
+    },
+    {
+      name: { type: "i18n", key: "batchEntry.exMoviesR1Name" },
+      status: { type: "status", canonical: "plan to watch" },
+      listType: { type: "listType", value: "pending" },
+      genres: { type: "i18n", key: "batchEntry.exMoviesR1Genres" },
+    },
+  ],
+  tv: [
+    {
+      name: { type: "i18n", key: "batchEntry.exTvR0Name" },
+      status: { type: "status", canonical: "watching" },
+      season: { type: "literal", value: "1" },
+      episode: { type: "literal", value: "3" },
+      contentHours: { type: "literal", value: "2.5" },
+    },
+    {
+      name: { type: "i18n", key: "batchEntry.exTvR1Name" },
+      status: { type: "status", canonical: "completed" },
+      season: { type: "literal", value: "4" },
+      episode: { type: "literal", value: "10" },
+      contentHours: { type: "literal", value: "12" },
+      review: { type: "i18n", key: "batchEntry.exTvR1Review" },
+      rate: { type: "literal", value: "10" },
+      listType: { type: "listType", value: "favorites" },
+    },
+  ],
+  anime: [
+    {
+      name: { type: "i18n", key: "batchEntry.exAnimeR0Name" },
+      status: { type: "status", canonical: "watching" },
+      season: { type: "literal", value: "1" },
+      episode: { type: "literal", value: "12" },
+      contentHours: { type: "literal", value: "4" },
+      rate: { type: "literal", value: "9" },
+    },
+    {
+      name: { type: "i18n", key: "batchEntry.exAnimeR1Name" },
+      status: { type: "status", canonical: "completed" },
+      season: { type: "literal", value: "1" },
+      episode: { type: "literal", value: "24" },
+      contentHours: { type: "literal", value: "9.5" },
+      review: { type: "i18n", key: "batchEntry.exAnimeR1Review" },
+      rate: { type: "literal", value: "10" },
+    },
+  ],
+  books: [
+    {
+      name: { type: "i18n", key: "batchEntry.exBooksR0Name" },
+      status: { type: "status", canonical: "reading" },
+      listType: { type: "listType", value: "pending" },
+    },
+    {
+      name: { type: "i18n", key: "batchEntry.exBooksR1Name" },
+      status: { type: "status", canonical: "completed" },
+      chapter: { type: "literal", value: "48" },
+      volume: { type: "literal", value: "1" },
+      contentHours: { type: "literal", value: "11" },
+      review: { type: "i18n", key: "batchEntry.exBooksR1Review" },
+      rate: { type: "literal", value: "9" },
+      listType: { type: "listType", value: "favorites" },
+    },
+  ],
+  manga: [
+    {
+      name: { type: "i18n", key: "batchEntry.exMangaR0Name" },
+      status: { type: "status", canonical: "reading" },
+      chapter: { type: "literal", value: "1090" },
+      ownership: { type: "ownership", mode: "own" },
+      purchaseAmount: { type: "literal", value: "9.99" },
+      purchaseCurrency: { type: "literal", value: "USD" },
+      rate: { type: "literal", value: "8.5" },
+    },
+    {
+      name: { type: "i18n", key: "batchEntry.exMangaR1Name" },
+      status: { type: "status", canonical: "completed" },
+      chapter: { type: "literal", value: "364" },
+      volume: { type: "literal", value: "41" },
+      ownership: { type: "ownership", mode: "wantToBuy" },
+      review: { type: "i18n", key: "batchEntry.exMangaR1Review" },
+      rate: { type: "literal", value: "10" },
+    },
+  ],
+  comics: [
+    {
+      name: { type: "i18n", key: "batchEntry.exComicsR0Name" },
+      status: { type: "status", canonical: "completed" },
+      ownership: { type: "ownership", mode: "own" },
+      purchaseAmount: { type: "literal", value: "24.99" },
+      purchaseCurrency: { type: "literal", value: "USD" },
+      rate: { type: "literal", value: "10" },
+    },
+    {
+      name: { type: "i18n", key: "batchEntry.exComicsR1Name" },
+      status: { type: "status", canonical: "reading" },
+      volume: { type: "literal", value: "2" },
+      contentHours: { type: "literal", value: "3" },
+      ownership: { type: "ownership", mode: "doNotOwn" },
+    },
+  ],
+  games: [
+    {
+      name: { type: "i18n", key: "batchEntry.exGamesR0Name" },
+      status: { type: "status", canonical: "playing" },
+      hoursToBeat: { type: "literal", value: "45" },
+      ownership: { type: "ownership", mode: "own" },
+      purchaseAmount: { type: "literal", value: "59.99" },
+      purchaseCurrency: { type: "literal", value: "USD" },
+      rate: { type: "literal", value: "10" },
+    },
+    {
+      name: { type: "i18n", key: "batchEntry.exGamesR1Name" },
+      status: { type: "status", canonical: "completed" },
+      hoursToBeat: { type: "literal", value: "22.5" },
+      ownership: { type: "ownership", mode: "sold" },
+      saleAmount: { type: "literal", value: "19.99" },
+      saleCurrency: { type: "literal", value: "USD" },
+      review: { type: "i18n", key: "batchEntry.exGamesR1Review" },
+      rate: { type: "literal", value: "9.5" },
+    },
+  ],
+  boardgames: [
+    {
+      name: { type: "literal", value: "Wingspan" },
+      status: { type: "status", canonical: "played" },
+      matchesPlayed: { type: "literal", value: "8" },
+      ownership: { type: "ownership", mode: "own" },
+      purchaseAmount: { type: "literal", value: "4999" },
+      purchaseCurrency: { type: "literal", value: "USD" },
+      mechanics: { type: "i18n", key: "batchEntry.exBoardgamesR0Mechanics" },
+      rate: { type: "literal", value: "9" },
+    },
+    {
+      name: { type: "literal", value: "Ticket to Ride" },
+      status: { type: "status", canonical: "plan to play" },
+      matchesPlayed: { type: "literal", value: "0" },
+      ownership: { type: "ownership", mode: "wantToBuy" },
+    },
+  ],
+};
 
 interface BatchEntryTabProps {
   /** When opened from a category tab (e.g. MediaLogs), preselect this category. */
@@ -100,7 +413,19 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
   const [overrideExistingLogs, setOverrideExistingLogs] = useState(false);
   const previewLoadTriggeredRef = useRef(false);
 
-  const exampleRows = useMemo(() => getExampleRows(mediaType), [mediaType]);
+  const exampleCols = EXAMPLE_COLUMNS_BY_MEDIA[mediaType];
+  const exampleRows = useMemo(
+    () =>
+      EXAMPLE_ROW_SPECS[mediaType].map((specRow) => {
+        const row: Partial<Record<ExampleColId, string>> = {};
+        for (const colId of EXAMPLE_COLUMNS_BY_MEDIA[mediaType]) {
+          const text = renderExampleCell(specRow[colId], mediaType, t);
+          if (text !== "") row[colId] = text;
+        }
+        return row;
+      }),
+    [mediaType, t]
+  );
 
   const apiKeyProvider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
@@ -202,19 +527,11 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
               continue;
             }
           }
-          const grade = row.grade ?? null;
           const status = resolveRowStatus(row, mediaType, defaultStatus);
+          const bgp = boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
           const res = await apiFetch<{ newBadges?: NewBadge[] }>("/logs", {
             method: "POST",
-            body: JSON.stringify({
-              mediaType,
-              externalId: hit.id,
-              title: hit.title,
-              image: hit.image ?? null,
-              grade,
-              review: row.review?.trim() || null,
-              status,
-            }),
+            body: JSON.stringify(buildBatchLogBody(row, mediaType, hit, status, bgp)),
           });
           if (res.newBadges?.length) newBadgesFromBatch.push(...res.newBadges);
           added++;
@@ -253,11 +570,39 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
     if (reasons.length > 0) {
       showErrorToast(t, "E020", { interpolation: { count: reasons.length } });
     }
-  }, [parseResult, mediaType, boardGameProvider, overrideExistingLogs, t, onDone]);
+  }, [parseResult, mediaType, boardGameProvider, overrideExistingLogs, defaultStatus, t, onDone]);
 
   const canPreview =
     hasApiKeyForCategory && parseResult?.ok && parseResult.rows.length > 0 && !loadingPreview;
   const previewReady = !!(previewRow && previewResult);
+
+  const previewExtraLine = useMemo(() => {
+    if (!previewRow) return null;
+    const parts: string[] = [];
+    const label = (colId: ExampleColId) => t(EXAMPLE_HEADER_KEYS[colId]);
+    if (previewRow.season != null) parts.push(`${label("season")}: ${previewRow.season}`);
+    if (previewRow.episode != null) parts.push(`${label("episode")}: ${previewRow.episode}`);
+    if (previewRow.chapter != null) parts.push(`${label("chapter")}: ${previewRow.chapter}`);
+    if (previewRow.volume != null) parts.push(`${label("volume")}: ${previewRow.volume}`);
+    if (previewRow.contentHours != null) parts.push(`${label("contentHours")}: ${previewRow.contentHours}`);
+    if (previewRow.hoursToBeat != null) parts.push(`${label("hoursToBeat")}: ${previewRow.hoursToBeat}`);
+    if (previewRow.matchesPlayed != null) parts.push(`${label("matchesPlayed")}: ${previewRow.matchesPlayed}`);
+    if (previewRow.own === true || previewRow.wantToBuy === true || previewRow.sold === true) {
+      if (previewRow.sold === true) parts.push(`${label("ownership")}: sold`);
+      else if (previewRow.wantToBuy === true) parts.push(`${label("ownership")}: ${t("itemReviewForm.wantToBuy")}`);
+      else if (previewRow.own === true) parts.push(`${label("ownership")}: ${t("itemReviewForm.own")}`);
+    }
+    if (previewRow.purchaseAmountMinor != null && previewRow.purchaseCurrency) {
+      parts.push(`${label("purchaseAmount")}: ${previewRow.purchaseAmountMinor} ${previewRow.purchaseCurrency}`);
+    }
+    if (previewRow.saleAmountMinor != null && previewRow.saleCurrency) {
+      parts.push(`${label("saleAmount")}: ${previewRow.saleAmountMinor} ${previewRow.saleCurrency}`);
+    }
+    if (previewRow.listType != null) parts.push(`${label("listType")}: ${previewRow.listType}`);
+    if (previewRow.genres?.length) parts.push(`${label("genres")}: ${previewRow.genres.join(", ")}`);
+    if (previewRow.mechanics?.length) parts.push(`${label("mechanics")}: ${previewRow.mechanics.join(", ")}`);
+    return parts.length ? parts.join(" · ") : null;
+  }, [previewRow, t]);
 
   useEffect(() => {
     if (!parseResult?.ok) previewLoadTriggeredRef.current = false;
@@ -423,34 +768,31 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
                 <table className="w-full min-w-[280px] border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-[var(--color-mid)]/30">
-                      <th className="py-2 pr-3 text-left font-semibold text-[var(--color-lightest)]">
-                        {t("batchEntry.exampleColumnName")}
-                      </th>
-                      <th className="py-2 pr-3 text-left font-semibold text-[var(--color-lightest)]">
-                        {t("batchEntry.exampleColumnStatus")}
-                      </th>
-                      <th className="py-2 pr-3 text-left font-semibold text-[var(--color-lightest)]">
-                        {t("batchEntry.exampleColumnReview")}
-                      </th>
-                      <th className="py-2 text-left font-semibold text-[var(--color-lightest)]">
-                        {t("batchEntry.exampleColumnRate")}
-                      </th>
+                      {exampleCols.map((colId) => (
+                        <th
+                          key={colId}
+                          className="py-2 pr-3 text-left font-semibold text-[var(--color-lightest)] last:pr-0"
+                        >
+                          {t(EXAMPLE_HEADER_KEYS[colId])}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="text-[var(--color-light)]">
                     {exampleRows.map((row, i) => (
                       <tr
-                        key={`${row.status}-${i}`}
+                        key={`example-${mediaType}-${i}`}
                         className={
                           i < exampleRows.length - 1
                             ? "border-b border-[var(--color-mid)]/20"
                             : ""
                         }
                       >
-                        <td className="py-1.5 pr-3">{row.name}</td>
-                        <td className="py-1.5 pr-3">{row.status}</td>
-                        <td className="py-1.5 pr-3">{row.review}</td>
-                        <td className="py-1.5">{row.rate}</td>
+                        {exampleCols.map((colId) => (
+                          <td key={colId} className="py-1.5 pr-3 align-top last:pr-0">
+                            {row[colId] ?? ""}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
@@ -525,6 +867,11 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
               {previewRow.review && (
                 <p className="mt-2 line-clamp-2 text-xs text-[var(--color-light)]">
                   {previewRow.review}
+                </p>
+              )}
+              {previewExtraLine && (
+                <p className="mt-2 line-clamp-3 text-[10px] leading-snug text-[var(--color-light)]">
+                  {previewExtraLine}
                 </p>
               )}
             </div>
