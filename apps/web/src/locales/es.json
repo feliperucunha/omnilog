@@ -249,8 +249,7 @@
   },
   "publicProfile": {
     "title": "Perfil público",
-    "titleWithName": "Log de {{name}}",
-    "backToApp": "Ir al app"
+    "titleWithName": "Log de {{name}}"
   },
   "social": {
     "follow": "Seguir",

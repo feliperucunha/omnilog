@@ -270,8 +270,7 @@
   },
   "publicProfile": {
     "title": "Public profile",
-    "titleWithName": "{{name}}'s log",
-    "backToApp": "Go to app"
+    "titleWithName": "{{name}}'s log"
   },
   "social": {
     "follow": "Follow",

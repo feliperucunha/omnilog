@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { MotionLink } from "@/components/MotionLink";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { motion } from "framer-motion";
 import {
@@ -25,6 +26,7 @@ import {
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
+import { itemDetailPath } from "@/lib/itemRoutes";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
@@ -1009,7 +1011,7 @@ export function Statistics() {
                     {spendDetailLogs.map((log) => (
                       <li key={log.id}>
                         <Link
-                          to={`/item/${log.mediaType}/${log.externalId}`}
+                          to={itemDetailPath(log.mediaType, log.externalId)}
                           className="flex items-center gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
                           onClick={() => setSpendDetailMediaType(null)}
                         >
@@ -1101,7 +1103,7 @@ export function Statistics() {
                     {spendDetailLogs.map((log) => (
                       <li key={log.id}>
                         <Link
-                          to={`/item/${log.mediaType}/${log.externalId}`}
+                          to={itemDetailPath(log.mediaType, log.externalId)}
                           className="flex items-center gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
                           onClick={() => setSpendDetailMediaType(null)}
                         >
@@ -1563,11 +1565,12 @@ export function Statistics() {
                         : "";
                     return (
                       <motion.li key={log.id} variants={staggerItem} className="list-none">
-                        <motion.div whileTap={tapScale} transition={tapTransition}>
-                          <Link
-                            to={`/item/${log.mediaType}/${log.externalId}`}
-                            className={`flex min-w-0 flex-row overflow-hidden rounded-lg border bg-[var(--color-dark)] text-left text-inherit no-underline shadow-[var(--shadow-card)] transition-[opacity,border-color] hover:opacity-95 max-md:min-h-[44px] ${listBorderClass} ${status == null ? "hover:border-black" : ""}`}
-                          >
+                        <MotionLink
+                          to={itemDetailPath(log.mediaType, log.externalId)}
+                          whileTap={tapScale}
+                          transition={tapTransition}
+                          className={`flex min-w-0 flex-row overflow-hidden rounded-lg border bg-[var(--color-dark)] text-left text-inherit no-underline shadow-[var(--shadow-card)] transition-[opacity,border-color] hover:opacity-95 max-md:min-h-[44px] ${listBorderClass} ${status == null ? "hover:border-black" : ""}`}
+                        >
                             <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-l-lg">
                               <ItemImage
                                 src={log.image}
@@ -1622,8 +1625,7 @@ export function Statistics() {
                                 })()}
                               </OverflowMarquee>
                             </div>
-                          </Link>
-                        </motion.div>
+                        </MotionLink>
                       </motion.li>
                     );
                   })}

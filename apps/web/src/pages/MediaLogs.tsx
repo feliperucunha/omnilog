@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { MotionLink } from "@/components/MotionLink";
 import { motion } from "framer-motion";
 import { Search, AlertTriangle, Plus, Download, Pencil, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { Logo } from "@/components/Logo";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
+import { itemDetailPath } from "@/lib/itemRoutes";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useLogComplete } from "@/contexts/LogCompleteContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1028,7 +1030,7 @@ export function MediaLogs({
               const isReviewExpanded = embedded && expandedReviewLogId === log.id;
               return (
               <motion.div key={log.id} variants={staggerItem} className="min-h-0 sm:h-full">
-                <motion.div whileTap={tapScale} transition={tapTransition} className="h-full">
+                <div className="h-full">
                   <Card
                     className={`relative flex flex-row min-h-0 overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${embedded && !isReviewExpanded ? "h-[193px] min-h-[193px] max-h-[193px] sm:h-[193px] sm:min-h-[193px] sm:max-h-[193px]" : embedded ? "min-h-[160px]" : "min-h-[140px] sm:min-h-[160px]"} ${listBorderClass}`}
                     style={cardShadow}
@@ -1039,8 +1041,10 @@ export function MediaLogs({
                       </div>
                     )}
                     {/* Left: image full height – flush with card edge, radius matches card (rounded-lg); click goes to item page */}
-                    <Link
-                      to={`/item/${log.mediaType}/${log.externalId}`}
+                    <MotionLink
+                      to={itemDetailPath(log.mediaType, log.externalId)}
+                      whileTap={tapScale}
+                      transition={tapTransition}
                       className="relative block h-full min-h-full w-28 flex-shrink-0 overflow-hidden sm:w-32"
                     >
                       <ItemImage
@@ -1057,15 +1061,17 @@ export function MediaLogs({
                           {getStatusLabel(t, log.status, log.mediaType)}
                         </span>
                       )}
-                    </Link>
+                    </MotionLink>
                     {/* Middle: title, grade, badge, episode, review */}
                     <div className={`flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 sm:p-4 ${embedded && !isReviewExpanded ? "min-h-0" : ""}`}>
-                      <Link
-                        to={`/item/${log.mediaType}/${log.externalId}`}
+                      <MotionLink
+                        to={itemDetailPath(log.mediaType, log.externalId)}
+                        whileTap={tapScale}
+                        transition={tapTransition}
                         className="block min-w-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
                       >
                         <OverflowMarquee className="text-sm font-semibold sm:text-base">{log.title}</OverflowMarquee>
-                      </Link>
+                      </MotionLink>
                       <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                         {log.grade != null ? (
                           <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
@@ -1213,7 +1219,7 @@ export function MediaLogs({
                       </div>
                     )}
                   </Card>
-                </motion.div>
+                </div>
               </motion.div>
             );
             })}

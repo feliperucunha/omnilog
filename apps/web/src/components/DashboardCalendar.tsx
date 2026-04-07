@@ -22,6 +22,7 @@ import { IN_PROGRESS_STATUSES, type Log } from "@geeklogs/shared";
 import { paperShadow } from "@/lib/paperShadow";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
+import { itemDetailPath } from "@/lib/itemRoutes";
 
 const WEEKDAY_KEYS = [
   "dashboard.calendarMon",
@@ -330,7 +331,7 @@ export function DashboardCalendar({
                     {dayLogs.map((log) => (
                       <li key={log.id}>
                         <Link
-                          to={`/item/${log.mediaType}/${log.externalId}`}
+                          to={itemDetailPath(log.mediaType, log.externalId)}
                           className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
                           onClick={() => setSelectedDate(null)}
                         >
@@ -394,7 +395,7 @@ export function DashboardCalendar({
                     {dayLogs.map((log) => (
                       <li key={log.id}>
                         <Link
-                          to={`/item/${log.mediaType}/${log.externalId}`}
+                          to={itemDetailPath(log.mediaType, log.externalId)}
                           className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
                           onClick={() => setSelectedDate(null)}
                         >

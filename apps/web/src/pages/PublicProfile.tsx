@@ -281,8 +281,8 @@ export function PublicProfile() {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
-          {token && !isOwnProfile && (
+        {token && !isOwnProfile && (
+          <div className="flex shrink-0 items-center gap-2 self-start sm:self-center">
             <Button
               type="button"
               variant={following ? "secondary" : "default"}
@@ -292,11 +292,8 @@ export function PublicProfile() {
             >
               {followLoading ? t("common.saving") : following ? t("social.following") : t("social.follow")}
             </Button>
-          )}
-          <Button asChild variant="outline" size="sm">
-            <Link to="/">{t("publicProfile.backToApp")}</Link>
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
 
       {publicMilestoneProgress && visibleTypes.length > 0 && (() => {

@@ -44,6 +44,8 @@ import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
+import { itemDetailPath } from "@/lib/itemRoutes";
+import { MotionLink } from "@/components/MotionLink";
 import * as storage from "@/lib/storage";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
@@ -707,15 +709,15 @@ export function Dashboard() {
                   const isExpanded = expandedReviewLogId === log.id;
                   return (
                   <motion.li key={log.id} variants={staggerItem} className="list-none">
-                    <motion.div
-                      whileTap={tapScale}
-                      transition={tapTransition}
+                    <div
                       className={`flex min-w-0 flex-row overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${!isExpanded ? "min-h-[160px] h-[160px]" : "min-h-[140px]"} ${listBorderClass}`}
                       style={paperShadow}
                     >
                       {/* Left: image full height */}
-                      <Link
-                        to={`/item/${log.mediaType}/${log.externalId}`}
+                      <MotionLink
+                        to={itemDetailPath(log.mediaType, log.externalId)}
+                        whileTap={tapScale}
+                        transition={tapTransition}
                         className="relative block h-full min-h-full w-28 flex-shrink-0 overflow-hidden rounded-l-lg sm:w-32"
                       >
                         <ItemImage
@@ -732,17 +734,19 @@ export function Dashboard() {
                             {getStatusLabel(t, log.status, log.mediaType)}
                           </span>
                         )}
-                      </Link>
+                      </MotionLink>
                       {/* Middle: title, meta, user, review */}
                       <div className={`flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 sm:p-4 ${!isExpanded ? "min-h-0" : ""}`}>
-                        <Link
-                          to={`/item/${log.mediaType}/${log.externalId}`}
+                        <MotionLink
+                          to={itemDetailPath(log.mediaType, log.externalId)}
+                          whileTap={tapScale}
+                          transition={tapTransition}
                           className="block min-w-0 shrink-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
                         >
                           <OverflowMarquee className="text-sm font-semibold sm:text-base">
                             {log.title}
                           </OverflowMarquee>
-                        </Link>
+                        </MotionLink>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-light)] shrink-0">
                           {log.grade != null ? (
                             <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
@@ -866,7 +870,7 @@ export function Dashboard() {
                           </div>
                         )}
                       </div>
-                    </motion.div>
+                    </div>
                   </motion.li>
                   );
                 })}
