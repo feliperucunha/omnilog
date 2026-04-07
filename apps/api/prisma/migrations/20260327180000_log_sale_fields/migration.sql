@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Log" ADD COLUMN "sold" BOOLEAN;
+ALTER TABLE "Log" ADD COLUMN "saleAmountMinor" INTEGER;
+ALTER TABLE "Log" ADD COLUMN "saleCurrency" TEXT;

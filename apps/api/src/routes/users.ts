@@ -7,6 +7,7 @@ import { serializeLog } from "../lib/serializeLog.js";
 import { getMilestoneProgress } from "../services/milestone.service.js";
 import {
   localDayBoundsFromDateString,
+  logSpendStatsDateWhere,
   purchaseLogCreatedAtRange,
   type PurchasePeriod,
 } from "../lib/purchaseFields.js";
@@ -227,7 +228,7 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
   const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
   const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
-  const where: Prisma.LogWhereInput = { userId: user.id };
+  let where: Prisma.LogWhereInput = { userId: user.id };
   if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
   if (status != null && status !== "") {
     if (mediaType && MEDIA_TYPES.includes(mediaType)) {
@@ -245,8 +246,10 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
     if (wantToBuyFilter) where.wantToBuy = true;
   }
   if (purchasedFilter) {
-    where.purchaseAmountMinor = { not: null };
-    where.purchaseCurrency = { not: null };
+    where.OR = [
+      { AND: [{ purchaseAmountMinor: { not: null } }, { purchaseCurrency: { not: null } }] },
+      { AND: [{ saleAmountMinor: { not: null } }, { saleCurrency: { not: null } }] },
+    ];
     const dateRaw = typeof req.query.purchaseDate === "string" ? req.query.purchaseDate.trim() : "";
     if (dateRaw !== "") {
       const tzRaw = req.query.timezoneOffsetMinutes;
@@ -255,7 +258,7 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
           ? parseInt(tzRaw, 10)
           : 0;
       const bounds = localDayBoundsFromDateString(dateRaw, tzOffsetMinutes);
-      if (bounds) where.createdAt = { gte: bounds.gte, lte: bounds.lte };
+      if (bounds) where = { AND: [where, logSpendStatsDateWhere(bounds)] };
     } else {
       const spendPeriodRaw = typeof req.query.spendPeriod === "string" ? req.query.spendPeriod.trim() : "";
       const validPeriods: PurchasePeriod[] = ["month", "year", "all"];
@@ -266,7 +269,7 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
             ? parseInt(tzRaw, 10)
             : 0;
         const range = purchaseLogCreatedAtRange(spendPeriodRaw as PurchasePeriod, tzOffsetMinutes);
-        if (range) where.createdAt = { gte: range.gte, lte: range.lte };
+        if (range) where = { AND: [where, logSpendStatsDateWhere(range)] };
       }
     }
   }

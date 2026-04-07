@@ -2,14 +2,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { paperShadow } from "@/lib/paperShadow";
 
-/** Four overview cards (Statistics summary row). */
+/** Overview cards (Statistics summary row). */
 export function StatisticsSummarySkeleton() {
   return (
     <section
       aria-hidden
-      className="grid min-w-0 grid-cols-1 gap-2 md:grid-cols-4 md:gap-4"
+      className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 md:gap-4"
     >
-      {Array.from({ length: 4 }).map((_, i) => (
+      {Array.from({ length: 5 }).map((_, i) => (
         <Card
           key={i}
           className="min-w-0 overflow-hidden rounded-xl border border-[var(--color-surface-border)]/90 bg-[var(--color-dark)] p-3.5 shadow-none md:min-h-[6.75rem] md:rounded-2xl md:bg-gradient-to-b md:from-[var(--color-dark)] md:to-[var(--color-darkest)]/55 md:p-5 md:shadow-[var(--shadow-sm)]"

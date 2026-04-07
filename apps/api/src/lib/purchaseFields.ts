@@ -1,5 +1,6 @@
 import type { MediaType } from "@geeklogs/shared";
 import { SPEND_TRACKED_MEDIA_TYPES } from "@geeklogs/shared";
+import type { Prisma } from "@prisma/client";
 
 const SPEND_SET = new Set<string>(SPEND_TRACKED_MEDIA_TYPES);
 
@@ -43,6 +44,41 @@ export function normalizePurchaseFields(
   return { ok: true, purchaseAmountMinor: amt, purchaseCurrency: cur };
 }
 
+/** Same rules as purchase; used for sale proceeds when log.sold is true. */
+export function normalizeSaleFields(
+  mediaType: MediaType,
+  saleAmountMinor: number | null | undefined,
+  saleCurrency: string | null | undefined
+):
+  | { ok: true; saleAmountMinor: number | null; saleCurrency: string | null }
+  | { ok: false; error: string } {
+  if (!isSpendTrackedMediaType(mediaType)) {
+    if (saleAmountMinor != null || (saleCurrency != null && saleCurrency !== "")) {
+      return {
+        ok: false,
+        error: "Sale amount is only supported for games, board games, books, manga, and comics.",
+      };
+    }
+    return { ok: true, saleAmountMinor: null, saleCurrency: null };
+  }
+  const amt = saleAmountMinor ?? null;
+  const curRaw = saleCurrency?.trim() ?? "";
+  const cur = curRaw === "" ? null : curRaw.toUpperCase();
+  if (amt == null && (cur == null || cur === "")) {
+    return { ok: true, saleAmountMinor: null, saleCurrency: null };
+  }
+  if (amt == null || cur == null || cur === "") {
+    return { ok: false, error: "Enter both amount and currency for sale, or leave sale empty." };
+  }
+  if (amt < 0 || amt > 999_999_999_999) {
+    return { ok: false, error: "Invalid sale amount." };
+  }
+  if (!ISO4217.test(cur)) {
+    return { ok: false, error: "Invalid currency (use a 3-letter ISO 4217 code, e.g. USD)." };
+  }
+  return { ok: true, saleAmountMinor: amt, saleCurrency: cur };
+}
+
 export type PurchasePeriod = "month" | "year" | "all";
 
 /**
@@ -63,6 +99,89 @@ export function localDayBoundsFromDateString(
   const gte = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - offsetMs);
   const lte = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999) - offsetMs);
   return { gte, lte };
+}
+
+/** Snapshot of stored purchase + sale money fields (for detecting changes). */
+export type SpendMonetarySnapshot = {
+  purchaseAmountMinor: number | null;
+  purchaseCurrency: string | null;
+  saleAmountMinor: number | null;
+  saleCurrency: string | null;
+};
+
+export function spendMonetarySnapshotFromLog(log: {
+  purchaseAmountMinor: number | null;
+  purchaseCurrency: string | null;
+  saleAmountMinor: number | null;
+  saleCurrency: string | null;
+}): SpendMonetarySnapshot {
+  return {
+    purchaseAmountMinor: log.purchaseAmountMinor ?? null,
+    purchaseCurrency: log.purchaseCurrency != null ? log.purchaseCurrency.toUpperCase() : null,
+    saleAmountMinor: log.saleAmountMinor ?? null,
+    saleCurrency: log.saleCurrency != null ? log.saleCurrency.toUpperCase() : null,
+  };
+}
+
+export function spendMonetarySnapshotsEqual(a: SpendMonetarySnapshot, b: SpendMonetarySnapshot): boolean {
+  return (
+    a.purchaseAmountMinor === b.purchaseAmountMinor &&
+    a.purchaseCurrency === b.purchaseCurrency &&
+    a.saleAmountMinor === b.saleAmountMinor &&
+    a.saleCurrency === b.saleCurrency
+  );
+}
+
+export function spendMonetaryHasAny(s: SpendMonetarySnapshot): boolean {
+  const hasPurchase =
+    s.purchaseAmountMinor != null && s.purchaseCurrency != null && s.purchaseCurrency !== "";
+  const hasSale = s.saleAmountMinor != null && s.saleCurrency != null && s.saleCurrency !== "";
+  return hasPurchase || hasSale;
+}
+
+/**
+ * After computing next purchase/sale snapshot: if unchanged leave column as-is (`undefined`);
+ * if cleared return `null`; if still has amounts return `now`.
+ */
+export function spendFieldsAtAfterSnapshotChange(
+  prev: SpendMonetarySnapshot,
+  next: SpendMonetarySnapshot,
+  now: Date
+): Date | null | undefined {
+  if (spendMonetarySnapshotsEqual(prev, next)) return undefined;
+  if (!spendMonetaryHasAny(next)) return null;
+  return now;
+}
+
+/**
+ * Spend stats / purchased list: attribute rows to a calendar window by when money fields were set,
+ * with legacy fallback to `createdAt` when `spendFieldsAt` is null (pre-migration rows).
+ */
+export function logSpendStatsDateWhere(range: { gte: Date; lte: Date } | undefined): Prisma.LogWhereInput {
+  if (!range) return {};
+  return {
+    OR: [
+      { spendFieldsAt: { gte: range.gte, lte: range.lte } },
+      {
+        AND: [{ spendFieldsAt: null }, { createdAt: { gte: range.gte, lte: range.lte } }],
+      },
+    ],
+  };
+}
+
+/** Same attribution as logSpendStatsDateWhere, but end is exclusive (`lt`), e.g. monthly digest windows. */
+export function logSpendStatsDateWhereHalfOpen(
+  range: { gte: Date; lt: Date } | undefined
+): Prisma.LogWhereInput {
+  if (!range) return {};
+  return {
+    OR: [
+      { spendFieldsAt: { gte: range.gte, lt: range.lt } },
+      {
+        AND: [{ spendFieldsAt: null }, { createdAt: { gte: range.gte, lt: range.lt } }],
+      },
+    ],
+  };
 }
 
 /** Filter on Log.createdAt for spend stats; `all` = no date bounds. */

@@ -9,6 +9,7 @@ import {
   Clock,
   Download,
   Layers,
+  Scale,
   Star,
   Wallet,
   type LucideIcon,
@@ -58,6 +59,38 @@ function formatMinorAsMoney(minor: number, currency: string): string {
   return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n);
 }
 
+function formatSignedMinorAsMoney(minor: number, currency: string): string {
+  const abs = Math.abs(minor);
+  const formatted = formatMinorAsMoney(abs, currency);
+  if (minor > 0) return `+${formatted}`;
+  if (minor < 0) return `−${formatMinorAsMoney(abs, currency)}`;
+  return formatMinorAsMoney(0, currency);
+}
+
+/** Purchases as outflow: −R$… (red in UI). */
+function formatPurchaseTotalsMinorAsMoney(minor: number, currency: string): string {
+  return `−${formatMinorAsMoney(minor, currency)}`;
+}
+
+/** Sales as inflow: +R$… (green in UI). */
+function formatSaleTotalsMinorAsMoney(minor: number, currency: string): string {
+  return `+${formatMinorAsMoney(minor, currency)}`;
+}
+
+function sumMinorByCurrency(
+  matrix: Record<string, Record<string, number>> | null
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!matrix) return out;
+  for (const mt of SPEND_TRACKED_MEDIA_TYPES) {
+    const by = matrix[mt] ?? {};
+    for (const [cur, minor] of Object.entries(by)) {
+      out[cur] = (out[cur] ?? 0) + minor;
+    }
+  }
+  return out;
+}
+
 type PurchasePeriod = "month" | "year" | "all";
 
 const STORAGE_KEY_STATS = "geeklogs.statistics.statsCollapsed";
@@ -91,6 +124,8 @@ interface LogStatsSummary {
   reviewedLogs: number;
   totalContentHours: number;
   completedLogsWithHours: number;
+  /** All-time net per ISO 4217 currency (sale proceeds − purchases). */
+  lifetimeNetByCurrency?: Record<string, number>;
 }
 
 const EMPTY_SUMMARY: LogStatsSummary = {
@@ -99,6 +134,7 @@ const EMPTY_SUMMARY: LogStatsSummary = {
   reviewedLogs: 0,
   totalContentHours: 0,
   completedLogsWithHours: 0,
+  lifetimeNetByCurrency: {},
 };
 
 /** Desktop: icon column + gap — value lines up under label text. */
@@ -109,11 +145,14 @@ function OverviewStatCard({
   label,
   value,
   sub,
+  valueClassName,
 }: {
   icon: LucideIcon;
   label: ReactNode;
   value: ReactNode;
   sub?: ReactNode;
+  /** Optional size override (e.g. multi-line currency totals). */
+  valueClassName?: string;
 }) {
   const iconBox = (compact: boolean) => (
     <div
@@ -142,9 +181,14 @@ function OverviewStatCard({
         {iconBox(true)}
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">{label}</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums leading-none text-[var(--color-lightest)]">
+          <div
+            className={cn(
+              "mt-1 text-xl font-semibold tabular-nums leading-none text-[var(--color-lightest)]",
+              valueClassName
+            )}
+          >
             {value}
-          </p>
+          </div>
           {sub ? <div className="mt-1 text-[11px] leading-snug text-[var(--color-light)]">{sub}</div> : null}
         </div>
       </div>
@@ -165,9 +209,9 @@ function OverviewStatCard({
             </p>
           </div>
           <div className={cn("min-w-0", OVERVIEW_STAT_VALUE_INSET)}>
-            <p className="text-3xl font-semibold tabular-nums leading-none tracking-tight text-[var(--color-lightest)]">
+            <div className="text-3xl font-semibold tabular-nums leading-none tracking-tight text-[var(--color-lightest)]">
               {value}
-            </p>
+            </div>
             {sub ? <div className="mt-2 text-xs leading-snug text-[var(--color-light)]">{sub}</div> : null}
           </div>
         </div>
@@ -209,8 +253,14 @@ export function Statistics() {
   const [purchaseSpending, setPurchaseSpending] = useState<Record<string, Record<string, number>> | null>(
     null
   );
+  const [saleProceedsByCategory, setSaleProceedsByCategory] = useState<Record<
+    string,
+    Record<string, number>
+  > | null>(null);
   /** Log rows counted per spend-tracked category (same period as spending). */
   const [purchaseItemCounts, setPurchaseItemCounts] = useState<Record<string, number> | null>(null);
+  const [saleItemCounts, setSaleItemCounts] = useState<Record<string, number> | null>(null);
+  const [netByCurrency, setNetByCurrency] = useState<Record<string, number> | null>(null);
   const [purchaseSpendingLoading, setPurchaseSpendingLoading] = useState(true);
   const [spendDetailMediaType, setSpendDetailMediaType] = useState<string | null>(null);
   const [spendDetailLogs, setSpendDetailLogs] = useState<Log[]>([]);
@@ -344,13 +394,22 @@ export function Statistics() {
     try {
       const res = await apiFetch<{
         data: Record<string, Record<string, number>>;
+        saleData?: Record<string, Record<string, number>>;
         counts?: Record<string, number>;
+        saleCounts?: Record<string, number>;
+        netByCurrency?: Record<string, number>;
       }>(`/logs/stats?group=purchaseSpending&period=${purchasePeriod}&timezoneOffsetMinutes=${tzOffsetMinutes}`);
       setPurchaseSpending(res.data ?? null);
+      setSaleProceedsByCategory(res.saleData ?? null);
       setPurchaseItemCounts(res.counts ?? null);
+      setSaleItemCounts(res.saleCounts ?? null);
+      setNetByCurrency(res.netByCurrency ?? null);
     } catch {
       setPurchaseSpending(null);
+      setSaleProceedsByCategory(null);
       setPurchaseItemCounts(null);
+      setSaleItemCounts(null);
+      setNetByCurrency(null);
     } finally {
       setPurchaseSpendingLoading(false);
     }
@@ -529,6 +588,48 @@ export function Statistics() {
     return SPEND_TRACKED_MEDIA_TYPES.reduce((acc, mt) => acc + (purchaseItemCounts[mt] ?? 0), 0);
   }, [purchaseItemCounts]);
 
+  const totalSaleItems = useMemo(() => {
+    if (!saleItemCounts) return 0;
+    return SPEND_TRACKED_MEDIA_TYPES.reduce((acc, mt) => acc + (saleItemCounts[mt] ?? 0), 0);
+  }, [saleItemCounts]);
+
+  /** Rows with purchase and/or sale in period (counts may overlap if one log has both). */
+  const totalFinanceItems = totalPurchaseItems + totalSaleItems;
+
+  const hasAnyFinanceActivity = useMemo(() => {
+    if (purchaseSpendingLoading) return true;
+    const spend =
+      purchaseSpending &&
+      SPEND_TRACKED_MEDIA_TYPES.some((mt) => {
+        const by = purchaseSpending[mt];
+        return by && Object.keys(by).length > 0;
+      });
+    const sales =
+      saleProceedsByCategory &&
+      SPEND_TRACKED_MEDIA_TYPES.some((mt) => {
+        const by = saleProceedsByCategory[mt];
+        return by && Object.keys(by).length > 0;
+      });
+    return Boolean(spend || sales);
+  }, [purchaseSpending, saleProceedsByCategory, purchaseSpendingLoading]);
+
+  const totalsSpentByCurrency = useMemo(
+    () => sumMinorByCurrency(purchaseSpending),
+    [purchaseSpending]
+  );
+  const totalsProceedsByCurrency = useMemo(
+    () => sumMinorByCurrency(saleProceedsByCategory),
+    [saleProceedsByCategory]
+  );
+  const financeCurrencyOrder = useMemo(() => {
+    const keys = new Set([
+      ...Object.keys(totalsSpentByCurrency),
+      ...Object.keys(totalsProceedsByCurrency),
+      ...(netByCurrency ? Object.keys(netByCurrency) : []),
+    ]);
+    return Array.from(keys).sort((a, b) => a.localeCompare(b));
+  }, [totalsSpentByCurrency, totalsProceedsByCurrency, netByCurrency]);
+
   return (
     <div className="relative flex min-w-0 flex-col gap-10 overflow-x-hidden">
       <Dialog open={showProModal && !isPro} onOpenChange={setShowProModal}>
@@ -574,7 +675,7 @@ export function Statistics() {
           {!summaryCollapsed && (
         <section
           aria-label={t("statistics.summaryTitle")}
-          className="grid min-w-0 grid-cols-1 gap-2 md:grid-cols-4 md:gap-4"
+          className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 md:gap-4"
         >
           <OverviewStatCard
             icon={Layers}
@@ -607,6 +708,36 @@ export function Statistics() {
             icon={Star}
             label={t("statistics.summaryReviewed")}
             value={summaryData.reviewedLogs}
+          />
+          <OverviewStatCard
+            icon={Scale}
+            label={t("statistics.summaryLifetimeBalance")}
+            valueClassName="!text-lg md:!text-xl md:!leading-snug"
+            value={(() => {
+              const net = summaryData.lifetimeNetByCurrency ?? {};
+              const entries = Object.entries(net).sort(([a], [b]) => a.localeCompare(b));
+              if (entries.length === 0) {
+                return <span className="text-[var(--color-light)]">—</span>;
+              }
+              return (
+                <div className="flex flex-col gap-1">
+                  {entries.map(([currency, minor]) => {
+                    const tone =
+                      minor > 0
+                        ? "text-emerald-400"
+                        : minor < 0
+                          ? "text-rose-400/90"
+                          : "text-[var(--color-lightest)]";
+                    return (
+                      <span key={currency} className={cn("leading-tight", tone)}>
+                        {formatSignedMinorAsMoney(minor, currency)}
+                      </span>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+            sub={<span className="tabular-nums">{t("statistics.summaryLifetimeBalanceSub")}</span>}
           />
         </section>
           )}
@@ -645,13 +776,13 @@ export function Statistics() {
                     <OverflowMarquee>{t("statistics.purchaseSpendingTitle")}</OverflowMarquee>
                   </h2>
                 </div>
-                {!purchaseSpendingLoading && totalPurchaseItems > 0 && (
+                {!purchaseSpendingLoading && totalFinanceItems > 0 && (
                   <p className="text-sm text-[var(--color-light)]">
                     {t(
-                      totalPurchaseItems === 1
-                        ? "statistics.purchaseItemsTotal_one"
-                        : "statistics.purchaseItemsTotal_other",
-                      { count: String(totalPurchaseItems) }
+                      totalFinanceItems === 1
+                        ? "statistics.financeItemsLabel_one"
+                        : "statistics.financeItemsLabel_other",
+                      { count: String(totalFinanceItems) }
                     )}
                   </p>
                 )}
@@ -675,14 +806,49 @@ export function Statistics() {
                 />
               </div>
             </div>
+            {!purchaseSpendingLoading && financeCurrencyOrder.length > 0 && (
+              <div className="mb-4 rounded-lg border border-[var(--color-mid)]/25 bg-[var(--color-darkest)]/40 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-light)]">
+                  {t("statistics.financeOverview")}
+                </p>
+                <ul className="m-0 mt-2 list-none space-y-2 p-0">
+                  {financeCurrencyOrder.map((cur) => {
+                    const spent = totalsSpentByCurrency[cur] ?? 0;
+                    const proceeds = totalsProceedsByCurrency[cur] ?? 0;
+                    const net = netByCurrency?.[cur] ?? proceeds - spent;
+                    const netTone =
+                      net > 0
+                        ? "text-emerald-400"
+                        : net < 0
+                          ? "text-rose-400/90"
+                          : "text-[var(--color-light)]";
+                    return (
+                      <li
+                        key={cur}
+                        className="rounded-md border border-[var(--color-mid)]/15 bg-[var(--color-dark)]/30 px-2 py-2"
+                      >
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-xs font-medium text-[var(--color-light)]">{cur}</span>
+                          <span className={cn("text-sm font-semibold tabular-nums", netTone)}>
+                            {formatSignedMinorAsMoney(net, cur)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-medium tabular-nums">
+                          <span className="text-emerald-400">{formatSaleTotalsMinorAsMoney(proceeds, cur)}</span>
+                          <span className="text-rose-400/90">
+                            {formatPurchaseTotalsMinorAsMoney(spent, cur)}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
             <div className="min-h-[12.5rem] min-w-0">
               {purchaseSpendingLoading ? (
                 <StatisticsBarsSkeleton rows={4} />
-              ) : !purchaseSpending ||
-                SPEND_TRACKED_MEDIA_TYPES.every((mt) => {
-                  const byCur = purchaseSpending[mt];
-                  return !byCur || Object.keys(byCur).length === 0;
-                }) ? (
+              ) : !hasAnyFinanceActivity ? (
                 <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
                   {t("statistics.purchaseEmpty")}
                 </p>
@@ -690,8 +856,12 @@ export function Statistics() {
                 (() => {
                   let maxMinorGlobal = 0;
                   for (const mt of SPEND_TRACKED_MEDIA_TYPES) {
-                    const byCur = purchaseSpending[mt] ?? {};
-                    for (const v of Object.values(byCur)) {
+                    const spendCur = purchaseSpending?.[mt] ?? {};
+                    for (const v of Object.values(spendCur)) {
+                      if (v > maxMinorGlobal) maxMinorGlobal = v;
+                    }
+                    const saleCur = saleProceedsByCategory?.[mt] ?? {};
+                    for (const v of Object.values(saleCur)) {
                       if (v > maxMinorGlobal) maxMinorGlobal = v;
                     }
                   }
@@ -699,55 +869,99 @@ export function Statistics() {
                   return (
                     <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
                       {SPEND_TRACKED_MEDIA_TYPES.map((mt) => {
-                        const byCurrency = purchaseSpending[mt] ?? {};
+                        const byCurrency = purchaseSpending?.[mt] ?? {};
+                        const bySaleCurrency = saleProceedsByCategory?.[mt] ?? {};
                         const entries = Object.entries(byCurrency).sort(([a], [b]) => a.localeCompare(b));
-                        const maxInCategory = Math.max(0, ...entries.map(([, v]) => v), 0);
-                        const itemCount = purchaseItemCounts?.[mt] ?? 0;
+                        const saleEntries = Object.entries(bySaleCurrency).sort(([a], [b]) =>
+                          a.localeCompare(b)
+                        );
+                        const maxPurchase = Math.max(0, ...entries.map(([, v]) => v), 0);
+                        const maxSale = Math.max(0, ...saleEntries.map(([, v]) => v), 0);
+                        const pCount = purchaseItemCounts?.[mt] ?? 0;
+                        const sCount = saleItemCounts?.[mt] ?? 0;
+                        const categoryFinanceItems = pCount + sCount;
+                        const hasFinanceRows = pCount > 0 || sCount > 0;
                         const rowInner = (
                           <>
                             <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
                               <OverflowMarquee className={statBarMarqueeClass}>{t(`nav.${mt}`)}</OverflowMarquee>
-                              {itemCount > 0 && (
+                              {categoryFinanceItems > 0 && (
                                 <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
                                   {t(
-                                    itemCount === 1
-                                      ? "statistics.purchaseItemsInCategory_one"
-                                      : "statistics.purchaseItemsInCategory_other",
-                                    { count: String(itemCount) }
+                                    categoryFinanceItems === 1
+                                      ? "statistics.financeItemsLabel_one"
+                                      : "statistics.financeItemsLabel_other",
+                                    { count: String(categoryFinanceItems) }
                                   )}
                                 </span>
                               )}
                             </div>
-                            <div className={statBarTrackClass}>
-                              <div
-                                className="h-full rounded bg-gradient-to-r from-[var(--color-mid)] to-[var(--color-mid)]/80"
-                                style={{
-                                  width: `${Math.max(4, (maxInCategory / maxMinorGlobal) * 100)}%`,
-                                }}
-                              />
+                            <div className="flex min-w-0 flex-col justify-center gap-1 py-0.5">
+                              {maxSale > 0 && (
+                                <div className={statBarTrackClass}>
+                                  <div
+                                    className="h-full rounded bg-emerald-600/75"
+                                    style={{
+                                      width: `${Math.max(4, (maxSale / maxMinorGlobal) * 100)}%`,
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              {maxPurchase > 0 && (
+                                <div className={statBarTrackClass}>
+                                  <div
+                                    className="h-full rounded bg-gradient-to-r from-[var(--color-mid)] to-[var(--color-mid)]/80"
+                                    style={{
+                                      width: `${Math.max(4, (maxPurchase / maxMinorGlobal) * 100)}%`,
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              {maxPurchase === 0 && maxSale === 0 && <div className={statBarTrackClass} />}
                             </div>
-                            <div className="flex min-w-0 flex-col items-end gap-0.5 text-right text-xs tabular-nums text-[var(--color-lightest)]">
-                              {entries.length === 0 ? (
+                            <div className="flex min-w-0 flex-col items-end gap-1 text-right text-xs tabular-nums">
+                              {entries.length === 0 && saleEntries.length === 0 ? (
                                 <span className="text-[var(--color-light)]">—</span>
                               ) : (
-                                entries.map(([currency, minor]) => (
-                                  <span key={`${mt}-${currency}`} className="leading-tight">
-                                    {formatMinorAsMoney(minor, currency)}
-                                  </span>
-                                ))
+                                <>
+                                  {saleEntries.length > 0 && (
+                                    <div className="flex flex-col items-end gap-0.5">
+                                      {saleEntries.map(([currency, minor]) => (
+                                        <span
+                                          key={`${mt}-sl-${currency}`}
+                                          className="leading-tight text-emerald-400"
+                                        >
+                                          {formatSaleTotalsMinorAsMoney(minor, currency)}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {entries.length > 0 && (
+                                    <div className="flex flex-col items-end gap-0.5">
+                                      {entries.map(([currency, minor]) => (
+                                        <span
+                                          key={`${mt}-sp-${currency}`}
+                                          className="leading-tight text-rose-400/90"
+                                        >
+                                          {formatPurchaseTotalsMinorAsMoney(minor, currency)}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </div>
                           </>
                         );
                         const rowClass = `${statBarGridClass} rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]`;
-                        return itemCount > 0 ? (
+                        return hasFinanceRows ? (
                           <button
                             key={mt}
                             type="button"
                             onClick={() => setSpendDetailMediaType(mt)}
                             className={`${rowClass} w-full cursor-pointer text-left hover:bg-[var(--color-mid)]/15`}
-                            title={t("statistics.purchaseDetailOpen", { category: t(`nav.${mt}`) })}
-                            aria-label={t("statistics.purchaseDetailOpen", { category: t(`nav.${mt}`) })}
+                            title={t("statistics.financeDetailOpen", { category: t(`nav.${mt}`) })}
+                            aria-label={t("statistics.financeDetailOpen", { category: t(`nav.${mt}`) })}
                           >
                             {rowInner}
                           </button>
@@ -778,7 +992,7 @@ export function Statistics() {
             >
               <div className="mt-6">
                 <OverflowMarquee className="mb-4 min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
-                  {t("statistics.purchaseSpendingDetailTitle", {
+                  {t("statistics.financeDetailTitle", {
                     category: t(`nav.${spendDetailMediaType}`),
                   })}
                 </OverflowMarquee>
@@ -788,7 +1002,7 @@ export function Statistics() {
                   </div>
                 ) : spendDetailLogs.length === 0 ? (
                   <p className="py-6 text-center text-sm text-[var(--color-light)]">
-                    {t("statistics.purchaseDetailEmpty")}
+                    {t("statistics.financeDetailEmpty")}
                   </p>
                 ) : (
                   <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -796,7 +1010,7 @@ export function Statistics() {
                       <li key={log.id}>
                         <Link
                           to={`/item/${log.mediaType}/${log.externalId}`}
-                          className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
+                          className="flex items-center gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
                           onClick={() => setSpendDetailMediaType(null)}
                         >
                           <ItemImage
@@ -819,12 +1033,35 @@ export function Statistics() {
                                 return duration ? <> · {t("dashboard.finishedIn", { duration })}</> : null;
                               })()}
                             </p>
-                            {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
+                            {log.status != null &&
+                            (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
                               <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
                                 {t("common.inProgress")}
                               </span>
                             ) : log.grade != null ? (
                               <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+                            ) : null}
+                          </div>
+                          <div className="flex shrink-0 flex-col items-end justify-center gap-0.5 text-xs tabular-nums">
+                            {log.purchaseAmountMinor != null && log.purchaseCurrency ? (
+                              <span className="text-right text-[var(--color-light)]">
+                                <span className="block text-[9px] uppercase tracking-wide">
+                                  {t("statistics.detailSpent")}
+                                </span>
+                                <span className="font-medium text-[var(--color-lightest)]">
+                                  {formatMinorAsMoney(log.purchaseAmountMinor, log.purchaseCurrency)}
+                                </span>
+                              </span>
+                            ) : null}
+                            {log.saleAmountMinor != null && log.saleCurrency ? (
+                              <span className="text-right text-emerald-400/90">
+                                <span className="block text-[9px] uppercase tracking-wide text-emerald-400/70">
+                                  {t("statistics.detailProceeds")}
+                                </span>
+                                <span className="font-medium">
+                                  {formatMinorAsMoney(log.saleAmountMinor, log.saleCurrency)}
+                                </span>
+                              </span>
                             ) : null}
                           </div>
                         </Link>
@@ -844,7 +1081,7 @@ export function Statistics() {
               <DialogHeader className="shrink-0 space-y-0 pr-8 text-left sm:pr-10">
                 <DialogTitle className="min-w-0 text-[var(--color-lightest)]">
                   <OverflowMarquee>
-                    {t("statistics.purchaseSpendingDetailTitle", {
+                    {t("statistics.financeDetailTitle", {
                       category: t(`nav.${spendDetailMediaType}`),
                     })}
                   </OverflowMarquee>
@@ -857,7 +1094,7 @@ export function Statistics() {
                   </div>
                 ) : spendDetailLogs.length === 0 ? (
                   <p className="py-6 text-center text-sm text-[var(--color-light)]">
-                    {t("statistics.purchaseDetailEmpty")}
+                    {t("statistics.financeDetailEmpty")}
                   </p>
                 ) : (
                   <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -865,7 +1102,7 @@ export function Statistics() {
                       <li key={log.id}>
                         <Link
                           to={`/item/${log.mediaType}/${log.externalId}`}
-                          className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
+                          className="flex items-center gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
                           onClick={() => setSpendDetailMediaType(null)}
                         >
                           <ItemImage
@@ -888,12 +1125,35 @@ export function Statistics() {
                                 return duration ? <> · {t("dashboard.finishedIn", { duration })}</> : null;
                               })()}
                             </p>
-                            {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
+                            {log.status != null &&
+                            (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
                               <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
                                 {t("common.inProgress")}
                               </span>
                             ) : log.grade != null ? (
                               <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+                            ) : null}
+                          </div>
+                          <div className="flex shrink-0 flex-col items-end justify-center gap-0.5 text-xs tabular-nums">
+                            {log.purchaseAmountMinor != null && log.purchaseCurrency ? (
+                              <span className="text-right text-[var(--color-light)]">
+                                <span className="block text-[9px] uppercase tracking-wide">
+                                  {t("statistics.detailSpent")}
+                                </span>
+                                <span className="font-medium text-[var(--color-lightest)]">
+                                  {formatMinorAsMoney(log.purchaseAmountMinor, log.purchaseCurrency)}
+                                </span>
+                              </span>
+                            ) : null}
+                            {log.saleAmountMinor != null && log.saleCurrency ? (
+                              <span className="text-right text-emerald-400/90">
+                                <span className="block text-[9px] uppercase tracking-wide text-emerald-400/70">
+                                  {t("statistics.detailProceeds")}
+                                </span>
+                                <span className="font-medium">
+                                  {formatMinorAsMoney(log.saleAmountMinor, log.saleCurrency)}
+                                </span>
+                              </span>
                             ) : null}
                           </div>
                         </Link>

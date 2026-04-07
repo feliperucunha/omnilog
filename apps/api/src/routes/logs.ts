@@ -54,9 +54,18 @@ const createLogSchema = z.object({
   boardGameSource: z.enum(["bgg", "ludopedia"]).nullable().optional(),
   own: z.boolean().nullable().optional(),
   wantToBuy: z.boolean().nullable().optional(),
+  sold: z.boolean().nullable().optional(),
   matchesPlayed: z.number().int().min(0).nullable().optional(),
   purchaseAmountMinor: z.number().int().min(0).max(999_999_999_999).nullable().optional(),
   purchaseCurrency: z
+    .string()
+    .length(3)
+    .regex(/^[A-Za-z]{3}$/)
+    .nullable()
+    .optional()
+    .transform((s) => (s == null ? null : s.toUpperCase())),
+  saleAmountMinor: z.number().int().min(0).max(999_999_999_999).nullable().optional(),
+  saleCurrency: z
     .string()
     .length(3)
     .regex(/^[A-Za-z]{3}$/)
@@ -136,9 +145,18 @@ const updateLogSchema = z.object({
   affinityContext: affinityContextSchema,
   own: z.boolean().nullable().optional(),
   wantToBuy: z.boolean().nullable().optional(),
+  sold: z.boolean().nullable().optional(),
   matchesPlayed: z.number().int().min(0).nullable().optional(),
   purchaseAmountMinor: z.number().int().min(0).max(999_999_999_999).nullable().optional(),
   purchaseCurrency: z
+    .string()
+    .length(3)
+    .regex(/^[A-Za-z]{3}$/)
+    .nullable()
+    .optional()
+    .transform((s) => (s == null ? null : s.toUpperCase())),
+  saleAmountMinor: z.number().int().min(0).max(999_999_999_999).nullable().optional(),
+  saleCurrency: z
     .string()
     .length(3)
     .regex(/^[A-Za-z]{3}$/)
@@ -165,6 +183,26 @@ function isSpendTrackedMediaType(mt: MediaType): boolean {
   return (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mt);
 }
 
+/** own / wantToBuy / sold are mutually exclusive for spend-tracked media. */
+function reconcileSpendTrackedOwnership(
+  mediaType: MediaType,
+  patch: { own?: boolean | null; wantToBuy?: boolean | null; sold?: boolean | null },
+  current: { own: boolean | null; wantToBuy: boolean | null; sold: boolean | null } | null
+): { own: boolean | null; wantToBuy: boolean | null; sold: boolean | null } | null {
+  if (!isSpendTrackedMediaType(mediaType)) return null;
+  const touched =
+    patch.own !== undefined || patch.wantToBuy !== undefined || patch.sold !== undefined;
+  if (!touched && current == null) return { own: false, wantToBuy: false, sold: false };
+  if (!touched) return null;
+  const o = patch.own !== undefined ? patch.own === true : current?.own === true;
+  const w = patch.wantToBuy !== undefined ? patch.wantToBuy === true : current?.wantToBuy === true;
+  const s = patch.sold !== undefined ? patch.sold === true : current?.sold === true;
+  if (s) return { own: false, wantToBuy: false, sold: true };
+  if (o) return { own: true, wantToBuy: false, sold: false };
+  if (w) return { own: false, wantToBuy: true, sold: false };
+  return { own: false, wantToBuy: false, sold: false };
+}
+
 function mergeLogWhere(base: Prisma.LogWhereInput, extra: Prisma.LogWhereInput): Prisma.LogWhereInput {
   return { AND: [base, extra] };
 }
@@ -184,8 +222,13 @@ import {
 } from "../services/gamification.service.js";
 import {
   normalizePurchaseFields,
+  normalizeSaleFields,
   purchaseLogCreatedAtRange,
   localDayBoundsFromDateString,
+  logSpendStatsDateWhere,
+  spendMonetarySnapshotFromLog,
+  spendFieldsAtAfterSnapshotChange,
+  spendMonetaryHasAny,
   type PurchasePeriod,
 } from "../lib/purchaseFields.js";
 import {
@@ -295,11 +338,13 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     if (wantToBuyFilter) where.wantToBuy = true;
   }
   if (purchasedFilter) {
-    where.purchaseAmountMinor = { not: null };
-    where.purchaseCurrency = { not: null };
+    where.OR = [
+      { AND: [{ purchaseAmountMinor: { not: null } }, { purchaseCurrency: { not: null } }] },
+      { AND: [{ saleAmountMinor: { not: null } }, { saleCurrency: { not: null } }] },
+    ];
     if (isFreeTierForList) {
       const range = purchaseLogCreatedAtRange("month", tzOffsetMinutesList);
-      if (range) where.createdAt = { gte: range.gte, lte: range.lte };
+      if (range) where = mergeLogWhere(where, logSpendStatsDateWhere(range));
     } else {
       const dateRaw = typeof req.query.purchaseDate === "string" ? req.query.purchaseDate.trim() : "";
       if (dateRaw !== "") {
@@ -309,7 +354,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
             ? parseInt(tzRaw, 10)
             : 0;
         const bounds = localDayBoundsFromDateString(dateRaw, tzOffsetMinutes);
-        if (bounds) where.createdAt = { gte: bounds.gte, lte: bounds.lte };
+        if (bounds) where = mergeLogWhere(where, logSpendStatsDateWhere(bounds));
       } else {
         const spendPeriodRaw = typeof req.query.spendPeriod === "string" ? req.query.spendPeriod.trim() : "";
         const validPeriods: PurchasePeriod[] = ["month", "year", "all"];
@@ -320,7 +365,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
               ? parseInt(tzRaw, 10)
               : 0;
           const range = purchaseLogCreatedAtRange(spendPeriodRaw as PurchasePeriod, tzOffsetMinutes);
-          if (range) where.createdAt = { gte: range.gte, lte: range.lte };
+          if (range) where = mergeLogWhere(where, logSpendStatsDateWhere(range));
         }
       }
     }
@@ -511,33 +556,80 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       periodRaw === "year" || periodRaw === "all" ? periodRaw : "month";
     if (!fullStatsAccess) period = "month";
     const range = purchaseLogCreatedAtRange(period, tzOffsetMinutes);
+    const spendPresentWhere: Prisma.LogWhereInput = {
+      OR: [
+        { AND: [{ purchaseAmountMinor: { not: null } }, { purchaseCurrency: { not: null } }] },
+        { AND: [{ saleAmountMinor: { not: null } }, { saleCurrency: { not: null } }] },
+      ],
+    };
+    const dateWhere = logSpendStatsDateWhere(range);
+    const purchaseSpendingAnd: Prisma.LogWhereInput[] = [
+      { userId },
+      { mediaType: { in: [...SPEND_TRACKED_MEDIA_TYPES] } },
+      spendPresentWhere,
+    ];
+    if (Object.keys(dateWhere).length > 0) purchaseSpendingAnd.push(dateWhere);
     const logs = await prisma.log.findMany({
-      where: {
-        userId,
-        purchaseAmountMinor: { not: null },
-        purchaseCurrency: { not: null },
-        mediaType: { in: [...SPEND_TRACKED_MEDIA_TYPES] },
-        ...(range ? { createdAt: { gte: range.gte, lte: range.lte } } : {}),
+      where: { AND: purchaseSpendingAnd },
+      select: {
+        mediaType: true,
+        purchaseAmountMinor: true,
+        purchaseCurrency: true,
+        saleAmountMinor: true,
+        saleCurrency: true,
       },
-      select: { mediaType: true, purchaseAmountMinor: true, purchaseCurrency: true },
     });
     const data: Record<string, Record<string, number>> = Object.fromEntries(
+      SPEND_TRACKED_MEDIA_TYPES.map((mt) => [mt, {} as Record<string, number>])
+    );
+    const saleData: Record<string, Record<string, number>> = Object.fromEntries(
       SPEND_TRACKED_MEDIA_TYPES.map((mt) => [mt, {} as Record<string, number>])
     );
     const counts: Record<string, number> = Object.fromEntries(
       SPEND_TRACKED_MEDIA_TYPES.map((mt) => [mt, 0])
     );
+    const saleCounts: Record<string, number> = Object.fromEntries(
+      SPEND_TRACKED_MEDIA_TYPES.map((mt) => [mt, 0])
+    );
+    const totalsPurchaseByCur: Record<string, number> = {};
+    const totalsSaleByCur: Record<string, number> = {};
     for (const row of logs) {
-      const n = row.purchaseAmountMinor;
-      const cur = row.purchaseCurrency;
-      if (n == null || cur == null) continue;
       const k = row.mediaType as string;
       if (!(k in data)) continue;
-      const bucket = data[k];
-      bucket[cur] = (bucket[cur] ?? 0) + n;
-      counts[k] = (counts[k] ?? 0) + 1;
+      const pn = row.purchaseAmountMinor;
+      const pc = row.purchaseCurrency;
+      if (pn != null && pc != null) {
+        const bucket = data[k];
+        bucket[pc] = (bucket[pc] ?? 0) + pn;
+        counts[k] = (counts[k] ?? 0) + 1;
+        totalsPurchaseByCur[pc] = (totalsPurchaseByCur[pc] ?? 0) + pn;
+      }
+      const sn = row.saleAmountMinor;
+      const sc = row.saleCurrency;
+      if (sn != null && sc != null) {
+        const sb = saleData[k];
+        sb[sc] = (sb[sc] ?? 0) + sn;
+        saleCounts[k] = (saleCounts[k] ?? 0) + 1;
+        totalsSaleByCur[sc] = (totalsSaleByCur[sc] ?? 0) + sn;
+      }
     }
-    res.json({ group: "purchaseSpending", period, data, counts });
+    const allCurrencies = new Set([
+      ...Object.keys(totalsPurchaseByCur),
+      ...Object.keys(totalsSaleByCur),
+    ]);
+    const netByCurrency: Record<string, number> = {};
+    for (const cur of allCurrencies) {
+      netByCurrency[cur] = (totalsSaleByCur[cur] ?? 0) - (totalsPurchaseByCur[cur] ?? 0);
+    }
+    res.json({
+      group: "purchaseSpending",
+      period,
+      data,
+      saleData,
+      counts,
+      saleCounts,
+      netByCurrency,
+    });
     return;
   }
 
@@ -553,23 +645,64 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
       : { userId, completedAt: { not: null } };
 
-    const [totalLogs, completedLogCount, reviewedLogs, completedLogs] = await Promise.all([
-      prisma.log.count({ where: totalWhere }),
-      prisma.log.count({ where: completedCountWhere }),
-      prisma.log.count({ where: reviewedWhere }),
-      prisma.log.findMany({
-        where: completedForHoursWhere,
-        select: {
-          completedAt: true,
-          contentHours: true,
-          startedAt: true,
-          mediaType: true,
-          hoursToBeat: true,
-          matchesPlayed: true,
-        },
-      }),
-    ]);
+    const spendLifetimeWhere: Prisma.LogWhereInput = {
+      userId,
+      mediaType: { in: [...SPEND_TRACKED_MEDIA_TYPES] },
+      OR: [
+        { AND: [{ purchaseAmountMinor: { not: null } }, { purchaseCurrency: { not: null } }] },
+        { AND: [{ saleAmountMinor: { not: null } }, { saleCurrency: { not: null } }] },
+      ],
+    };
+
+    const [totalLogs, completedLogCount, reviewedLogs, completedLogs, spendLifetimeRows] =
+      await Promise.all([
+        prisma.log.count({ where: totalWhere }),
+        prisma.log.count({ where: completedCountWhere }),
+        prisma.log.count({ where: reviewedWhere }),
+        prisma.log.findMany({
+          where: completedForHoursWhere,
+          select: {
+            completedAt: true,
+            contentHours: true,
+            startedAt: true,
+            mediaType: true,
+            hoursToBeat: true,
+            matchesPlayed: true,
+          },
+        }),
+        prisma.log.findMany({
+          where: spendLifetimeWhere,
+          select: {
+            purchaseAmountMinor: true,
+            purchaseCurrency: true,
+            saleAmountMinor: true,
+            saleCurrency: true,
+          },
+        }),
+      ]);
     const { totalHours, logsWithPositiveHours } = rollupHoursFromCompletedLogs(completedLogs);
+    const totalsPurchaseByCur: Record<string, number> = {};
+    const totalsSaleByCur: Record<string, number> = {};
+    for (const row of spendLifetimeRows) {
+      const pn = row.purchaseAmountMinor;
+      const pc = row.purchaseCurrency;
+      if (pn != null && pc != null) {
+        totalsPurchaseByCur[pc] = (totalsPurchaseByCur[pc] ?? 0) + pn;
+      }
+      const sn = row.saleAmountMinor;
+      const sc = row.saleCurrency;
+      if (sn != null && sc != null) {
+        totalsSaleByCur[sc] = (totalsSaleByCur[sc] ?? 0) + sn;
+      }
+    }
+    const lifetimeCurrencies = new Set([
+      ...Object.keys(totalsPurchaseByCur),
+      ...Object.keys(totalsSaleByCur),
+    ]);
+    const lifetimeNetByCurrency: Record<string, number> = {};
+    for (const cur of lifetimeCurrencies) {
+      lifetimeNetByCurrency[cur] = (totalsSaleByCur[cur] ?? 0) - (totalsPurchaseByCur[cur] ?? 0);
+    }
     res.json({
       group: "summary",
       data: {
@@ -578,6 +711,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
         reviewedLogs,
         totalContentHours: totalHours,
         completedLogsWithHours: logsWithPositiveHours,
+        lifetimeNetByCurrency,
       },
     });
     return;
@@ -795,8 +929,8 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
 /** Column keys for CSV export. When single category, only relevant columns; when all, include mediaType. */
 const EXPORT_COLUMNS_ALL: readonly string[] = [
   "mediaType", "externalId", "title", "grade", "status", "season", "episode", "chapter", "volume",
-  "startedAt", "completedAt", "contentHours", "hoursToBeat", "own", "wantToBuy", "matchesPlayed",
-  "purchaseAmountMinor", "purchaseCurrency", "review", "createdAt", "updatedAt",
+  "startedAt", "completedAt", "contentHours", "hoursToBeat", "own", "wantToBuy", "sold", "matchesPlayed",
+  "purchaseAmountMinor", "purchaseCurrency", "saleAmountMinor", "saleCurrency", "review", "createdAt", "updatedAt",
 ];
 const EXPORT_COLUMNS_BY_MEDIA: Record<MediaType, readonly string[]> = {
   movies: ["externalId", "title", "grade", "status", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
@@ -805,19 +939,19 @@ const EXPORT_COLUMNS_BY_MEDIA: Record<MediaType, readonly string[]> = {
   books: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   manga: [
     "externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "purchaseAmountMinor",
-    "purchaseCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
+    "purchaseCurrency", "saleAmountMinor", "saleCurrency", "sold", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
   ],
   comics: [
     "externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "purchaseAmountMinor",
-    "purchaseCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
+    "purchaseCurrency", "saleAmountMinor", "saleCurrency", "sold", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
   ],
   games: [
-    "externalId", "title", "grade", "status", "contentHours", "hoursToBeat", "own", "wantToBuy",
-    "purchaseAmountMinor", "purchaseCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
+    "externalId", "title", "grade", "status", "contentHours", "hoursToBeat", "own", "wantToBuy", "sold",
+    "purchaseAmountMinor", "purchaseCurrency", "saleAmountMinor", "saleCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
   ],
   boardgames: [
-    "externalId", "title", "grade", "status", "own", "wantToBuy", "matchesPlayed",
-    "purchaseAmountMinor", "purchaseCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
+    "externalId", "title", "grade", "status", "own", "wantToBuy", "sold", "matchesPlayed",
+    "purchaseAmountMinor", "purchaseCurrency", "saleAmountMinor", "saleCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
   ],
 };
 
@@ -838,12 +972,15 @@ function getExportValue(
     hoursToBeat: number | null;
     own: boolean | null;
     wantToBuy: boolean | null;
+    sold: boolean | null;
     matchesPlayed: number | null;
     review: string | null;
     createdAt: Date;
     updatedAt: Date;
     purchaseAmountMinor?: number | null;
     purchaseCurrency?: string | null;
+    saleAmountMinor?: number | null;
+    saleCurrency?: string | null;
   },
   key: string
 ): string | number | null | undefined {
@@ -863,12 +1000,15 @@ function getExportValue(
     case "hoursToBeat": return log.hoursToBeat;
     case "own": return log.own == null ? null : log.own ? "true" : "false";
     case "wantToBuy": return log.wantToBuy == null ? null : log.wantToBuy ? "true" : "false";
+    case "sold": return log.sold == null ? null : log.sold ? "true" : "false";
     case "matchesPlayed": return log.matchesPlayed;
     case "review": return log.review;
     case "createdAt": return log.createdAt.toISOString();
     case "updatedAt": return log.updatedAt.toISOString();
     case "purchaseAmountMinor": return log.purchaseAmountMinor ?? null;
     case "purchaseCurrency": return log.purchaseCurrency ?? null;
+    case "saleAmountMinor": return log.saleAmountMinor ?? null;
+    case "saleCurrency": return log.saleCurrency ?? null;
     default: return undefined;
   }
 }
@@ -945,9 +1085,12 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     boardGameSource: bodyBoardGameSource,
     own: bodyOwn,
     wantToBuy: bodyWantToBuy,
+    sold: bodySold,
     matchesPlayed: bodyMatchesPlayed,
     purchaseAmountMinor: bodyPurchaseAmountMinor,
     purchaseCurrency: bodyPurchaseCurrency,
+    saleAmountMinor: bodySaleAmountMinor,
+    saleCurrency: bodySaleCurrency,
   } = parsed.data;
   const genresJson =
     genresInput && genresInput.length > 0
@@ -1035,6 +1178,40 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       }
     }
 
+    const ownershipNext = reconcileSpendTrackedOwnership(
+      mediaType,
+      { own: bodyOwn, wantToBuy: bodyWantToBuy, sold: bodySold },
+      existing ?? null
+    );
+    const soldActive =
+      ownershipNext != null ? ownershipNext.sold === true : (existing?.sold === true);
+
+    let saleResolved: { saleAmountMinor: number | null; saleCurrency: string | null };
+    if (!soldActive) {
+      saleResolved = { saleAmountMinor: null, saleCurrency: null };
+    } else if (!existing) {
+      const sn = normalizeSaleFields(mediaType, bodySaleAmountMinor, bodySaleCurrency);
+      if (!sn.ok) {
+        res.status(400).json({ error: sn.error });
+        return;
+      }
+      saleResolved = sn;
+    } else {
+      if (bodySaleAmountMinor !== undefined || bodySaleCurrency !== undefined) {
+        const sn = normalizeSaleFields(mediaType, bodySaleAmountMinor, bodySaleCurrency);
+        if (!sn.ok) {
+          res.status(400).json({ error: sn.error });
+          return;
+        }
+        saleResolved = sn;
+      } else {
+        saleResolved = {
+          saleAmountMinor: existing.saleAmountMinor,
+          saleCurrency: existing.saleCurrency,
+        };
+      }
+    }
+
     let log;
     if (existing) {
       const hadStatsReview = countsAsReviewForGamification(existing.grade, existing.review);
@@ -1058,9 +1235,13 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         affinityContext?: string | null;
         own?: boolean | null;
         wantToBuy?: boolean | null;
+        sold?: boolean | null;
         matchesPlayed?: number | null;
         purchaseAmountMinor?: number | null;
         purchaseCurrency?: string | null;
+        saleAmountMinor?: number | null;
+        saleCurrency?: string | null;
+        spendFieldsAt?: Date | null;
       } = {
         title: sanitizedTitle,
         grade: grade ?? null,
@@ -1075,27 +1256,38 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         volume: volume ?? null,
         purchaseAmountMinor: purchaseResolved.purchaseAmountMinor,
         purchaseCurrency: purchaseResolved.purchaseCurrency,
+        saleAmountMinor: saleResolved.saleAmountMinor,
+        saleCurrency: saleResolved.saleCurrency,
       };
       if (image !== undefined) updateData.image = sanitizedImage ?? null;
       if (genresJson !== undefined) updateData.genres = genresJson;
       if (mechanicsJson !== undefined) updateData.mechanics = mechanicsJson;
       if (affinityStored !== undefined) updateData.affinityContext = affinityStored;
-      if (bodyOwn !== undefined && isSpendTrackedMediaType(mediaType)) {
-        updateData.own = bodyOwn ?? null;
-      }
-      if (bodyWantToBuy !== undefined && isSpendTrackedMediaType(mediaType)) {
-        updateData.wantToBuy = bodyWantToBuy ?? null;
+      if (ownershipNext != null && isSpendTrackedMediaType(mediaType)) {
+        updateData.own = ownershipNext.own;
+        updateData.wantToBuy = ownershipNext.wantToBuy;
+        updateData.sold = ownershipNext.sold;
       }
       if (bodyMatchesPlayed !== undefined && mediaType === "boardgames") {
         updateData.matchesPlayed = bodyMatchesPlayed ?? null;
       }
       if (isInProgress(status) && existing.startedAt == null) updateData.startedAt = now;
       if (isCompleted(status)) updateData.completedAt = now;
+      const prevSpendSnap = spendMonetarySnapshotFromLog(existing);
+      const nextSpendSnap = spendMonetarySnapshotFromLog({
+        purchaseAmountMinor: updateData.purchaseAmountMinor ?? null,
+        purchaseCurrency: updateData.purchaseCurrency ?? null,
+        saleAmountMinor: updateData.saleAmountMinor ?? null,
+        saleCurrency: updateData.saleCurrency ?? null,
+      });
+      const spendAtNext = spendFieldsAtAfterSnapshotChange(prevSpendSnap, nextSpendSnap, now);
+      if (spendAtNext !== undefined) updateData.spendFieldsAt = spendAtNext;
       log = await prisma.log.update({
         where: { id: existing.id },
         data: updateData,
       });
       await persistUserDefaultPurchaseCurrency(userId, log.purchaseAmountMinor, log.purchaseCurrency);
+      await persistUserDefaultPurchaseCurrency(userId, log.saleAmountMinor, log.saleCurrency);
       let newBadges: NewBadge[] = [];
       const hasStatsReview = countsAsReviewForGamification(log.grade, log.review);
       if (!hadStatsReview && hasStatsReview) {
@@ -1158,14 +1350,29 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           mechanics: mechanicsJson,
           affinityContext: affinityStored !== undefined ? affinityStored : null,
           boardGameSource,
-          own: isSpendTrackedMediaType(mediaType) ? (bodyOwn ?? null) : null,
-          wantToBuy: isSpendTrackedMediaType(mediaType) ? (bodyWantToBuy ?? null) : null,
+          own: ownershipNext != null && isSpendTrackedMediaType(mediaType) ? ownershipNext.own : null,
+          wantToBuy:
+            ownershipNext != null && isSpendTrackedMediaType(mediaType) ? ownershipNext.wantToBuy : null,
+          sold: ownershipNext != null && isSpendTrackedMediaType(mediaType) ? ownershipNext.sold : null,
           matchesPlayed: mediaType === "boardgames" ? (bodyMatchesPlayed ?? null) : null,
           purchaseAmountMinor: purchaseResolved.purchaseAmountMinor,
           purchaseCurrency: purchaseResolved.purchaseCurrency,
+          saleAmountMinor: saleResolved.saleAmountMinor,
+          saleCurrency: saleResolved.saleCurrency,
+          spendFieldsAt: spendMonetaryHasAny(
+            spendMonetarySnapshotFromLog({
+              purchaseAmountMinor: purchaseResolved.purchaseAmountMinor,
+              purchaseCurrency: purchaseResolved.purchaseCurrency,
+              saleAmountMinor: saleResolved.saleAmountMinor,
+              saleCurrency: saleResolved.saleCurrency,
+            })
+          )
+            ? now
+            : null,
         },
       });
       await persistUserDefaultPurchaseCurrency(userId, log.purchaseAmountMinor, log.purchaseCurrency);
+      await persistUserDefaultPurchaseCurrency(userId, log.saleAmountMinor, log.saleCurrency);
       const newBadges: NewBadge[] = [];
       try {
         const fromLog = await handleLogCreated(userId);
@@ -1363,9 +1570,13 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     affinityContext?: string | null;
     own?: boolean | null;
     wantToBuy?: boolean | null;
+    sold?: boolean | null;
     matchesPlayed?: number | null;
     purchaseAmountMinor?: number | null;
     purchaseCurrency?: string | null;
+    saleAmountMinor?: number | null;
+    saleCurrency?: string | null;
+    spendFieldsAt?: Date | null;
   } = {};
   if (parsed.data.image !== undefined) data.image = sanitizeUrl(parsed.data.image) ?? null;
   if (parsed.data.grade !== undefined) data.grade = parsed.data.grade;
@@ -1399,11 +1610,19 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
         : stringifyLogAffinityContext(parsed.data.affinityContext);
   }
   const logMediaType = log.mediaType as MediaType;
-  if (parsed.data.own !== undefined && isSpendTrackedMediaType(logMediaType)) {
-    data.own = parsed.data.own ?? null;
-  }
-  if (parsed.data.wantToBuy !== undefined && isSpendTrackedMediaType(logMediaType)) {
-    data.wantToBuy = parsed.data.wantToBuy ?? null;
+  const ownPatch = reconcileSpendTrackedOwnership(
+    logMediaType,
+    {
+      own: parsed.data.own,
+      wantToBuy: parsed.data.wantToBuy,
+      sold: parsed.data.sold,
+    },
+    log
+  );
+  if (ownPatch != null) {
+    data.own = ownPatch.own;
+    data.wantToBuy = ownPatch.wantToBuy;
+    data.sold = ownPatch.sold;
   }
   if (parsed.data.matchesPlayed !== undefined && logMediaType === "boardgames") {
     data.matchesPlayed = parsed.data.matchesPlayed ?? null;
@@ -1421,12 +1640,56 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     data.purchaseAmountMinor = pn.purchaseAmountMinor;
     data.purchaseCurrency = pn.purchaseCurrency;
   }
+  const mergedSold = ownPatch != null ? ownPatch.sold === true : log.sold === true;
+  if (
+    parsed.data.saleAmountMinor !== undefined ||
+    parsed.data.saleCurrency !== undefined ||
+    ownPatch != null
+  ) {
+    if (!mergedSold) {
+      data.saleAmountMinor = null;
+      data.saleCurrency = null;
+    } else if (parsed.data.saleAmountMinor !== undefined || parsed.data.saleCurrency !== undefined) {
+      const sn = normalizeSaleFields(
+        logMediaType,
+        parsed.data.saleAmountMinor,
+        parsed.data.saleCurrency
+      );
+      if (!sn.ok) {
+        res.status(400).json({ error: sn.error });
+        return;
+      }
+      data.saleAmountMinor = sn.saleAmountMinor;
+      data.saleCurrency = sn.saleCurrency;
+    }
+  }
   if (isInProgress(parsed.data.status)) data.grade = null;
+  const mergedPurchaseMinor =
+    data.purchaseAmountMinor !== undefined ? data.purchaseAmountMinor : log.purchaseAmountMinor;
+  const mergedPurchaseCurrency =
+    data.purchaseCurrency !== undefined ? data.purchaseCurrency : log.purchaseCurrency;
+  const mergedSaleMinor = data.saleAmountMinor !== undefined ? data.saleAmountMinor : log.saleAmountMinor;
+  const mergedSaleCurrency =
+    data.saleCurrency !== undefined ? data.saleCurrency : log.saleCurrency;
+  const prevSpendSnapPatch = spendMonetarySnapshotFromLog(log);
+  const nextSpendSnapPatch = spendMonetarySnapshotFromLog({
+    purchaseAmountMinor: mergedPurchaseMinor,
+    purchaseCurrency: mergedPurchaseCurrency,
+    saleAmountMinor: mergedSaleMinor,
+    saleCurrency: mergedSaleCurrency,
+  });
+  const spendAtPatch = spendFieldsAtAfterSnapshotChange(
+    prevSpendSnapPatch,
+    nextSpendSnapPatch,
+    new Date()
+  );
+  if (spendAtPatch !== undefined) data.spendFieldsAt = spendAtPatch;
   const updated = await prisma.log.update({
     where: { id: log.id },
     data,
   });
   await persistUserDefaultPurchaseCurrency(userId, updated.purchaseAmountMinor, updated.purchaseCurrency);
+  await persistUserDefaultPurchaseCurrency(userId, updated.saleAmountMinor, updated.saleCurrency);
   const hadStatsReview = countsAsReviewForGamification(log.grade, log.review);
   const hasStatsReview = countsAsReviewForGamification(updated.grade, updated.review);
   let newBadges: NewBadge[] = [];

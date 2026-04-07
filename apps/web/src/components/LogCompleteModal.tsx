@@ -110,7 +110,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const nativeUi = USE_NATIVE_LOG_COMPLETE_LAYOUT_ON_WEB || isCapacitorNativeShell;
   const androidWebView = typeof window !== "undefined" && isCapacitorAndroid();
   const nativeColors = theme.colorScheme === "light" ? NATIVE_LIGHT : NATIVE_DARK;
-  const { image, title, grade, status, review, own, wantToBuy, matchesPlayed, mediaType } = state;
+  const { image, title, grade, status, review, own, wantToBuy, sold, matchesPlayed, mediaType } = state;
   const showCollectionOwnershipMeta =
     mediaType != null && (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mediaType);
   const showBoardGameMatchesMeta = mediaType === "boardgames";
@@ -405,6 +405,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       {showCollectionOwnershipMeta &&
         (own != null ||
           wantToBuy != null ||
+          sold != null ||
           (showBoardGameMatchesMeta && matchesPlayed != null && matchesPlayed > 0)) && (
         <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-light)] md:mb-3">
           {own != null && (
@@ -412,6 +413,9 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
           )}
           {wantToBuy != null && (
             <span>{t("itemReviewForm.wantToBuy")}: {wantToBuy ? t("common.yes") : t("common.no")}</span>
+          )}
+          {sold != null && (
+            <span>{t("itemReviewForm.sold")}: {sold ? t("common.yes") : t("common.no")}</span>
           )}
           {showBoardGameMatchesMeta && matchesPlayed != null && matchesPlayed > 0 && (
             <span>{t("itemReviewForm.matchesPlayed")}: {matchesPlayed}</span>
@@ -680,6 +684,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
               {showCollectionOwnershipMeta &&
                 (own != null ||
                   wantToBuy != null ||
+                  sold != null ||
                   (showBoardGameMatchesMeta && matchesPlayed != null && matchesPlayed > 0)) && (
                 <div style={{ marginBottom: sz(6), fontSize: sz(11), color: nativeColors.textMuted }}>
                   {own != null && (
@@ -688,6 +693,11 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                   {wantToBuy != null && (
                     <span style={{ marginLeft: 10 }}>
                       {t("itemReviewForm.wantToBuy")}: {wantToBuy ? t("common.yes") : t("common.no")}
+                    </span>
+                  )}
+                  {sold != null && (
+                    <span style={{ marginLeft: 10 }}>
+                      {t("itemReviewForm.sold")}: {sold ? t("common.yes") : t("common.no")}
                     </span>
                   )}
                   {showBoardGameMatchesMeta && matchesPlayed != null && matchesPlayed > 0 && (

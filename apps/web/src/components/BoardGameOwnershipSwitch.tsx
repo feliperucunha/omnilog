@@ -1,15 +1,16 @@
 import { useId } from "react";
-import { Ban, PackageCheck, ShoppingBag } from "lucide-react";
+import { Ban, HandCoins, PackageCheck, ShoppingBag } from "lucide-react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { cn } from "@/lib/utils";
 import type { BoardGameOwnership } from "@/lib/boardGameOwnership";
 
-const MODES: BoardGameOwnership[] = ["doNotOwn", "wantToBuy", "own"];
+const MODES: BoardGameOwnership[] = ["doNotOwn", "wantToBuy", "own", "sold"];
 
 const icons = {
   doNotOwn: Ban,
   wantToBuy: ShoppingBag,
   own: PackageCheck,
+  sold: HandCoins,
 } as const;
 
 export interface BoardGameOwnershipSwitchProps {
@@ -65,12 +66,12 @@ export const BoardGameOwnershipSwitch = ({
             );
           })}
         </div>
-        <div className="grid grid-cols-3 gap-1 px-0.5 text-center">
+        <div className="grid grid-cols-4 gap-0.5 px-0.5 text-center sm:gap-1">
           {MODES.map((mode) => (
             <span
               key={mode}
               className={cn(
-                "text-xs font-semibold leading-tight text-[var(--color-light)]",
+                "text-[10px] font-semibold leading-tight text-[var(--color-light)] sm:text-xs",
                 value === mode && "text-[var(--color-lightest)]"
               )}
             >
@@ -78,7 +79,9 @@ export const BoardGameOwnershipSwitch = ({
                 ? t("itemReviewForm.doNotOwn")
                 : mode === "wantToBuy"
                   ? t("itemReviewForm.wantToBuy")
-                  : t("itemReviewForm.own")}
+                  : mode === "sold"
+                    ? t("itemReviewForm.sold")
+                    : t("itemReviewForm.own")}
             </span>
           ))}
         </div>

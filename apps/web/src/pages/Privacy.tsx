@@ -39,7 +39,7 @@ export function Privacy() {
         <p className="text-xs text-[var(--color-light)]">{t("legal.privacyLastUpdated", params)}</p>
       </header>
 
-      {locale !== "en" && (
+      {locale !== "en" && t("legal.privacyLocaleNote", params).trim() !== "" && (
         <p className="whitespace-pre-wrap rounded-lg border border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/40 p-3 text-xs text-[var(--color-light)]">
           {t("legal.privacyLocaleNote", params)}
         </p>

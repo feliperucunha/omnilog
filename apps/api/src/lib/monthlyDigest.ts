@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { SPEND_TRACKED_MEDIA_TYPES } from "@geeklogs/shared";
 import { prisma } from "./prisma.js";
+import { logSpendStatsDateWhereHalfOpen } from "./purchaseFields.js";
 import { rollupHoursFromCompletedLogs, type CompletedLogForHours } from "./completedLogHours.js";
 import { isSmtpConfigured, sendMonthlyDigestEmail } from "./email.js";
 import { APP_SETTING_KEYS, getAppSettingValue, upsertAppSettingValue } from "./appSettings.js";
@@ -127,7 +128,7 @@ export async function computeUserDigestStats(userId: string, period: DigestPerio
         purchaseAmountMinor: { not: null },
         purchaseCurrency: { not: null },
         mediaType: { in: [...SPEND_TRACKED_MEDIA_TYPES] },
-        createdAt: { gte: start, lt: endExclusive },
+        AND: [logSpendStatsDateWhereHalfOpen({ gte: start, lt: endExclusive })],
       },
       select: { purchaseAmountMinor: true, purchaseCurrency: true },
     }),

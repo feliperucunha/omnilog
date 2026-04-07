@@ -28,7 +28,7 @@ import {
   mediaTypeHasPurchaseAmount,
 } from "@/lib/mediaTypeFeatures";
 import { MoneyAmountInput } from "@/components/MoneyAmountInput";
-import { DEFAULT_PURCHASE_CURRENCY } from "@/lib/currencies";
+import { DEFAULT_PURCHASE_CURRENCY, normalizeCurrencyCode } from "@/lib/currencies";
 import { BoardGameMatchesSection } from "@/components/BoardGameMatchesSection";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +49,8 @@ export interface LogCompleteState {
   own?: boolean | null;
   /** Same categories: user wants to buy a copy. */
   wantToBuy?: boolean | null;
+  /** Sold / no longer owned (spend-tracked categories). */
+  sold?: boolean | null;
   /** Board games only: number of matches/sessions played. */
   matchesPlayed?: number | null;
 }
@@ -101,19 +103,31 @@ export function ItemReviewForm({
   const [hoursToBeat, setHoursToBeat] = useState<number | "">("");
   const [own, setOwn] = useState(false);
   const [wantToBuy, setWantToBuy] = useState(false);
+  const [sold, setSold] = useState(false);
   const [matchesPlayed, setMatchesPlayed] = useState<number | "">("");
   const [purchaseCurrency, setPurchaseCurrency] = useState(DEFAULT_PURCHASE_CURRENCY);
   const [purchaseAmountMinor, setPurchaseAmountMinor] = useState<number | null>(null);
+  const [saleCurrency, setSaleCurrency] = useState(DEFAULT_PURCHASE_CURRENCY);
+  const [saleAmountMinor, setSaleAmountMinor] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [boardMainTab, setBoardMainTab] = useState<"review" | "matches">("review");
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    if (loadingLog || myLog != null) return;
-    const d = me?.defaultPurchaseCurrency;
+    if (loadingLog) return;
+    const d = normalizeCurrencyCode(me?.defaultPurchaseCurrency);
     if (!d) return;
-    setPurchaseCurrency((prev) => (prev === DEFAULT_PURCHASE_CURRENCY ? d : prev));
-  }, [loadingLog, myLog, me?.defaultPurchaseCurrency]);
+    setPurchaseCurrency((prev) => {
+      if (prev !== DEFAULT_PURCHASE_CURRENCY) return prev;
+      if (normalizeCurrencyCode(myLog?.purchaseCurrency)) return prev;
+      return d;
+    });
+    setSaleCurrency((prev) => {
+      if (prev !== DEFAULT_PURCHASE_CURRENCY) return prev;
+      if (normalizeCurrencyCode(myLog?.saleCurrency)) return prev;
+      return d;
+    });
+  }, [loadingLog, myLog?.purchaseCurrency, myLog?.saleCurrency, me?.defaultPurchaseCurrency]);
 
   type ProgressOptions = {
     seasons?: number[];
@@ -133,8 +147,9 @@ export function ItemReviewForm({
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
   const showPurchaseAmount = mediaTypeHasPurchaseAmount(mediaType);
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
-  /** Spend field only when "Own" is selected (games / board games); manga & comics have no ownership switch. */
+  /** Spend field when "Own" is selected. */
   const showPurchaseAmountField = showPurchaseAmount && (!showCollectionOwnership || own);
+  const showSaleAmountField = showPurchaseAmount && (!showCollectionOwnership || sold);
 
   useEffect(() => {
     if (!showSeasonEpisode && !showChapterVolume) return;
@@ -168,12 +183,17 @@ export function ItemReviewForm({
           setHoursToBeat(log.hoursToBeat != null ? log.hoursToBeat : "");
           setOwn(log.own ?? false);
           setWantToBuy(log.wantToBuy ?? false);
+          setSold(log.sold ?? false);
           const defaultMatches = showBoardGameFields
             ? (log.status === "played" ? 1 : log.status === "plan to play" ? 0 : "")
             : "";
           setMatchesPlayed(log.matchesPlayed != null ? log.matchesPlayed : defaultMatches);
-          setPurchaseCurrency(log.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY);
+          setPurchaseCurrency(
+            normalizeCurrencyCode(log.purchaseCurrency) ?? DEFAULT_PURCHASE_CURRENCY
+          );
           setPurchaseAmountMinor(log.purchaseAmountMinor ?? null);
+          setSaleCurrency(normalizeCurrencyCode(log.saleCurrency) ?? DEFAULT_PURCHASE_CURRENCY);
+          setSaleAmountMinor(log.saleAmountMinor ?? null);
         } else {
           setStars(null);
           setReview("");
@@ -185,9 +205,18 @@ export function ItemReviewForm({
           setHoursToBeat("");
           setOwn(false);
           setWantToBuy(false);
+          setSold(false);
           setMatchesPlayed(showBoardGameFields ? 1 : "");
-          setPurchaseCurrency(meRef.current?.defaultPurchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY);
+          setPurchaseCurrency(
+            normalizeCurrencyCode(meRef.current?.defaultPurchaseCurrency) ??
+              DEFAULT_PURCHASE_CURRENCY
+          );
           setPurchaseAmountMinor(null);
+          setSaleCurrency(
+            normalizeCurrencyCode(meRef.current?.defaultPurchaseCurrency) ??
+              DEFAULT_PURCHASE_CURRENCY
+          );
+          setSaleAmountMinor(null);
         }
       })
       .catch(() => {
@@ -246,6 +275,7 @@ export function ItemReviewForm({
       if (showCollectionOwnership) {
         payload.own = own;
         payload.wantToBuy = wantToBuy;
+        payload.sold = sold;
       }
       if (showBoardGameFields && !myLog) {
         payload.matchesPlayed = toNum(matchesPlayed);
@@ -258,6 +288,14 @@ export function ItemReviewForm({
         } else {
           payload.purchaseAmountMinor = purchaseAmountMinor;
           payload.purchaseCurrency = purchaseCurrency || DEFAULT_PURCHASE_CURRENCY;
+        }
+        const includeSale = !showCollectionOwnership || sold;
+        if (!includeSale || saleAmountMinor == null) {
+          payload.saleAmountMinor = null;
+          payload.saleCurrency = null;
+        } else {
+          payload.saleAmountMinor = saleAmountMinor;
+          payload.saleCurrency = saleCurrency || DEFAULT_PURCHASE_CURRENCY;
         }
       }
       if (genreList.length > 0) payload.genres = genreList;
@@ -291,7 +329,9 @@ export function ItemReviewForm({
           mechanicsMatch &&
           affinityMatch &&
           (!showCollectionOwnership ||
-            (own === (myLog.own ?? false) && wantToBuy === (myLog.wantToBuy ?? false))) &&
+            (own === (myLog.own ?? false) &&
+              wantToBuy === (myLog.wantToBuy ?? false) &&
+              sold === (myLog.sold ?? false))) &&
           (!showBoardGameFields ||
             (myLog && mediaType === "boardgames") ||
             toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)) &&
@@ -305,6 +345,18 @@ export function ItemReviewForm({
                 purchaseAmountMinor === (myLog.purchaseAmountMinor ?? null) &&
                 (purchaseCurrency || DEFAULT_PURCHASE_CURRENCY) ===
                   (myLog.purchaseCurrency ?? DEFAULT_PURCHASE_CURRENCY)
+              );
+            })()) &&
+          (!showPurchaseAmount ||
+            (() => {
+              const includeSale = !showCollectionOwnership || sold;
+              if (!includeSale) {
+                return (myLog.saleAmountMinor ?? null) == null;
+              }
+              return (
+                saleAmountMinor === (myLog.saleAmountMinor ?? null) &&
+                (saleCurrency || DEFAULT_PURCHASE_CURRENCY) ===
+                  (myLog.saleCurrency ?? DEFAULT_PURCHASE_CURRENCY)
               );
             })());
         if (noChange) {
@@ -321,8 +373,8 @@ export function ItemReviewForm({
         invalidateLogsAndItemsCache();
         if (
           showPurchaseAmount &&
-          (!showCollectionOwnership || own) &&
-          purchaseAmountMinor != null
+          (((!showCollectionOwnership || own) && purchaseAmountMinor != null) ||
+            ((!showCollectionOwnership || sold) && saleAmountMinor != null))
         ) {
           void refetchMe();
         }
@@ -336,7 +388,7 @@ export function ItemReviewForm({
             mediaType,
             id: externalId,
             review: review.trim() || null,
-            ...(showCollectionOwnership && { own, wantToBuy }),
+            ...(showCollectionOwnership && { own, wantToBuy, sold }),
             ...(showBoardGameFields && {
               matchesPlayed:
                 mediaType === "boardgames" ? (updated.matchesPlayed ?? null) : toNum(matchesPlayed),
@@ -363,8 +415,8 @@ export function ItemReviewForm({
         invalidateLogsAndItemsCache();
         if (
           showPurchaseAmount &&
-          (!showCollectionOwnership || own) &&
-          purchaseAmountMinor != null
+          (((!showCollectionOwnership || own) && purchaseAmountMinor != null) ||
+            ((!showCollectionOwnership || sold) && saleAmountMinor != null))
         ) {
           void refetchMe();
         }
@@ -377,7 +429,7 @@ export function ItemReviewForm({
           mediaType,
           id: externalId,
           review: review.trim() || null,
-          ...(showCollectionOwnership && { own, wantToBuy }),
+          ...(showCollectionOwnership && { own, wantToBuy, sold }),
           ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
         });
       }
@@ -599,11 +651,12 @@ export function ItemReviewForm({
             {showCollectionOwnership && (
               <>
                 <BoardGameOwnershipSwitch
-                  value={boardGameOwnershipFromBooleans(own, wantToBuy)}
+                  value={boardGameOwnershipFromBooleans(own, wantToBuy, sold)}
                   onChange={(mode) => {
                     const next = boardGameOwnershipToBooleans(mode);
                     setOwn(next.own);
                     setWantToBuy(next.wantToBuy);
+                    setSold(next.sold);
                   }}
                   disabled={saving}
                 />
@@ -646,6 +699,18 @@ export function ItemReviewForm({
                 onCurrencyChange={setPurchaseCurrency}
                 amountMinor={purchaseAmountMinor}
                 onAmountMinorChange={setPurchaseAmountMinor}
+                disabled={saving}
+                t={t}
+                className="w-full max-w-full sm:max-w-md"
+              />
+            )}
+            {showSaleAmountField && (
+              <MoneyAmountInput
+                label={t("money.saleProceeds")}
+                currency={saleCurrency}
+                onCurrencyChange={setSaleCurrency}
+                amountMinor={saleAmountMinor}
+                onAmountMinorChange={setSaleAmountMinor}
                 disabled={saving}
                 t={t}
                 className="w-full max-w-full sm:max-w-md"

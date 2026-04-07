@@ -22,3 +22,11 @@ export const COMMON_CURRENCIES: readonly { code: string; labelKey: string }[] = 
 ] as const;
 
 export const DEFAULT_PURCHASE_CURRENCY = "USD";
+
+/** Normalize API/user currency to uppercase ISO code, or null if empty. */
+export function normalizeCurrencyCode(code: string | null | undefined): string | null {
+  if (code == null) return null;
+  const s = String(code).trim();
+  if (s === "") return null;
+  return s.toUpperCase();
+}

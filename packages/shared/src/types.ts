@@ -319,6 +319,8 @@ export interface Log {
   own: boolean | null;
   /** Board games and video games: user wants to buy a copy. */
   wantToBuy: boolean | null;
+  /** Spend-tracked categories: user sold / no longer owns; optional sale proceeds below. */
+  sold: boolean | null;
   /** Boardgames only: number of matches/sessions played. */
   matchesPlayed: number | null;
   /** Genre names (for stats and badges). Stored when logging. */
@@ -335,6 +337,10 @@ export interface Log {
   purchaseAmountMinor?: number | null;
   /** ISO 4217 currency code when purchaseAmountMinor is set. */
   purchaseCurrency?: string | null;
+  /** Amount received from sale (minor units) when sold is true. */
+  saleAmountMinor?: number | null;
+  /** ISO 4217 when saleAmountMinor is set. */
+  saleCurrency?: string | null;
   /** Number of like reactions (feed/reviews). */
   likesCount?: number;
   /** Number of dislike reactions (feed/reviews). */
@@ -370,11 +376,15 @@ export interface CreateLogInput {
   own?: boolean | null;
   /** Board games and video games: user wants to buy a copy. */
   wantToBuy?: boolean | null;
+  /** Sold / no longer owned (spend-tracked categories). */
+  sold?: boolean | null;
   /** Board games only: number of matches/sessions played. */
   matchesPlayed?: number | null;
   /** Optional purchase amount (minor units); requires purchaseCurrency for eligible media types. */
   purchaseAmountMinor?: number | null;
   purchaseCurrency?: string | null;
+  saleAmountMinor?: number | null;
+  saleCurrency?: string | null;
 }
 
 /** One player row in a board game match session. */

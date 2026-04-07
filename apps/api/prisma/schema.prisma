@@ -190,6 +190,8 @@ model Log {
   boardGameSource String?  // "bgg" | "ludopedia" when mediaType = boardgames; which API this externalId came from
   own            Boolean? // games, board games, books, manga, comics: user owns a copy
   wantToBuy      Boolean? // same categories: user wants to buy a copy
+  /// User sold / no longer has the item; optional sale proceeds in saleAmountMinor + saleCurrency
+  sold           Boolean?
   matchesPlayed  Int?     // boardgames only: number of matches/sessions played
   genres         String?  // JSON array of genre names (for stats and badges)
   mechanics       String?  // JSON array of board-game mechanic names (BGG / Ludopedia); optional
@@ -197,6 +199,11 @@ model Log {
   // purchaseAmountMinor + purchaseCurrency: optional spend (minor units + ISO 4217) for games/boardgames/books/manga/comics
   purchaseAmountMinor Int?
   purchaseCurrency    String?
+  // Sale proceeds when sold=true (same minor-unit + ISO 4217 convention as purchase)
+  saleAmountMinor Int?
+  saleCurrency    String?
+  /// When purchase/sale amounts were last set or changed (statistics “this month/year” use this instead of createdAt).
+  spendFieldsAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   reactions        LogReaction[]

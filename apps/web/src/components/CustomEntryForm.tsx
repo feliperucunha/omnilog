@@ -91,6 +91,7 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
   const [volume, setVolume] = useState<number | "">("");
   const [own, setOwn] = useState(false);
   const [wantToBuy, setWantToBuy] = useState(false);
+  const [sold, setSold] = useState(false);
   const [matchesPlayed, setMatchesPlayed] = useState<number | "">("");
   const [loading, setLoading] = useState(false);
 
@@ -140,7 +141,7 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
           episode: showSeasonEpisode ? toNum(episode) : null,
           chapter: showChapterVolume ? toNum(chapter) : null,
           volume: showChapterVolume ? toNum(volume) : null,
-          ...(showCollectionOwnership && { own, wantToBuy }),
+          ...(showCollectionOwnership && { own, wantToBuy, sold }),
           ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
         }),
       });
@@ -156,6 +157,7 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
         mediaType,
         id: externalId,
         review: review.trim() || null,
+        ...(showCollectionOwnership && { own, wantToBuy, sold }),
       };
       onSaved(completion);
       return true;
@@ -182,6 +184,7 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
     volume,
     own,
     wantToBuy,
+    sold,
     matchesPlayed,
     mediaType,
     showSeasonEpisode,
@@ -372,11 +375,12 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
               {showCollectionOwnership && (
                 <>
                   <BoardGameOwnershipSwitch
-                    value={boardGameOwnershipFromBooleans(own, wantToBuy)}
+                    value={boardGameOwnershipFromBooleans(own, wantToBuy, sold)}
                     onChange={(mode) => {
                       const next = boardGameOwnershipToBooleans(mode);
                       setOwn(next.own);
                       setWantToBuy(next.wantToBuy);
+                      setSold(next.sold);
                     }}
                     disabled={loading}
                   />

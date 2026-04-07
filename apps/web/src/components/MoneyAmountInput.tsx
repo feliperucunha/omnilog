@@ -8,7 +8,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { COMMON_CURRENCIES, DEFAULT_PURCHASE_CURRENCY } from "@/lib/currencies";
+import { COMMON_CURRENCIES, DEFAULT_PURCHASE_CURRENCY, normalizeCurrencyCode } from "@/lib/currencies";
 import {
   formatPartialMoneyInput,
   minorToAmountString,
@@ -43,7 +43,8 @@ export function MoneyAmountInput({
   className,
 }: MoneyAmountInputProps) {
   const baseId = useId();
-  const cur = currency || DEFAULT_PURCHASE_CURRENCY;
+  const normalizedProp = normalizeCurrencyCode(currency);
+  const cur = normalizedProp ?? DEFAULT_PURCHASE_CURRENCY;
   const [text, setText] = useState(() => minorToAmountString(amountMinor, cur));
   const focusedRef = useRef(false);
 
@@ -52,10 +53,16 @@ export function MoneyAmountInput({
     setText(minorToAmountString(amountMinor, cur));
   }, [amountMinor, cur]);
 
-  const currencyOptions = COMMON_CURRENCIES.map((c) => ({
-    value: c.code,
-    label: `${c.code} — ${t(c.labelKey)}`,
-  }));
+  const codesInList = new Set(COMMON_CURRENCIES.map((c) => c.code));
+  const extraOption =
+    !codesInList.has(cur) ? ([{ value: cur, label: cur }] as { value: string; label: string }[]) : [];
+  const currencyOptions = [
+    ...extraOption,
+    ...COMMON_CURRENCIES.map((c) => ({
+      value: c.code,
+      label: `${c.code} — ${t(c.labelKey)}`,
+    })),
+  ];
   const selectedCurrencyFullLabel = currencyOptions.find((o) => o.value === cur)?.label ?? cur;
   const triggerAria = `${t("money.currencyAria")}: ${selectedCurrencyFullLabel}`;
 
@@ -75,7 +82,7 @@ export function MoneyAmountInput({
         <SelectRoot
           value={cur}
           onValueChange={(next) => {
-            const code = next || DEFAULT_PURCHASE_CURRENCY;
+            const code = normalizeCurrencyCode(next) ?? DEFAULT_PURCHASE_CURRENCY;
             onCurrencyChange(code);
             const stripped = text.replace(/,/g, "");
             const reformatted = formatPartialMoneyInput(stripped, code);
