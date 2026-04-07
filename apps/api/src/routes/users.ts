@@ -10,6 +10,7 @@ import {
   purchaseLogCreatedAtRange,
   type PurchasePeriod,
 } from "../lib/purchaseFields.js";
+import { sanitizeText, SEARCH_QUERY_MAX_LENGTH } from "../lib/sanitize.js";
 
 /** Public (no auth) read-only profile and logs for sharing. */
 
@@ -268,6 +269,14 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
         if (range) where.createdAt = { gte: range.gte, lte: range.lte };
       }
     }
+  }
+
+  const titleSearch = sanitizeText(
+    typeof req.query.q === "string" ? req.query.q : "",
+    SEARCH_QUERY_MAX_LENGTH
+  );
+  if (titleSearch) {
+    where.title = { contains: titleSearch, mode: "insensitive" };
   }
 
   const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =

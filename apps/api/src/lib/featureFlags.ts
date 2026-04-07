@@ -9,7 +9,8 @@ export const FEATURE_FLAG_KEYS = {
   BETA_BANNER_ENABLED: "beta_banner_enabled",
   /**
    * When enabled, the web app periodically requests /api/health to reduce cold starts on free hosts
-   * that sleep after idle (e.g. Koyeb). Temporary ops toggle; remove when on a paid always-on plan.
+   * that sleep after idle (e.g. Koyeb). API env WAKE_API_PING_ENABLED=true also turns this on without DB.
+   * Temporary ops toggle; remove when on a paid always-on plan.
    */
   WAKE_API_PING: "wake_api_ping",
 } as const;

@@ -104,10 +104,18 @@ app.get("/api/health", (_req, res) => {
 
 /** Public: whether clients should ping /api/health on an interval (free-tier sleep). No auth / no app version header. */
 app.get("/api/wake-ping-config", async (_req, res) => {
-  const enabled = await isWakeApiPingEnabled();
   const raw = Number(process.env.WAKE_PING_INTERVAL_MS);
   const intervalMs =
     Number.isFinite(raw) && raw >= 60_000 ? Math.floor(raw) : 5 * 60 * 1000;
+
+  const envEnabled =
+    process.env.WAKE_API_PING_ENABLED === "true" || process.env.WAKE_API_PING_ENABLED === "1";
+  if (envEnabled) {
+    res.json({ enabled: true, intervalMs });
+    return;
+  }
+
+  const enabled = await isWakeApiPingEnabled();
   res.json({ enabled, intervalMs });
 });
 

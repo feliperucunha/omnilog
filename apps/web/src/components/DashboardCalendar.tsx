@@ -49,11 +49,21 @@ function formatCalendarDayDate(dateKey: string, locale: string): string {
   return date.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
 
+/** Same calendar month anchor as GET /logs/stats (timezoneOffsetMinutes). */
+function calendarMonthFromOffset(tzOffsetMinutes: number): { year: number; month: number } {
+  const offsetMs = tzOffsetMinutes * 60 * 1000;
+  const shifted = new Date(Date.now() + offsetMs);
+  return { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1 };
+}
+
+export type DashboardCalendarAccess = "full" | "monthOnly";
+
 export function DashboardCalendar({
-  isPro,
+  access,
   fillColumnHeight,
 }: {
-  isPro: boolean;
+  /** full = any month (Pro). monthOnly = current calendar month in user TZ (free statistics). */
+  access: DashboardCalendarAccess;
   /** When set (e.g. Statistics desktop two-column row), the card stretches to match the sibling column height. */
   fillColumnHeight?: boolean;
 }) {
@@ -69,8 +79,18 @@ export function DashboardCalendar({
 
   const tzOffsetMinutes = useMemo(() => -new Date().getTimezoneOffset(), []);
 
+  const canFetchCalendar = access === "full" || access === "monthOnly";
+  const canInteract = canFetchCalendar;
+
+  useEffect(() => {
+    if (access !== "monthOnly") return;
+    const { year: y, month: m } = calendarMonthFromOffset(tzOffsetMinutes);
+    setYear(y);
+    setMonth(m);
+  }, [access, tzOffsetMinutes]);
+
   const fetchCalendar = useCallback(async (y: number, m: number) => {
-    if (!isPro) return;
+    if (!canFetchCalendar) return;
     setLoading(true);
     try {
       const res = await apiFetch<CalendarData>(
@@ -82,16 +102,16 @@ export function DashboardCalendar({
     } finally {
       setLoading(false);
     }
-  }, [isPro, tzOffsetMinutes]);
+  }, [canFetchCalendar, tzOffsetMinutes]);
 
   useEffect(() => {
-    if (!isPro) {
+    if (!canFetchCalendar) {
       setData(null);
       setLoading(false);
       return;
     }
     void fetchCalendar(year, month);
-  }, [isPro, year, month, fetchCalendar]);
+  }, [canFetchCalendar, year, month, fetchCalendar]);
 
   const fetchDayLogs = useCallback(async (dateKey: string) => {
     setDayLogsLoading(true);
@@ -109,9 +129,9 @@ export function DashboardCalendar({
   }, [tzOffsetMinutes]);
 
   useEffect(() => {
-    if (selectedDate && isPro) fetchDayLogs(selectedDate);
+    if (selectedDate && canInteract) fetchDayLogs(selectedDate);
     else setDayLogs([]);
-  }, [selectedDate, isPro, fetchDayLogs]);
+  }, [selectedDate, canInteract, fetchDayLogs]);
 
   const prevMonth = useCallback(() => {
     if (month === 1) {
@@ -133,10 +153,10 @@ export function DashboardCalendar({
 
   const handleDayClick = useCallback(
     (dateKey: string) => {
-      if (!isPro) return;
+      if (!canInteract) return;
       setSelectedDate(dateKey);
     },
-    [isPro]
+    [canInteract]
   );
 
   const now = new Date();
@@ -152,9 +172,9 @@ export function DashboardCalendar({
     year: "numeric",
   });
 
-  /** Show skeleton until the viewed month matches loaded data (handles me/isPro hydration and month changes). */
+  /** Show skeleton until the viewed month matches loaded data (handles access hydration and month changes). */
   const calendarBusy =
-    isPro &&
+    canFetchCalendar &&
     (loading || data == null || data.year !== year || data.month !== month);
 
   return (
@@ -162,35 +182,16 @@ export function DashboardCalendar({
       <Card
         className={cn(
           "relative min-w-0 w-full max-w-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)] overflow-hidden",
-          !isPro && "select-none",
           fillColumnHeight && "md:flex md:h-full md:min-h-0 md:flex-col"
         )}
         style={paperShadow}
       >
-        {!isPro && (
-          <div
-            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[var(--color-dark)]/80 backdrop-blur-md"
-            aria-hidden
-          >
-            <p className="text-center text-sm font-medium text-[var(--color-lightest)] px-4">
-              {t("dashboard.calendarProOnly")}
-            </p>
-            <Button asChild size="sm" className="btn-gradient">
-              <Link to="/tiers">{t("tiers.upgradeToPro")}</Link>
-            </Button>
-          </div>
-        )}
-        <div
-          className={cn(
-            !isPro && "pointer-events-none blur-sm",
-            fillColumnHeight && "flex min-h-0 min-w-0 flex-1 flex-col"
-          )}
-        >
+        <div className={cn(fillColumnHeight && "flex min-h-0 min-w-0 flex-1 flex-col")}>
           <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-[var(--color-mid)]/30 px-4 py-3">
             <h3 className="min-w-0 flex-1 text-sm font-semibold uppercase tracking-wide text-[var(--color-light)]">
               <OverflowMarquee>{t("dashboard.calendarTitle")}</OverflowMarquee>
             </h3>
-            {isPro && (
+            {access === "full" && (
               <div className="flex min-w-0 shrink items-center gap-0.5">
                 <Button
                   type="button"
@@ -216,6 +217,9 @@ export function DashboardCalendar({
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
+            )}
+            {access === "monthOnly" && (
+              <span className="shrink-0 text-xs text-[var(--color-light)]">{t("statistics.purchasePeriodMonth")}</span>
             )}
           </div>
           <div
@@ -244,14 +248,14 @@ export function DashboardCalendar({
                 const key = getMonthKey(year, month, day);
                 const count = data?.dates[key] ?? 0;
                 const isToday = isCurrentMonth && now.getDate() === day;
-                const DayCell = isPro ? "button" : "div";
+                const DayCell = canInteract ? "button" : "div";
                 return (
                   <DayCell
                     key={day}
-                    type={isPro ? "button" : undefined}
-                    onClick={isPro ? () => handleDayClick(key) : undefined}
+                    type={canInteract ? "button" : undefined}
+                    onClick={canInteract ? () => handleDayClick(key) : undefined}
                     className={`relative min-h-[3.5rem] flex flex-col items-center justify-start gap-0.5 border-b border-r border-[var(--color-mid)]/20 bg-[var(--color-dark)] pt-1.5 text-left ${
-                      isPro
+                      canInteract
                         ? "cursor-pointer hover:bg-[var(--color-mid)]/15 active:bg-[var(--color-mid)]/25"
                         : ""
                     } ${isToday ? "ring-1 ring-inset ring-[var(--color-mid)] bg-[var(--color-mid)]/10" : ""}`}
@@ -263,7 +267,7 @@ export function DashboardCalendar({
                     >
                       {day}
                     </span>
-                    {isPro && count > 0 && (
+                    {canInteract && count > 0 && (
                       <span className="flex gap-0.5 flex-wrap justify-center px-0.5">
                         {Array.from({ length: Math.min(count, 4) }, (_, j) => (
                           <span
@@ -301,7 +305,7 @@ export function DashboardCalendar({
         </div>
       </Card>
 
-      {isPro && selectedDate && (
+      {canInteract && selectedDate && (
         isMobile ? (
           <Drawer open onOpenChange={(open) => !open && setSelectedDate(null)}>
             <DrawerContent

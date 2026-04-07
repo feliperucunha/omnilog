@@ -199,7 +199,8 @@ model Log {
   purchaseCurrency    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  reactions   LogReaction[]
+  reactions        LogReaction[]
+  boardGameMatches BoardGameMatch[]
 
   @@unique([userId, mediaType, externalId])
   @@index([userId])
@@ -220,6 +221,21 @@ model LogReaction {
   @@unique([userId, logId])
   @@index([logId])
   @@index([userId])
+}
+
+/// Board games only: one play session with players, scores, optional session notes (not the main log review).
+model BoardGameMatch {
+  id        String   @id @default(cuid())
+  logId     String
+  log       Log      @relation(fields: [logId], references: [id], onDelete: Cascade)
+  playedAt  DateTime
+  /// JSON: [{ "name": string, "score": number | null, "winner": boolean }]
+  players   String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([logId])
+  @@index([logId, playedAt])
 }
 
 /// App-wide toggles (e.g. relax API-key UX). Editable via admin API only.

@@ -377,6 +377,29 @@ export interface CreateLogInput {
   purchaseCurrency?: string | null;
 }
 
+/** One player row in a board game match session. */
+export interface BoardGameMatchPlayer {
+  name: string;
+  score: number | null;
+  winner: boolean;
+}
+
+/** Board games only: a logged play session (separate from the main log review). */
+export interface BoardGameMatch {
+  id: string;
+  logId: string;
+  playedAt: string;
+  players: BoardGameMatchPlayer[];
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface CreateBoardGameMatchInput {
+  playedAt: string;
+  players: BoardGameMatchPlayer[];
+  notes?: string | null;
+}
+
 export interface UpdateLogInput {
   image?: string | null;
   grade?: number;

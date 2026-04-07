@@ -328,6 +328,24 @@ export function Dashboard() {
     return () => window.removeEventListener(LOGS_INVALIDATED_EVENT, refetchMilestones);
   }, [token]);
 
+  /** When opening a friend from the feed, keep the same list filters as on the home category list (search, sort, status, collection). */
+  const feedUserProfilePath = useCallback(
+    (slug: string, logMediaType: MediaType) => {
+      const next = new URLSearchParams();
+      next.set("category", logMediaType);
+      const q = searchParams.get("q");
+      if (q?.trim()) next.set("q", q.trim());
+      const status = searchParams.get("status");
+      if (status) next.set("status", status);
+      const sort = searchParams.get("sort");
+      if (sort) next.set("sort", sort);
+      if (searchParams.get("own") === "true") next.set("own", "true");
+      if (searchParams.get("wantToBuy") === "true") next.set("wantToBuy", "true");
+      return `/${slug}?${next.toString()}`;
+    },
+    [searchParams]
+  );
+
   const handleShare = useCallback(async () => {
     if (!me?.user?.id) return;
     const slug = me.user.username || me.user.id;
@@ -761,7 +779,7 @@ export function Dashboard() {
                           )}
                         </div>
                         <Link
-                          to={`/${feedUser.username ?? feedUser.id}`}
+                          to={feedUserProfilePath(feedUser.username ?? feedUser.id, log.mediaType)}
                           className="flex w-fit items-center gap-1.5 text-xs text-[var(--color-light)] hover:text-[var(--color-lightest)] hover:underline shrink-0"
                         >
                           <User className="size-3.5 shrink-0" aria-hidden />

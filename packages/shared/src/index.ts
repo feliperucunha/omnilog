@@ -17,6 +17,9 @@ export type {
   AuthLoginInput,
   AuthResponse,
   SpendTrackedMediaType,
+  BoardGameMatchPlayer,
+  BoardGameMatch,
+  CreateBoardGameMatchInput,
 } from "./types.js";
 export { APP_VERSION } from "./version.js";
 export {

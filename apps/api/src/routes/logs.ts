@@ -8,7 +8,7 @@ import {
   MEDIA_TYPES,
   SPEND_TRACKED_MEDIA_TYPES,
 } from "@geeklogs/shared";
-import type { MediaType } from "@geeklogs/shared";
+import type { BoardGameMatchPlayer, MediaType } from "@geeklogs/shared";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import {
@@ -17,6 +17,7 @@ import {
   sanitizeUrl,
   TITLE_MAX_LENGTH,
   EXTERNAL_ID_MAX_LENGTH,
+  SEARCH_QUERY_MAX_LENGTH,
 } from "../lib/sanitize.js";
 import { authMiddleware, type AuthenticatedRequest } from "../middleware/auth.js";
 import type { NewBadge } from "../services/gamification.service.js";
@@ -64,6 +65,60 @@ const createLogSchema = z.object({
     .transform((s) => (s == null ? null : s.toUpperCase())),
 });
 
+const PLAYER_NAME_MAX = 80;
+
+const boardGameMatchPlayerSchema = z.object({
+  name: z.string().min(1).max(PLAYER_NAME_MAX),
+  score: z.number().finite().nullable().optional(),
+  winner: z.boolean(),
+});
+
+const createBoardGameMatchBodySchema = z.object({
+  playedAt: z.string().min(1).max(40),
+  players: z.array(boardGameMatchPlayerSchema).min(1).max(16),
+  notes: z.string().max(50000).optional().nullable(),
+});
+
+function parseBoardGamePlayersJson(json: string): BoardGameMatchPlayer[] {
+  try {
+    const raw = JSON.parse(json) as unknown;
+    if (!Array.isArray(raw)) return [];
+    const out: BoardGameMatchPlayer[] = [];
+    for (const row of raw) {
+      if (row == null || typeof row !== "object") continue;
+      const o = row as Record<string, unknown>;
+      const name = typeof o.name === "string" ? o.name : "";
+      if (!name) continue;
+      const winner = Boolean(o.winner);
+      let score: number | null = null;
+      if (typeof o.score === "number" && Number.isFinite(o.score)) score = o.score;
+      else if (o.score === null) score = null;
+      out.push({ name, score, winner });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function serializeBoardGameMatchRow(row: {
+  id: string;
+  logId: string;
+  playedAt: Date;
+  players: string;
+  notes: string | null;
+  createdAt: Date;
+}) {
+  return {
+    id: row.id,
+    logId: row.logId,
+    playedAt: row.playedAt.toISOString(),
+    players: parseBoardGamePlayersJson(row.players),
+    notes: row.notes,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 const updateLogSchema = z.object({
   image: z.string().url().max(2048).nullable().optional(),
   grade: z.number().min(0).max(10).nullable().optional(),
@@ -110,6 +165,10 @@ function isSpendTrackedMediaType(mt: MediaType): boolean {
   return (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mt);
 }
 
+function mergeLogWhere(base: Prisma.LogWhereInput, extra: Prisma.LogWhereInput): Prisma.LogWhereInput {
+  return { AND: [base, extra] };
+}
+
 import { persistUserDefaultPurchaseCurrency } from "../lib/userPurchasePreference.js";
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
 import { stringifyLogAffinityContext, logAffinityContextSchema } from "../lib/logAffinityContext.js";
@@ -129,6 +188,10 @@ import {
   localDayBoundsFromDateString,
   type PurchasePeriod,
 } from "../lib/purchaseFields.js";
+import {
+  freeTierStatisticsMonthRange,
+  freeTierStatisticsMonthWhere,
+} from "../lib/statisticsScope.js";
 
 const FREE_LOG_LIMIT = 500;
 
@@ -187,12 +250,33 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const ownFilter = req.query.own === "true";
   const wantToBuyFilter = req.query.wantToBuy === "true";
   const purchasedFilter = req.query.purchased === "true" || req.query.purchased === "1";
+  const forStatistics =
+    req.query.forStatistics === "1" || req.query.forStatistics === "true";
   const limitParam = req.query.limit != null ? parseInt(String(req.query.limit), 10) : NaN;
   const usePagination = Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= PAGINATION_LIMIT_MAX;
   const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
   const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
-  const where: Prisma.LogWhereInput = { userId };
+  const tzRawList = req.query.timezoneOffsetMinutes;
+  const tzOffsetMinutesList =
+    typeof tzRawList === "string" && tzRawList !== "" && Number.isFinite(parseInt(tzRawList, 10))
+      ? parseInt(tzRawList, 10)
+      : 0;
+
+  let statisticsMonthWhereFree: Prisma.LogWhereInput | undefined;
+  let isFreeTierForList = false;
+  if (forStatistics || purchasedFilter) {
+    const u = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { tier: true },
+    });
+    isFreeTierForList = u != null && !tierHasProFeatures(u.tier);
+    if (forStatistics && isFreeTierForList) {
+      statisticsMonthWhereFree = freeTierStatisticsMonthWhere(tzOffsetMinutesList);
+    }
+  }
+
+  let where: Prisma.LogWhereInput = { userId };
   if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
   if (externalId) {
     const safe = sanitizeText(externalId, EXTERNAL_ID_MAX_LENGTH);
@@ -213,28 +297,45 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   if (purchasedFilter) {
     where.purchaseAmountMinor = { not: null };
     where.purchaseCurrency = { not: null };
-    const dateRaw = typeof req.query.purchaseDate === "string" ? req.query.purchaseDate.trim() : "";
-    if (dateRaw !== "") {
-      const tzRaw = req.query.timezoneOffsetMinutes;
-      const tzOffsetMinutes =
-        typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
-          ? parseInt(tzRaw, 10)
-          : 0;
-      const bounds = localDayBoundsFromDateString(dateRaw, tzOffsetMinutes);
-      if (bounds) where.createdAt = { gte: bounds.gte, lte: bounds.lte };
+    if (isFreeTierForList) {
+      const range = purchaseLogCreatedAtRange("month", tzOffsetMinutesList);
+      if (range) where.createdAt = { gte: range.gte, lte: range.lte };
     } else {
-      const spendPeriodRaw = typeof req.query.spendPeriod === "string" ? req.query.spendPeriod.trim() : "";
-      const validPeriods: PurchasePeriod[] = ["month", "year", "all"];
-      if (validPeriods.includes(spendPeriodRaw as PurchasePeriod)) {
+      const dateRaw = typeof req.query.purchaseDate === "string" ? req.query.purchaseDate.trim() : "";
+      if (dateRaw !== "") {
         const tzRaw = req.query.timezoneOffsetMinutes;
         const tzOffsetMinutes =
           typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
             ? parseInt(tzRaw, 10)
             : 0;
-        const range = purchaseLogCreatedAtRange(spendPeriodRaw as PurchasePeriod, tzOffsetMinutes);
-        if (range) where.createdAt = { gte: range.gte, lte: range.lte };
+        const bounds = localDayBoundsFromDateString(dateRaw, tzOffsetMinutes);
+        if (bounds) where.createdAt = { gte: bounds.gte, lte: bounds.lte };
+      } else {
+        const spendPeriodRaw = typeof req.query.spendPeriod === "string" ? req.query.spendPeriod.trim() : "";
+        const validPeriods: PurchasePeriod[] = ["month", "year", "all"];
+        if (validPeriods.includes(spendPeriodRaw as PurchasePeriod)) {
+          const tzRaw = req.query.timezoneOffsetMinutes;
+          const tzOffsetMinutes =
+            typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
+              ? parseInt(tzRaw, 10)
+              : 0;
+          const range = purchaseLogCreatedAtRange(spendPeriodRaw as PurchasePeriod, tzOffsetMinutes);
+          if (range) where.createdAt = { gte: range.gte, lte: range.lte };
+        }
       }
     }
+  }
+
+  const titleSearch = sanitizeText(
+    typeof req.query.q === "string" ? req.query.q : "",
+    SEARCH_QUERY_MAX_LENGTH
+  );
+  if (titleSearch) {
+    where.title = { contains: titleSearch, mode: "insensitive" };
+  }
+
+  if (statisticsMonthWhereFree) {
+    where = mergeLogWhere(where, statisticsMonthWhereFree);
   }
 
   const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =
@@ -367,6 +468,19 @@ logsRouter.delete("/:id/reaction", async (req: AuthenticatedRequest, res) => {
 /** GET /logs/stats?group=summary|category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear - summary = account totals; category/month/year rows include { hours, count }; genre uses unique log counts per genre name */
 logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tier: true },
+  });
+  const fullStatsAccess = user != null && tierHasProFeatures(user.tier);
+  const tzRawStats = req.query.timezoneOffsetMinutes;
+  const tzOffsetMinutes =
+    typeof tzRawStats === "string" && tzRawStats !== "" && Number.isFinite(parseInt(tzRawStats, 10))
+      ? parseInt(tzRawStats, 10)
+      : 0;
+  const freeMonthWhere = fullStatsAccess ? undefined : freeTierStatisticsMonthWhere(tzOffsetMinutes);
+  const freeMonthRange = fullStatsAccess ? undefined : freeTierStatisticsMonthRange(tzOffsetMinutes);
+
   const groupParam = req.query.group as string;
   const group =
     groupParam === "summary"
@@ -393,13 +507,9 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
 
   if (group === "purchaseSpending") {
     const periodRaw = typeof req.query.period === "string" ? req.query.period.trim() : "month";
-    const period: PurchasePeriod =
+    let period: PurchasePeriod =
       periodRaw === "year" || periodRaw === "all" ? periodRaw : "month";
-    const tzRaw = req.query.timezoneOffsetMinutes;
-    const tzOffsetMinutes =
-      typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
-        ? parseInt(tzRaw, 10)
-        : 0;
+    if (!fullStatsAccess) period = "month";
     const range = purchaseLogCreatedAtRange(period, tzOffsetMinutes);
     const logs = await prisma.log.findMany({
       where: {
@@ -432,12 +542,23 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 
   if (group === "summary") {
+    const totalWhere = freeMonthWhere ? mergeLogWhere({ userId }, freeMonthWhere) : { userId };
+    const completedCountWhere: Prisma.LogWhereInput = freeMonthRange
+      ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+      : { userId, completedAt: { not: null } };
+    const reviewedWhere = freeMonthWhere
+      ? mergeLogWhere({ userId, grade: { not: null } }, freeMonthWhere)
+      : { userId, grade: { not: null } };
+    const completedForHoursWhere: Prisma.LogWhereInput = freeMonthRange
+      ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+      : { userId, completedAt: { not: null } };
+
     const [totalLogs, completedLogCount, reviewedLogs, completedLogs] = await Promise.all([
-      prisma.log.count({ where: { userId } }),
-      prisma.log.count({ where: { userId, completedAt: { not: null } } }),
-      prisma.log.count({ where: { userId, grade: { not: null } } }),
+      prisma.log.count({ where: totalWhere }),
+      prisma.log.count({ where: completedCountWhere }),
+      prisma.log.count({ where: reviewedWhere }),
       prisma.log.findMany({
-        where: { userId, completedAt: { not: null } },
+        where: completedForHoursWhere,
         select: {
           completedAt: true,
           contentHours: true,
@@ -463,8 +584,9 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 
   if (group === "genre") {
+    const genreBase: Prisma.LogWhereInput = { userId, genres: { not: null } };
     const logs = await prisma.log.findMany({
-      where: { userId, genres: { not: null } },
+      where: freeMonthWhere ? mergeLogWhere(genreBase, freeMonthWhere) : genreBase,
       select: { id: true, genres: true },
     });
     const byGenre: Record<string, Set<string>> = {};
@@ -489,8 +611,11 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 
   if (group === "completedByMonth" || group === "completedByYear") {
+    const completedTimeWhere: Prisma.LogWhereInput = freeMonthRange
+      ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+      : { userId, completedAt: { not: null } };
     const logs = await prisma.log.findMany({
-      where: { userId, completedAt: { not: null } },
+      where: completedTimeWhere,
       select: { completedAt: true },
     });
     const byPeriod: Record<string, number> = {};
@@ -510,8 +635,11 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 
   if (group === "categoryByMonth" || group === "categoryByYear") {
+    const catTimeWhere: Prisma.LogWhereInput = freeMonthRange
+      ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+      : { userId, completedAt: { not: null } };
     const logs = await prisma.log.findMany({
-      where: { userId, completedAt: { not: null } },
+      where: catTimeWhere,
       select: { completedAt: true, mediaType: true },
     });
     const byPeriodCategory: Record<string, Record<string, number>> = {};
@@ -536,11 +664,11 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
+  const hoursRollupWhere: Prisma.LogWhereInput = freeMonthRange
+    ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+    : { userId, completedAt: { not: null } };
   const logs = await prisma.log.findMany({
-    where: {
-      userId,
-      completedAt: { not: null },
-    },
+    where: hoursRollupWhere,
     select: { completedAt: true, contentHours: true, startedAt: true, mediaType: true, hoursToBeat: true, matchesPlayed: true },
   });
   const byKeyHours: Record<string, number> = {};
@@ -569,7 +697,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   res.json({ group, data: entries });
 });
 
-/** GET /logs/by-date?date=YYYY-MM-DD&timezoneOffsetMinutes=? - Logs completed or started on the given date (in user's local time). Pro only. Returns { data: Log[] }. */
+/** GET /logs/by-date?date=YYYY-MM-DD&timezoneOffsetMinutes=? - Logs completed or started on the given date (in user's local time). Pro: any date. Free: only days in the current calendar month (same window as statistics). */
 logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const user = await prisma.user.findUnique({
@@ -577,18 +705,22 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
     select: { tier: true },
   });
   const hasProAccess = user != null && tierHasProFeatures(user.tier);
-  if (!hasProAccess) {
-    res.json({ data: [] });
-    return;
-  }
   const dateParam = typeof req.query.date === "string" ? req.query.date.trim() : "";
   const tzOffsetMinutes = typeof req.query.timezoneOffsetMinutes === "string"
     ? parseInt(req.query.timezoneOffsetMinutes, 10)
     : 0;
-  const bounds = localDayBoundsFromDateString(dateParam, Number.isFinite(tzOffsetMinutes) ? tzOffsetMinutes : 0);
+  const tz = Number.isFinite(tzOffsetMinutes) ? tzOffsetMinutes : 0;
+  const bounds = localDayBoundsFromDateString(dateParam, tz);
   if (!bounds) {
     res.status(400).json({ error: "Invalid date; use YYYY-MM-DD" });
     return;
+  }
+  if (!hasProAccess) {
+    const monthRange = freeTierStatisticsMonthRange(tz);
+    if (!monthRange || bounds.lte < monthRange.gte || bounds.gte > monthRange.lte) {
+      res.json({ data: [] });
+      return;
+    }
   }
   const { gte: start, lte: end } = bounds;
   const logs = await prisma.log.findMany({
@@ -604,7 +736,7 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
   res.json({ data: logs.map(serializeLog) });
 });
 
-/** GET /logs/calendar?year=YYYY&month=M - Start and end dates per day for a month. Pro only; free accounts get no data. */
+/** GET /logs/calendar?year=YYYY&month=M - Activity counts per day. Pro: any month. Free: only the current calendar month in the user's timezone (same as statistics). */
 logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const user = await prisma.user.findUnique({
@@ -612,12 +744,6 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
     select: { tier: true },
   });
   const hasProAccess = user != null && tierHasProFeatures(user.tier);
-  if (!hasProAccess) {
-    const year = typeof req.query.year === "string" ? parseInt(req.query.year, 10) : new Date().getFullYear();
-    const month = typeof req.query.month === "string" ? parseInt(req.query.month, 10) : new Date().getMonth() + 1;
-    res.json({ year: Number.isFinite(year) ? year : new Date().getFullYear(), month: Number.isFinite(month) ? month : new Date().getMonth() + 1, dates: {} });
-    return;
-  }
   const yearParam = typeof req.query.year === "string" ? parseInt(req.query.year, 10) : new Date().getFullYear();
   const monthParam = typeof req.query.month === "string" ? parseInt(req.query.month, 10) : new Date().getMonth() + 1;
   const year = Number.isFinite(yearParam) ? yearParam : new Date().getFullYear();
@@ -626,6 +752,15 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
     ? parseInt(req.query.timezoneOffsetMinutes, 10)
     : 0;
   const offsetMs = Number.isFinite(tzOffsetMinutes) ? tzOffsetMinutes * 60 * 1000 : 0;
+  if (!hasProAccess) {
+    const shifted = new Date(Date.now() + offsetMs);
+    const cy = shifted.getUTCFullYear();
+    const cm = shifted.getUTCMonth() + 1;
+    if (year !== cy || month !== cm) {
+      res.json({ year, month, dates: {} });
+      return;
+    }
+  }
   const start = new Date(Date.UTC(year, month - 1, 1));
   const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
   const logs = await prisma.log.findMany({
@@ -1057,6 +1192,137 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     }
   } catch (e) {
     res.status(500).json({ error: "Failed to save log" });
+  }
+});
+
+/** List play sessions for a board-game log. */
+logsRouter.get("/:id/board-game-matches", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const logId = req.params.id;
+  const log = await prisma.log.findFirst({
+    where: { id: logId, userId },
+    select: { id: true, mediaType: true },
+  });
+  if (!log) {
+    res.status(404).json({ error: "Log not found" });
+    return;
+  }
+  if (log.mediaType !== "boardgames") {
+    res.status(400).json({ error: "Matches are only for board game logs" });
+    return;
+  }
+  const rows = await prisma.boardGameMatch.findMany({
+    where: { logId },
+    orderBy: [{ playedAt: "desc" }, { createdAt: "desc" }],
+  });
+  res.json({ data: rows.map(serializeBoardGameMatchRow) });
+});
+
+/** Add a play session; bumps log.matchesPlayed by 1 and sets status to played when it was not already. */
+logsRouter.post("/:id/board-game-matches", async (req: AuthenticatedRequest, res) => {
+  const parsed = createBoardGameMatchBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const userId = req.user!.userId;
+  const logId = req.params.id;
+  const log = await prisma.log.findFirst({
+    where: { id: logId, userId },
+    select: { id: true, mediaType: true, matchesPlayed: true, status: true },
+  });
+  if (!log) {
+    res.status(404).json({ error: "Log not found" });
+    return;
+  }
+  if (log.mediaType !== "boardgames") {
+    res.status(400).json({ error: "Matches are only for board game logs" });
+    return;
+  }
+  const playedAt = new Date(parsed.data.playedAt);
+  if (Number.isNaN(playedAt.getTime())) {
+    res.status(400).json({ error: { playedAt: ["Invalid date"] } });
+    return;
+  }
+  const playersPayload: BoardGameMatchPlayer[] = parsed.data.players.map((p) => ({
+    name: sanitizeText(p.name.trim(), PLAYER_NAME_MAX) || "Player",
+    score: p.score === undefined ? null : p.score,
+    winner: p.winner,
+  }));
+  const notes = sanitizeReview(parsed.data.notes ?? null);
+
+  try {
+    const now = new Date();
+    const bumpToPlayed = log.status !== "played";
+    const [match, updatedLog] = await prisma.$transaction(async (tx) => {
+      const m = await tx.boardGameMatch.create({
+        data: {
+          logId,
+          playedAt,
+          players: JSON.stringify(playersPayload),
+          notes,
+        },
+      });
+      const nextCount = (log.matchesPlayed ?? 0) + 1;
+      const ul = await tx.log.update({
+        where: { id: logId },
+        data: {
+          matchesPlayed: nextCount,
+          ...(bumpToPlayed
+            ? {
+                status: "played",
+                completedAt: now,
+              }
+            : {}),
+        },
+      });
+      return [m, ul] as const;
+    });
+    res.status(201).json({
+      match: serializeBoardGameMatchRow(match),
+      log: serializeLog(updatedLog),
+    });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to save match" });
+  }
+});
+
+/** Remove a play session; decrements log.matchesPlayed (min 0). */
+logsRouter.delete("/:id/board-game-matches/:matchId", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const logId = req.params.id;
+  const matchId = req.params.matchId;
+  const log = await prisma.log.findFirst({
+    where: { id: logId, userId },
+    select: { id: true, mediaType: true, matchesPlayed: true },
+  });
+  if (!log) {
+    res.status(404).json({ error: "Log not found" });
+    return;
+  }
+  if (log.mediaType !== "boardgames") {
+    res.status(400).json({ error: "Matches are only for board game logs" });
+    return;
+  }
+  const existing = await prisma.boardGameMatch.findFirst({
+    where: { id: matchId, logId },
+  });
+  if (!existing) {
+    res.status(404).json({ error: "Match not found" });
+    return;
+  }
+  try {
+    const updatedLog = await prisma.$transaction(async (tx) => {
+      await tx.boardGameMatch.delete({ where: { id: matchId } });
+      const nextCount = Math.max(0, (log.matchesPlayed ?? 0) - 1);
+      return tx.log.update({
+        where: { id: logId },
+        data: { matchesPlayed: nextCount },
+      });
+    });
+    res.json({ log: serializeLog(updatedLog) });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to delete match" });
   }
 });
 

@@ -286,50 +286,58 @@ export function Statistics() {
   const fetchStats = useCallback(async (group: StatsGroup) => {
     setStatsLoading(true);
     try {
-      const res = await apiFetch<{ data: StatsEntry[] }>(`/logs/stats?group=${group}`);
+      const res = await apiFetch<{ data: StatsEntry[] }>(
+        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}`
+      );
       setStats(res.data ?? []);
     } catch {
       setStats([]);
     } finally {
       setStatsLoading(false);
     }
-  }, []);
+  }, [tzOffsetMinutes]);
 
   const fetchGenreStats = useCallback(async () => {
     setGenreStatsLoading(true);
     try {
-      const res = await apiFetch<{ data: StatsEntry[] }>("/logs/stats?group=genre");
+      const res = await apiFetch<{ data: StatsEntry[] }>(
+        `/logs/stats?group=genre&timezoneOffsetMinutes=${tzOffsetMinutes}`
+      );
       setGenreStats(res.data ?? []);
     } catch {
       setGenreStats([]);
     } finally {
       setGenreStatsLoading(false);
     }
-  }, []);
+  }, [tzOffsetMinutes]);
 
   const fetchStatusOverTimeStats = useCallback(async (group: "completedByMonth" | "completedByYear") => {
     setStatusOverTimeLoading(true);
     try {
-      const res = await apiFetch<{ data: StatsEntry[] }>(`/logs/stats?group=${group}`);
+      const res = await apiFetch<{ data: StatsEntry[] }>(
+        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}`
+      );
       setStatusOverTimeStats(res.data ?? []);
     } catch {
       setStatusOverTimeStats([]);
     } finally {
       setStatusOverTimeLoading(false);
     }
-  }, []);
+  }, [tzOffsetMinutes]);
 
   const fetchCategoryOverTimeStats = useCallback(async (group: "categoryByMonth" | "categoryByYear") => {
     setCategoryOverTimeLoading(true);
     try {
-      const res = await apiFetch<{ data: CategoryOverTimeEntry[] }>(`/logs/stats?group=${group}`);
+      const res = await apiFetch<{ data: CategoryOverTimeEntry[] }>(
+        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}`
+      );
       setCategoryOverTimeStats(res.data ?? []);
     } catch {
       setCategoryOverTimeStats([]);
     } finally {
       setCategoryOverTimeLoading(false);
     }
-  }, []);
+  }, [tzOffsetMinutes]);
 
   const fetchPurchaseSpending = useCallback(async () => {
     setPurchaseSpendingLoading(true);
@@ -349,28 +357,48 @@ export function Statistics() {
   }, [purchasePeriod, tzOffsetMinutes]);
 
   useEffect(() => {
-    if (isPro) fetchStats(statsGroup);
-  }, [isPro, statsGroup, fetchStats]);
+    void fetchStats(statsGroup);
+  }, [statsGroup, fetchStats]);
 
   useEffect(() => {
-    if (isPro) fetchGenreStats();
-  }, [isPro, fetchGenreStats]);
+    void fetchGenreStats();
+  }, [fetchGenreStats]);
 
   useEffect(() => {
-    if (isPro && genreGraphMode === "statusOverTime") {
-      fetchStatusOverTimeStats(statusOverTimeGroup === "year" ? "completedByYear" : "completedByMonth");
+    if (genreGraphMode === "statusOverTime") {
+      const apiGroup =
+        !isPro ? "completedByMonth" : statusOverTimeGroup === "year" ? "completedByYear" : "completedByMonth";
+      fetchStatusOverTimeStats(apiGroup);
     }
   }, [isPro, genreGraphMode, statusOverTimeGroup, fetchStatusOverTimeStats]);
 
   useEffect(() => {
-    if (isPro && genreGraphMode === "byCategory") {
-      fetchCategoryOverTimeStats(categoryOverTimeGroup === "year" ? "categoryByYear" : "categoryByMonth");
+    if (genreGraphMode === "byCategory") {
+      const apiGroup =
+        !isPro ? "categoryByMonth" : categoryOverTimeGroup === "year" ? "categoryByYear" : "categoryByMonth";
+      fetchCategoryOverTimeStats(apiGroup);
     }
   }, [isPro, genreGraphMode, categoryOverTimeGroup, fetchCategoryOverTimeStats]);
 
   useEffect(() => {
-    if (isPro) void fetchPurchaseSpending();
-  }, [isPro, fetchPurchaseSpending]);
+    if (!isPro && purchasePeriod !== "month") setPurchasePeriod("month");
+  }, [isPro, purchasePeriod]);
+
+  useEffect(() => {
+    if (!isPro && statsGroup !== "category") setStatsGroup("category");
+  }, [isPro, statsGroup]);
+
+  useEffect(() => {
+    if (!isPro && statusOverTimeGroup !== "month") setStatusOverTimeGroup("month");
+  }, [isPro, statusOverTimeGroup]);
+
+  useEffect(() => {
+    if (!isPro && categoryOverTimeGroup !== "month") setCategoryOverTimeGroup("month");
+  }, [isPro, categoryOverTimeGroup]);
+
+  useEffect(() => {
+    void fetchPurchaseSpending();
+  }, [fetchPurchaseSpending]);
 
   useEffect(() => {
     if (!spendDetailMediaType) {
@@ -408,11 +436,16 @@ export function Statistics() {
 
   const fetchLogs = useCallback(() => {
     setLoading(true);
+    const logsQuery = isPro
+      ? "/logs?limit=5&sort=dateDesc"
+      : `/logs?limit=5&sort=dateDesc&forStatistics=1&timezoneOffsetMinutes=${tzOffsetMinutes}`;
     Promise.all([
-      apiFetchCached<Log[] | { data: Log[]; nextCursor: string | null }>("/logs?limit=5&sort=date", {
+      apiFetchCached<Log[] | { data: Log[]; nextCursor: string | null }>(logsQuery, {
         ttlMs: 2 * 60 * 1000,
       }).then((res) => setLogs(Array.isArray(res) ? res : res.data)),
-      apiFetch<{ data: LogStatsSummary }>("/logs/stats?group=summary")
+      apiFetch<{ data: LogStatsSummary }>(
+        `/logs/stats?group=summary&timezoneOffsetMinutes=${tzOffsetMinutes}`
+      )
         .then((res) => setSummary(res.data ?? null))
         .catch(() => setSummary(null)),
     ])
@@ -421,7 +454,7 @@ export function Statistics() {
         setSummary(null);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [isPro, tzOffsetMinutes]);
 
   const handleExportClick = useCallback(() => {
     if (!isPro) {
@@ -457,17 +490,8 @@ export function Statistics() {
   }, [t, setPageTitle, setRightSlot, handleExportClick, exporting]);
 
   useEffect(() => {
-    if (isPro) fetchLogs();
-    else {
-      setLoading(false);
-      setStatsLoading(false);
-      setSummary(null);
-    }
-  }, [isPro, fetchLogs]);
-
-  useEffect(() => {
-    if (!isPro) setShowProModal(true);
-  }, [isPro]);
+    void fetchLogs();
+  }, [fetchLogs]);
 
   const recent = logs.slice(0, 5); // Show only the 5 most recent logs
   const displayedStats =
@@ -525,9 +549,14 @@ export function Statistics() {
         </DialogContent>
       </Dialog>
 
-      <div className={`flex flex-col gap-12 ${!isPro ? "pointer-events-none select-none blur-sm" : ""}`}>
-      {isPro && loading && <StatisticsSummarySkeleton />}
-      {isPro && !loading && (
+      <div className="flex flex-col gap-12">
+      {!isPro && (
+        <p className="rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/10 px-4 py-3 text-sm leading-snug text-[var(--color-light)]">
+          {t("statistics.freeMonthNotice")}
+        </p>
+      )}
+      {loading && <StatisticsSummarySkeleton />}
+      {!loading && (
         <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
           <button
             type="button"
@@ -584,7 +613,7 @@ export function Statistics() {
         </div>
       )}
 
-      {isPro && !loading && (
+      {!loading && (
         <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
           <button
             type="button"
@@ -631,11 +660,15 @@ export function Statistics() {
                 <Select
                   value={purchasePeriod}
                   onValueChange={(v) => setPurchasePeriod(v as PurchasePeriod)}
-                  options={[
-                    { value: "month", label: t("statistics.purchasePeriodMonth") },
-                    { value: "year", label: t("statistics.purchasePeriodYear") },
-                    { value: "all", label: t("statistics.purchasePeriodAll") },
-                  ]}
+                  options={
+                    isPro
+                      ? [
+                          { value: "month", label: t("statistics.purchasePeriodMonth") },
+                          { value: "year", label: t("statistics.purchasePeriodYear") },
+                          { value: "all", label: t("statistics.purchasePeriodAll") },
+                        ]
+                      : [{ value: "month", label: t("statistics.purchasePeriodMonth") }]
+                  }
                   aria-label={t("statistics.purchasePeriodLabel")}
                   className="w-full min-w-0"
                   triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
@@ -735,7 +768,7 @@ export function Statistics() {
         </div>
       )}
 
-      {isPro && spendDetailMediaType && (
+      {spendDetailMediaType && (
         isMobile ? (
           <Drawer open onOpenChange={(open) => !open && setSpendDetailMediaType(null)}>
             <DrawerContent
@@ -894,7 +927,7 @@ export function Statistics() {
           aria-label={t("dashboard.calendarTitle")}
           className="flex min-h-0 min-w-0 flex-1 flex-col md:min-h-0"
         >
-          <DashboardCalendar isPro={isPro} fillColumnHeight />
+          <DashboardCalendar access={isPro ? "full" : "monthOnly"} fillColumnHeight />
         </section>
           )}
         </div>
@@ -930,7 +963,7 @@ export function Statistics() {
               className="w-full min-w-0 sm:max-w-[220px]"
               triggerClassName="w-full min-w-0"
             />
-            {genreGraphMode === "statusOverTime" && (
+            {genreGraphMode === "statusOverTime" && isPro && (
               <Select
                 value={statusOverTimeGroup}
                 onValueChange={(v) => setStatusOverTimeGroup(v as StatusOverTimeGroup)}
@@ -943,7 +976,7 @@ export function Statistics() {
                 triggerClassName="w-full min-w-0"
               />
             )}
-            {genreGraphMode === "byCategory" && (
+            {genreGraphMode === "byCategory" && isPro && (
               <Select
                 value={categoryOverTimeGroup}
                 onValueChange={(v) => setCategoryOverTimeGroup(v as StatusOverTimeGroup)}
@@ -1132,11 +1165,15 @@ export function Statistics() {
                     <Select
                       value={statsGroup}
                       onValueChange={(v) => setStatsGroup(v as StatsGroup)}
-                      options={[
-                        { value: "category", label: t("dashboard.byCategory") },
-                        { value: "month", label: t("dashboard.byMonth") },
-                        { value: "year", label: t("dashboard.byYear") },
-                      ]}
+                      options={
+                        isPro
+                          ? [
+                              { value: "category", label: t("dashboard.byCategory") },
+                              { value: "month", label: t("dashboard.byMonth") },
+                              { value: "year", label: t("dashboard.byYear") },
+                            ]
+                          : [{ value: "category", label: t("dashboard.byCategory") }]
+                      }
                       aria-label={t("dashboard.statsTitle")}
                       className="min-w-0 w-full md:max-w-[min(20rem,100%)]"
                       triggerClassName="w-full min-w-0"

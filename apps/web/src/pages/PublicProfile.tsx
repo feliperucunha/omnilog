@@ -358,6 +358,23 @@ export function PublicProfile() {
             publicUserId={userId}
             initialFilters={initialFilters}
             initialFiltersSyncKey={searchParamsKey}
+            onFiltersChange={(f) => {
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.set("category", selectedCategory);
+                if (f.status) next.set("status", f.status);
+                else next.delete("status");
+                if (f.sort !== "dateDesc") next.set("sort", f.sort);
+                else next.delete("sort");
+                if (f.search.trim()) next.set("q", f.search.trim());
+                else next.delete("q");
+                next.delete("own");
+                next.delete("wantToBuy");
+                if (f.collection === "owned") next.set("own", "true");
+                else if (f.collection === "wantToBuy") next.set("wantToBuy", "true");
+                return next;
+              }, { replace: true });
+            }}
           />
         </section>
       )}

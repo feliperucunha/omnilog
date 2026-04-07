@@ -6,6 +6,7 @@ import { AdBanner } from "@/components/AdBanner";
 import { InvalidApiKeyBanner } from "@/components/InvalidApiKeyBanner";
 import { PageTitleProvider, usePageTitle } from "@/contexts/PageTitleContext";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 
 function AppLayoutContent() {
   const pageTitle = usePageTitle();
@@ -14,15 +15,20 @@ function AppLayoutContent() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const ptrEnabled =
     location.pathname === "/" || location.pathname === "/search";
-  usePullToRefresh({ enabled: ptrEnabled, scrollRef });
+  const ptr = usePullToRefresh({ enabled: ptrEnabled, scrollRef });
 
   return (
     <>
       <Topbar />
       <div
         ref={scrollRef}
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto"
       >
+        <PullToRefreshIndicator
+          pullRawDy={ptr.pullRawDy}
+          thresholdPx={ptr.thresholdPx}
+          isRefreshing={ptr.isRefreshing}
+        />
         {belowNavbar != null && belowNavbar !== false && (
           <div className="sticky top-0 z-20 w-full shrink-0 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
             {belowNavbar}

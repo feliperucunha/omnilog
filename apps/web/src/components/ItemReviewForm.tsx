@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ import {
 } from "@/lib/mediaTypeFeatures";
 import { MoneyAmountInput } from "@/components/MoneyAmountInput";
 import { DEFAULT_PURCHASE_CURRENCY } from "@/lib/currencies";
+import { BoardGameMatchesSection } from "@/components/BoardGameMatchesSection";
+import { cn } from "@/lib/utils";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
 const HAS_SEASON_FIELD: MediaType[] = ["tv"];
@@ -102,6 +105,8 @@ export function ItemReviewForm({
   const [purchaseCurrency, setPurchaseCurrency] = useState(DEFAULT_PURCHASE_CURRENCY);
   const [purchaseAmountMinor, setPurchaseAmountMinor] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [boardMainTab, setBoardMainTab] = useState<"review" | "matches">("review");
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     if (loadingLog || myLog != null) return;
@@ -193,6 +198,14 @@ export function ItemReviewForm({
       .finally(() => setLoadingLog(false));
   }, [mediaType, externalId]);
 
+  useEffect(() => {
+    if (!showBoardGameFields || !myLog) {
+      setBoardMainTab("review");
+      return;
+    }
+    setBoardMainTab(searchParams.get("matches") === "1" ? "matches" : "review");
+  }, [myLog?.id, showBoardGameFields, searchParams]);
+
   const toNum = (v: number | ""): number | null => (v === "" ? null : v);
 
   const sameStringList = (a: string[], b: string[] | null | undefined): boolean => {
@@ -234,7 +247,7 @@ export function ItemReviewForm({
         payload.own = own;
         payload.wantToBuy = wantToBuy;
       }
-      if (showBoardGameFields) {
+      if (showBoardGameFields && !myLog) {
         payload.matchesPlayed = toNum(matchesPlayed);
       }
       if (showPurchaseAmount) {
@@ -279,7 +292,9 @@ export function ItemReviewForm({
           affinityMatch &&
           (!showCollectionOwnership ||
             (own === (myLog.own ?? false) && wantToBuy === (myLog.wantToBuy ?? false))) &&
-          (!showBoardGameFields || toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)) &&
+          (!showBoardGameFields ||
+            (myLog && mediaType === "boardgames") ||
+            toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)) &&
           (!showPurchaseAmount ||
             (() => {
               const includePurchase = !showCollectionOwnership || own;
@@ -322,7 +337,10 @@ export function ItemReviewForm({
             id: externalId,
             review: review.trim() || null,
             ...(showCollectionOwnership && { own, wantToBuy }),
-            ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
+            ...(showBoardGameFields && {
+              matchesPlayed:
+                mediaType === "boardgames" ? (updated.matchesPlayed ?? null) : toNum(matchesPlayed),
+            }),
           });
         }
       } else {
@@ -420,6 +438,37 @@ export function ItemReviewForm({
             )}
           </div>
         )}
+        {showBoardGameFields && myLog && (
+          <div className="mb-3 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
+            <button
+              type="button"
+              onClick={() => setBoardMainTab("review")}
+              className={cn(
+                "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                boardMainTab === "review"
+                  ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+                  : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+              )}
+            >
+              {t("boardGameMatches.tabReview")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setBoardMainTab("matches")}
+              className={cn(
+                "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                boardMainTab === "matches"
+                  ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+                  : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+              )}
+            >
+              {t("boardGameMatches.tabMatches")}
+            </button>
+          </div>
+        )}
+        {showBoardGameFields && myLog && boardMainTab === "matches" ? (
+          <BoardGameMatchesSection logId={myLog.id} onLogUpdated={setMyLog} />
+        ) : (
         <form onSubmit={handleSubmit}>
           <div className="flex flex-col gap-4">
             <div>
@@ -431,7 +480,7 @@ export function ItemReviewForm({
                 onValueChange={(v) => {
                   const next = v || null;
                   setStatus(next);
-                  if (showBoardGameFields) {
+                  if (showBoardGameFields && !myLog) {
                     setMatchesPlayed(next === "played" ? 1 : next === "plan to play" ? 0 : matchesPlayed);
                   }
                   if (next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && episodesCount != null && episodesCount > 0) {
@@ -560,7 +609,7 @@ export function ItemReviewForm({
                 />
               </>
             )}
-            {showBoardGameFields && (
+            {showBoardGameFields && !myLog && (
                 <div className="space-y-2">
                   <Label className="text-sm text-[var(--color-lightest)]">
                     {t("itemReviewForm.matchesPlayed")}
@@ -583,6 +632,11 @@ export function ItemReviewForm({
                     aria-label={t("itemReviewForm.matchesPlayed")}
                   />
                 </div>
+            )}
+            {showBoardGameFields && myLog && (
+              <p className="text-sm text-[var(--color-light)]">
+                {t("boardGameMatches.matchCountReadOnly", { count: String(myLog.matchesPlayed ?? 0) })}
+              </p>
             )}
 
             {showPurchaseAmountField && (
@@ -629,6 +683,7 @@ export function ItemReviewForm({
             </motion.div>
           </div>
         </form>
+        )}
       </Card>
     </motion.div>
   );

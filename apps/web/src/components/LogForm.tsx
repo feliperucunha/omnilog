@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { NumberCombobox } from "@/components/ui/number-combobox";
 import type { MediaType, Log } from "@geeklogs/shared";
+import { BoardGameMatchesSection } from "@/components/BoardGameMatchesSection";
+import { cn } from "@/lib/utils";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
@@ -61,6 +63,10 @@ interface LogFormEditProps {
   log: Log;
   /** TV/Anime: total episodes (set episode to this when user selects completed status). */
   episodesCount?: number | null;
+  /** Board games: open Matches tab first (e.g. list + button). */
+  initialBoardGameTab?: "review" | "matches";
+  /** Board games: after a match is saved/deleted, parent should refresh `log` (e.g. matchesPlayed). */
+  onLogRefreshed?: (log: Log) => void;
   onSaved: (completion?: LogCompleteState) => void;
   onCancel: () => void;
   /** Called when user confirms delete; modal will close after. */
@@ -113,6 +119,7 @@ export function LogForm(props: LogFormProps) {
   };
   const [progressOptions, setProgressOptions] = useState<ProgressOptions | null>(null);
   const [progressOptionsLoading, setProgressOptionsLoading] = useState(false);
+  const [boardMainTab, setBoardMainTab] = useState<"review" | "matches">("review");
 
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
@@ -124,6 +131,10 @@ export function LogForm(props: LogFormProps) {
   const showPurchaseAmount = mediaTypeHasPurchaseAmount(mediaType);
   /** Spend field only when "Own" is selected (games / board games); manga & comics have no ownership switch. */
   const showPurchaseAmountField = showPurchaseAmount && (!showCollectionOwnership || own);
+  const showBoardGameTabs = isEdit && showBoardGameFields;
+  const initialBoardGameTab = isEdit && "initialBoardGameTab" in props ? props.initialBoardGameTab : undefined;
+  const onLogRefreshed = isEdit && "onLogRefreshed" in props ? props.onLogRefreshed : undefined;
+
   const [purchaseCurrency, setPurchaseCurrency] = useState(
     () => (isEdit && log?.purchaseCurrency ? log.purchaseCurrency : DEFAULT_PURCHASE_CURRENCY)
   );
@@ -174,6 +185,11 @@ export function LogForm(props: LogFormProps) {
     }
   }, [isEdit, log?.id]);
 
+  useEffect(() => {
+    if (!showBoardGameTabs) return;
+    setBoardMainTab(initialBoardGameTab ?? "review");
+  }, [showBoardGameTabs, log?.id, initialBoardGameTab]);
+
   const title = isEdit ? log!.title : props.title;
   const image = isEdit ? (log!.image ?? null) : (props as LogFormCreateProps).image;
 
@@ -199,7 +215,9 @@ export function LogForm(props: LogFormProps) {
         (!showHoursToBeat || toNum(hoursToBeat) === (log.hoursToBeat ?? null)) &&
         (!showCollectionOwnership ||
           (own === (log.own ?? false) && wantToBuy === (log.wantToBuy ?? false))) &&
-        (!showBoardGameFields || toNum(matchesPlayed) === (log.matchesPlayed ?? null)) &&
+        (!showBoardGameFields ||
+          (isEdit && mediaType === "boardgames") ||
+          toNum(matchesPlayed) === (log.matchesPlayed ?? null)) &&
         (!showPurchaseAmount ||
           (() => {
             const includePurchase = !showCollectionOwnership || own;
@@ -284,7 +302,7 @@ export function LogForm(props: LogFormProps) {
           payload.own = own;
           payload.wantToBuy = wantToBuy;
         }
-        if (showBoardGameFields) {
+        if (showBoardGameFields && !(isEdit && mediaType === "boardgames")) {
           payload.matchesPlayed = toNum(matchesPlayed);
         }
         if (showPurchaseAmount) {
@@ -310,7 +328,9 @@ export function LogForm(props: LogFormProps) {
           (!showHoursToBeat || toNum(hoursToBeat) === (props.log.hoursToBeat ?? null)) &&
           (!showCollectionOwnership ||
             (own === (props.log.own ?? false) && wantToBuy === (props.log.wantToBuy ?? false))) &&
-          (!showBoardGameFields || toNum(matchesPlayed) === (props.log.matchesPlayed ?? null)) &&
+          (!showBoardGameFields ||
+            (isEdit && mediaType === "boardgames") ||
+            toNum(matchesPlayed) === (props.log.matchesPlayed ?? null)) &&
           (!showPurchaseAmount ||
             (() => {
               const includePurchase = !showCollectionOwnership || own;
@@ -356,7 +376,12 @@ export function LogForm(props: LogFormProps) {
             id: props.log.externalId,
             review: review.trim() || null,
             ...(showCollectionOwnership && { own, wantToBuy }),
-            ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
+            ...(showBoardGameFields && {
+              matchesPlayed:
+                isEdit && mediaType === "boardgames"
+                  ? (updated.matchesPlayed ?? null)
+                  : toNum(matchesPlayed),
+            }),
           };
           props.onSaved(completion);
         } else {
@@ -482,6 +507,36 @@ export function LogForm(props: LogFormProps) {
     void performSave({ optimisticClose: true });
   }, [confirmDeleteOpen, isDirty, performSave, onCancel]);
 
+  const boardGameTabBar =
+    showBoardGameTabs && log ? (
+      <div className="mb-3 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
+        <button
+          type="button"
+          onClick={() => setBoardMainTab("review")}
+          className={cn(
+            "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            boardMainTab === "review"
+              ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+              : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+          )}
+        >
+          {t("boardGameMatches.tabReview")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setBoardMainTab("matches")}
+          className={cn(
+            "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            boardMainTab === "matches"
+              ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+              : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+          )}
+        >
+          {t("boardGameMatches.tabMatches")}
+        </button>
+      </div>
+    ) : null;
+
   const formContent = (
     <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
       <div className="mb-4 flex min-w-0 gap-4">
@@ -501,6 +556,15 @@ export function LogForm(props: LogFormProps) {
           {title}
         </div>
       </div>
+      {boardGameTabBar}
+      {showBoardGameTabs && boardMainTab === "matches" && log ? (
+        <BoardGameMatchesSection
+          logId={log.id}
+          onLogUpdated={(lg) => {
+            onLogRefreshed?.(lg);
+          }}
+        />
+      ) : (
       <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-4">
               {isEdit && (
@@ -514,7 +578,7 @@ export function LogForm(props: LogFormProps) {
                       onValueChange={(v) => {
                         const next = v || null;
                         setStatus(next);
-                        if (showBoardGameFields) {
+                        if (showBoardGameFields && !isEdit) {
                           setMatchesPlayed(next === "played" ? 1 : next === "plan to play" ? 0 : matchesPlayed);
                         }
                         if (isEdit && next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && "episodesCount" in props && props.episodesCount != null && props.episodesCount > 0) {
@@ -643,27 +707,32 @@ export function LogForm(props: LogFormProps) {
                   />
                 </>
               )}
-              {showBoardGameFields && (
+              {showBoardGameFields && !isEdit && (
                 <div className="space-y-2">
-                    <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.matchesPlayed")}</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={1}
-                      placeholder="0"
-                      value={matchesPlayed === "" ? "" : matchesPlayed}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                        const v = e.target.value;
-                        if (v === "") setMatchesPlayed("");
-                        else {
-                          const n = parseInt(v, 10);
-                          if (Number.isInteger(n) && n >= 0) setMatchesPlayed(n);
-                        }
-                      }}
-                      className="w-full max-w-[8rem]"
-                      aria-label={t("itemReviewForm.matchesPlayed")}
-                    />
+                  <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.matchesPlayed")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="0"
+                    value={matchesPlayed === "" ? "" : matchesPlayed}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const v = e.target.value;
+                      if (v === "") setMatchesPlayed("");
+                      else {
+                        const n = parseInt(v, 10);
+                        if (Number.isInteger(n) && n >= 0) setMatchesPlayed(n);
+                      }
+                    }}
+                    className="w-full max-w-[8rem]"
+                    aria-label={t("itemReviewForm.matchesPlayed")}
+                  />
                 </div>
+              )}
+              {showBoardGameFields && isEdit && log && (
+                <p className="text-sm text-[var(--color-light)]">
+                  {t("boardGameMatches.matchCountReadOnly", { count: String(log.matchesPlayed ?? 0) })}
+                </p>
               )}
               {showPurchaseAmountField && (
                 <MoneyAmountInput
@@ -708,6 +777,7 @@ export function LogForm(props: LogFormProps) {
               )}
             </div>
           </form>
+      )}
     </motion.div>
   );
 

@@ -1,11 +1,10 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, AlertTriangle, Plus, Download, Pencil, X } from "lucide-react";
+import { Search, AlertTriangle, Plus, Download, Pencil, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
 import type { MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
@@ -144,6 +143,7 @@ export function MediaLogs({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingLog, setEditingLog] = useState<Log | null>(null);
+  const [boardGameEditTab, setBoardGameEditTab] = useState<"review" | "matches">("review");
   const [editingLogEpisodesCount, setEditingLogEpisodesCount] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>(() => initialFilters?.status ?? "");
@@ -153,7 +153,10 @@ export function MediaLogs({
   );
   const [sortBy, setSortBy] = useState<MediaLogsSort>(() => (initialFilters?.sort as MediaLogsSort) ?? DEFAULT_SORT);
   const [showCustomEntry, setShowCustomEntry] = useState(false);
-  const [categorySearchQuery, setCategorySearchQuery] = useState(() => initialFilters?.search ?? "");
+  /** Applied filter (API + URL); updated on submit, not on every keystroke. */
+  const [categorySearchQuery, setCategorySearchQuery] = useState(() => (initialFilters?.search ?? "").trim());
+  /** In-progress text in the search field. */
+  const [categorySearchDraft, setCategorySearchDraft] = useState(() => initialFilters?.search ?? "");
   const [incrementingId, setIncrementingId] = useState<string | null>(null);
   const [exportingCategory, setExportingCategory] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
@@ -180,7 +183,8 @@ export function MediaLogs({
     if (initialFiltersSyncKey == null) return;
     setStatusFilter(initialFilters?.status ?? "");
     setSortBy((initialFilters?.sort as MediaLogsSort) ?? DEFAULT_SORT);
-    setCategorySearchQuery(initialFilters?.search ?? "");
+    setCategorySearchQuery((initialFilters?.search ?? "").trim());
+    setCategorySearchDraft(initialFilters?.search ?? "");
     setCollectionFilter((initialFilters?.collection as CollectionListFilter) ?? "");
   }, [initialFiltersSyncKey, initialFilters]);
 
@@ -220,6 +224,8 @@ export function MediaLogs({
     log.status != null &&
     !(COMPLETED_STATUSES as readonly string[]).includes(log.status);
 
+  const showBoardGameMatchButton = (log: Log) => mediaType === "boardgames" && log.status != null;
+
   const getProgress = (log: Log): { field: "episode" | "chapter" | "volume"; value: number; labelKey: string } => {
     if (EPISODE_TYPES.includes(log.mediaType))
       return { field: "episode", value: log.episode ?? 0, labelKey: "itemReviewForm.episode" };
@@ -246,6 +252,8 @@ export function MediaLogs({
       if (statusFilter) params.set("status", statusFilter);
       if (showCollectionOwnershipFilters && collectionFilter === "owned") params.set("own", "true");
       if (showCollectionOwnershipFilters && collectionFilter === "wantToBuy") params.set("wantToBuy", "true");
+      const q = categorySearchQuery.trim();
+      if (q) params.set("q", q);
       if (!reset && nextCursor) params.set("cursor", nextCursor);
       const path = publicUserId
         ? `/users/${publicUserId}/logs?${params.toString()}`
@@ -282,6 +290,7 @@ export function MediaLogs({
       t,
       publicUserId,
       showCollectionOwnershipFilters,
+      categorySearchQuery,
     ]
   );
 
@@ -299,6 +308,7 @@ export function MediaLogs({
 
   useEffect(() => {
     setCategorySearchQuery("");
+    setCategorySearchDraft("");
     if (!mediaTypeHasCollectionOwnership(mediaType)) {
       setCollectionFilter("");
     }
@@ -312,7 +322,10 @@ export function MediaLogs({
 
   useEffect(() => {
     const defaultsMatch =
-      sortBy === "dateDesc" && statusFilter === "" && collectionFilter === "";
+      sortBy === "dateDesc" &&
+      statusFilter === "" &&
+      collectionFilter === "" &&
+      categorySearchQuery.trim() === "";
     const useInitial = embedded && initialLogsProp !== undefined && defaultsMatch;
     if (useInitial) {
       setLogs(initialLogsProp ?? []);
@@ -331,6 +344,7 @@ export function MediaLogs({
     statusFilter,
     collectionFilter,
     sortBy,
+    categorySearchQuery,
     publicUserId,
     embedded,
     initialLogsProp,
@@ -340,7 +354,7 @@ export function MediaLogs({
   /** When embedded, start with Load more again when category or filters change. */
   useEffect(() => {
     if (embedded) setInfiniteScrollEnabled(false);
-  }, [embedded, mediaType, statusFilter, collectionFilter, sortBy]);
+  }, [embedded, mediaType, statusFilter, collectionFilter, sortBy, categorySearchQuery]);
 
   useEffect(() => {
     setStatusCounts(null);
@@ -399,6 +413,7 @@ export function MediaLogs({
 
   const handleSaved = (completion?: LogCompleteState) => {
     setEditingLog(null);
+    setBoardGameEditTab("review");
     invalidateLogsAndItemsCache();
     fetchLogs();
     fetchStatusCounts();
@@ -427,12 +442,6 @@ export function MediaLogs({
 
   const label = t(`nav.${mediaType}`);
 
-  const filteredLogs = useMemo(() => {
-    const q = categorySearchQuery.trim().toLowerCase();
-    if (!q) return logs;
-    return logs.filter((log) => log.title.toLowerCase().includes(q));
-  }, [logs, categorySearchQuery]);
-
   const collectionOwnershipSelectOptions = useMemo(
     () => [
       { value: "" as CollectionListFilter, label: t("mediaLogs.filterAll") },
@@ -442,10 +451,28 @@ export function MediaLogs({
     [t]
   );
 
+  const handleListSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const t = categorySearchDraft.trim();
+    setCategorySearchQuery(t);
+    setCategorySearchDraft(t);
+  };
+
+  /** When the field is emptied, drop the applied filter so the list and URL match. */
+  const handleCategorySearchDraftChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setCategorySearchDraft(v);
+    if (v.trim() === "") {
+      setCategorySearchQuery("");
+    }
+  };
+
   const handleCategorySearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!embedded) {
-      const q = categorySearchQuery.trim();
+      const q = categorySearchDraft.trim();
+      setCategorySearchQuery(q);
+      setCategorySearchDraft(q);
       navigate("/search", { state: { mediaType, query: q || undefined } });
     }
   };
@@ -467,6 +494,9 @@ export function MediaLogs({
       setExportingCategory(false);
     }
   };
+
+  const showCategorySearchClear =
+    categorySearchDraft.trim() !== "" || categorySearchQuery !== "";
 
   if (loading && logs.length === 0) {
     return (
@@ -595,35 +625,41 @@ export function MediaLogs({
                 triggerClassName="w-full min-w-0 max-w-none"
               />
             </div>
-            <div className="relative min-w-0 w-full max-w-xs shrink-0">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
-              <Input
-                ref={categorySearchInputRef}
-                type="search"
-                placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
-                value={categorySearchQuery}
-                onChange={(e) => setCategorySearchQuery(e.target.value)}
-                className={cn(
-                  "w-full border-[var(--color-mid)] bg-[var(--color-darkest)] pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)]",
-                  categorySearchQuery.trim() !== "" ? "pr-9" : ""
+            <form onSubmit={handleListSearchSubmit} className="contents">
+              <div className="relative min-w-0 w-full max-w-xs shrink-0">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
+                <Input
+                  ref={categorySearchInputRef}
+                  type="text"
+                  inputMode="search"
+                  enterKeyHint="search"
+                  placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
+                  value={categorySearchDraft}
+                  onChange={handleCategorySearchDraftChange}
+                  title={t("mediaLogs.searchConfirmHint")}
+                  className={cn(
+                    "w-full border-[var(--color-mid)] bg-[var(--color-darkest)] pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)]",
+                    showCategorySearchClear ? "pr-9" : "pr-3"
+                  )}
+                  aria-label={t("mediaLogs.searchTitlesLabel")}
+                />
+                {showCategorySearchClear && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setCategorySearchDraft("");
+                      setCategorySearchQuery("");
+                      categorySearchInputRef.current?.focus();
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+                    aria-label={t("search.clearSearch")}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 )}
-                aria-label={t("mediaLogs.searchTitlesLabel")}
-              />
-              {categorySearchQuery.trim() !== "" && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    setCategorySearchQuery("");
-                    categorySearchInputRef.current?.focus();
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
-                  aria-label={t("search.clearSearch")}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+              </div>
+            </form>
           </div>
           {!readOnly && (
           <div className="flex justify-between items-center gap-4 flex-wrap min-w-0">
@@ -903,25 +939,29 @@ export function MediaLogs({
 
       {/* 3. Search */}
       {(embedded || readOnly) && (
-        <div className="relative min-w-0 max-w-xs">
+        <form onSubmit={handleListSearchSubmit} className="relative min-w-0 max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
           <Input
             ref={categorySearchInputRef}
-            type="search"
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
             placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
-            value={categorySearchQuery}
-            onChange={(e) => setCategorySearchQuery(e.target.value)}
+            value={categorySearchDraft}
+            onChange={handleCategorySearchDraftChange}
+            title={t("mediaLogs.searchConfirmHint")}
             className={cn(
               "w-full border-[var(--color-mid)] bg-[var(--color-darkest)] pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)]",
-              categorySearchQuery.trim() !== "" ? "pr-9" : ""
+              showCategorySearchClear ? "pr-9" : "pr-3"
             )}
             aria-label={t("mediaLogs.searchTitlesLabel")}
           />
-          {categorySearchQuery.trim() !== "" && (
+          {showCategorySearchClear && (
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
+                setCategorySearchDraft("");
                 setCategorySearchQuery("");
                 categorySearchInputRef.current?.focus();
               }}
@@ -931,12 +971,12 @@ export function MediaLogs({
               <X className="h-4 w-4" />
             </button>
           )}
-        </div>
+        </form>
       )}
 
       </div>
 
-      {filteredLogs.length === 0 ? (
+      {logs.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -944,11 +984,11 @@ export function MediaLogs({
           className="flex flex-1 flex-col items-center justify-center min-h-[50vh] py-12"
         >
           <p className="text-center text-[var(--color-light)]">
-            {logs.length === 0
-              ? t("mediaLogs.noLogsFor", { label: label.toLowerCase() })
-              : t("mediaLogs.noTitlesMatchSearch")}
+            {categorySearchQuery.trim()
+              ? t("mediaLogs.noTitlesMatchSearch")
+              : t("mediaLogs.noLogsFor", { label: label.toLowerCase() })}
           </p>
-          {!readOnly && logs.length === 0 && (
+          {!readOnly && logs.length === 0 && !categorySearchQuery.trim() && (
             <Link
               to="/search"
               state={{ mediaType }}
@@ -961,7 +1001,7 @@ export function MediaLogs({
       ) : (
         <motion.div variants={staggerContainer} initial="initial" animate="animate" className="min-w-0 overflow-hidden">
           <div className="flex min-w-0 flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-            {filteredLogs.map((log) => {
+            {logs.map((log) => {
               const isDropped = log.status === "dropped";
               const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
               const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);
@@ -1140,12 +1180,31 @@ export function MediaLogs({
                             )}
                           </button>
                         )}
+                        {showBoardGameMatchButton(log) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setBoardGameEditTab("matches");
+                              setEditingLog(log);
+                            }}
+                            disabled={deletingId === log.id}
+                            aria-label={t("mediaLogs.addMatch")}
+                            className="flex h-10 min-w-10 items-center justify-center gap-1 rounded-xl border-0 bg-[var(--color-darkest)] px-2.5 shadow-[var(--shadow-sm)] transition-[transform,box-shadow] hover:scale-[1.04] hover:shadow-[var(--shadow-md)] active:scale-[0.98] disabled:scale-100 disabled:opacity-50 [@media(hover:hover)]:hover:bg-[var(--btn-gradient-start)] [@media(hover:hover)]:hover:shadow-[0_0_0_2px_var(--btn-gradient-start)]"
+                          >
+                            <Plus className="h-4 w-4 shrink-0 text-[var(--color-lightest)]" aria-hidden />
+                          </button>
+                        )}
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
                           className="h-9 w-9 rounded-lg text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)] transition-colors"
-                          onClick={() => setEditingLog(log)}
+                          onClick={() => {
+                            setBoardGameEditTab("review");
+                            setEditingLog(log);
+                          }}
                           disabled={deletingId === log.id}
                           aria-label={t("common.edit")}
                         >
@@ -1200,8 +1259,16 @@ export function MediaLogs({
           mode="edit"
           log={editingLog}
           episodesCount={editingLogEpisodesCount}
+          initialBoardGameTab={editingLog.mediaType === "boardgames" ? boardGameEditTab : undefined}
+          onLogRefreshed={(lg) => {
+            setEditingLog(lg);
+            setLogs((prev) => prev.map((l) => (l.id === lg.id ? lg : l)));
+          }}
           onSaved={handleSaved}
-          onCancel={() => setEditingLog(null)}
+          onCancel={() => {
+            setEditingLog(null);
+            setBoardGameEditTab("review");
+          }}
           onDelete={editingLog ? (id) => handleDelete(id) : undefined}
         />
       )}
@@ -1221,21 +1288,25 @@ export function MediaLogs({
           </span>
           <Input
             ref={categorySearchInputRef}
-            type="search"
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
             placeholder={t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })}
-            value={categorySearchQuery}
-            onChange={(e) => setCategorySearchQuery(e.target.value)}
+            value={categorySearchDraft}
+            onChange={handleCategorySearchDraftChange}
+            title={t("mediaLogs.searchConfirmHint")}
             className={cn(
               "h-11 min-w-0 flex-1 border-0 bg-transparent pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)] focus-visible:ring-0 focus-visible:ring-offset-0",
-              categorySearchQuery.trim() !== "" ? "pr-10" : "pr-4"
+              showCategorySearchClear ? "pr-10" : "pr-4"
             )}
             aria-label={t("search.search")}
           />
-          {categorySearchQuery.trim() !== "" && (
+          {showCategorySearchClear && (
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
+                setCategorySearchDraft("");
                 setCategorySearchQuery("");
                 categorySearchInputRef.current?.focus();
               }}
