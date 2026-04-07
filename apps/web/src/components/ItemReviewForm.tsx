@@ -113,21 +113,27 @@ export function ItemReviewForm({
   const [boardMainTab, setBoardMainTab] = useState<"review" | "matches">("review");
   const [searchParams] = useSearchParams();
 
+  /** When the log has no saved currency for a field, use account default (not only when state is still USD). */
   useEffect(() => {
     if (loadingLog) return;
     const d = normalizeCurrencyCode(me?.defaultPurchaseCurrency);
-    if (!d) return;
-    setPurchaseCurrency((prev) => {
-      if (prev !== DEFAULT_PURCHASE_CURRENCY) return prev;
-      if (normalizeCurrencyCode(myLog?.purchaseCurrency)) return prev;
-      return d;
-    });
-    setSaleCurrency((prev) => {
-      if (prev !== DEFAULT_PURCHASE_CURRENCY) return prev;
-      if (normalizeCurrencyCode(myLog?.saleCurrency)) return prev;
-      return d;
-    });
-  }, [loadingLog, myLog?.purchaseCurrency, myLog?.saleCurrency, me?.defaultPurchaseCurrency]);
+    const logPc = normalizeCurrencyCode(myLog?.purchaseCurrency);
+    const logSc = normalizeCurrencyCode(myLog?.saleCurrency);
+    if (logPc) {
+      setPurchaseCurrency(logPc);
+    } else if (d) {
+      setPurchaseCurrency(d);
+    } else {
+      setPurchaseCurrency(DEFAULT_PURCHASE_CURRENCY);
+    }
+    if (logSc) {
+      setSaleCurrency(logSc);
+    } else if (d) {
+      setSaleCurrency(d);
+    } else {
+      setSaleCurrency(DEFAULT_PURCHASE_CURRENCY);
+    }
+  }, [loadingLog, myLog?.id, myLog?.purchaseCurrency, myLog?.saleCurrency, me?.defaultPurchaseCurrency]);
 
   type ProgressOptions = {
     seasons?: number[];
@@ -164,6 +170,7 @@ export function ItemReviewForm({
   }, [mediaType, externalId, showSeasonEpisode, showChapterVolume]);
 
   useEffect(() => {
+    setLoadingLog(true);
     apiFetchCached<Log[]>(
       `/logs?mediaType=${mediaType}&externalId=${encodeURIComponent(externalId)}`,
       { ttlMs: 2 * 60 * 1000 }
@@ -189,10 +196,16 @@ export function ItemReviewForm({
             : "";
           setMatchesPlayed(log.matchesPlayed != null ? log.matchesPlayed : defaultMatches);
           setPurchaseCurrency(
-            normalizeCurrencyCode(log.purchaseCurrency) ?? DEFAULT_PURCHASE_CURRENCY
+            normalizeCurrencyCode(log.purchaseCurrency) ??
+              normalizeCurrencyCode(meRef.current?.defaultPurchaseCurrency) ??
+              DEFAULT_PURCHASE_CURRENCY
           );
           setPurchaseAmountMinor(log.purchaseAmountMinor ?? null);
-          setSaleCurrency(normalizeCurrencyCode(log.saleCurrency) ?? DEFAULT_PURCHASE_CURRENCY);
+          setSaleCurrency(
+            normalizeCurrencyCode(log.saleCurrency) ??
+              normalizeCurrencyCode(meRef.current?.defaultPurchaseCurrency) ??
+              DEFAULT_PURCHASE_CURRENCY
+          );
           setSaleAmountMinor(log.saleAmountMinor ?? null);
         } else {
           setStars(null);

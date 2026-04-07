@@ -80,6 +80,7 @@ export function MoneyAmountInput({
         )}
       >
         <SelectRoot
+          key={cur}
           value={cur}
           onValueChange={(next) => {
             const code = normalizeCurrencyCode(next) ?? DEFAULT_PURCHASE_CURRENCY;

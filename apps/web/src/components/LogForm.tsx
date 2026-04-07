@@ -158,18 +158,21 @@ export function LogForm(props: LogFormProps) {
 
   useEffect(() => {
     const d = normalizeCurrencyCode(me?.defaultPurchaseCurrency);
+    if (!isEdit) {
+      if (d) {
+        setPurchaseCurrency(d);
+        setSaleCurrency(d);
+      }
+      return;
+    }
     if (!d) return;
-    setPurchaseCurrency((prev) => {
-      if (prev !== DEFAULT_PURCHASE_CURRENCY) return prev;
-      if (isEdit && normalizeCurrencyCode(log?.purchaseCurrency)) return prev;
-      return d;
-    });
-    setSaleCurrency((prev) => {
-      if (prev !== DEFAULT_PURCHASE_CURRENCY) return prev;
-      if (isEdit && normalizeCurrencyCode(log?.saleCurrency)) return prev;
-      return d;
-    });
-  }, [isEdit, log?.purchaseCurrency, log?.saleCurrency, me?.defaultPurchaseCurrency]);
+    if (!normalizeCurrencyCode(log?.purchaseCurrency)) {
+      setPurchaseCurrency(d);
+    }
+    if (!normalizeCurrencyCode(log?.saleCurrency)) {
+      setSaleCurrency(d);
+    }
+  }, [isEdit, log?.purchaseCurrency, log?.saleCurrency, log?.id, me?.defaultPurchaseCurrency]);
 
   useEffect(() => {
     if (!isEdit || !log) return;
@@ -204,13 +207,19 @@ export function LogForm(props: LogFormProps) {
         : "";
       setMatchesPlayed(log.matchesPlayed ?? defaultMatches);
       setPurchaseCurrency(
-        normalizeCurrencyCode(log.purchaseCurrency) ?? DEFAULT_PURCHASE_CURRENCY
+        normalizeCurrencyCode(log.purchaseCurrency) ??
+          normalizeCurrencyCode(me?.defaultPurchaseCurrency) ??
+          DEFAULT_PURCHASE_CURRENCY
       );
       setPurchaseAmountMinor(log.purchaseAmountMinor ?? null);
-      setSaleCurrency(normalizeCurrencyCode(log.saleCurrency) ?? DEFAULT_PURCHASE_CURRENCY);
+      setSaleCurrency(
+        normalizeCurrencyCode(log.saleCurrency) ??
+          normalizeCurrencyCode(me?.defaultPurchaseCurrency) ??
+          DEFAULT_PURCHASE_CURRENCY
+      );
       setSaleAmountMinor(log.saleAmountMinor ?? null);
     }
-  }, [isEdit, log?.id]);
+  }, [isEdit, log?.id, me?.defaultPurchaseCurrency]);
 
   useEffect(() => {
     if (!showBoardGameTabs) return;

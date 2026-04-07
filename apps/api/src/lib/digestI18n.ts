@@ -24,6 +24,12 @@ type Copy = {
   completed: string;
   reviewsSaved: string;
   contentHours: string;
+  /** Individual play sessions (BoardGameMatch rows) in the period. */
+  boardGameMatchesLogged: string;
+  /** Completed logs with media type board games. */
+  boardGamesCompleted: string;
+  /** New logs with media type board games. */
+  boardGamesAdded: string;
   purchaseTotal: string;
   openApp: string;
   footer: string;
@@ -36,11 +42,15 @@ const en: Copy = {
   subjectPrefix: "Your Geeklogs recap",
   monthlyRecapKicker: "Monthly recap",
   greeting: (name) => `Hi ${name},`,
-  intro: "Here's what you tracked on Geeklogs during this period.",
+  intro:
+    "Here's what you tracked on Geeklogs during this period — including board game play sessions, matches played, ownership, sale flags, and mechanics where you use them.",
   newLogs: "New logs",
   completed: "Completed",
   reviewsSaved: "Reviews saved",
   contentHours: "Content hours",
+  boardGameMatchesLogged: "Board game matches logged",
+  boardGamesCompleted: "Board games completed",
+  boardGamesAdded: "Board games added",
   purchaseTotal: "Purchase total",
   openApp: "Open Geeklogs",
   footer:
@@ -54,11 +64,15 @@ const ptBR: Copy = {
   subjectPrefix: "Seu resumo Geeklogs",
   monthlyRecapKicker: "Resumo mensal",
   greeting: (name) => `Olá, ${name},`,
-  intro: "Aqui está o que você registrou no Geeklogs neste período.",
+  intro:
+    "Aqui está o que você registrou no Geeklogs neste período — incluindo partidas de jogos de tabuleiro, partidas jogadas, posse, venda e mecânicas quando você usa esses campos.",
   newLogs: "Novos registros",
   completed: "Concluídos",
   reviewsSaved: "Resenhas salvas",
   contentHours: "Horas de conteúdo",
+  boardGameMatchesLogged: "Partidas de jogos de tabuleiro registradas",
+  boardGamesCompleted: "Jogos de tabuleiro concluídos",
+  boardGamesAdded: "Jogos de tabuleiro adicionados",
   purchaseTotal: "Total em compras",
   openApp: "Abrir Geeklogs",
   footer:
@@ -72,11 +86,15 @@ const es: Copy = {
   subjectPrefix: "Tu resumen de Geeklogs",
   monthlyRecapKicker: "Resumen mensual",
   greeting: (name) => `Hola, ${name},`,
-  intro: "Esto es lo que registraste en Geeklogs en este periodo.",
+  intro:
+    "Esto es lo que registraste en Geeklogs en este periodo — incluidas partidas de juegos de mesa, partidas jugadas, propiedad, venta y mecánicas cuando las usas.",
   newLogs: "Registros nuevos",
   completed: "Completados",
   reviewsSaved: "Reseñas guardadas",
   contentHours: "Horas de contenido",
+  boardGameMatchesLogged: "Partidas de juegos de mesa registradas",
+  boardGamesCompleted: "Juegos de mesa completados",
+  boardGamesAdded: "Juegos de mesa añadidos",
   purchaseTotal: "Total en compras",
   openApp: "Abrir Geeklogs",
   footer:

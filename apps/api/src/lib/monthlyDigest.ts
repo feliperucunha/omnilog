@@ -84,6 +84,8 @@ export function getPreviousCalendarMonthUtc(now: Date = new Date()): DigestPerio
   };
 }
 
+const BOARDGAMES_MEDIA = "boardgames" as const;
+
 export type UserDigestStats = {
   logsAdded: number;
   completedCount: number;
@@ -92,12 +94,27 @@ export type UserDigestStats = {
   logsWithPositiveHours: number;
   /** Totals per ISO 4217 currency code (minor units summed). */
   spendByCurrency: Record<string, number>;
+  /** BoardGameMatch rows with playedAt in the digest window (user’s logs only). */
+  boardGameSessionsLogged: number;
+  /** Logs with mediaType boardgames and completedAt in the window. */
+  boardGamesCompleted: number;
+  /** Logs with mediaType boardgames and createdAt in the window. */
+  boardGamesAdded: number;
 };
 
 export async function computeUserDigestStats(userId: string, period: DigestPeriod): Promise<UserDigestStats> {
   const { start, endExclusive } = period;
 
-  const [logsAdded, completedCount, reviewsCount, completedLogs, purchaseLogs] = await Promise.all([
+  const [
+    logsAdded,
+    completedCount,
+    reviewsCount,
+    completedLogs,
+    purchaseLogs,
+    boardGameSessionsLogged,
+    boardGamesCompleted,
+    boardGamesAdded,
+  ] = await Promise.all([
     prisma.log.count({
       where: { userId, createdAt: { gte: start, lt: endExclusive } },
     }),
@@ -132,6 +149,26 @@ export async function computeUserDigestStats(userId: string, period: DigestPerio
       },
       select: { purchaseAmountMinor: true, purchaseCurrency: true },
     }),
+    prisma.boardGameMatch.count({
+      where: {
+        playedAt: { gte: start, lt: endExclusive },
+        log: { userId },
+      },
+    }),
+    prisma.log.count({
+      where: {
+        userId,
+        mediaType: BOARDGAMES_MEDIA,
+        completedAt: { gte: start, lt: endExclusive },
+      },
+    }),
+    prisma.log.count({
+      where: {
+        userId,
+        mediaType: BOARDGAMES_MEDIA,
+        createdAt: { gte: start, lt: endExclusive },
+      },
+    }),
   ]);
 
   const hoursRollup = rollupHoursFromCompletedLogs(completedLogs as CompletedLogForHours[]);
@@ -151,6 +188,9 @@ export async function computeUserDigestStats(userId: string, period: DigestPerio
     totalHours: hoursRollup.totalHours,
     logsWithPositiveHours: hoursRollup.logsWithPositiveHours,
     spendByCurrency,
+    boardGameSessionsLogged,
+    boardGamesCompleted,
+    boardGamesAdded,
   };
 }
 
@@ -241,6 +281,9 @@ function buildDigestHtml(params: {
                 ${statRow(copy.completed, String(stats.completedCount), p)}
                 ${statRow(copy.reviewsSaved, String(stats.reviewsCount), p)}
                 ${statRow(copy.contentHours, stats.totalHours === 0 ? "0" : String(stats.totalHours), p)}
+                ${statRow(copy.boardGamesAdded, String(stats.boardGamesAdded), p)}
+                ${statRow(copy.boardGamesCompleted, String(stats.boardGamesCompleted), p)}
+                ${statRow(copy.boardGameMatchesLogged, String(stats.boardGameSessionsLogged), p)}
                 <tr>
                   <td style="padding:14px 16px;background:${p.statBg};border-radius:10px;border:1px solid ${p.border};">
                     <p style="margin:0 0 4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:${p.muted};">${escapeHtml(copy.purchaseTotal)}</p>
@@ -303,6 +346,9 @@ function buildDigestText(params: {
     `- ${copy.completed}: ${stats.completedCount}`,
     `- ${copy.reviewsSaved}: ${stats.reviewsCount}`,
     `- ${copy.contentHours}: ${stats.totalHours}`,
+    `- ${copy.boardGamesAdded}: ${stats.boardGamesAdded}`,
+    `- ${copy.boardGamesCompleted}: ${stats.boardGamesCompleted}`,
+    `- ${copy.boardGameMatchesLogged}: ${stats.boardGameSessionsLogged}`,
     `- ${copy.textPurchaseLine}: ${spendLines || "—"}`,
     "",
     `${copy.openApp}: ${appOrigin}/dashboard`,
