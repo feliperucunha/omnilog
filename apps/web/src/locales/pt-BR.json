@@ -75,7 +75,7 @@
     "email": "E-mail",
     "submit": "Enviar link",
     "sending": "Enviando…",
-    "backToLogin": "Voltar ao entrar",
+    "backToLogin": "Voltar ao Login",
     "success": "Se esse e-mail estiver cadastrado, você receberá um link em breve."
   },
   "resetPassword": {

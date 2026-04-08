@@ -68,9 +68,6 @@ export function ForgotPassword() {
                 <p className="text-sm text-[var(--color-light)]">
                   {t("forgotPassword.success")}
                 </p>
-                <Button asChild className="w-full">
-                  <Link to="/login">{t("forgotPassword.backToLogin")}</Link>
-                </Button>
               </div>
             ) : (
               <form onSubmit={handleSubmit}>
