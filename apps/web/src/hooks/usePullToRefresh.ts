@@ -5,6 +5,9 @@ import { APP_PTR_REFRESH_EVENT } from "@/lib/appPtrRefresh";
 /** Finger travel required to trigger refresh (matches prior behavior). */
 export const PULL_TO_REFRESH_THRESHOLD_PX = 72;
 
+/** After this much movement, lock the gesture to horizontal vs vertical so carousel drags do not pull-to-refresh. */
+const GESTURE_AXIS_LOCK_MIN_PX = 10;
+
 function isNativeMobile(): boolean {
   return Capacitor.isNativePlatform();
 }
@@ -27,6 +30,9 @@ export function usePullToRefresh(opts: {
   const [pullRawDy, setPullRawDy] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const startYRef = useRef(0);
+  const startXRef = useRef(0);
+  /** null = not locked yet; set on first decisive move */
+  const gestureAxisRef = useRef<"horizontal" | "vertical" | null>(null);
   const trackingRef = useRef(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -50,6 +56,8 @@ export function usePullToRefresh(opts: {
     const onStart = (e: TouchEvent) => {
       if (el.scrollTop > 2) return;
       startYRef.current = e.touches[0].clientY;
+      startXRef.current = e.touches[0].clientX;
+      gestureAxisRef.current = null;
       trackingRef.current = true;
     };
 
@@ -57,10 +65,29 @@ export function usePullToRefresh(opts: {
       if (!trackingRef.current) return;
       if (el.scrollTop > 2) {
         trackingRef.current = false;
+        gestureAxisRef.current = null;
         setPullRawDy(0);
         return;
       }
-      const dy = e.touches[0].clientY - startYRef.current;
+      const x = e.touches[0].clientX;
+      const y = e.touches[0].clientY;
+      const dx = x - startXRef.current;
+      const dy = y - startYRef.current;
+      const adx = Math.abs(dx);
+      const ady = Math.abs(dy);
+
+      if (gestureAxisRef.current === null && (adx >= GESTURE_AXIS_LOCK_MIN_PX || ady >= GESTURE_AXIS_LOCK_MIN_PX)) {
+        if (adx > ady) {
+          gestureAxisRef.current = "horizontal";
+          trackingRef.current = false;
+          setPullRawDy(0);
+          return;
+        }
+        gestureAxisRef.current = "vertical";
+      }
+
+      if (gestureAxisRef.current === "horizontal") return;
+
       if (dy <= 0) {
         setPullRawDy(0);
         return;
@@ -71,10 +98,13 @@ export function usePullToRefresh(opts: {
     const finishPull = (clientY: number) => {
       if (!trackingRef.current) return;
       trackingRef.current = false;
+      const axis = gestureAxisRef.current;
+      gestureAxisRef.current = null;
       const dy = clientY - startYRef.current;
       setPullRawDy(0);
 
       if (el.scrollTop > 2) return;
+      if (axis === "horizontal") return;
 
       if (dy >= PULL_TO_REFRESH_THRESHOLD_PX) {
         clearRefreshTimer();
@@ -95,6 +125,7 @@ export function usePullToRefresh(opts: {
     const onCancel = () => {
       if (!trackingRef.current) return;
       trackingRef.current = false;
+      gestureAxisRef.current = null;
       setPullRawDy(0);
     };
 

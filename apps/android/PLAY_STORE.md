@@ -72,10 +72,106 @@ cd apps/android/android
 
 Output: `apps/android/android/app/build/outputs/bundle/release/app-release.aab`.
 
+## Store listing copy (Play Console)
+
+Paste **Short description** (max **80** characters per locale) and **Full description** (max **4000**) into Play Console → **Grow** → **Store presence** → **Main store listing**. Add the same texts under **Custom store listings** or **Translations** for **English (United States)**, **Portuguese (Brazil)**, and **Spanish** as needed.
+
+Character counts below were checked for the short lines; trim if Google’s limit changes.
+
+### English (en)
+
+**Short description (73 characters)**
+
+```
+Track movies, TV, video games, board games, books, anime, manga & comics.
+```
+
+**Full description**
+
+```
+Geeklogs is one home for everything you watch, play, and read. Instead of juggling separate apps and spreadsheets, keep movies, TV shows, video games, board games, books, anime, manga, and comic books in a single list—with grades, short reviews, status, statistics, and optional social discovery.
+
+WHAT YOU CAN DO
+
+• Browse and add titles from popular catalogs (where you connect your own API keys for search, as documented in the app).
+• Log custom entries when something is not in the database.
+• Batch import many titles from a spreadsheet; export your logs to CSV from Settings or category views when your account supports it (check in-app help for API key and plan requirements).
+• Track progress: seasons and episodes, chapters and volumes, started and completed dates, and time-based fields where they apply.
+• Board games: catalog source preferences, collection flags (own, want, sold), optional purchase and sale amounts, mechanics, and play sessions with players, scores, and session notes—plus a running match count for your stats.
+• Social: follow friends (and discover users from search) and see activity from people you follow.
+• See summaries and charts for your activity over time.
+• Use the app in light or dark theme and switch the interface among English, Portuguese (Brazil), and Spanish.
+• Optional email recaps can highlight your monthly activity (if enabled in your account).
+
+Geeklogs syncs with your account so your library stays available when you sign in on the web or other supported clients. Create a free account to get started.
+
+Privacy and terms apply; see the links in the app or on the Geeklogs website for the current policies.
+```
+
+### Portuguese — Brazil (pt-BR)
+
+**Short description (79 characters)**
+
+```
+Filmes, séries, jogos eletrônicos e de mesa, livros, anime, manga e quadrinhos.
+```
+
+**Full description**
+
+```
+O Geeklogs é um lugar só para tudo o que você assiste, joga e lê. Em vez de vários apps e planilhas, reúna filmes, séries, videogames, jogos de tabuleiro, livros, anime, manga e quadrinhos numa lista única—notas, resenhas curtas, status, estatísticas e descoberta social opcional.
+
+O QUE DÁ PARA FAZER
+
+• Pesquisar e adicionar títulos a partir de catálogos populares (quando você conecta suas próprias chaves de API para busca, conforme explicado no app).
+• Registrar entradas manuais quando algo não está na base.
+• Importação em lote por planilha e exportação dos registros em CSV nas Configurações ou nas listas por categoria quando sua conta permitir (veja a ajuda no app para requisitos de plano e chaves de API).
+• Acompanhar progresso: temporadas e episódios, capítulos e volumes, datas de início e conclusão e campos de tempo quando fazem sentido.
+• Jogos de tabuleiro: preferência de catálogo, campos de coleção (tenho, quero comprar, vendi), valores opcionais de compra e venda, mecânicas e partidas com jogadores, pontuações e notas da sessão—além da contagem de partidas nas estatísticas.
+• Social: siga amigos (e descubra usuários na busca) e acompanhe a atividade de quem você segue.
+• Ver resumos e gráficos da sua atividade ao longo do tempo.
+• Tema claro ou escuro e interface em inglês, português (Brasil) ou espanhol.
+• Resumos por e-mail opcionais do mês (se ativados na conta).
+
+O Geeklogs sincroniza com a sua conta para manter a biblioteca ao entrar no site ou em outros clientes suportados. Crie uma conta gratuita para começar.
+
+Privacidade e termos se aplicam; use os links no app ou no site do Geeklogs para as políticas atualizadas.
+```
+
+### Spanish (es)
+
+**Short description (79 characters)**
+
+```
+Películas, series, videojuegos y juegos de mesa, libros, anime, manga y cómics.
+```
+
+**Full description**
+
+```
+Geeklogs es un solo hogar para todo lo que ves, juegas y lees. En lugar de repartir la información entre apps y hojas de cálculo, reúne películas, series, videojuegos, juegos de mesa, libros, anime, manga y cómics en una lista con notas, reseñas breves, estado, estadísticas y descubrimiento social opcional.
+
+QUÉ PUEDES HACER
+
+• Explorar y añadir títulos desde catálogos populares (cuando conectas tus propias claves de API para la búsqueda, según se indica en la app).
+• Registrar entradas manuales si algo no está en la base de datos.
+• Importación masiva desde hojas de cálculo y exportación de tus registros en CSV desde Ajustes o las listas por categoría cuando tu cuenta lo permita (consulta la ayuda en la app para requisitos de plan y claves API).
+• Seguir el progreso: temporadas y episodios, capítulos y volúmenes, fechas de inicio y de finalización y campos de tiempo cuando correspondan.
+• Juegos de mesa: preferencia de catálogo, datos de colección (tengo, quiero comprar, vendí), importes opcionales de compra y venta, mecánicas y partidas con jugadores, puntuaciones y notas de sesión—además del recuento de partidas en tus estadísticas.
+• Social: sigue a amigos (y descubre usuarios desde la búsqueda) y consulta la actividad de quienes sigues.
+• Ver resúmenes y gráficos de tu actividad a lo largo del tiempo.
+• Tema claro u oscuro e interfaz en inglés, portugués (Brasil) o español.
+• Resúmenes mensuales por correo opcionales (si los activas en la cuenta).
+
+Geeklogs se sincroniza con tu cuenta para que tu biblioteca siga disponible al iniciar sesión en la web u otros clientes compatibles. Crea una cuenta gratuita para empezar.
+
+Privacidad y términos aplican; consulta los enlaces en la app o en el sitio de Geeklogs para las políticas vigentes.
+```
+
 ## 4. Play Console checklist (you do these in the browser)
 
 - **Create the app** (if not already): Play Console → Create app → Fill in name, default language, type (e.g. App).
-- **Store listing:** Short description, full description, screenshots (phone 16:9 or 9:16, 320–3840 px), feature graphic (1024×500), app icon (512×512). Optional: TV/banner graphics if you target TV.
+- **Store listing:** Short description, full description, screenshots (phone 16:9 or 9:16, 320–3840 px), feature graphic (1024×500), app icon (512×512). Optional: TV/banner graphics if you target TV. Draft copy for **English**, **Portuguese (Brazil)**, and **Spanish** is in [Store listing copy](#store-listing-copy-play-console) above.
 - **Content rating:** Complete the questionnaire (e.g. IARC). Submit and attach the rating to the release.
 - **Privacy policy:** If the app collects any user data (e.g. account, usage), add a privacy policy URL in Store listing and in the **App content** section.
 - **Data safety:** In **App content** → **Data safety**, declare what data is collected (e.g. account info, app interactions) and how it’s used (e.g. app functionality). Be accurate; the app uses credentials and likely API usage.
