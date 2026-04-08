@@ -774,7 +774,7 @@ export function Settings() {
                   </p>
                 </div>
                 <a
-                  href="mailto:feliperubenmv@gmail.com"
+                  href="mailto:felipe.cunha@geeklogs.com.br"
                   className="shrink-0 rounded p-1 text-[var(--color-light)] transition-colors hover:text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
                   aria-label={t("settings.apiKeysSupport")}
                   title={t("settings.apiKeysSupport")}
