@@ -12,7 +12,10 @@ import { meRouter } from "./routes/me.js";
 import { searchRouter } from "./routes/search.js";
 import { settingsRouter } from "./routes/settings.js";
 import { stripeRouter, handleStripeWebhook } from "./routes/stripe.js";
+import { googlePlayBillingRouter } from "./routes/googlePlayBilling.js";
+import { handleGooglePlayPubSubPush } from "./routes/googlePlayPubsub.js";
 import { cronRouter, runSubscriptionExpiry } from "./routes/cron.js";
+import { syncGooglePlaySubscriptions } from "./lib/googlePlayBilling.js";
 import { usersRouter } from "./routes/users.js";
 import { feedbackRouter } from "./routes/feedback.js";
 import { followsRouter } from "./routes/follows.js";
@@ -55,13 +58,20 @@ app.post(
 
 app.use(express.json());
 
+// Play RTDN: Pub/Sub push (no X-App-Version; authenticate via JWT or shared secret — see .env.example)
+app.post("/api/billing/google-play/pubsub", (req, res) =>
+  void handleGooglePlayPubSubPush(req, res)
+);
+
 /** Require X-App-Version to match API version for all /api routes except /api/health and /api/wake-ping-config. Returns 401 when out of sync. */
 app.use("/api", (req, res, next) => {
   if (
     req.path === "/health" ||
     req.path === "/health/" ||
     req.path === "/wake-ping-config" ||
-    req.path === "/wake-ping-config/"
+    req.path === "/wake-ping-config/" ||
+    req.path === "/billing/google-play/pubsub" ||
+    req.path === "/billing/google-play/pubsub/"
   ) {
     return next();
   }
@@ -82,6 +92,7 @@ const limiter = rateLimit({
   windowMs: rateLimitWindowMs,
   max: rateLimitMax,
   message: { error: "Too many requests" },
+  skip: (req) => req.originalUrl.includes("/billing/google-play/pubsub"),
 });
 app.use("/api/", limiter);
 
@@ -92,6 +103,7 @@ app.use("/api/logs", logsRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/stripe", stripeRouter);
+app.use("/api/billing/google-play", googlePlayBillingRouter);
 app.use("/api/cron", cronRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/feedback", feedbackRouter);
@@ -155,10 +167,16 @@ app.listen(PORT, () => {
     });
 
   // Run subscription expiry in-process: on startup and every 24h (no external cron needed)
+  void syncGooglePlaySubscriptions().then((n) => {
+    if (n > 0) console.log(`Google Play subscription sync: ${n} user(s) cleared or updated`);
+  });
   void runSubscriptionExpiry().then((n) => {
     if (n > 0) console.log(`Subscription expiry: ${n} user(s) downgraded to free`);
   });
   setInterval(() => {
+    void syncGooglePlaySubscriptions().then((n) => {
+      if (n > 0) console.log(`Google Play subscription sync: ${n} user(s) cleared or updated`);
+    });
     void runSubscriptionExpiry().then((n) => {
       if (n > 0) console.log(`Subscription expiry: ${n} user(s) downgraded to free`);
     });

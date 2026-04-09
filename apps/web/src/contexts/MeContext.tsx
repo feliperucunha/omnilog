@@ -21,6 +21,10 @@ export interface MeResponse {
   tier: "free" | "beta" | "pro" | "admin";
   subscriptionEndsAt: string | null;
   daysRemaining: number | null; // Pro subscription days left (null if not pro or no end date)
+  /** Where the current Pro subscription is billed (if applicable). */
+  billingProvider?: "stripe" | "google_play" | null;
+  /** Google Play base product id; use with Play Store subscription management URL. */
+  googlePlayProductId?: string;
   country?: string; // ISO 3166-1 alpha-2 e.g. BR for pricing
   /** Last ISO 4217 currency used when saving a purchase amount (default for spend fields). */
   defaultPurchaseCurrency?: string;

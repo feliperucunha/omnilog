@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { prisma } from "../lib/prisma.js";
+import { syncGooglePlaySubscriptions } from "../lib/googlePlayBilling.js";
 
 const CRON_SECRET = process.env.CRON_SECRET?.trim();
 
@@ -18,6 +19,8 @@ export async function runSubscriptionExpiry(): Promise<number> {
     data: {
       tier: "free",
       subscriptionEndsAt: null,
+      googlePlayPurchaseToken: null,
+      googlePlayProductId: null,
     },
   });
   return result.count;
@@ -36,6 +39,7 @@ cronRouter.get("/subscriptions", async (req: Request, res: Response): Promise<vo
     return;
   }
 
+  const googlePlayCleared = await syncGooglePlaySubscriptions();
   const expired = await runSubscriptionExpiry();
-  res.json({ ok: true, expired });
+  res.json({ ok: true, expired, googlePlayCleared });
 });

@@ -4,6 +4,10 @@ import Stripe from "stripe";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
+import {
+  isGooglePlayBillingConfigured,
+  verifyGooglePlayPurchase,
+} from "../lib/googlePlayBilling.js";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim();
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
@@ -60,11 +64,53 @@ stripeRouter.post(
     const userId = req.user.userId;
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { country: true, email: true, stripeCustomerId: true },
+      select: {
+        tier: true,
+        country: true,
+        email: true,
+        stripeCustomerId: true,
+        stripeSubscriptionId: true,
+        googlePlayPurchaseToken: true,
+      },
     });
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
+    }
+
+    if (user.tier === "admin") {
+      res.status(400).json({ error: "Admin accounts do not need a subscription." });
+      return;
+    }
+
+    if (user.tier === "pro" && user.stripeSubscriptionId) {
+      res.status(409).json({
+        error:
+          "You already have an active Pro subscription. Use Manage subscription to open the billing portal and change or cancel your plan.",
+      });
+      return;
+    }
+
+    if (user.tier === "pro" && !user.stripeSubscriptionId && !user.googlePlayPurchaseToken) {
+      res.status(409).json({
+        error: "You already have Pro access on this account.",
+      });
+      return;
+    }
+
+    if (user.googlePlayPurchaseToken && isGooglePlayBillingConfigured()) {
+      try {
+        const play = await verifyGooglePlayPurchase(user.googlePlayPurchaseToken);
+        if (play?.entitled) {
+          res.status(409).json({
+            error:
+              "You already have an active subscription through Google Play. Open Subscriptions in the Play Store app to manage or cancel it before subscribing on the web.",
+          });
+          return;
+        }
+      } catch (e) {
+        console.error("Stripe checkout: Google Play verify failed (not blocking checkout):", e);
+      }
     }
 
     const region = normalizeCountry(user.country);
@@ -125,8 +171,15 @@ stripeRouter.post(
     const userId = req.user.userId;
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { stripeCustomerId: true },
+      select: { stripeCustomerId: true, googlePlayPurchaseToken: true },
     });
+    if (user?.googlePlayPurchaseToken && !user.stripeCustomerId) {
+      res.status(400).json({
+        error:
+          "This account is billed through Google Play. Open the Play Store → Payments & subscriptions → Subscriptions to manage your plan.",
+      });
+      return;
+    }
     if (!user?.stripeCustomerId) {
       res.status(400).json({ error: "No subscription to manage" });
       return;
@@ -261,6 +314,8 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
             stripeSubscriptionId: subscriptionId,
             stripeCustomerId: customerId ?? undefined,
             subscriptionEndsAt: periodEnd ?? undefined,
+            googlePlayPurchaseToken: null,
+            googlePlayProductId: null,
           },
         });
         break;

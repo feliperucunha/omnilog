@@ -81,6 +81,9 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       onboarded: true,
       tier: true,
       subscriptionEndsAt: true,
+      stripeSubscriptionId: true,
+      googlePlayPurchaseToken: true,
+      googlePlayProductId: true,
       preferredTheme: true,
       preferredLocale: true,
       recapEmailsEnabled: true,
@@ -135,6 +138,19 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
           ? "beta"
           : "free";
   const subscriptionEndsAt = user.subscriptionEndsAt?.toISOString() ?? null;
+  const billingProvider =
+    user.tier === "pro"
+      ? user.googlePlayPurchaseToken != null
+        ? ("google_play" as const)
+        : user.stripeSubscriptionId != null
+          ? ("stripe" as const)
+          : null
+      : null;
+  const googlePlayProductIdForClient =
+    billingProvider === "google_play" && user.googlePlayProductId
+      ? user.googlePlayProductId
+      : undefined;
+
   const daysRemaining =
     subscriptionEndsAt && user.tier === "pro"
       ? Math.max(
@@ -164,6 +180,8 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     tier,
     subscriptionEndsAt,
     daysRemaining,
+    billingProvider,
+    googlePlayProductId: googlePlayProductIdForClient,
     country: user.country ?? undefined,
     defaultPurchaseCurrency: user.defaultPurchaseCurrency ?? undefined,
     logCount,

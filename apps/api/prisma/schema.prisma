@@ -67,6 +67,10 @@ model User {
   tier                Tier     @default(free)
   stripeSubscriptionId  String?  @unique // Stripe subscription ID for Pro
   stripeCustomerId     String?  // Stripe customer ID (for billing portal)
+  /// Google Play subscription purchase token (Android); verified server-side; unique per purchase
+  googlePlayPurchaseToken String? @unique
+  /// Base product id from Play (e.g. geeklogs_pro_yearly); used for manage-subscription deep link
+  googlePlayProductId    String?
   subscriptionEndsAt   DateTime?       // Pro access until this date; cron clears tier when past; null = endless (e.g. testing)
   country             String?  // ISO 3166-1 alpha-2 e.g. BR for pricing
   defaultPurchaseCurrency String? // ISO 4217; last currency used when saving a purchase amount
@@ -266,5 +270,12 @@ model StripeWebhookEvent {
   id             String   @id @default(cuid())
   stripeEventId  String   @unique
   createdAt      DateTime @default(now())
+}
+
+/// Processed Google Play RTDN Pub/Sub `message.messageId` — idempotency for push retries.
+model GooglePlayPubSubMessage {
+  id         String   @id @default(cuid())
+  messageId  String   @unique
+  createdAt  DateTime @default(now())
 }
 

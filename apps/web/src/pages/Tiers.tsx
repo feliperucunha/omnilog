@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Check, Sparkles, Loader2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -9,12 +9,14 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiError, invalidateLogsAndItemsCache } from "@/lib/api";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { TiersSkeleton } from "@/components/skeletons";
 import { tierHasUnlimitedLogs } from "@/lib/userTier";
+import { isCapacitorAndroid } from "@/lib/androidOverlayBack";
+import { isNativePurchaseUserCanceled, PlayBilling } from "@/lib/playBilling";
 
 const FREE_LOG_LIMIT = 500;
 
@@ -38,19 +40,49 @@ export function Tiers() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const checkoutInFlightRef = useRef(false);
+  const portalInFlightRef = useRef(false);
+  const cancelInFlightRef = useRef(false);
+  const processedCheckoutReturnRef = useRef<string | null>(null);
 
   useEffect(() => {
     const approved = searchParams.get("approved");
     const canceled = searchParams.get("canceled");
-    if (approved === "1") {
-      toast.success(t("tiers.upgradeSuccess"));
-      refetch();
-      setSearchParams({}, { replace: true });
-    } else if (canceled === "1") {
-      toast.info(t("tiers.upgradeCanceled"));
-      setSearchParams({}, { replace: true });
+    if (approved !== "1" && canceled !== "1") {
+      processedCheckoutReturnRef.current = null;
+      return;
     }
+    const key = searchParams.toString();
+    if (processedCheckoutReturnRef.current === key) return;
+    processedCheckoutReturnRef.current = key;
+
+    void (async () => {
+      if (approved === "1") {
+        await refetch();
+        toast.success(t("tiers.upgradeSuccess"));
+        setSearchParams({}, { replace: true });
+      } else if (canceled === "1") {
+        toast.info(t("tiers.upgradeCanceled"));
+        setSearchParams({}, { replace: true });
+      }
+    })();
   }, [searchParams, setSearchParams, refetch, t]);
+
+  /** After Play Store / external flows, refresh subscription state (standard Capacitor pattern). */
+  useEffect(() => {
+    if (!isCapacitorAndroid() || !token) return;
+    let remove: (() => void) | undefined;
+    void import("@capacitor/app").then(({ App }) => {
+      void App.addListener("resume", () => {
+        void refetch();
+      }).then((handle) => {
+        remove = () => handle.remove();
+      });
+    });
+    return () => {
+      remove?.();
+    };
+  }, [token, refetch]);
 
   const tier = me?.tier ?? "free";
   const logCount = me?.logCount ?? 0;
@@ -68,7 +100,73 @@ export function Tiers() {
 
   if (token && loading) return <TiersSkeleton />;
 
+  const subscribeViaGooglePlay = async () => {
+    if (!me?.user.id) {
+      toast.error(t("tiers.playBillingLoginRequired"));
+      return;
+    }
+    const monthly = import.meta.env.VITE_GOOGLE_PLAY_PRODUCT_MONTHLY?.trim();
+    const yearly = import.meta.env.VITE_GOOGLE_PLAY_PRODUCT_YEARLY?.trim();
+    const productId = interval === "yearly" ? yearly : monthly;
+    if (!productId) {
+      toast.error(t("tiers.playBillingProductsNotConfigured"));
+      return;
+    }
+    const productIds = [monthly, yearly].filter((x): x is string => Boolean(x && x.length > 0));
+    if (productIds.length === 0) {
+      toast.error(t("tiers.playBillingProductsNotConfigured"));
+      return;
+    }
+    const q = await PlayBilling.querySubscriptionProducts({ productIds });
+    const row = q.products.find((p) => p.productId === productId);
+    if (!row?.offerToken) {
+      toast.error(t("tiers.playBillingOfferMissing"));
+      return;
+    }
+    const uid = me.user.id;
+    const purchase = await PlayBilling.purchaseSubscription({
+      productId,
+      offerToken: row.offerToken,
+      ...(uid
+        ? { obfuscatedAccountId: uid.length > 64 ? uid.slice(0, 64) : uid }
+        : {}),
+    });
+    await apiFetch("/billing/google-play/verify", {
+      method: "POST",
+      body: JSON.stringify({
+        purchaseToken: purchase.purchaseToken,
+        productId,
+      }),
+    });
+    invalidateLogsAndItemsCache();
+    await refetch();
+    toast.success(t("tiers.upgradeSuccess"));
+  };
+
   const handleSubscribe = async () => {
+    if (checkoutInFlightRef.current) return;
+    checkoutInFlightRef.current = true;
+
+    if (isCapacitorAndroid()) {
+      setCheckoutLoading(true);
+      try {
+        await subscribeViaGooglePlay();
+      } catch (err) {
+        if (isNativePurchaseUserCanceled(err)) {
+          toast.info(t("tiers.upgradeCanceled"));
+        } else if (err instanceof ApiError && err.statusCode === 409) {
+          toast.error(err.message);
+          console.error("[checkout conflict]", err);
+        } else {
+          showErrorToast(t, "E025", { originalError: err });
+        }
+      } finally {
+        setCheckoutLoading(false);
+        checkoutInFlightRef.current = false;
+      }
+      return;
+    }
+
     setCheckoutLoading(true);
     try {
       const data = await apiFetch<{ url: string }>("/stripe/create-checkout-session", {
@@ -81,12 +179,42 @@ export function Tiers() {
       }
       throw new Error("No checkout URL returned");
     } catch (err) {
+      if (err instanceof ApiError && err.statusCode === 409) {
+        toast.error(err.message);
+        console.error("[checkout conflict]", err);
+      } else {
+        showErrorToast(t, "E025", { originalError: err });
+      }
+    } finally {
       setCheckoutLoading(false);
-      showErrorToast(t, "E025", { originalError: err });
+      checkoutInFlightRef.current = false;
     }
   };
 
   const handleManageSubscription = async () => {
+    if (portalInFlightRef.current) return;
+    portalInFlightRef.current = true;
+
+    if (isCapacitorAndroid() && me?.billingProvider === "google_play") {
+      setPortalLoading(true);
+      try {
+        const pkg =
+          import.meta.env.VITE_ANDROID_PACKAGE_ID?.trim() || "com.geeklogs.app";
+        const sku = me.googlePlayProductId?.trim() || "";
+        const url = sku
+          ? `https://play.google.com/store/account/subscriptions?package=${encodeURIComponent(pkg)}&sku=${encodeURIComponent(sku)}`
+          : `https://play.google.com/store/account/subscriptions?package=${encodeURIComponent(pkg)}`;
+        const { Browser } = await import("@capacitor/browser");
+        await Browser.open({ url });
+      } catch (err) {
+        showErrorToast(t, "E099", { originalError: err });
+      } finally {
+        setPortalLoading(false);
+        portalInFlightRef.current = false;
+      }
+      return;
+    }
+
     setPortalLoading(true);
     try {
       const data = await apiFetch<{ url: string }>("/stripe/create-portal-session", {
@@ -99,17 +227,31 @@ export function Tiers() {
       }
       throw new Error("No portal URL returned");
     } catch (err) {
+      if (err instanceof ApiError && err.statusCode === 400 && err.message) {
+        toast.error(err.message);
+        console.error("[portal]", err);
+      } else {
+        showErrorToast(t, "E099", { originalError: err });
+      }
+    } finally {
       setPortalLoading(false);
-      showErrorToast(t, "E099", { originalError: err });
+      portalInFlightRef.current = false;
     }
   };
 
   const handleCancelSubscription = async () => {
+    if (me?.billingProvider === "google_play") {
+      toast.info(t("tiers.cancelInPlayStore"));
+      return;
+    }
+
+    if (cancelInFlightRef.current) return;
+    cancelInFlightRef.current = true;
     setCancelLoading(true);
     try {
       await apiFetch<{ ok: boolean }>("/stripe/cancel-subscription", { method: "POST" });
       toast.success(t("tiers.cancelSubscriptionSuccess"));
-      refetch();
+      await refetch();
     } catch {
       try {
         const data = await apiFetch<{ url: string }>("/stripe/create-portal-session", {
@@ -126,6 +268,7 @@ export function Tiers() {
       showErrorToast(t, "E023");
     } finally {
       setCancelLoading(false);
+      cancelInFlightRef.current = false;
     }
   };
 
@@ -140,6 +283,15 @@ export function Tiers() {
         <p className="mt-2 text-[var(--color-light)]">
           {t("tiers.subtitle")}
         </p>
+        {isCapacitorAndroid() ? (
+          <p className="mt-2 text-xs text-[var(--color-light)]">
+            {t("tiers.paymentMethodGooglePlay")}
+          </p>
+        ) : (
+          <p className="mt-2 text-xs text-[var(--color-light)]">
+            {t("tiers.paymentMethodStripe")}
+          </p>
+        )}
       </div>
 
       {token && me && (
@@ -186,15 +338,17 @@ export function Tiers() {
               >
                 {portalLoading ? t("tiers.redirecting") : t("tiers.manageSubscription")}
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="border-red-500/50 text-red-400 hover:bg-red-500/20"
-                disabled={portalLoading || cancelLoading}
-                onClick={handleCancelSubscription}
-              >
-                {cancelLoading ? t("tiers.canceling") : t("tiers.cancelSubscription")}
-              </Button>
+              {me.billingProvider !== "google_play" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-red-500/50 text-red-400 hover:bg-red-500/20"
+                  disabled={portalLoading || cancelLoading}
+                  onClick={handleCancelSubscription}
+                >
+                  {cancelLoading ? t("tiers.canceling") : t("tiers.cancelSubscription")}
+                </Button>
+              ) : null}
             </div>
           )}
         </Card>
@@ -250,6 +404,7 @@ export function Tiers() {
                 type="single"
                 value={interval}
                 onValueChange={(v) => v && setInterval(v as "monthly" | "yearly")}
+                disabled={checkoutLoading}
                 className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5 gap-0"
                 aria-label={t("tiers.billingInterval")}
               >
@@ -337,7 +492,9 @@ export function Tiers() {
               {checkoutLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
-                  {t("tiers.redirecting")}
+                  {isCapacitorAndroid()
+                    ? t("tiers.processingPurchase")
+                    : t("tiers.redirecting")}
                 </>
               ) : (
                 t("tiers.upgradeToPro")
