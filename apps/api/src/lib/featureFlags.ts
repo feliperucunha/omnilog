@@ -63,17 +63,47 @@ export async function isWakeApiPingEnabled(): Promise<boolean> {
   return row.enabled;
 }
 
+/** When no DB row exists, admin list and toggles use these defaults (same as the `is*` readers). */
+function defaultEnabledWhenMissing(key: FeatureFlagKey): boolean {
+  switch (key) {
+    case FEATURE_FLAG_KEYS.DISABLE_API_KEY_REQUIREMENTS:
+      return true;
+    case FEATURE_FLAG_KEYS.REGISTER_NEW_USERS_AS_BETA:
+      return false;
+    case FEATURE_FLAG_KEYS.BETA_BANNER_ENABLED:
+      return true;
+    case FEATURE_FLAG_KEYS.WAKE_API_PING:
+      return false;
+    default:
+      return false;
+  }
+}
+
+/** All known keys for admin UI, merged with DB (missing rows show effective defaults). */
 export async function listFeatureFlags() {
-  return prisma.featureFlag.findMany({
+  const rows = await prisma.featureFlag.findMany({
     orderBy: { key: "asc" },
     select: { key: true, enabled: true, updatedAt: true },
+  });
+  const byKey = new Map(rows.map((r) => [r.key, r]));
+  const keys = (Object.values(FEATURE_FLAG_KEYS) as FeatureFlagKey[]).sort((a, b) =>
+    a.localeCompare(b)
+  );
+  return keys.map((key) => {
+    const row = byKey.get(key);
+    return {
+      key,
+      enabled: row ? row.enabled : defaultEnabledWhenMissing(key),
+      updatedAt: row?.updatedAt ?? new Date(0),
+    };
   });
 }
 
 export async function setFeatureFlagEnabled(key: FeatureFlagKey, enabled: boolean) {
-  return prisma.featureFlag.update({
+  return prisma.featureFlag.upsert({
     where: { key },
-    data: { enabled },
+    create: { key, enabled },
+    update: { enabled },
     select: { key: true, enabled: true, updatedAt: true },
   });
 }

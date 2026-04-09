@@ -200,6 +200,14 @@ usersRouter.get("/:identifier/logs/status-counts", async (req: Request<{ identif
     byStatus[key] = row._count.id;
     total += row._count.id;
   }
+  if ((SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mediaType)) {
+    const [owned, wantToBuy] = await Promise.all([
+      prisma.log.count({ where: { userId: user.id, mediaType, own: true } }),
+      prisma.log.count({ where: { userId: user.id, mediaType, wantToBuy: true } }),
+    ]);
+    res.json({ data: { total, byStatus, owned, wantToBuy } });
+    return;
+  }
   res.json({ data: { total, byStatus } });
 });
 

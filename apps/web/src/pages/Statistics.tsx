@@ -12,7 +12,6 @@ import {
   Layers,
   Scale,
   Star,
-  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -20,6 +19,7 @@ import { apiFetch, apiFetchCached, apiFetchFile, downloadFile } from "@/lib/api"
 import {
   StatisticsSummarySkeleton,
   StatisticsBarsSkeleton,
+  StatisticsSpendByCategorySkeleton,
   StatisticsCategoryOverTimeSkeleton,
   StatisticsRecentLogsSkeleton,
 } from "@/components/skeletons";
@@ -53,6 +53,7 @@ import { toast } from "sonner";
 import * as storage from "@/lib/storage";
 import { paperShadow } from "@/lib/paperShadow";
 import { currencyMinorDecimals } from "@/lib/moneyInput";
+import { formatStatsTimeAxisLabel } from "@/lib/formatStatsPeriod";
 import { cn } from "@/lib/utils";
 
 function formatMinorAsMoney(minor: number, currency: string): string {
@@ -69,28 +70,65 @@ function formatSignedMinorAsMoney(minor: number, currency: string): string {
   return formatMinorAsMoney(0, currency);
 }
 
-/** Purchases as outflow: −R$… (red in UI). */
-function formatPurchaseTotalsMinorAsMoney(minor: number, currency: string): string {
-  return `−${formatMinorAsMoney(minor, currency)}`;
-}
-
-/** Sales as inflow: +R$… (green in UI). */
-function formatSaleTotalsMinorAsMoney(minor: number, currency: string): string {
-  return `+${formatMinorAsMoney(minor, currency)}`;
-}
-
-function sumMinorByCurrency(
-  matrix: Record<string, Record<string, number>> | null
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  if (!matrix) return out;
-  for (const mt of SPEND_TRACKED_MEDIA_TYPES) {
-    const by = matrix[mt] ?? {};
-    for (const [cur, minor] of Object.entries(by)) {
-      out[cur] = (out[cur] ?? 0) + minor;
-    }
+/** One track: emerald (sales) left, rose (purchases) right — width vs global max. */
+function SpendCategorySegmentBar({
+  purchaseMinor,
+  saleMinor,
+  globalMaxMinor,
+}: {
+  purchaseMinor: number;
+  saleMinor: number;
+  globalMaxMinor: number;
+}) {
+  const total = purchaseMinor + saleMinor;
+  if (globalMaxMinor <= 0 || total <= 0) {
+    return <div className="h-1.5 w-full rounded-full bg-[var(--color-mid)]/12" aria-hidden />;
   }
-  return out;
+  const widthPct = Math.max(6, Math.min(100, (total / globalMaxMinor) * 100));
+  return (
+    <div className="h-1.5 w-full rounded-full bg-[var(--color-mid)]/12" aria-hidden>
+      <div
+        className="flex h-full min-w-0 overflow-hidden rounded-full"
+        style={{ width: `${widthPct}%` }}
+      >
+        {saleMinor > 0 ? (
+          <div
+            className="h-full min-w-0 shrink-0 bg-emerald-500/50"
+            style={{ width: `${(saleMinor / total) * 100}%` }}
+          />
+        ) : null}
+        {purchaseMinor > 0 ? (
+          <div
+            className="h-full min-w-0 shrink-0 bg-rose-500/45"
+            style={{ width: `${(purchaseMinor / total) * 100}%` }}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** Section divider for time-based stats (replaces raw `YYYY-MM` labels). */
+function StatsTimeSectionDivider({ label }: { label: string }) {
+  return (
+    <div
+      className="relative flex items-center gap-3 py-1.5 first:pt-0"
+      role="separator"
+      aria-label={label}
+    >
+      <div
+        className="h-px min-w-[1.25rem] flex-1 bg-gradient-to-r from-transparent via-[var(--color-mid)]/45 to-[var(--color-mid)]/20"
+        aria-hidden
+      />
+      <span className="max-w-[min(100%,18rem)] shrink-0 truncate rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/60 px-3.5 py-1 text-center text-[11px] font-semibold leading-tight tracking-wide text-[var(--color-lightest)] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]">
+        {label}
+      </span>
+      <div
+        className="h-px min-w-[1.25rem] flex-1 bg-gradient-to-l from-transparent via-[var(--color-mid)]/45 to-[var(--color-mid)]/20"
+        aria-hidden
+      />
+    </div>
+  );
 }
 
 type PurchasePeriod = "month" | "year" | "all";
@@ -185,7 +223,7 @@ function OverviewStatCard({
           <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">{label}</p>
           <div
             className={cn(
-              "mt-1 text-xl font-semibold tabular-nums leading-none text-[var(--color-lightest)]",
+              "mt-1 w-full min-w-0 text-xl font-semibold tabular-nums leading-none text-[var(--color-lightest)]",
               valueClassName
             )}
           >
@@ -210,8 +248,13 @@ function OverviewStatCard({
               {label}
             </p>
           </div>
-          <div className={cn("min-w-0", OVERVIEW_STAT_VALUE_INSET)}>
-            <div className="text-3xl font-semibold tabular-nums leading-none tracking-tight text-[var(--color-lightest)]">
+          <div className={cn("min-w-0 w-full max-w-full", OVERVIEW_STAT_VALUE_INSET)}>
+            <div
+              className={cn(
+                "w-full min-w-0 text-3xl font-semibold tabular-nums leading-none tracking-tight text-[var(--color-lightest)]",
+                valueClassName
+              )}
+            >
               {value}
             </div>
             {sub ? <div className="mt-2 text-xs leading-snug text-[var(--color-light)]">{sub}</div> : null}
@@ -223,7 +266,7 @@ function OverviewStatCard({
 }
 
 export function Statistics() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { me } = useMe();
   const { visibleTypes } = useVisibleMediaTypes();
   const { setPageTitle, setRightSlot } = usePageTitle() ?? {};
@@ -262,7 +305,6 @@ export function Statistics() {
   /** Log rows counted per spend-tracked category (same period as spending). */
   const [purchaseItemCounts, setPurchaseItemCounts] = useState<Record<string, number> | null>(null);
   const [saleItemCounts, setSaleItemCounts] = useState<Record<string, number> | null>(null);
-  const [netByCurrency, setNetByCurrency] = useState<Record<string, number> | null>(null);
   const [purchaseSpendingLoading, setPurchaseSpendingLoading] = useState(true);
   const [spendDetailMediaType, setSpendDetailMediaType] = useState<string | null>(null);
   const [spendDetailLogs, setSpendDetailLogs] = useState<Log[]>([]);
@@ -399,19 +441,16 @@ export function Statistics() {
         saleData?: Record<string, Record<string, number>>;
         counts?: Record<string, number>;
         saleCounts?: Record<string, number>;
-        netByCurrency?: Record<string, number>;
       }>(`/logs/stats?group=purchaseSpending&period=${purchasePeriod}&timezoneOffsetMinutes=${tzOffsetMinutes}`);
       setPurchaseSpending(res.data ?? null);
       setSaleProceedsByCategory(res.saleData ?? null);
       setPurchaseItemCounts(res.counts ?? null);
       setSaleItemCounts(res.saleCounts ?? null);
-      setNetByCurrency(res.netByCurrency ?? null);
     } catch {
       setPurchaseSpending(null);
       setSaleProceedsByCategory(null);
       setPurchaseItemCounts(null);
       setSaleItemCounts(null);
-      setNetByCurrency(null);
     } finally {
       setPurchaseSpendingLoading(false);
     }
@@ -615,22 +654,19 @@ export function Statistics() {
     return Boolean(spend || sales);
   }, [purchaseSpending, saleProceedsByCategory, purchaseSpendingLoading]);
 
-  const totalsSpentByCurrency = useMemo(
-    () => sumMinorByCurrency(purchaseSpending),
-    [purchaseSpending]
+  /** Categories with purchase/sale data in the period (counts and/or non-zero totals). */
+  const spendMediaTypesWithActivity = useMemo(
+    () =>
+      SPEND_TRACKED_MEDIA_TYPES.filter((mt) => {
+        const pCount = purchaseItemCounts?.[mt] ?? 0;
+        const sCount = saleItemCounts?.[mt] ?? 0;
+        if (pCount > 0 || sCount > 0) return true;
+        const spend = Object.values(purchaseSpending?.[mt] ?? {}).some((v) => v > 0);
+        const sale = Object.values(saleProceedsByCategory?.[mt] ?? {}).some((v) => v > 0);
+        return spend || sale;
+      }),
+    [purchaseItemCounts, saleItemCounts, purchaseSpending, saleProceedsByCategory]
   );
-  const totalsProceedsByCurrency = useMemo(
-    () => sumMinorByCurrency(saleProceedsByCategory),
-    [saleProceedsByCategory]
-  );
-  const financeCurrencyOrder = useMemo(() => {
-    const keys = new Set([
-      ...Object.keys(totalsSpentByCurrency),
-      ...Object.keys(totalsProceedsByCurrency),
-      ...(netByCurrency ? Object.keys(netByCurrency) : []),
-    ]);
-    return Array.from(keys).sort((a, b) => a.localeCompare(b));
-  }, [totalsSpentByCurrency, totalsProceedsByCurrency, netByCurrency]);
 
   return (
     <div className="relative flex min-w-0 flex-col gap-10 overflow-x-hidden">
@@ -714,7 +750,7 @@ export function Statistics() {
           <OverviewStatCard
             icon={Scale}
             label={t("statistics.summaryLifetimeBalance")}
-            valueClassName="!text-lg md:!text-xl md:!leading-snug"
+            valueClassName="!text-base sm:!text-lg md:!text-lg lg:!text-xl xl:!text-xl 2xl:!text-2xl !leading-snug !tracking-tight"
             value={(() => {
               const net = summaryData.lifetimeNetByCurrency ?? {};
               const entries = Object.entries(net).sort(([a], [b]) => a.localeCompare(b));
@@ -722,7 +758,7 @@ export function Statistics() {
                 return <span className="text-[var(--color-light)]">—</span>;
               }
               return (
-                <div className="flex flex-col gap-1">
+                <div className="flex min-w-0 w-full flex-col gap-1">
                   {entries.map(([currency, minor]) => {
                     const tone =
                       minor > 0
@@ -731,7 +767,13 @@ export function Statistics() {
                           ? "text-rose-400/90"
                           : "text-[var(--color-lightest)]";
                     return (
-                      <span key={currency} className={cn("leading-tight", tone)}>
+                      <span
+                        key={currency}
+                        className={cn(
+                          "min-w-0 max-w-full break-words [overflow-wrap:anywhere] leading-tight",
+                          tone
+                        )}
+                      >
                         {formatSignedMinorAsMoney(minor, currency)}
                       </span>
                     );
@@ -739,7 +781,6 @@ export function Statistics() {
                 </div>
               );
             })()}
-            sub={<span className="tabular-nums">{t("statistics.summaryLifetimeBalanceSub")}</span>}
           />
         </section>
           )}
@@ -767,29 +808,21 @@ export function Statistics() {
           className="min-w-0 w-full"
         >
           <Card
-            className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 md:p-5"
+            className="overflow-hidden border-[var(--color-surface-border)]/80 bg-[var(--color-dark)] p-4 md:p-6"
             style={paperShadow}
           >
-            <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
-                <div className="flex min-w-0 shrink-0 items-center gap-2">
-                  <Wallet className="h-5 w-5 shrink-0 text-[var(--color-mid)]" aria-hidden />
-                  <h2 className="min-w-0 text-base font-semibold text-[var(--color-lightest)]">
-                    <OverflowMarquee>{t("statistics.purchaseSpendingTitle")}</OverflowMarquee>
-                  </h2>
-                </div>
-                {!purchaseSpendingLoading && totalFinanceItems > 0 && (
-                  <p className="text-sm text-[var(--color-light)]">
-                    {t(
-                      totalFinanceItems === 1
-                        ? "statistics.financeItemsLabel_one"
-                        : "statistics.financeItemsLabel_other",
-                      { count: String(totalFinanceItems) }
-                    )}
-                  </p>
-                )}
-              </div>
-              <div className="w-full min-w-0 sm:w-auto sm:max-w-[min(18rem,calc(100vw-2rem))] sm:shrink-0">
+            <div className="mb-5 flex min-w-0 flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              {!purchaseSpendingLoading && totalFinanceItems > 0 && (
+                <p className="min-w-0 text-sm text-[var(--color-light)] sm:max-w-[55%]">
+                  {t(
+                    totalFinanceItems === 1
+                      ? "statistics.financeItemsLabel_one"
+                      : "statistics.financeItemsLabel_other",
+                    { count: String(totalFinanceItems) }
+                  )}
+                </p>
+              )}
+              <div className="w-full min-w-0 sm:ml-auto sm:w-auto sm:max-w-[min(18rem,calc(100vw-2rem))] sm:shrink-0">
                 <Select
                   value={purchasePeriod}
                   onValueChange={(v) => setPurchasePeriod(v as PurchasePeriod)}
@@ -808,56 +841,17 @@ export function Statistics() {
                 />
               </div>
             </div>
-            {!purchaseSpendingLoading && financeCurrencyOrder.length > 0 && (
-              <div className="mb-4 rounded-lg border border-[var(--color-mid)]/25 bg-[var(--color-darkest)]/40 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-light)]">
-                  {t("statistics.financeOverview")}
-                </p>
-                <ul className="m-0 mt-2 list-none space-y-2 p-0">
-                  {financeCurrencyOrder.map((cur) => {
-                    const spent = totalsSpentByCurrency[cur] ?? 0;
-                    const proceeds = totalsProceedsByCurrency[cur] ?? 0;
-                    const net = netByCurrency?.[cur] ?? proceeds - spent;
-                    const netTone =
-                      net > 0
-                        ? "text-emerald-400"
-                        : net < 0
-                          ? "text-rose-400/90"
-                          : "text-[var(--color-light)]";
-                    return (
-                      <li
-                        key={cur}
-                        className="rounded-md border border-[var(--color-mid)]/15 bg-[var(--color-dark)]/30 px-2 py-2"
-                      >
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-xs font-medium text-[var(--color-light)]">{cur}</span>
-                          <span className={cn("text-sm font-semibold tabular-nums", netTone)}>
-                            {formatSignedMinorAsMoney(net, cur)}
-                          </span>
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-medium tabular-nums">
-                          <span className="text-emerald-400">{formatSaleTotalsMinorAsMoney(proceeds, cur)}</span>
-                          <span className="text-rose-400/90">
-                            {formatPurchaseTotalsMinorAsMoney(spent, cur)}
-                          </span>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
             <div className="min-h-[12.5rem] min-w-0">
               {purchaseSpendingLoading ? (
-                <StatisticsBarsSkeleton rows={4} />
-              ) : !hasAnyFinanceActivity ? (
+                <StatisticsSpendByCategorySkeleton rows={5} />
+              ) : !hasAnyFinanceActivity || spendMediaTypesWithActivity.length === 0 ? (
                 <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
                   {t("statistics.purchaseEmpty")}
                 </p>
               ) : (
                 (() => {
                   let maxMinorGlobal = 0;
-                  for (const mt of SPEND_TRACKED_MEDIA_TYPES) {
+                  for (const mt of spendMediaTypesWithActivity) {
                     const spendCur = purchaseSpending?.[mt] ?? {};
                     for (const v of Object.values(spendCur)) {
                       if (v > maxMinorGlobal) maxMinorGlobal = v;
@@ -869,8 +863,9 @@ export function Statistics() {
                   }
                   if (maxMinorGlobal === 0) maxMinorGlobal = 1;
                   return (
-                    <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-                      {SPEND_TRACKED_MEDIA_TYPES.map((mt) => {
+                    <div className="flex min-w-0 flex-col gap-3">
+                      <p className="text-[11px] text-[var(--color-light)]">{t("statistics.spendBarCaption")}</p>
+                      {spendMediaTypesWithActivity.map((mt) => {
                         const byCurrency = purchaseSpending?.[mt] ?? {};
                         const bySaleCurrency = saleProceedsByCategory?.[mt] ?? {};
                         const entries = Object.entries(byCurrency).sort(([a], [b]) => a.localeCompare(b));
@@ -882,95 +877,83 @@ export function Statistics() {
                         const pCount = purchaseItemCounts?.[mt] ?? 0;
                         const sCount = saleItemCounts?.[mt] ?? 0;
                         const categoryFinanceItems = pCount + sCount;
-                        const hasFinanceRows = pCount > 0 || sCount > 0;
-                        const rowInner = (
+                        const currencyKeys = Array.from(
+                          new Set([...Object.keys(byCurrency), ...Object.keys(bySaleCurrency)])
+                        ).sort((a, b) => a.localeCompare(b));
+                        const netSpans = currencyKeys
+                          .filter((c) => (byCurrency[c] ?? 0) + (bySaleCurrency[c] ?? 0) > 0)
+                          .map((currency) => {
+                            const net = (bySaleCurrency[currency] ?? 0) - (byCurrency[currency] ?? 0);
+                            const tone =
+                              net > 0
+                                ? "text-emerald-400"
+                                : net < 0
+                                  ? "text-rose-400/90"
+                                  : "text-[var(--color-light)]";
+                            return (
+                              <span
+                                key={`${mt}-net-${currency}`}
+                                className={cn("text-sm font-semibold tabular-nums tracking-tight", tone)}
+                              >
+                                {formatSignedMinorAsMoney(net, currency)}
+                              </span>
+                            );
+                          });
+                        const shell =
+                          "rounded-2xl border border-[var(--color-surface-border)]/55 bg-[var(--color-darkest)]/20 px-4 py-3.5 sm:px-5 sm:py-4";
+                        const body = (
                           <>
-                            <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                              <OverflowMarquee className={statBarMarqueeClass}>{t(`nav.${mt}`)}</OverflowMarquee>
-                              {categoryFinanceItems > 0 && (
-                                <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                                  {t(
-                                    categoryFinanceItems === 1
-                                      ? "statistics.financeItemsLabel_one"
-                                      : "statistics.financeItemsLabel_other",
-                                    { count: String(categoryFinanceItems) }
-                                  )}
-                                </span>
-                              )}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-[var(--color-lightest)]">
+                                  {t(`nav.${mt}`)}
+                                </p>
+                                {categoryFinanceItems > 0 ? (
+                                  <p className="mt-0.5 text-xs tabular-nums text-[var(--color-light)]">
+                                    {t(
+                                      categoryFinanceItems === 1
+                                        ? "statistics.financeItemsLabel_one"
+                                        : "statistics.financeItemsLabel_other",
+                                      { count: String(categoryFinanceItems) }
+                                    )}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <ChevronRight
+                                className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-mid)]"
+                                aria-hidden
+                              />
                             </div>
-                            <div className="flex min-w-0 flex-col justify-center gap-1 py-0.5">
-                              {maxSale > 0 && (
-                                <div className={statBarTrackClass}>
-                                  <div
-                                    className="h-full rounded bg-emerald-600/75"
-                                    style={{
-                                      width: `${Math.max(4, (maxSale / maxMinorGlobal) * 100)}%`,
-                                    }}
-                                  />
-                                </div>
-                              )}
-                              {maxPurchase > 0 && (
-                                <div className={statBarTrackClass}>
-                                  <div
-                                    className="h-full rounded bg-gradient-to-r from-[var(--color-mid)] to-[var(--color-mid)]/80"
-                                    style={{
-                                      width: `${Math.max(4, (maxPurchase / maxMinorGlobal) * 100)}%`,
-                                    }}
-                                  />
-                                </div>
-                              )}
-                              {maxPurchase === 0 && maxSale === 0 && <div className={statBarTrackClass} />}
+                            <div className="mt-3">
+                              <SpendCategorySegmentBar
+                                purchaseMinor={maxPurchase}
+                                saleMinor={maxSale}
+                                globalMaxMinor={maxMinorGlobal}
+                              />
                             </div>
-                            <div className="flex min-w-0 flex-col items-end gap-1 text-right text-xs tabular-nums">
-                              {entries.length === 0 && saleEntries.length === 0 ? (
-                                <span className="text-[var(--color-light)]">—</span>
+                            <div className="mt-3 flex min-w-0 flex-col items-end gap-1 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-x-4 sm:gap-y-1">
+                              {netSpans.length === 0 ? (
+                                <span className="text-sm text-[var(--color-light)]">—</span>
                               ) : (
-                                <>
-                                  {saleEntries.length > 0 && (
-                                    <div className="flex flex-col items-end gap-0.5">
-                                      {saleEntries.map(([currency, minor]) => (
-                                        <span
-                                          key={`${mt}-sl-${currency}`}
-                                          className="leading-tight text-emerald-400"
-                                        >
-                                          {formatSaleTotalsMinorAsMoney(minor, currency)}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {entries.length > 0 && (
-                                    <div className="flex flex-col items-end gap-0.5">
-                                      {entries.map(([currency, minor]) => (
-                                        <span
-                                          key={`${mt}-sp-${currency}`}
-                                          className="leading-tight text-rose-400/90"
-                                        >
-                                          {formatPurchaseTotalsMinorAsMoney(minor, currency)}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                </>
+                                netSpans
                               )}
                             </div>
                           </>
                         );
-                        const rowClass = `${statBarGridClass} rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]`;
-                        return hasFinanceRows ? (
+                        return (
                           <button
                             key={mt}
                             type="button"
                             onClick={() => setSpendDetailMediaType(mt)}
-                            className={`${rowClass} w-full cursor-pointer text-left hover:bg-[var(--color-mid)]/15`}
+                            className={cn(
+                              shell,
+                              "w-full cursor-pointer text-left transition-[transform,background-color,border-color] hover:border-[var(--color-mid)]/40 hover:bg-[var(--color-mid)]/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] active:scale-[0.995]"
+                            )}
                             title={t("statistics.financeDetailOpen", { category: t(`nav.${mt}`) })}
                             aria-label={t("statistics.financeDetailOpen", { category: t(`nav.${mt}`) })}
                           >
-                            {rowInner}
+                            {body}
                           </button>
-                        ) : (
-                          <div key={mt} className={rowClass}>
-                            {rowInner}
-                          </div>
                         );
                       })}
                     </div>
@@ -1305,35 +1288,40 @@ export function Statistics() {
                   {t("dashboard.noStatusOverTimeYet")}
                 </p>
               ) : (
-                <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+                <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
                   {statusOverTimeStats.map(({ period, hours, count }) => {
                     const itemCount = count ?? hours;
+                    const timeLabel = formatStatsTimeAxisLabel(
+                      period,
+                      statusOverTimeGroup === "year" ? "year" : "month",
+                      locale
+                    );
                     return (
-                      <div key={period} className={statBarGridClass}>
-                        <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                          <OverflowMarquee className={statBarMarqueeClass}>
-                            {statusOverTimeGroup === "year" ? period : period.slice(0, 7)}
-                          </OverflowMarquee>
-                          {itemCount > 0 && (
-                            <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                              {t(
-                                itemCount === 1
-                                  ? "statistics.statItemsCount_one"
-                                  : "statistics.statItemsCount_other",
-                                { count: String(itemCount) }
-                              )}
-                            </span>
-                          )}
+                      <div key={period} className="flex min-w-0 flex-col gap-2">
+                        <StatsTimeSectionDivider label={timeLabel} />
+                        <div className={statBarGridClass}>
+                          <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
+                            {itemCount > 0 && (
+                              <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
+                                {t(
+                                  itemCount === 1
+                                    ? "statistics.statItemsCount_one"
+                                    : "statistics.statItemsCount_other",
+                                  { count: String(itemCount) }
+                                )}
+                              </span>
+                            )}
+                          </div>
+                          <div className={statBarTrackClass}>
+                            <div
+                              className={statBarFillClass}
+                              style={{ width: `${Math.max(5, (hours / maxStatusOverTimeCount) * 100)}%` }}
+                            />
+                          </div>
+                          <span className={statBarValueClass}>
+                            {t("dashboard.completedCount", { count: String(Math.round(hours)) })}
+                          </span>
                         </div>
-                        <div className={statBarTrackClass}>
-                          <div
-                            className={statBarFillClass}
-                            style={{ width: `${Math.max(5, (hours / maxStatusOverTimeCount) * 100)}%` }}
-                          />
-                        </div>
-                        <span className={statBarValueClass}>
-                          {t("dashboard.completedCount", { count: String(Math.round(hours)) })}
-                        </span>
                       </div>
                     );
                   })}
@@ -1350,47 +1338,54 @@ export function Statistics() {
                   {t("dashboard.noStatsYet")}
                 </p>
               ) : (
-                <div className="flex min-w-0 flex-col gap-3 overflow-hidden">
-                  {categoryOverTimePeriods.map((period) => (
-                    <div key={period} className="flex min-w-0 flex-col gap-1.5">
-                      <span className="shrink-0 text-xs font-medium text-[var(--color-light)]">
-                        {categoryOverTimeGroup === "year" ? period : period.slice(0, 7)}
-                      </span>
-                      <div className="flex min-w-0 flex-col gap-1">
-                        {(categoryOverTimeByPeriod[period] ?? []).map(({ mediaType, hours, count }) => {
-                          const itemCount = count ?? hours;
-                          return (
-                            <div key={`${period}-${mediaType}`} className={statBarGridClass}>
-                              <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                                <OverflowMarquee className={statBarMarqueeClass}>
-                                  {t(`nav.${mediaType}`)}
-                                </OverflowMarquee>
-                                {itemCount > 0 && (
-                                  <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                                    {t(
-                                      itemCount === 1
-                                        ? "statistics.statItemsCount_one"
-                                        : "statistics.statItemsCount_other",
-                                      { count: String(itemCount) }
-                                    )}
-                                  </span>
-                                )}
+                <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
+                  {categoryOverTimePeriods.map((period) => {
+                    const timeLabel = formatStatsTimeAxisLabel(
+                      period,
+                      categoryOverTimeGroup === "year" ? "year" : "month",
+                      locale
+                    );
+                    return (
+                      <div key={period} className="flex min-w-0 flex-col gap-2">
+                        <StatsTimeSectionDivider label={timeLabel} />
+                        <div className="flex min-w-0 flex-col gap-1">
+                          {(categoryOverTimeByPeriod[period] ?? []).map(({ mediaType, hours, count }) => {
+                            const itemCount = count ?? hours;
+                            return (
+                              <div key={`${period}-${mediaType}`} className={statBarGridClass}>
+                                <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
+                                  <OverflowMarquee className={statBarMarqueeClass}>
+                                    {t(`nav.${mediaType}`)}
+                                  </OverflowMarquee>
+                                  {itemCount > 0 && (
+                                    <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
+                                      {t(
+                                        itemCount === 1
+                                          ? "statistics.statItemsCount_one"
+                                          : "statistics.statItemsCount_other",
+                                        { count: String(itemCount) }
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className={statBarTrackClass}>
+                                  <div
+                                    className={statBarFillClass}
+                                    style={{
+                                      width: `${Math.max(5, (hours / maxCategoryOverTimeCount) * 100)}%`,
+                                    }}
+                                  />
+                                </div>
+                                <span className={statBarValueClass}>
+                                  {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
+                                </span>
                               </div>
-                              <div className={statBarTrackClass}>
-                                <div
-                                  className={statBarFillClass}
-                                  style={{ width: `${Math.max(5, (hours / maxCategoryOverTimeCount) * 100)}%` }}
-                                />
-                              </div>
-                              <span className={statBarValueClass}>
-                                {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
-                              </span>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1449,39 +1444,60 @@ export function Statistics() {
                         {t("dashboard.noStatsYet")}
                       </p>
                     ) : (
-                      <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-                        {displayedStats.map(({ period, hours, count }) => (
-                          <div key={period} className={statBarGridClass}>
-                            <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                              <OverflowMarquee className={statBarMarqueeClass}>
-                                {statsGroup === "category"
-                                  ? t(`nav.${period}`)
-                                  : statsGroup === "year"
-                                    ? period
-                                    : period.slice(0, 7)}
-                              </OverflowMarquee>
-                              {(count ?? 0) > 0 && (
-                                <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                                  {t(
-                                    (count ?? 0) === 1
-                                      ? "statistics.statItemsCount_one"
-                                      : "statistics.statItemsCount_other",
-                                    { count: String(count ?? 0) }
-                                  )}
-                                </span>
+                      <div
+                        className={cn(
+                          "flex min-w-0 flex-col overflow-hidden",
+                          statsGroup === "category" ? "gap-2" : "gap-4"
+                        )}
+                      >
+                        {displayedStats.map(({ period, hours, count }) => {
+                          const isTimeAxis = statsGroup === "month" || statsGroup === "year";
+                          const timeLabel = isTimeAxis
+                            ? formatStatsTimeAxisLabel(
+                                period,
+                                statsGroup === "year" ? "year" : "month",
+                                locale
+                              )
+                            : null;
+                          const barRow = (
+                            <div className={statBarGridClass}>
+                              <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
+                                {!isTimeAxis && (
+                                  <OverflowMarquee className={statBarMarqueeClass}>
+                                    {t(`nav.${period}`)}
+                                  </OverflowMarquee>
+                                )}
+                                {(count ?? 0) > 0 && (
+                                  <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
+                                    {t(
+                                      (count ?? 0) === 1
+                                        ? "statistics.statItemsCount_one"
+                                        : "statistics.statItemsCount_other",
+                                      { count: String(count ?? 0) }
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                              <div className={statBarTrackClass}>
+                                <div
+                                  className={statBarFillClass}
+                                  style={{ width: `${Math.max(5, (hours / maxHours) * 100)}%` }}
+                                />
+                              </div>
+                              <span className={statBarValueClass}>
+                                {t("dashboard.hoursConsumed", { hours: hours.toFixed(1) })}
+                              </span>
+                            </div>
+                          );
+                          return (
+                            <div key={period} className={cn(isTimeAxis && "flex min-w-0 flex-col gap-2")}>
+                              {isTimeAxis && timeLabel != null && (
+                                <StatsTimeSectionDivider label={timeLabel} />
                               )}
+                              {barRow}
                             </div>
-                            <div className={statBarTrackClass}>
-                              <div
-                                className={statBarFillClass}
-                                style={{ width: `${Math.max(5, (hours / maxHours) * 100)}%` }}
-                              />
-                            </div>
-                            <span className={statBarValueClass}>
-                              {t("dashboard.hoursConsumed", { hours: hours.toFixed(1) })}
-                            </span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

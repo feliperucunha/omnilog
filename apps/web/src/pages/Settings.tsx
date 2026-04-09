@@ -1041,20 +1041,10 @@ export function Settings() {
                         >
                           <div className="min-w-0 flex-1 space-y-1">
                             <p className="font-medium text-[var(--color-lightest)]">
-                              {t(
-                                `settings.adminFlag_${f.key}` as
-                                  | "settings.adminFlag_disable_api_key_requirements"
-                                  | "settings.adminFlag_register_new_users_as_beta"
-                                  | "settings.adminFlag_wake_api_ping"
-                              )}
+                              {t(`settings.adminFlag_${f.key}`)}
                             </p>
                             <p className="text-xs leading-relaxed text-[var(--color-light)]">
-                              {t(
-                                `settings.adminFlag_${f.key}_hint` as
-                                  | "settings.adminFlag_disable_api_key_requirements_hint"
-                                  | "settings.adminFlag_register_new_users_as_beta_hint"
-                                  | "settings.adminFlag_wake_api_ping_hint"
-                              )}
+                              {t(`settings.adminFlag_${f.key}_hint`)}
                             </p>
                             <p className="font-mono text-[10px] text-[var(--color-mid)]">{f.key}</p>
                           </div>
@@ -1070,12 +1060,7 @@ export function Settings() {
                               onCheckedChange={(v) => {
                                 void handleToggleAdminFeatureFlag(f.key, v);
                               }}
-                              aria-label={t(
-                                `settings.adminFlag_${f.key}` as
-                                  | "settings.adminFlag_disable_api_key_requirements"
-                                  | "settings.adminFlag_register_new_users_as_beta"
-                                  | "settings.adminFlag_wake_api_ping"
-                              )}
+                              aria-label={t(`settings.adminFlag_${f.key}`)}
                             />
                           </div>
                         </li>

@@ -149,7 +149,12 @@ export function MediaLogs({
   const [editingLogEpisodesCount, setEditingLogEpisodesCount] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>(() => initialFilters?.status ?? "");
-  const [statusCounts, setStatusCounts] = useState<{ total: number; byStatus: Record<string, number> } | null>(null);
+  const [statusCounts, setStatusCounts] = useState<{
+    total: number;
+    byStatus: Record<string, number>;
+    owned?: number;
+    wantToBuy?: number;
+  } | null>(null);
   const [collectionFilter, setCollectionFilter] = useState<CollectionListFilter>(
     () => initialFilters?.collection ?? ""
   );
@@ -301,8 +306,14 @@ export function MediaLogs({
       ? `/users/${publicUserId}/logs/status-counts?mediaType=${encodeURIComponent(mediaType)}`
       : `/logs/status-counts?mediaType=${encodeURIComponent(mediaType)}`;
     const fetcher = publicUserId
-      ? () => apiFetchPublic<{ data: { total: number; byStatus: Record<string, number> } }>(path)
-      : () => apiFetchCached<{ data: { total: number; byStatus: Record<string, number> } }>(path, { ttlMs: 2 * 60 * 1000 });
+      ? () =>
+          apiFetchPublic<{
+            data: { total: number; byStatus: Record<string, number>; owned?: number; wantToBuy?: number };
+          }>(path)
+      : () =>
+          apiFetchCached<{
+            data: { total: number; byStatus: Record<string, number>; owned?: number; wantToBuy?: number };
+          }>(path, { ttlMs: 2 * 60 * 1000 });
     fetcher()
       .then((res) => setStatusCounts(res.data ?? null))
       .catch(() => setStatusCounts(null));
@@ -444,14 +455,23 @@ export function MediaLogs({
 
   const label = t(`nav.${mediaType}`);
 
-  const collectionOwnershipSelectOptions = useMemo(
-    () => [
+  const collectionOwnershipSelectOptions = useMemo(() => {
+    const ownedBase = t("mediaLogs.filterOwned");
+    const wtbBase = t("mediaLogs.filterWantToBuy");
+    const ownedLabel =
+      statusCounts != null && typeof statusCounts.owned === "number"
+        ? `${ownedBase} (${statusCounts.owned})`
+        : ownedBase;
+    const wantToBuyLabel =
+      statusCounts != null && typeof statusCounts.wantToBuy === "number"
+        ? `${wtbBase} (${statusCounts.wantToBuy})`
+        : wtbBase;
+    return [
       { value: "" as CollectionListFilter, label: t("mediaLogs.filterAll") },
-      { value: "owned" as const, label: t("mediaLogs.filterOwned") },
-      { value: "wantToBuy" as const, label: t("mediaLogs.filterWantToBuy") },
-    ],
-    [t]
-  );
+      { value: "owned" as const, label: ownedLabel },
+      { value: "wantToBuy" as const, label: wantToBuyLabel },
+    ];
+  }, [t, statusCounts]);
 
   const handleListSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();

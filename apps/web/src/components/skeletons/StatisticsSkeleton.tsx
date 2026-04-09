@@ -36,6 +36,32 @@ export function StatisticsSummarySkeleton() {
   );
 }
 
+/** Spending-by-category cards (Statistics purchase section). */
+export function StatisticsSpendByCategorySkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="flex min-h-[12.5rem] min-w-0 flex-col gap-3" aria-hidden>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-2xl border border-[var(--color-surface-border)]/40 bg-[var(--color-darkest)]/20 px-4 py-3.5 sm:px-5 sm:py-4"
+        >
+          <div className="flex justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-32 max-w-full rounded-md" />
+              <Skeleton className="h-2.5 w-20 rounded" />
+            </div>
+            <Skeleton className="mt-0.5 h-4 w-4 shrink-0 rounded" />
+          </div>
+          <Skeleton className="mt-3 h-1.5 w-full rounded-full bg-[var(--color-mid)]/20" />
+          <div className="mt-3 flex justify-end gap-2">
+            <Skeleton className="h-4 w-24 rounded-md" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Bar rows matching genre / status / category / hours charts (fixed height to avoid layout shift). */
 export function StatisticsBarsSkeleton({ rows = 6 }: { rows?: number }) {
   return (

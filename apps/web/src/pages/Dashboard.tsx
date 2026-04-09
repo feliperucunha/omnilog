@@ -252,11 +252,15 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!me?.user?.id) return;
+    if (me.announcements?.betaBanner?.enabled === false) {
+      setShowBetaModal(false);
+      return;
+    }
     const key = `${BETA_MODAL_STORAGE_KEY}.${me.user.id}`;
-    storage.getItem(key).then((value) => {
-      if (value !== "true") setShowBetaModal(true);
+    void storage.getItem(key).then((value) => {
+      setShowBetaModal(value !== "true");
     });
-  }, [me?.user?.id]);
+  }, [me?.user?.id, me?.announcements?.betaBanner?.enabled]);
 
   const handleBetaModalClose = useCallback(() => {
     if (me?.user?.id) void storage.setItem(`${BETA_MODAL_STORAGE_KEY}.${me.user.id}`, "true");

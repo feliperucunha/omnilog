@@ -1,4 +1,6 @@
-import { NavLink, Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 import {
   Home,
   BarChart3,
@@ -16,6 +18,12 @@ import { cn } from "@/lib/utils";
 
 const iconSize = 18;
 
+/** Single active tab: pathname equality only (avoids prefix quirks; home is exactly `/`). */
+function navItemIsActive(to: string, pathname: string): boolean {
+  if (to === "/") return pathname === "/";
+  return pathname === to;
+}
+
 function NavLinkItem({
   to,
   label,
@@ -32,22 +40,23 @@ function NavLinkItem({
   bottomBar?: boolean;
   className?: string;
 }) {
+  const { pathname } = useLocation();
+  const isActive = navItemIsActive(to, pathname);
+
   return (
-    <NavLink
+    <Link
       to={to}
-      end
-      className={({ isActive }) =>
-        cn(
-          "flex rounded-lg text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/50",
-          bottomBar
-            ? "flex-1 flex-col items-center justify-center gap-0.5 py-2 px-1 min-w-0"
-            : iconOnly
-              ? "flex-1 justify-center py-4 items-center"
-              : "items-center gap-3 px-3 py-2.5 text-sm font-medium",
-          isActive && "bg-[var(--color-mid)]/50",
-          className
-        )
-      }
+      className={cn(
+        "flex rounded-lg text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/50 [-webkit-tap-highlight-color:transparent]",
+        bottomBar
+          ? "flex-1 flex-col items-center justify-center gap-0.5 py-2 px-1 min-w-0"
+          : iconOnly
+            ? "flex-1 justify-center py-4 items-center"
+            : "items-center gap-3 px-3 py-2.5 text-sm font-medium",
+        isActive && "bg-[var(--color-mid)]/50",
+        className
+      )}
+      aria-current={isActive ? "page" : undefined}
       aria-label={label}
     >
       <span
@@ -70,13 +79,24 @@ function NavLinkItem({
           {label}
         </span>
       )}
-    </NavLink>
+    </Link>
   );
 }
 
 export function Nav() {
   const { t } = useLocale();
   const { token } = useAuth();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Android WebView: after a system back gesture the previously tapped nav link can
+    // stay focused while the new route activates another item—both looked "selected".
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return;
+    const ae = document.activeElement;
+    if (!(ae instanceof HTMLElement) || ae.tagName !== "A") return;
+    const inMainNav = ae.closest('nav[aria-label="Main navigation"]');
+    if (inMainNav) ae.blur();
+  }, [location.pathname, location.search, location.hash]);
 
   const navItems: { to: string; labelKey: string; icon: React.ReactNode }[] = [
     { to: "/", labelKey: "nav.dashboard", icon: <Home size={iconSize} /> },

@@ -275,6 +275,14 @@ logsRouter.get("/status-counts", async (req: AuthenticatedRequest, res) => {
     byStatus[key] = row._count.id;
     total += row._count.id;
   }
+  if (isSpendTrackedMediaType(mediaType)) {
+    const [owned, wantToBuy] = await Promise.all([
+      prisma.log.count({ where: { userId, mediaType, own: true } }),
+      prisma.log.count({ where: { userId, mediaType, wantToBuy: true } }),
+    ]);
+    res.json({ data: { total, byStatus, owned, wantToBuy } });
+    return;
+  }
   res.json({ data: { total, byStatus } });
 });
 

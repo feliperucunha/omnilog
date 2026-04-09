@@ -9,6 +9,7 @@ export {
   StatisticsSkeleton,
   StatisticsSummarySkeleton,
   StatisticsBarsSkeleton,
+  StatisticsSpendByCategorySkeleton,
   StatisticsCategoryOverTimeSkeleton,
   StatisticsRecentLogsSkeleton,
 } from "./StatisticsSkeleton";
