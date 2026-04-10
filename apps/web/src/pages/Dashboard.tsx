@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchCached, invalidateApiCache, LOGS_INVALIDATED_EVENT } from "@/lib/api";
 import { APP_PTR_REFRESH_EVENT } from "@/lib/appPtrRefresh";
-import { FullPageLoader } from "@/components/FullPageLoader";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
@@ -60,7 +59,7 @@ const BETA_MODAL_STORAGE_KEY = "geeklogs.betaModalSeen";
 const SOCIAL_COLLAPSED_STORAGE_KEY = "geeklogs.dashboard.socialCollapsed";
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** Base URL for share profile link (always prod so shared links work). */
-const PROFILE_SHARE_BASE_URL = "https://geeklogs.vercel.app";
+const PROFILE_SHARE_BASE_URL = "https://geeklogs.com.br";
 
 /** Milestone progress from GET /me/milestones/progress */
 interface ScopeProgress {
@@ -80,9 +79,6 @@ interface MilestoneProgressResponse {
 }
 
 
-type LogsPayload = { data: Log[]; nextCursor: string | null } | Log[];
-const LOGS_PAGE_SIZE = 24;
-
 const VALID_LOGS_SORTS: MediaLogsSort[] = [
   "dateAsc",
   "dateDesc",
@@ -94,11 +90,29 @@ const VALID_LOGS_SORTS: MediaLogsSort[] = [
   "timeToBeatDesc",
 ];
 
+/** Matches StickyCategoryStrip layout while /me (or cached order) is not ready yet. */
+function CategoryOrderSkeletonStrip() {
+  return (
+    <div
+      className="scrollbar-hide flex min-h-[3rem] min-w-0 overflow-x-auto scroll-smooth [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]"
+      aria-busy
+    >
+      <div className="flex min-w-max items-stretch gap-6 pl-3 pr-3">
+        {Array.from({ length: 8 }, (_, i) => (
+          <div key={i} className="flex shrink-0 flex-col items-center justify-start pt-3">
+            <div className="h-4 w-16 max-w-[5rem] animate-pulse rounded bg-[var(--color-mid)]/30" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Dashboard() {
   const { t } = useLocale();
   const { token } = useAuth();
   const { me, loading: meLoading } = useMe();
-  const { visibleTypes } = useVisibleMediaTypes();
+  const { visibleTypes, visibleTypesOrderReady } = useVisibleMediaTypes();
   const { setPageTitle, setRightSlot, setBelowNavbar } = usePageTitle() ?? {};
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParamsKey = searchParams.toString();
@@ -110,15 +124,17 @@ export function Dashboard() {
     const q = params.get("q") ?? "";
     const ownQ = params.get("own") === "true";
     const wtbQ = params.get("wantToBuy") === "true";
+    const genre = params.get("genre") ?? "";
     let collection: CollectionListFilter = "";
     if (ownQ) collection = "owned";
     else if (wtbQ) collection = "wantToBuy";
-    if (!status && sort === "dateDesc" && !q && !collection) return undefined;
+    if (!status && sort === "dateDesc" && !q && !collection && !genre) return undefined;
     return {
       status,
       sort,
       search: q,
       collection,
+      genre,
     };
   }, [searchParamsKey]);
   const categoryParam = searchParams.get("category");
@@ -128,8 +144,9 @@ export function Dashboard() {
     return defaultCategory;
   });
   const [counts, setCounts] = useState<Record<MediaType, number> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  /** Background fetch for category strip counts only — never blocks the main dashboard shell. */
+  const [countsLoading, setCountsLoading] = useState(true);
+  const [countsError, setCountsError] = useState<string | null>(null);
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [feedLoading, setFeedLoading] = useState(false);
   const [feedFriendFilter, setFeedFriendFilter] = useState<string>("all");
@@ -140,19 +157,13 @@ export function Dashboard() {
   const [socialCollapsed, setSocialCollapsed] = useState(false);
   const [milestoneProgress, setMilestoneProgress] = useState<MilestoneProgressResponse | null>(null);
   const isMobile = useIsMobile();
-  /** Initial logs for first paint (avoids second skeleton). Cleared when category changes so MediaLogs can show its skeleton. */
-  const [initialLogsData, setInitialLogsData] = useState<{
-    mediaType: MediaType;
-    logs: Log[];
-    nextCursor: string | null;
-  } | null>(null);
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
   /** Current filters from MediaLogs (for share URL). */
   const shareFiltersRef = useRef<SharedFilters>({
     status: "",
     sort: "dateDesc",
     search: "",
     collection: "",
+    genre: "",
   });
 
   /** Load collapsed prefs from persistent storage (Android/Capacitor). */
@@ -205,50 +216,23 @@ export function Dashboard() {
   );
 
   const fetchCounts = useCallback(() => {
-    setError(null);
-    setLoading(true);
+    setCountsError(null);
+    setCountsLoading(true);
     apiFetchCached<{ data: Record<MediaType, number> }>("/logs/counts", { ttlMs: 2 * 60 * 1000 })
-      .then((res) => setCounts(res.data ?? null))
+      .then((res) => {
+        setCounts(res.data ?? null);
+        setCountsError(null);
+      })
       .catch((err) => {
         setCounts(null);
-        setError(err instanceof Error ? err.message : t("dashboard.couldntLoadLogs"));
+        setCountsError(err instanceof Error ? err.message : t("dashboard.couldntLoadLogs"));
       })
-      .finally(() => setLoading(false));
+      .finally(() => setCountsLoading(false));
   }, [t]);
 
   useEffect(() => {
     fetchCounts();
   }, [fetchCounts]);
-
-  /** Fetch first page of logs for selected category so we can show content without a second skeleton. */
-  useEffect(() => {
-    if (!token || !me || counts === null || visibleTypes.length === 0) return;
-    const needInitial =
-      !initialLoadDone && (initialLogsData === null || initialLogsData.mediaType !== selectedCategory);
-    if (!needInitial) return;
-    const params = new URLSearchParams({
-      mediaType: selectedCategory,
-      sort: "dateDesc",
-      limit: String(LOGS_PAGE_SIZE),
-    });
-    let cancelled = false;
-    apiFetchCached<LogsPayload>(`/logs?${params.toString()}`, { ttlMs: 2 * 60 * 1000 })
-      .then((response) => {
-        if (cancelled) return;
-        const list = Array.isArray(response) ? response : response.data ?? [];
-        const cursor = Array.isArray(response) ? null : (response.nextCursor ?? null);
-        setInitialLogsData({ mediaType: selectedCategory, logs: list, nextCursor: cursor });
-        setInitialLoadDone(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setInitialLogsData({ mediaType: selectedCategory, logs: [], nextCursor: null });
-        setInitialLoadDone(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [token, me, counts, visibleTypes.length, selectedCategory, initialLoadDone, initialLogsData]);
 
   useEffect(() => {
     if (!me?.user?.id) return;
@@ -347,6 +331,8 @@ export function Dashboard() {
       if (sort) next.set("sort", sort);
       if (searchParams.get("own") === "true") next.set("own", "true");
       if (searchParams.get("wantToBuy") === "true") next.set("wantToBuy", "true");
+      const genre = searchParams.get("genre");
+      if (genre) next.set("genre", genre);
       return `/${slug}?${next.toString()}`;
     },
     [searchParams]
@@ -365,6 +351,7 @@ export function Dashboard() {
       if (f.search.trim()) params.set("q", f.search.trim());
       if (f.collection === "owned") params.set("own", "true");
       else if (f.collection === "wantToBuy") params.set("wantToBuy", "true");
+      if (f.genre.trim()) params.set("genre", f.genre.trim());
     }
     const query = params.toString();
     const url = query ? `${base}?${query}` : base;
@@ -404,6 +391,14 @@ export function Dashboard() {
       setBelowNavbar?.(null);
       return;
     }
+    if (!visibleTypesOrderReady) {
+      setBelowNavbar?.(
+        <div className="sticky top-14 z-20 w-full shrink-0 self-start">
+          <CategoryOrderSkeletonStrip />
+        </div>
+      );
+      return () => setBelowNavbar?.(null);
+    }
     const byTypeMap = Object.fromEntries(
       MEDIA_TYPES.map((type) => [type, counts?.[type] ?? 0])
     ) as Record<MediaType, number>;
@@ -412,7 +407,7 @@ export function Dashboard() {
         items={visibleTypes.map((type) => ({
           value: type,
           label: t(`nav.${type}`),
-          count: byTypeMap[type] ?? 0,
+          ...(counts != null ? { count: byTypeMap[type] ?? 0 } : {}),
         }))}
         selectedValue={selectedCategory}
         onSelect={(v) => setCategory(v as MediaType)}
@@ -422,7 +417,7 @@ export function Dashboard() {
       />
     );
     return () => setBelowNavbar?.(null);
-  }, [visibleTypes, selectedCategory, counts, t, setBelowNavbar, setCategory]);
+  }, [visibleTypes, visibleTypesOrderReady, selectedCategory, counts, t, setBelowNavbar, setCategory]);
 
   const byType = Object.fromEntries(
     MEDIA_TYPES.map((type) => [type, counts?.[type] ?? 0])
@@ -438,38 +433,6 @@ export function Dashboard() {
     (selectedCategory === "boardgames"
       ? !hasBoardGameKey
       : me?.apiKeys && !me.apiKeys[apiKeyProvider]);
-
-  const showFullPageLoader =
-    meLoading ||
-    (loading && counts === null) ||
-    (!initialLoadDone && (initialLogsData === null || initialLogsData.mediaType !== selectedCategory));
-  if (showFullPageLoader) {
-    return <FullPageLoader />;
-  }
-
-  if (error && counts === null) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
-      >
-        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
-          <div className="flex flex-col gap-4">
-            <p className="font-medium text-[var(--color-lightest)]">
-              {t("dashboard.couldntLoadLogs")}
-            </p>
-            <p className="text-sm text-[var(--color-light)]">{error}</p>
-            <Button
-              onClick={fetchCounts}
-            >
-              {t("common.tryAgain")}
-            </Button>
-          </div>
-        </Card>
-      </motion.div>
-    );
-  }
 
   const betaMessageParagraphs = t("dashboard.betaModalMessage").split("\n\n");
 
@@ -500,8 +463,30 @@ export function Dashboard() {
     </Button>
   );
 
+  const categoryCountSuffix = (type: MediaType) =>
+    counts != null ? ` (${byType[type] ?? 0})` : countsLoading ? " (…)" : "";
+
   return (
     <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden">
+      {countsError != null && counts === null && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 320, damping: 28 }}
+        >
+          <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-md)]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div className="min-w-0">
+                <p className="font-medium text-[var(--color-lightest)]">{t("dashboard.couldntLoadCounts")}</p>
+                <p className="mt-1 text-sm text-[var(--color-light)]">{countsError}</p>
+              </div>
+              <Button type="button" variant="outline" className="shrink-0" onClick={fetchCounts} disabled={countsLoading}>
+                {t("common.tryAgain")}
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
+      )}
       {isMobile ? (
         <Drawer open={showBetaModal} onOpenChange={(open) => !open && handleBetaModalClose()}>
           <DrawerContent
@@ -542,9 +527,10 @@ export function Dashboard() {
                   key={type}
                   value={type}
                   className="rounded-md px-4 py-3 text-sm max-md:min-h-[44px] data-[state=on]:bg-gradient-to-br data-[state=on]:from-[var(--btn-gradient-start)] data-[state=on]:to-[var(--btn-gradient-end)] data-[state=on]:text-[var(--btn-text)] md:px-3 md:py-2"
-                  aria-label={`${t(`nav.${type}`)} (${byType[type] ?? 0})`}
+                  aria-label={`${t(`nav.${type}`)}${categoryCountSuffix(type)}`}
                 >
-                  {t(`nav.${type}`)} ({byType[type] ?? 0})
+                  {t(`nav.${type}`)}
+                  {categoryCountSuffix(type)}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
@@ -572,12 +558,6 @@ export function Dashboard() {
             milestoneProgress={
               milestoneProgress?.perMedium.find((p) => p.mediaType === selectedCategory) ?? null
             }
-            initialLogs={
-              initialLogsData?.mediaType === selectedCategory ? initialLogsData.logs : undefined
-            }
-            initialNextCursor={
-              initialLogsData?.mediaType === selectedCategory ? initialLogsData.nextCursor : undefined
-            }
             initialFilters={logsInitialFilters}
             initialFiltersSyncKey={searchParamsKey}
             onFiltersChange={(f) => {
@@ -595,6 +575,8 @@ export function Dashboard() {
                 next.delete("wantToBuy");
                 if (f.collection === "owned") next.set("own", "true");
                 else if (f.collection === "wantToBuy") next.set("wantToBuy", "true");
+                if (f.genre.trim()) next.set("genre", f.genre.trim());
+                else next.delete("genre");
                 next.delete("purchased");
                 next.delete("purchaseDate");
                 return next;
@@ -672,7 +654,7 @@ export function Dashboard() {
                 {t("social.emptyFeed")}
               </p>
               <Link
-                to="/search"
+                to="/"
                 className="mt-3 flex justify-center text-sm text-[var(--color-lightest)] underline hover:no-underline"
               >
                 {t("social.findUsers")}
@@ -722,14 +704,16 @@ export function Dashboard() {
                         to={itemDetailPath(log.mediaType, log.externalId)}
                         whileTap={tapScale}
                         transition={tapTransition}
-                        className="relative block h-full min-h-full w-28 flex-shrink-0 overflow-hidden rounded-l-lg sm:w-32"
+                        className="relative w-28 shrink-0 self-stretch overflow-hidden rounded-l-lg sm:w-32 min-h-[7rem]"
                       >
-                        <ItemImage
-                          src={log.image}
-                          className="h-full w-full object-cover"
-                          mediaType={log.mediaType}
-                          boardGameSource={log.boardGameSource}
-                        />
+                        <div className="absolute inset-0 min-h-0 rounded-l-lg">
+                          <ItemImage
+                            src={log.image}
+                            className="h-full w-full min-h-0 rounded-l-lg"
+                            mediaType={log.mediaType}
+                            boardGameSource={log.boardGameSource}
+                          />
+                        </div>
                         {log.status && (
                           <span
                             className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}

@@ -18,9 +18,9 @@ import { cn } from "@/lib/utils";
 
 const iconSize = 18;
 
-/** Single active tab: pathname equality only (avoids prefix quirks; home is exactly `/`). */
+/** Single active tab: pathname equality; search home is `/` or legacy `/search`. */
 function navItemIsActive(to: string, pathname: string): boolean {
-  if (to === "/") return pathname === "/";
+  if (to === "/") return pathname === "/" || pathname === "/search";
   return pathname === to;
 }
 
@@ -99,9 +99,9 @@ export function Nav() {
   }, [location.pathname, location.search, location.hash]);
 
   const navItems: { to: string; labelKey: string; icon: React.ReactNode }[] = [
-    { to: "/", labelKey: "nav.dashboard", icon: <Home size={iconSize} /> },
+    { to: "/dashboard", labelKey: "nav.dashboard", icon: <Home size={iconSize} /> },
     { to: "/statistics", labelKey: "nav.statistics", icon: <BarChart3 size={iconSize} /> },
-    { to: "/search", labelKey: "nav.search", icon: <Search size={iconSize} /> },
+    { to: "/", labelKey: "nav.search", icon: <Search size={iconSize} /> },
     { to: "/settings", labelKey: "nav.settings", icon: <Settings size={iconSize} /> },
     { to: "/tiers", labelKey: "nav.plans", icon: <CreditCard size={iconSize} /> },
     { to: "/about", labelKey: "nav.about", icon: <Info size={iconSize} /> },
@@ -142,12 +142,12 @@ export function Nav() {
           ) : (
             <>
               <NavLinkItem
-                to="/"
+                to="/dashboard"
                 label={t("nav.dashboard")}
                 icon={<Home size={iconSize} />}
               />
               <NavLinkItem
-                to="/search"
+                to="/"
                 label={t("nav.search")}
                 icon={<Search size={iconSize} />}
               />
@@ -176,8 +176,8 @@ export function Nav() {
           ))
         ) : (
           <>
-            <NavLinkItem to="/" label={t("nav.dashboard")} icon={<Home size={iconSize} />} bottomBar />
-            <NavLinkItem to="/search" label={t("nav.search")} icon={<Search size={iconSize} />} bottomBar />
+            <NavLinkItem to="/dashboard" label={t("nav.dashboard")} icon={<Home size={iconSize} />} bottomBar />
+            <NavLinkItem to="/" label={t("nav.search")} icon={<Search size={iconSize} />} bottomBar />
             <NavLinkItem to="/tiers" label={t("nav.plans")} icon={<CreditCard size={iconSize} />} bottomBar />
             <NavLinkItem to="/about" label={t("nav.about")} icon={<Info size={iconSize} />} bottomBar />
             <NavLinkItem to="/login" label={t("nav.logIn")} icon={<LogIn size={iconSize} />} bottomBar />

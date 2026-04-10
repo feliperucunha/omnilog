@@ -3,19 +3,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function MediaLogsSkeleton() {
   return (
     <div className="flex min-w-0 flex-col gap-6 overflow-hidden">
-      {/* Desktop toolbar: row 1 = filters + search, row 2 = experience bar + buttons */}
+      {/* Desktop toolbar: row 1 = experience bar + buttons, row 2 = filters + search */}
       <div className="hidden min-w-0 flex-col gap-3 md:flex">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 flex-wrap items-center gap-3">
-            <Skeleton className="h-5 w-14 rounded" />
-            <Skeleton className="h-9 w-[11rem] rounded-md" />
-            <Skeleton className="h-5 w-14 rounded ml-2 md:ml-4" />
-            <Skeleton className="h-9 w-[11rem] rounded-md" />
-          </div>
-          <div className="relative min-w-0 w-full max-w-xs shrink-0">
-            <Skeleton className="h-10 w-full rounded-md" />
-          </div>
-        </div>
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-2 max-w-[400px]">
             <Skeleton className="h-9 w-9 rounded-full" />
@@ -28,15 +17,21 @@ export function MediaLogsSkeleton() {
             <Skeleton className="h-9 w-9 rounded-md" />
           </div>
         </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <Skeleton className="h-5 w-14 rounded" />
+            <Skeleton className="h-9 w-[11rem] rounded-md" />
+            <Skeleton className="h-5 w-14 rounded ml-2 md:ml-4" />
+            <Skeleton className="h-9 w-[11rem] rounded-md" />
+          </div>
+          <div className="relative min-h-10 min-w-0 [flex:1_1_12rem]">
+            <Skeleton className="h-10 w-full rounded-md" />
+          </div>
+        </div>
       </div>
 
-      {/* Mobile toolbar: filters, header row, search */}
+      {/* Mobile toolbar: header row, filters, search */}
       <div className="flex min-w-0 flex-col gap-3 md:hidden">
-        <div className="grid w-full grid-cols-2 gap-2">
-          <Skeleton className="h-10 w-full rounded-md min-w-0" />
-          <Skeleton className="h-10 w-full rounded-md min-w-0" />
-          <Skeleton className="h-10 w-full rounded-md min-w-0 col-span-2" />
-        </div>
         <div className="flex min-w-0 flex-nowrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
             <Skeleton className="h-9 w-9 rounded-full shrink-0" />
@@ -49,7 +44,12 @@ export function MediaLogsSkeleton() {
             <Skeleton className="h-8 w-8 rounded-md" />
           </div>
         </div>
-        <div className="relative min-w-0 max-w-xs">
+        <div className="grid w-full grid-cols-2 gap-2">
+          <Skeleton className="h-10 w-full rounded-md min-w-0" />
+          <Skeleton className="h-10 w-full rounded-md min-w-0" />
+          <Skeleton className="h-10 w-full rounded-md min-w-0 col-span-2" />
+        </div>
+        <div className="relative min-h-10 w-full min-w-0">
           <Skeleton className="h-10 w-full rounded-md" />
         </div>
       </div>

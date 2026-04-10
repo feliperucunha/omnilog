@@ -35,12 +35,14 @@ SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 type SelectContentProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
   /** Scroll long lists inside the panel (e.g. currency). Does not affect other selects unless set. */
   viewportClassName?: string;
+  /** Bottom fade overlay so long scrollable lists read as “more below”. */
+  scrollHint?: boolean;
 };
 
 const SelectContent = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Content>,
   SelectContentProps
->(({ className, children, position = "popper", viewportClassName, ...props }, ref) => (
+>(({ className, children, position = "popper", viewportClassName, scrollHint, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -66,6 +68,12 @@ const SelectContent = React.forwardRef<
       >
         {children}
       </SelectPrimitive.Viewport>
+      {scrollHint ? (
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-7 rounded-b-md bg-gradient-to-t from-[var(--color-dark)] via-[var(--color-dark)]/70 to-transparent"
+          aria-hidden
+        />
+      ) : null}
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
 ));
@@ -168,7 +176,7 @@ export function Select({
             <OverflowMarquee className="text-left">{valueSummary}</OverflowMarquee>
           )}
         </SelectTrigger>
-        <SelectContent viewportClassName={scrollViewportClass}>
+        <SelectContent viewportClassName={scrollViewportClass} scrollHint={contentScrollable === true}>
           {options.map((opt) => (
             <SelectItem key={opt.value === "" ? "__empty" : opt.value} value={opt.value === "" ? "__empty" : opt.value}>
               {opt.label}

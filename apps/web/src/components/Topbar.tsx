@@ -20,7 +20,8 @@ import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 
 const ROUTE_TITLE_KEYS: Record<string, string> = {
-  "/": "nav.dashboard",
+  "/": "nav.search",
+  "/dashboard": "nav.dashboard",
   "/statistics": "nav.statistics",
   "/search": "nav.search",
   "/settings": "nav.settings",
@@ -74,7 +75,7 @@ export function Topbar() {
           <Link
             to="/"
             className="flex shrink-0 items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
-            aria-label={t("nav.dashboard")}
+            aria-label={t("nav.search")}
           >
             <Logo alt={t("app.name")} className="h-9 w-auto flex-shrink-0 sm:h-11" />
           </Link>

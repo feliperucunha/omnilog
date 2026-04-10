@@ -5,5 +5,5 @@
     <string name="package_name">com.geeklogs.app</string>
     <string name="custom_url_scheme">com.geeklogs.app</string>
     <!-- HTTPS App Links host (change to your deployed web origin; must match assetlinks.json). -->
-    <string name="app_link_host">geeklogs.vercel.app</string>
+    <string name="app_link_host">geeklogs.com.br</string>
 </resources>

@@ -12,8 +12,6 @@ import { Onboarding } from "@/pages/Onboarding";
 import { Dashboard } from "@/pages/Dashboard";
 import { PublicProfile } from "@/pages/PublicProfile";
 import { PublicProfileLayout } from "@/layouts/PublicProfileLayout";
-import { GuestHome } from "@/pages/GuestHome";
-
 const Statistics = lazy(() => import("@/pages/Statistics").then((m) => ({ default: m.Statistics })));
 const Search = lazy(() => import("@/pages/Search").then((m) => ({ default: m.Search })));
 const ItemPage = lazy(() => import("@/pages/ItemPage").then((m) => ({ default: m.ItemPage })));
@@ -60,13 +58,6 @@ const RequireOnboarded = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const DashboardOrSearch = () => {
-  const { token, initializing } = useAuth();
-  if (initializing) return null;
-  if (token) return <Dashboard />;
-  return <GuestHome />;
-};
-
 export default function App() {
   return (
     <>
@@ -86,7 +77,8 @@ export default function App() {
                 </Suspense>
               }
             >
-              <Route index element={<DashboardOrSearch />} />
+              <Route index element={<Search />} />
+              <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
               <Route path="search" element={<Search />} />
               <Route path="about" element={<About />} />
@@ -95,14 +87,14 @@ export default function App() {
               <Route path="terms" element={<Terms />} />
               <Route path="tiers" element={<Tiers />} />
               <Route path="item/:mediaType/:id" element={<ItemPage />} />
-              <Route path="movies" element={<ProtectedRoute><Navigate to="/?category=movies" replace /></ProtectedRoute>} />
-              <Route path="tv" element={<ProtectedRoute><Navigate to="/?category=tv" replace /></ProtectedRoute>} />
-              <Route path="boardgames" element={<ProtectedRoute><Navigate to="/?category=boardgames" replace /></ProtectedRoute>} />
-              <Route path="games" element={<ProtectedRoute><Navigate to="/?category=games" replace /></ProtectedRoute>} />
-              <Route path="books" element={<ProtectedRoute><Navigate to="/?category=books" replace /></ProtectedRoute>} />
-              <Route path="anime" element={<ProtectedRoute><Navigate to="/?category=anime" replace /></ProtectedRoute>} />
-              <Route path="manga" element={<ProtectedRoute><Navigate to="/?category=manga" replace /></ProtectedRoute>} />
-              <Route path="comics" element={<ProtectedRoute><Navigate to="/?category=comics" replace /></ProtectedRoute>} />
+              <Route path="movies" element={<ProtectedRoute><Navigate to="/dashboard?category=movies" replace /></ProtectedRoute>} />
+              <Route path="tv" element={<ProtectedRoute><Navigate to="/dashboard?category=tv" replace /></ProtectedRoute>} />
+              <Route path="boardgames" element={<ProtectedRoute><Navigate to="/dashboard?category=boardgames" replace /></ProtectedRoute>} />
+              <Route path="games" element={<ProtectedRoute><Navigate to="/dashboard?category=games" replace /></ProtectedRoute>} />
+              <Route path="books" element={<ProtectedRoute><Navigate to="/dashboard?category=books" replace /></ProtectedRoute>} />
+              <Route path="anime" element={<ProtectedRoute><Navigate to="/dashboard?category=anime" replace /></ProtectedRoute>} />
+              <Route path="manga" element={<ProtectedRoute><Navigate to="/dashboard?category=manga" replace /></ProtectedRoute>} />
+              <Route path="comics" element={<ProtectedRoute><Navigate to="/dashboard?category=comics" replace /></ProtectedRoute>} />
               <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             </Route>
           </Route>

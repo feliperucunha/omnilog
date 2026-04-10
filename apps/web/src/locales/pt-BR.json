@@ -271,7 +271,8 @@
   },
   "publicProfile": {
     "title": "Perfil público",
-    "titleWithName": "Log de {{name}}"
+    "titleWithName": "Log de {{name}}",
+    "pinnedHighlights": "Destaques ({{count}})"
   },
   "social": {
     "follow": "Seguir",
@@ -328,7 +329,8 @@
     "recentLogs": "Logs recentes",
     "noLogsYet": "Nenhum log ainda.",
     "searchAndAddFirst": "Busque e adicione seu primeiro log",
-    "couldntLoadLogs": "Não foi possível carregar seus logs"
+    "couldntLoadLogs": "Não foi possível carregar seus logs",
+    "couldntLoadCounts": "Não foi possível carregar as contagens por categoria"
   },
   "statistics": {
     "freeMonthNotice": "Você está vendo apenas este mês civil. Faça upgrade para o Pro para histórico completo, todos os períodos e exportação CSV.",
@@ -445,6 +447,8 @@
     "filterCollection": "Tenho / quero comprar",
     "filterOwned": "Na minha coleção",
     "filterWantToBuy": "Quero comprar",
+    "filterGenre": "Gênero",
+    "filterAllGenres": "Todos os gêneros",
     "sortLabel": "Ordenar:",
     "sortByDateAsc": "Data (mais antiga primeiro)",
     "sortByDateDesc": "Data (mais recente primeiro)",

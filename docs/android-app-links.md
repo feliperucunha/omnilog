@@ -2,14 +2,14 @@
 
 The app registers:
 
-1. **HTTPS** — `https://<app_link_host>/…` (see `app_link_host` in `apps/android/android/app/src/main/res/values/strings.xml`; default `geeklogs.vercel.app`).
+1. **HTTPS** — `https://<app_link_host>/…` (see `app_link_host` in `apps/android/android/app/src/main/res/values/strings.xml`; default `geeklogs.com.br`).
 2. **Custom scheme** — `geeklogs://app/…` (no server file required).
 
 ## Web build
 
 Set `VITE_APP_WEB_ORIGIN` to your public site origin (same host as `app_link_host`), e.g.:
 
-`https://geeklogs.vercel.app`
+`https://geeklogs.com.br`
 
 This is used at runtime to match opened HTTPS URLs and for in-app navigation from external links.
 

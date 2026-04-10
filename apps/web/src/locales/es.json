@@ -251,7 +251,8 @@
   },
   "publicProfile": {
     "title": "Perfil público",
-    "titleWithName": "Log de {{name}}"
+    "titleWithName": "Log de {{name}}",
+    "pinnedHighlights": "Destacados ({{count}})"
   },
   "social": {
     "follow": "Seguir",
@@ -280,6 +281,7 @@
     "noLogsYet": "Aún no hay logs.",
     "searchAndAddFirst": "Busca y añade tu primer log",
     "couldntLoadLogs": "No se pudieron cargar tus logs",
+    "couldntLoadCounts": "No se pudieron cargar los totales por categoría",
     "finishedIn": "Terminado en {{duration}}",
     "statsTitle": "Tiempo consumido",
     "hoursConsumed": "{{hours}}h",
@@ -425,6 +427,8 @@
     "filterCollection": "Colección / quiero comprar",
     "filterOwned": "En mi colección",
     "filterWantToBuy": "Quiero comprar",
+    "filterGenre": "Género",
+    "filterAllGenres": "Todos los géneros",
     "sortLabel": "Ordenar:",
     "sortByDateAsc": "Fecha (más antigua primero)",
     "sortByDateDesc": "Fecha (más reciente primero)",

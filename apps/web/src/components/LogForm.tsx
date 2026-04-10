@@ -219,7 +219,7 @@ export function LogForm(props: LogFormProps) {
       );
       setSaleAmountMinor(log.saleAmountMinor ?? null);
     }
-  }, [isEdit, log?.id, me?.defaultPurchaseCurrency]);
+  }, [isEdit, log?.id, log?.matchesPlayed, me?.defaultPurchaseCurrency, showBoardGameFields]);
 
   useEffect(() => {
     if (!showBoardGameTabs) return;
@@ -253,9 +253,7 @@ export function LogForm(props: LogFormProps) {
           (own === (log.own ?? false) &&
             wantToBuy === (log.wantToBuy ?? false) &&
             sold === (log.sold ?? false))) &&
-        (!showBoardGameFields ||
-          (isEdit && mediaType === "boardgames") ||
-          toNum(matchesPlayed) === (log.matchesPlayed ?? null)) &&
+        (!showBoardGameFields || toNum(matchesPlayed) === (log.matchesPlayed ?? null)) &&
         (!showPurchaseAmount ||
           (() => {
             const includePurchase = !showCollectionOwnership || own;
@@ -795,7 +793,7 @@ export function LogForm(props: LogFormProps) {
                   />
                 </>
               )}
-              {showBoardGameFields && !isEdit && (
+              {showBoardGameFields && (
                 <div className="space-y-2">
                   <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.matchesPlayed")}</Label>
                   <Input
@@ -812,15 +810,11 @@ export function LogForm(props: LogFormProps) {
                         if (Number.isInteger(n) && n >= 0) setMatchesPlayed(n);
                       }
                     }}
+                    disabled={loading || deleting}
                     className="w-full max-w-[8rem]"
                     aria-label={t("itemReviewForm.matchesPlayed")}
                   />
                 </div>
-              )}
-              {showBoardGameFields && isEdit && log && (
-                <p className="text-sm text-[var(--color-light)]">
-                  {t("boardGameMatches.matchCountReadOnly", { count: String(log.matchesPlayed ?? 0) })}
-                </p>
               )}
               {showPurchaseAmountField && (
                 <MoneyAmountInput
@@ -920,7 +914,7 @@ export function LogForm(props: LogFormProps) {
           <p className="text-sm text-[var(--color-light)]">
             {t("common.deleteLogConfirm")}
           </p>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="flex gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="ghost"

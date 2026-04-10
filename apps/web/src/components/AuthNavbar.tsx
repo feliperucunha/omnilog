@@ -24,7 +24,7 @@ export function AuthNavbar() {
       <Link
         to="/"
         className="flex min-w-0 items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
-        aria-label={t("nav.dashboard")}
+        aria-label={t("nav.search")}
       >
         <Logo alt={t("app.name")} className="h-9 w-auto flex-shrink-0" />
         <span className="brand-title ml-1 text-lg font-bold text-(--btn-gradient-end) dark:text-(--btn-gradient-start) sm:text-xl">

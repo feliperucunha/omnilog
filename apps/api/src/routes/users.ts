@@ -12,6 +12,7 @@ import {
   type PurchasePeriod,
 } from "../lib/purchaseFields.js";
 import { sanitizeText, SEARCH_QUERY_MAX_LENGTH } from "../lib/sanitize.js";
+import { computeGenreFacets, fetchLogsWithGenreFilter, LOG_GENRE_FILTER_MAX_LENGTH } from "../lib/logGenreList.js";
 
 /** Public (no auth) read-only profile and logs for sharing. */
 
@@ -188,11 +189,22 @@ usersRouter.get("/:identifier/logs/status-counts", async (req: Request<{ identif
     res.status(400).json({ error: "mediaType required and must be a valid media type" });
     return;
   }
-  const rows = await prisma.log.groupBy({
-    by: ["status"],
-    where: { userId: user.id, mediaType },
-    _count: { id: true },
-  });
+  const [rows, genreRows] = await Promise.all([
+    prisma.log.groupBy({
+      by: ["status"],
+      where: { userId: user.id, mediaType },
+      _count: { id: true },
+    }),
+    prisma.log.findMany({
+      where: {
+        userId: user.id,
+        mediaType,
+        genres: { not: null },
+        NOT: { genres: "" },
+      },
+      select: { id: true, genres: true },
+    }),
+  ]);
   let total = 0;
   const byStatus: Record<string, number> = {};
   for (const row of rows) {
@@ -200,15 +212,16 @@ usersRouter.get("/:identifier/logs/status-counts", async (req: Request<{ identif
     byStatus[key] = row._count.id;
     total += row._count.id;
   }
+  const byGenre = computeGenreFacets(genreRows);
   if ((SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mediaType)) {
     const [owned, wantToBuy] = await Promise.all([
       prisma.log.count({ where: { userId: user.id, mediaType, own: true } }),
       prisma.log.count({ where: { userId: user.id, mediaType, wantToBuy: true } }),
     ]);
-    res.json({ data: { total, byStatus, owned, wantToBuy } });
+    res.json({ data: { total, byStatus, owned, wantToBuy, byGenre } });
     return;
   }
-  res.json({ data: { total, byStatus } });
+  res.json({ data: { total, byStatus, byGenre } });
 });
 
 /** GET /users/:identifier/logs - Public list of logs (same shape as GET /logs). Supports ?limit=&cursor= for pagination. No auth. */
@@ -290,6 +303,11 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
     where.title = { contains: titleSearch, mode: "insensitive" };
   }
 
+  const genreFilter = sanitizeText(
+    typeof req.query.genre === "string" ? req.query.genre : "",
+    LOG_GENRE_FILTER_MAX_LENGTH
+  );
+
   const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =
     sort === "matchesPlayedDesc"
       ? [{ matchesPlayed: "desc" }, { updatedAt: "desc" }]
@@ -306,6 +324,31 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
                 : sort === "dateDesc"
                   ? { updatedAt: "desc" }
                   : { updatedAt: "asc" };
+
+  if (genreFilter) {
+    if (usePagination && takeSize != null) {
+      const result = await fetchLogsWithGenreFilter(prisma, {
+        where,
+        sort,
+        genre: genreFilter,
+        takeSize,
+        cursorId,
+        usePagination: true,
+      });
+      res.json(result);
+      return;
+    }
+    const data = await fetchLogsWithGenreFilter(prisma, {
+      where,
+      sort,
+      genre: genreFilter,
+      takeSize: PAGINATION_LIMIT_MAX,
+      cursorId: undefined,
+      usePagination: false,
+    });
+    res.json(data);
+    return;
+  }
 
   if (usePagination && takeSize != null) {
     const take = takeSize + 1;

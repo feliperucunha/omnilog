@@ -209,6 +209,7 @@ function mergeLogWhere(base: Prisma.LogWhereInput, extra: Prisma.LogWhereInput):
 
 import { persistUserDefaultPurchaseCurrency } from "../lib/userPurchasePreference.js";
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
+import { computeGenreFacets, fetchLogsWithGenreFilter, LOG_GENRE_FILTER_MAX_LENGTH } from "../lib/logGenreList.js";
 import { stringifyLogAffinityContext, logAffinityContextSchema } from "../lib/logAffinityContext.js";
 import { hoursFromCompletedLogForStats, rollupHoursFromCompletedLogs } from "../lib/completedLogHours.js";
 import { tierHasProFeatures, tierHasUnlimitedLogs } from "../lib/userTier.js";
@@ -263,11 +264,22 @@ logsRouter.get("/status-counts", async (req: AuthenticatedRequest, res) => {
     res.status(400).json({ error: "mediaType required and must be a valid media type" });
     return;
   }
-  const rows = await prisma.log.groupBy({
-    by: ["status"],
-    where: { userId, mediaType },
-    _count: { id: true },
-  });
+  const [rows, genreRows] = await Promise.all([
+    prisma.log.groupBy({
+      by: ["status"],
+      where: { userId, mediaType },
+      _count: { id: true },
+    }),
+    prisma.log.findMany({
+      where: {
+        userId,
+        mediaType,
+        genres: { not: null },
+        NOT: { genres: "" },
+      },
+      select: { id: true, genres: true },
+    }),
+  ]);
   let total = 0;
   const byStatus: Record<string, number> = {};
   for (const row of rows) {
@@ -275,15 +287,16 @@ logsRouter.get("/status-counts", async (req: AuthenticatedRequest, res) => {
     byStatus[key] = row._count.id;
     total += row._count.id;
   }
+  const byGenre = computeGenreFacets(genreRows);
   if (isSpendTrackedMediaType(mediaType)) {
     const [owned, wantToBuy] = await Promise.all([
       prisma.log.count({ where: { userId, mediaType, own: true } }),
       prisma.log.count({ where: { userId, mediaType, wantToBuy: true } }),
     ]);
-    res.json({ data: { total, byStatus, owned, wantToBuy } });
+    res.json({ data: { total, byStatus, owned, wantToBuy, byGenre } });
     return;
   }
-  res.json({ data: { total, byStatus } });
+  res.json({ data: { total, byStatus, byGenre } });
 });
 
 logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
@@ -387,6 +400,11 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     where.title = { contains: titleSearch, mode: "insensitive" };
   }
 
+  const genreFilter = sanitizeText(
+    typeof req.query.genre === "string" ? req.query.genre : "",
+    LOG_GENRE_FILTER_MAX_LENGTH
+  );
+
   if (statisticsMonthWhereFree) {
     where = mergeLogWhere(where, statisticsMonthWhereFree);
   }
@@ -407,6 +425,31 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
                 : sort === "dateDesc"
                   ? { updatedAt: "desc" }
                   : { updatedAt: "asc" };
+
+  if (genreFilter) {
+    if (usePagination && takeSize != null) {
+      const result = await fetchLogsWithGenreFilter(prisma, {
+        where,
+        sort,
+        genre: genreFilter,
+        takeSize,
+        cursorId,
+        usePagination: true,
+      });
+      res.json(result);
+      return;
+    }
+    const data = await fetchLogsWithGenreFilter(prisma, {
+      where,
+      sort,
+      genre: genreFilter,
+      takeSize: PAGINATION_LIMIT_MAX,
+      cursorId: undefined,
+      usePagination: false,
+    });
+    res.json(data);
+    return;
+  }
 
   if (usePagination && takeSize != null) {
     const take = takeSize + 1;

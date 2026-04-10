@@ -272,7 +272,8 @@
   },
   "publicProfile": {
     "title": "Public profile",
-    "titleWithName": "{{name}}'s log"
+    "titleWithName": "{{name}}'s log",
+    "pinnedHighlights": "Highlights ({{count}})"
   },
   "social": {
     "follow": "Follow",
@@ -301,6 +302,7 @@
     "noLogsYet": "No logs yet.",
     "searchAndAddFirst": "Search and add your first log",
     "couldntLoadLogs": "Couldn't load your logs",
+    "couldntLoadCounts": "Couldn't load category counts",
     "finishedIn": "Finished in {{duration}}",
     "statsTitle": "Time consumed",
     "hoursConsumed": "{{hours}}h",
@@ -446,6 +448,8 @@
     "filterCollection": "Own / wishlist",
     "filterOwned": "Owned",
     "filterWantToBuy": "Want to buy",
+    "filterGenre": "Genre",
+    "filterAllGenres": "All genres",
     "sortLabel": "Sort:",
     "sortByDateAsc": "Date (oldest first)",
     "sortByDateDesc": "Date (newest first)",

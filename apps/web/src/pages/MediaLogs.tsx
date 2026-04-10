@@ -89,6 +89,8 @@ export interface SharedFilters {
   sort: MediaLogsSort;
   search: string;
   collection: CollectionListFilter;
+  /** Exact genre name from log metadata; empty = all genres. */
+  genre: string;
 }
 
 interface MediaLogsProps {
@@ -154,10 +156,12 @@ export function MediaLogs({
     byStatus: Record<string, number>;
     owned?: number;
     wantToBuy?: number;
+    byGenre?: Array<{ name: string; count: number }>;
   } | null>(null);
   const [collectionFilter, setCollectionFilter] = useState<CollectionListFilter>(
     () => initialFilters?.collection ?? ""
   );
+  const [genreFilter, setGenreFilter] = useState(() => (initialFilters?.genre ?? "").trim());
   const [sortBy, setSortBy] = useState<MediaLogsSort>(() => (initialFilters?.sort as MediaLogsSort) ?? DEFAULT_SORT);
   const [showCustomEntry, setShowCustomEntry] = useState(false);
   /** Applied filter (API + URL); updated on submit, not on every keystroke. */
@@ -182,9 +186,10 @@ export function MediaLogs({
         sort: sortBy,
         search: categorySearchQuery,
         collection: collectionFilter,
+        genre: genreFilter,
       });
     }
-  }, [embedded, onFiltersChange, statusFilter, sortBy, categorySearchQuery, collectionFilter]);
+  }, [embedded, onFiltersChange, statusFilter, sortBy, categorySearchQuery, collectionFilter, genreFilter]);
 
   useEffect(() => {
     if (initialFiltersSyncKey == null) return;
@@ -193,6 +198,7 @@ export function MediaLogs({
     setCategorySearchQuery((initialFilters?.search ?? "").trim());
     setCategorySearchDraft(initialFilters?.search ?? "");
     setCollectionFilter((initialFilters?.collection as CollectionListFilter) ?? "");
+    setGenreFilter((initialFilters?.genre ?? "").trim());
   }, [initialFiltersSyncKey, initialFilters]);
 
   useEffect(() => {
@@ -261,6 +267,7 @@ export function MediaLogs({
       if (showCollectionOwnershipFilters && collectionFilter === "wantToBuy") params.set("wantToBuy", "true");
       const q = categorySearchQuery.trim();
       if (q) params.set("q", q);
+      if (genreFilter) params.set("genre", genreFilter);
       if (!reset && nextCursor) params.set("cursor", nextCursor);
       const path = publicUserId
         ? `/users/${publicUserId}/logs?${params.toString()}`
@@ -298,6 +305,7 @@ export function MediaLogs({
       publicUserId,
       showCollectionOwnershipFilters,
       categorySearchQuery,
+      genreFilter,
     ]
   );
 
@@ -308,11 +316,23 @@ export function MediaLogs({
     const fetcher = publicUserId
       ? () =>
           apiFetchPublic<{
-            data: { total: number; byStatus: Record<string, number>; owned?: number; wantToBuy?: number };
+            data: {
+              total: number;
+              byStatus: Record<string, number>;
+              owned?: number;
+              wantToBuy?: number;
+              byGenre?: Array<{ name: string; count: number }>;
+            };
           }>(path)
       : () =>
           apiFetchCached<{
-            data: { total: number; byStatus: Record<string, number>; owned?: number; wantToBuy?: number };
+            data: {
+              total: number;
+              byStatus: Record<string, number>;
+              owned?: number;
+              wantToBuy?: number;
+              byGenre?: Array<{ name: string; count: number }>;
+            };
           }>(path, { ttlMs: 2 * 60 * 1000 });
     fetcher()
       .then((res) => setStatusCounts(res.data ?? null))
@@ -322,6 +342,7 @@ export function MediaLogs({
   useEffect(() => {
     setCategorySearchQuery("");
     setCategorySearchDraft("");
+    setGenreFilter("");
     if (!mediaTypeHasCollectionOwnership(mediaType)) {
       setCollectionFilter("");
     }
@@ -338,6 +359,7 @@ export function MediaLogs({
       sortBy === "dateDesc" &&
       statusFilter === "" &&
       collectionFilter === "" &&
+      genreFilter === "" &&
       categorySearchQuery.trim() === "";
     const useInitial = embedded && initialLogsProp !== undefined && defaultsMatch;
     if (useInitial) {
@@ -362,12 +384,13 @@ export function MediaLogs({
     embedded,
     initialLogsProp,
     initialNextCursorProp,
+    genreFilter,
   ]);
 
   /** When embedded, start with Load more again when category or filters change. */
   useEffect(() => {
     if (embedded) setInfiniteScrollEnabled(false);
-  }, [embedded, mediaType, statusFilter, collectionFilter, sortBy, categorySearchQuery]);
+  }, [embedded, mediaType, statusFilter, collectionFilter, sortBy, categorySearchQuery, genreFilter]);
 
   useEffect(() => {
     setStatusCounts(null);
@@ -473,6 +496,21 @@ export function MediaLogs({
     ];
   }, [t, statusCounts]);
 
+  const genreSelectOptions = useMemo(() => {
+    const base = t("mediaLogs.filterAllGenres");
+    const rows = statusCounts?.byGenre ?? [];
+    return [
+      { value: "", label: base },
+      ...rows.map((g) => ({ value: g.name, label: `${g.name} (${g.count})` })),
+    ];
+  }, [t, statusCounts?.byGenre]);
+
+  useEffect(() => {
+    if (!genreFilter || !statusCounts?.byGenre?.length) return;
+    const exists = statusCounts.byGenre.some((g) => g.name === genreFilter);
+    if (!exists) setGenreFilter("");
+  }, [statusCounts?.byGenre, genreFilter]);
+
   const handleListSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const t = categorySearchDraft.trim();
@@ -495,7 +533,7 @@ export function MediaLogs({
       const q = categorySearchDraft.trim();
       setCategorySearchQuery(q);
       setCategorySearchDraft(q);
-      navigate("/search", { state: { mediaType, query: q || undefined } });
+      navigate("/", { state: { mediaType, query: q || undefined } });
     }
   };
 
@@ -600,89 +638,9 @@ export function MediaLogs({
           </span>
         </Link>
       )}
-      {/* Desktop (embedded): row 1 = filters + search (always); row 2 = experience bar + action buttons (only when !readOnly) */}
+      {/* Desktop (embedded): row 1 = experience bar + action buttons; row 2 = filters + search */}
       {embedded && (
         <div className="hidden md:flex flex-col gap-3 min-w-0">
-          <div className="flex justify-between items-center gap-4 flex-wrap">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-              <span className="shrink-0 text-sm text-[var(--color-light)]">{t("itemReviewForm.status")}:</span>
-              <Select
-                value={statusFilter}
-                onValueChange={setStatusFilter}
-                options={[
-                  { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
-                  ...statusOptions.map((s) => ({
-                    value: s,
-                    label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
-                  })),
-                ]}
-                aria-label={t("itemReviewForm.status")}
-                className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
-                triggerClassName="w-full min-w-0 max-w-none"
-              />
-              {showCollectionOwnershipFilters && (
-                <Select
-                  value={collectionFilter}
-                  onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
-                  options={collectionOwnershipSelectOptions}
-                  aria-label={t("mediaLogs.filterCollection")}
-                  className="min-w-0 w-[12rem] max-w-[min(100%,18rem)] shrink-0"
-                  triggerClassName="w-full min-w-0 max-w-none"
-                />
-              )}
-              <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
-              <Select
-                value={sortBy}
-                onValueChange={(v) => setSortBy(v as typeof sortBy)}
-                options={[
-                  { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
-                  { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
-                  { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
-                  { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
-                  ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
-                  ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
-                ]}
-                aria-label={t("mediaLogs.sortLabel")}
-                className="min-w-0 flex-1 basis-52 max-w-xl"
-                triggerClassName="w-full min-w-0 max-w-none"
-              />
-            </div>
-            <form onSubmit={handleListSearchSubmit} className="contents">
-              <div className="relative min-w-0 w-full max-w-xs shrink-0">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
-                <Input
-                  ref={categorySearchInputRef}
-                  type="text"
-                  inputMode="search"
-                  enterKeyHint="search"
-                  placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
-                  value={categorySearchDraft}
-                  onChange={handleCategorySearchDraftChange}
-                  title={t("mediaLogs.searchConfirmHint")}
-                  className={cn(
-                    "w-full border-[var(--color-mid)] bg-[var(--color-darkest)] pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)]",
-                    showCategorySearchClear ? "pr-9" : "pr-3"
-                  )}
-                  aria-label={t("mediaLogs.searchTitlesLabel")}
-                />
-                {showCategorySearchClear && (
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      setCategorySearchDraft("");
-                      setCategorySearchQuery("");
-                      categorySearchInputRef.current?.focus();
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
-                    aria-label={t("search.clearSearch")}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </form>
-          </div>
           {!readOnly && (
           <div className="flex justify-between items-center gap-4 flex-wrap min-w-0">
             {milestoneProgress && (() => {
@@ -750,6 +708,94 @@ export function MediaLogs({
             </div>
           </div>
           )}
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <Select
+                value={statusFilter}
+                onValueChange={setStatusFilter}
+                options={[
+                  { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
+                  ...statusOptions.map((s) => ({
+                    value: s,
+                    label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
+                  })),
+                ]}
+                aria-label={t("itemReviewForm.status")}
+                className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
+                triggerClassName="w-full min-w-0 max-w-none"
+              />
+              {showCollectionOwnershipFilters && (
+                <Select
+                  value={collectionFilter}
+                  onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
+                  options={collectionOwnershipSelectOptions}
+                  aria-label={t("mediaLogs.filterCollection")}
+                  className="min-w-0 w-[12rem] max-w-[min(100%,18rem)] shrink-0"
+                  triggerClassName="w-full min-w-0 max-w-none"
+                />
+              )}
+              <Select
+                value={genreFilter}
+                onValueChange={setGenreFilter}
+                options={genreSelectOptions}
+                aria-label={t("mediaLogs.filterGenre")}
+                contentScrollable
+                className="min-w-0 w-[12rem] max-w-[min(100%,20rem)] shrink-0"
+                triggerClassName="w-full min-w-0 max-w-none"
+              />
+              <Select
+                value={sortBy}
+                onValueChange={(v) => setSortBy(v as typeof sortBy)}
+                options={[
+                  { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
+                  { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
+                  { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
+                  { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
+                  ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
+                  ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
+                ]}
+                aria-label={t("mediaLogs.sortLabel")}
+                className="min-w-0 w-[14rem] max-w-[min(100%,24rem)] shrink-0"
+                triggerClassName="w-full min-w-0 max-w-none"
+              />
+            </div>
+            <form
+              onSubmit={handleListSearchSubmit}
+              className="relative min-h-10 min-w-0 [flex:1_1_12rem]"
+            >
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
+              <Input
+                ref={categorySearchInputRef}
+                type="text"
+                inputMode="search"
+                enterKeyHint="search"
+                placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
+                value={categorySearchDraft}
+                onChange={handleCategorySearchDraftChange}
+                title={t("mediaLogs.searchConfirmHint")}
+                className={cn(
+                  "w-full border-[var(--color-mid)] bg-[var(--color-darkest)] pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)]",
+                  showCategorySearchClear ? "pr-9" : "pr-3"
+                )}
+                aria-label={t("mediaLogs.searchTitlesLabel")}
+              />
+              {showCategorySearchClear && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setCategorySearchDraft("");
+                    setCategorySearchQuery("");
+                    categorySearchInputRef.current?.focus();
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+                  aria-label={t("search.clearSearch")}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </form>
+          </div>
         </div>
       )}
 
@@ -764,99 +810,9 @@ export function MediaLogs({
         />
       )}
 
-      {/* Mobile when embedded: wrapper shows filters, header (buttons+bar), search. Desktop when embedded uses the block above. When not embedded wrapper is always visible. */}
+      {/* Mobile when embedded: header, filters, search. Desktop when embedded uses the block above. When not embedded wrapper is always visible. */}
       <div className={cn("flex min-w-0 flex-col gap-3", embedded && "md:hidden")}>
-      {/* 1. Filters row */}
-      <div className="flex w-full min-w-0 flex-wrap items-center gap-3 overflow-hidden">
-        {/* Mobile (< md): custom dropdowns, no labels */}
-        <div className={cn("grid w-full min-w-0 gap-2 md:hidden", mediaType === "boardgames" ? "grid-cols-2" : "grid-cols-2")}>
-          <Select
-            value={statusFilter}
-            onValueChange={setStatusFilter}
-            options={[
-              { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
-              ...statusOptions.map((s) => ({
-                value: s,
-                label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
-              })),
-            ]}
-            aria-label={t("itemReviewForm.status")}
-            className="min-w-0 w-full"
-            triggerClassName="w-full max-w-none min-w-0"
-          />
-          {showCollectionOwnershipFilters && (
-            <Select
-              value={collectionFilter}
-              onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
-              options={collectionOwnershipSelectOptions}
-              aria-label={t("mediaLogs.filterCollection")}
-              className="min-w-0 w-full"
-              triggerClassName="w-full max-w-none min-w-0"
-            />
-          )}
-          <Select
-            value={sortBy}
-            onValueChange={(v) => setSortBy(v as typeof sortBy)}
-            options={[
-              { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
-              { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
-              { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
-              { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
-              ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
-              ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
-            ]}
-            aria-label={t("mediaLogs.sortLabel")}
-            className="col-span-2 min-w-0 w-full"
-            triggerClassName="w-full max-w-none min-w-0"
-          />
-        </div>
-        {/* Desktop (md+): status and sort dropdowns */}
-        <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-3 md:flex">
-        <span className="shrink-0 text-sm text-[var(--color-light)]">{t("itemReviewForm.status")}:</span>
-        <Select
-          value={statusFilter}
-          onValueChange={setStatusFilter}
-          options={[
-            { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
-            ...statusOptions.map((s) => ({
-              value: s,
-              label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
-            })),
-          ]}
-          aria-label={t("itemReviewForm.status")}
-          className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
-          triggerClassName="w-full min-w-0 max-w-none"
-        />
-        {showCollectionOwnershipFilters && (
-          <Select
-            value={collectionFilter}
-            onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
-            options={collectionOwnershipSelectOptions}
-            aria-label={t("mediaLogs.filterCollection")}
-            className="min-w-0 w-[12rem] max-w-[min(100%,18rem)] shrink-0"
-            triggerClassName="w-full min-w-0 max-w-none"
-          />
-        )}
-        <span className="ml-2 shrink-0 text-sm text-[var(--color-light)] md:ml-4">{t("mediaLogs.sortLabel")}</span>
-        <Select
-          value={sortBy}
-          onValueChange={(v) => setSortBy(v as typeof sortBy)}
-          options={[
-            { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
-            { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
-            { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
-            { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
-            ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
-            ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
-          ]}
-          aria-label={t("mediaLogs.sortLabel")}
-          className="min-w-0 flex-1 basis-52 max-w-xl"
-          triggerClassName="w-full min-w-0 max-w-none"
-        />
-      </div>
-      </div>
-
-      {/* 2. Header: left = title + experience bar; right = action buttons; bar shorter on mobile to fit one line */}
+      {/* 1. Header: left = title + experience bar; right = action buttons; bar shorter on mobile to fit one line */}
       <div className="flex min-w-0 flex-nowrap items-center justify-between gap-2 overflow-hidden max-md:gap-1.5 sm:flex-wrap sm:gap-3">
         {/* Left: title (when !embedded) + experience bar + badges */}
         <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden max-md:gap-1.5 sm:gap-3">
@@ -959,9 +915,124 @@ export function MediaLogs({
         )}
       </div>
 
+      {/* 2. Filters row */}
+      <div className="flex w-full min-w-0 flex-wrap items-center gap-3 overflow-hidden">
+        {/* Mobile (< md): row1 = status [+ collection]; row2 = genre | sort */}
+        <div className="flex w-full min-w-0 flex-col gap-2 md:hidden">
+          <div
+            className={cn(
+              "grid w-full min-w-0 gap-2",
+              showCollectionOwnershipFilters ? "grid-cols-2" : "grid-cols-1"
+            )}
+          >
+            <Select
+              value={statusFilter}
+              onValueChange={setStatusFilter}
+              options={[
+                { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
+                ...statusOptions.map((s) => ({
+                  value: s,
+                  label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
+                })),
+              ]}
+              aria-label={t("itemReviewForm.status")}
+              className="min-w-0 w-full"
+              triggerClassName="w-full max-w-none min-w-0"
+            />
+            {showCollectionOwnershipFilters && (
+              <Select
+                value={collectionFilter}
+                onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
+                options={collectionOwnershipSelectOptions}
+                aria-label={t("mediaLogs.filterCollection")}
+                className="min-w-0 w-full"
+                triggerClassName="w-full max-w-none min-w-0"
+              />
+            )}
+          </div>
+          <div className="grid w-full min-w-0 grid-cols-2 gap-2">
+            <Select
+              value={genreFilter}
+              onValueChange={setGenreFilter}
+              options={genreSelectOptions}
+              aria-label={t("mediaLogs.filterGenre")}
+              contentScrollable
+              className="min-w-0 w-full"
+              triggerClassName="w-full max-w-none min-w-0"
+            />
+            <Select
+              value={sortBy}
+              onValueChange={(v) => setSortBy(v as typeof sortBy)}
+              options={[
+                { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
+                { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
+                { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
+                { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
+                ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
+                ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
+              ]}
+              aria-label={t("mediaLogs.sortLabel")}
+              className="min-w-0 w-full"
+              triggerClassName="w-full max-w-none min-w-0"
+            />
+          </div>
+        </div>
+        {/* Desktop (md+): filters + sort wrap on narrow viewports; no search here (non-embedded uses floating search). */}
+        <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-3 md:flex">
+        <Select
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          options={[
+            { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
+            ...statusOptions.map((s) => ({
+              value: s,
+              label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
+            })),
+          ]}
+          aria-label={t("itemReviewForm.status")}
+          className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
+          triggerClassName="w-full min-w-0 max-w-none"
+        />
+        {showCollectionOwnershipFilters && (
+          <Select
+            value={collectionFilter}
+            onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
+            options={collectionOwnershipSelectOptions}
+            aria-label={t("mediaLogs.filterCollection")}
+            className="min-w-0 w-[12rem] max-w-[min(100%,18rem)] shrink-0"
+            triggerClassName="w-full min-w-0 max-w-none"
+          />
+        )}
+        <Select
+          value={genreFilter}
+          onValueChange={setGenreFilter}
+          options={genreSelectOptions}
+          aria-label={t("mediaLogs.filterGenre")}
+          contentScrollable
+          className="min-w-0 w-[12rem] max-w-[min(100%,20rem)] shrink-0"
+          triggerClassName="w-full min-w-0 max-w-none"
+        />
+        <Select
+          value={sortBy}
+          onValueChange={(v) => setSortBy(v as typeof sortBy)}
+          options={[
+            { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
+            { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
+            { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
+            { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
+            ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
+            ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
+          ]}
+          aria-label={t("mediaLogs.sortLabel")}
+          className="min-w-0 w-[14rem] max-w-[min(100%,24rem)] shrink-0"
+          triggerClassName="w-full min-w-0 max-w-none"
+        />
+      </div>
+      </div>
+
       {/* 3. Search */}
       {(embedded || readOnly) && (
-        <form onSubmit={handleListSearchSubmit} className="relative min-w-0 max-w-xs">
+        <form onSubmit={handleListSearchSubmit} className="relative min-h-10 w-full min-w-0">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
           <Input
             ref={categorySearchInputRef}
@@ -1012,7 +1083,7 @@ export function MediaLogs({
           </p>
           {!readOnly && logs.length === 0 && !categorySearchQuery.trim() && (
             <Link
-              to="/search"
+              to="/"
               state={{ mediaType }}
               className="mt-4 inline-block text-[var(--color-lightest)] underline hover:no-underline"
             >
@@ -1065,14 +1136,16 @@ export function MediaLogs({
                       to={itemDetailPath(log.mediaType, log.externalId)}
                       whileTap={tapScale}
                       transition={tapTransition}
-                      className="relative block h-full min-h-full w-28 flex-shrink-0 overflow-hidden sm:w-32"
+                      className="relative w-28 shrink-0 self-stretch overflow-hidden sm:w-32 min-h-[7rem]"
                     >
-                      <ItemImage
-                        src={log.image}
-                        className="h-full w-full object-cover"
-                        mediaType={log.mediaType}
-                        boardGameSource={log.boardGameSource}
-                      />
+                      <div className="absolute inset-0 min-h-0">
+                        <ItemImage
+                          src={log.image}
+                          className="h-full w-full min-h-0"
+                          mediaType={log.mediaType}
+                          boardGameSource={log.boardGameSource}
+                        />
+                      </div>
                       {log.status && (
                         <span
                           className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}

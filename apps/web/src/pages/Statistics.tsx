@@ -1535,7 +1535,7 @@ export function Statistics() {
                   <p className="flex min-h-0 flex-1 items-center justify-center text-center text-[var(--color-light)]">
                     <span>
                       {t("dashboard.noLogsYet")}{" "}
-                      <Link to="/search" className="text-[var(--color-lightest)] underline hover:no-underline">
+                      <Link to="/" className="text-[var(--color-lightest)] underline hover:no-underline">
                         {t("dashboard.searchAndAddFirst")}
                       </Link>
                     </span>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useParams, useSearchParams, Navigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchPublic } from "@/lib/api";
@@ -21,6 +22,7 @@ import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 /** Per-medium milestone progress (same shape as GET /me/milestones/progress). */
 interface PublicMilestoneProgress {
@@ -82,6 +84,8 @@ export function PublicProfile() {
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [publicMilestoneProgress, setPublicMilestoneProgress] = useState<PublicMilestoneProgress | null>(null);
+  const [pinnedHighlightsOpen, setPinnedHighlightsOpen] = useState(false);
+  const [milestoneBadgesOpen, setMilestoneBadgesOpen] = useState(false);
   const isOwnProfile = !!me?.user?.id && !!profile?.id && me.user.id === profile.id;
 
   const visibleTypes = profile?.visibleMediaTypes ?? [];
@@ -186,15 +190,17 @@ export function PublicProfile() {
     const qParam = params.get("q") ?? "";
     const ownQ = params.get("own") === "true";
     const wtbQ = params.get("wantToBuy") === "true";
+    const genreParam = params.get("genre") ?? "";
     let collection: CollectionListFilter = "";
     if (ownQ) collection = "owned";
     else if (wtbQ) collection = "wantToBuy";
-    if (!statusParam && sortParam === "dateDesc" && !qParam && !collection) return undefined;
+    if (!statusParam && sortParam === "dateDesc" && !qParam && !collection && !genreParam) return undefined;
     return {
       status: statusParam,
       sort: sortParam,
       search: qParam,
       collection,
+      genre: genreParam,
     };
   }, [searchParamsKey]);
 
@@ -267,17 +273,51 @@ export function PublicProfile() {
             <OverflowMarquee>{title}</OverflowMarquee>
           </div>
           {selectedBadges.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2" aria-label={t("settings.profileBadges")}>
-              {selectedBadges.map((b) => (
-                <span
-                  key={b.id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)]/80 px-3 py-1 text-sm text-[var(--color-lightest)]"
-                  title={b.name}
-                >
-                  <span aria-hidden>{b.icon}</span>
-                  <OverflowMarquee className="max-w-[140px]">{b.name}</OverflowMarquee>
+            <div className="flex min-w-0 flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => setPinnedHighlightsOpen((o) => !o)}
+                aria-expanded={pinnedHighlightsOpen}
+                aria-controls={pinnedHighlightsOpen ? "public-profile-pinned-highlights" : undefined}
+                className="flex w-full max-w-full min-w-0 items-center justify-between gap-2 rounded-md py-1 text-left text-sm font-medium text-[var(--color-light)] transition-colors hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+              >
+                <span className="min-w-0 truncate">
+                  {t("publicProfile.pinnedHighlights", { count: String(selectedBadges.length) })}
                 </span>
-              ))}
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-[var(--color-light)] transition-transform duration-200",
+                    pinnedHighlightsOpen && "rotate-180"
+                  )}
+                  aria-hidden
+                />
+              </button>
+              <AnimatePresence initial={false}>
+                {pinnedHighlightsOpen && (
+                  <motion.div
+                    id="public-profile-pinned-highlights"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 pt-1" role="list">
+                      {selectedBadges.map((b) => (
+                        <span
+                          key={b.id}
+                          role="listitem"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-dark)]/80 px-3 py-1 text-sm text-[var(--color-lightest)]"
+                          title={b.name}
+                        >
+                          <span aria-hidden>{b.icon}</span>
+                          <OverflowMarquee className="max-w-[140px]">{b.name}</OverflowMarquee>
+                        </span>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
         </div>
@@ -305,41 +345,71 @@ export function PublicProfile() {
         return (
           <section
             aria-label={t("dashboard.badgesSectionTitle")}
-            className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
+            className="flex min-w-0 flex-col gap-0 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
           >
-            <h2 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
-              <OverflowMarquee>{t("dashboard.badgesSectionTitle")}</OverflowMarquee>
-            </h2>
-            <div className="flex min-w-0 flex-wrap gap-4">
-              {visibleTypes.map((type) => {
-                const pm = publicMilestoneProgress.perMedium.find((p) => p.mediaType === type);
-                const reviews = pm?.reviews ?? { current: 0, earned: [] };
-                const logs = pm?.logs ?? { current: 0, earned: [] };
-                const scope = reviews.earned.length > 0 ? reviews : logs;
-                const kind = scope === reviews ? "reviews" : "logs";
-                const categoryLabel = t(`nav.${type}`);
-                const displayName = profile?.username ?? profile?.id ?? "";
-                if (scope.earned.length === 0) return null;
-                const latest = scope.earned[scope.earned.length - 1]!;
-                const level = scope.earned.length;
-                return (
-                  <div key={type} className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="shrink-0 text-sm text-[var(--color-light)]">{categoryLabel}:</span>
-                    <LevelBadge
-                      icon={MEDIA_BADGE_ICONS[type as MediaType]}
-                      level={level}
-                      title={latest.label}
-                      popupDetail={{
-                        user: displayName,
-                        categoryLabel,
-                        count: scope === reviews ? reviews.current : logs.current,
-                        kind,
-                      }}
-                    />
+            <button
+              type="button"
+              onClick={() => setMilestoneBadgesOpen((o) => !o)}
+              aria-expanded={milestoneBadgesOpen}
+              aria-controls={milestoneBadgesOpen ? "public-profile-milestone-badges" : undefined}
+              className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+            >
+              <h2 className="min-w-0 flex-1 text-lg font-semibold text-[var(--color-lightest)]">
+                <OverflowMarquee>{t("dashboard.badgesSectionTitle")}</OverflowMarquee>
+              </h2>
+              <ChevronDown
+                className={cn(
+                  "h-5 w-5 shrink-0 text-[var(--color-light)] transition-transform duration-200",
+                  milestoneBadgesOpen && "rotate-180"
+                )}
+                aria-hidden
+              />
+            </button>
+            <AnimatePresence initial={false}>
+              {milestoneBadgesOpen && (
+                <motion.div
+                  id="public-profile-milestone-badges"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                  role="region"
+                  aria-label={t("dashboard.badgesSectionTitle")}
+                >
+                  <div className="flex min-w-0 flex-wrap gap-4 pt-3">
+                    {visibleTypes.map((type) => {
+                      const pm = publicMilestoneProgress.perMedium.find((p) => p.mediaType === type);
+                      const reviews = pm?.reviews ?? { current: 0, earned: [] };
+                      const logs = pm?.logs ?? { current: 0, earned: [] };
+                      const scope = reviews.earned.length > 0 ? reviews : logs;
+                      const kind = scope === reviews ? "reviews" : "logs";
+                      const categoryLabel = t(`nav.${type}`);
+                      const displayName = profile?.username ?? profile?.id ?? "";
+                      if (scope.earned.length === 0) return null;
+                      const latest = scope.earned[scope.earned.length - 1]!;
+                      const level = scope.earned.length;
+                      return (
+                        <div key={type} className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="shrink-0 text-xs text-[var(--color-light)]">{categoryLabel}:</span>
+                          <LevelBadge
+                            icon={MEDIA_BADGE_ICONS[type as MediaType]}
+                            level={level}
+                            title={latest.label}
+                            popupDetail={{
+                              user: displayName,
+                              categoryLabel,
+                              count: scope === reviews ? reviews.current : logs.current,
+                              kind,
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </section>
         );
       })()}
@@ -369,6 +439,8 @@ export function PublicProfile() {
                 next.delete("wantToBuy");
                 if (f.collection === "owned") next.set("own", "true");
                 else if (f.collection === "wantToBuy") next.set("wantToBuy", "true");
+                if (f.genre.trim()) next.set("genre", f.genre.trim());
+                else next.delete("genre");
                 return next;
               }, { replace: true });
             }}

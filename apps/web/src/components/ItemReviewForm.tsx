@@ -248,6 +248,13 @@ export function ItemReviewForm({
     setBoardMainTab(searchParams.get("matches") === "1" ? "matches" : "review");
   }, [myLog?.id, showBoardGameFields, searchParams]);
 
+  useEffect(() => {
+    if (!myLog || !showBoardGameFields) return;
+    const defaultMatches =
+      myLog.status === "played" ? 1 : myLog.status === "plan to play" ? 0 : "";
+    setMatchesPlayed(myLog.matchesPlayed != null ? myLog.matchesPlayed : defaultMatches);
+  }, [myLog?.id, myLog?.matchesPlayed, myLog?.status, showBoardGameFields]);
+
   const toNum = (v: number | ""): number | null => (v === "" ? null : v);
 
   const sameStringList = (a: string[], b: string[] | null | undefined): boolean => {
@@ -345,9 +352,7 @@ export function ItemReviewForm({
             (own === (myLog.own ?? false) &&
               wantToBuy === (myLog.wantToBuy ?? false) &&
               sold === (myLog.sold ?? false))) &&
-          (!showBoardGameFields ||
-            (myLog && mediaType === "boardgames") ||
-            toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)) &&
+          (!showBoardGameFields || toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)) &&
           (!showPurchaseAmount ||
             (() => {
               const includePurchase = !showCollectionOwnership || own;
@@ -675,34 +680,30 @@ export function ItemReviewForm({
                 />
               </>
             )}
-            {showBoardGameFields && !myLog && (
-                <div className="space-y-2">
-                  <Label className="text-sm text-[var(--color-lightest)]">
-                    {t("itemReviewForm.matchesPlayed")}
-                  </Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder="0"
-                    value={matchesPlayed === "" ? "" : matchesPlayed}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === "") setMatchesPlayed("");
-                      else {
-                        const n = parseInt(v, 10);
-                        if (Number.isInteger(n) && n >= 0) setMatchesPlayed(n);
-                      }
-                    }}
-                    className="w-full max-w-[8rem]"
-                    aria-label={t("itemReviewForm.matchesPlayed")}
-                  />
-                </div>
-            )}
-            {showBoardGameFields && myLog && (
-              <p className="text-sm text-[var(--color-light)]">
-                {t("boardGameMatches.matchCountReadOnly", { count: String(myLog.matchesPlayed ?? 0) })}
-              </p>
+            {showBoardGameFields && (
+              <div className="space-y-2">
+                <Label className="text-sm text-[var(--color-lightest)]">
+                  {t("itemReviewForm.matchesPlayed")}
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  placeholder="0"
+                  value={matchesPlayed === "" ? "" : matchesPlayed}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "") setMatchesPlayed("");
+                    else {
+                      const n = parseInt(v, 10);
+                      if (Number.isInteger(n) && n >= 0) setMatchesPlayed(n);
+                    }
+                  }}
+                  disabled={saving}
+                  className="w-full max-w-[8rem]"
+                  aria-label={t("itemReviewForm.matchesPlayed")}
+                />
+              </div>
             )}
 
             {showPurchaseAmountField && (

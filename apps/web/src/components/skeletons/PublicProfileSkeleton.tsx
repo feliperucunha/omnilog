@@ -18,10 +18,8 @@ export function PublicProfileSkeleton() {
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-col gap-2">
             <Skeleton className="h-8 w-48 rounded-md sm:h-9 sm:w-56" />
-            <div className="flex flex-wrap gap-2">
-              <Skeleton className="h-7 w-24 rounded-full" />
-              <Skeleton className="h-7 w-20 rounded-full" />
-            </div>
+            {/* Pinned highlights toggle (collapsed by default on real page) */}
+            <Skeleton className="h-6 w-40 max-w-full rounded-md" />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Skeleton className="h-9 w-20 rounded-md" />
@@ -29,15 +27,14 @@ export function PublicProfileSkeleton() {
           </div>
         </div>
 
-        {/* Optional badges section */}
+        {/* Milestone badges section (collapsed by default on real page) */}
         <section
           aria-hidden
-          className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
+          className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
         >
-          <Skeleton className="h-6 w-40 rounded" />
-          <div className="flex flex-wrap gap-2">
-            <Skeleton className="h-8 w-24 rounded-full" />
-            <Skeleton className="h-8 w-20 rounded-full" />
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <Skeleton className="h-7 w-32 rounded-md" />
+            <Skeleton className="h-5 w-5 shrink-0 rounded" />
           </div>
         </section>
 

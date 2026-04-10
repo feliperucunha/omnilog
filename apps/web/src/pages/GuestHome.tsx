@@ -21,7 +21,7 @@ export function GuestHome() {
       </p>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Button asChild variant="default" size="lg" className="gap-2">
-          <Link to="/search">
+          <Link to="/">
             <Search className="size-4" aria-hidden />
             {t("nav.search")}
           </Link>

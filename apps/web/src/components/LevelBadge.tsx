@@ -63,7 +63,7 @@ function BadgeInsignia({
   return (
     <span className={`inline-flex items-center gap-1.5 max-md:gap-2 ${className}`}>
       <span
-        className="inline-flex h-6 w-6 max-md:h-8 max-md:w-8 flex-shrink-0 items-center justify-center rounded-full p-[3px] max-md:p-[4px] shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_1px_2px_rgba(0,0,0,0.3)]"
+        className="inline-flex h-6 w-6 max-md:h-6 max-md:w-6 flex-shrink-0 items-center justify-center rounded-full p-[3px] max-md:p-[3px] shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_1px_2px_rgba(0,0,0,0.3)]"
         style={{
           background: "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(0,0,0,0.2) 100%)",
           boxShadow: `inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 3px rgba(0,0,0,0.35), 0 0 0 2px ${rarity.color}`,
@@ -71,7 +71,7 @@ function BadgeInsignia({
         aria-hidden
       >
         <span
-          className="flex h-full w-full items-center justify-center rounded-full text-[var(--color-lightest)] text-[0.65rem] max-md:text-[0.8rem]"
+          className="flex h-full w-full items-center justify-center rounded-full text-[var(--color-lightest)] text-[0.55rem] max-md:text-[0.6rem]"
           style={{
             background: rarity.gradient,
             boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.2)",
