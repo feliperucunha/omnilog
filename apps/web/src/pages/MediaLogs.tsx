@@ -45,6 +45,7 @@ import {
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 import { mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
+import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
 
@@ -545,7 +546,12 @@ export function MediaLogs({
     }
     setExportingCategory(true);
     try {
-      const { blob, filename } = await apiFetchFile(`/logs/export?mediaType=${encodeURIComponent(mediaType)}`);
+      const { blob } = await apiFetchFile(`/logs/export?mediaType=${encodeURIComponent(mediaType)}`);
+      const filename = buildLogsExportFilename({
+        page: embedded ? "dashboard" : "logs",
+        userSlug: userSlugFromMe(me),
+        categoryKey: mediaType,
+      });
       await downloadFile(blob, filename);
       toast.success(t("mediaLogs.exportCategorySuccess"));
     } catch (err) {

@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { SettingsSkeleton } from "@/components/skeletons";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { apiFetch, invalidateApiCache, apiFetchFile, downloadFile } from "@/lib/api";
+import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
 import { toast } from "sonner";
 import { showErrorToast } from "@/lib/errorToast";
 import { API_KEY_META, type ApiKeyProvider } from "@/lib/apiKeyMeta";
@@ -328,9 +329,15 @@ export function Settings() {
       }
       setExporting(true);
       try {
+        const userSlug = userSlugFromMe(me);
         for (let i = 0; i < selected.length; i++) {
           const mt = selected[i];
-          const { blob, filename } = await apiFetchFile(`/logs/export?mediaType=${encodeURIComponent(mt)}`);
+          const { blob } = await apiFetchFile(`/logs/export?mediaType=${encodeURIComponent(mt)}`);
+          const filename = buildLogsExportFilename({
+            page: "settings",
+            userSlug,
+            categoryKey: mt,
+          });
           await downloadFile(blob, filename);
           if (i < selected.length - 1) await new Promise((r) => setTimeout(r, 300));
         }
@@ -344,7 +351,7 @@ export function Settings() {
         setExporting(false);
       }
     },
-    [exportSelectedCategories, t]
+    [exportSelectedCategories, me, t]
   );
 
   const exportDrawerBeforeDismiss = useCallback(async (): Promise<boolean> => {

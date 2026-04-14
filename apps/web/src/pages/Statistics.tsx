@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchCached, apiFetchFile, downloadFile } from "@/lib/api";
+import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
 import {
   StatisticsSummarySkeleton,
   StatisticsBarsSkeleton,
@@ -562,11 +563,16 @@ export function Statistics() {
       return;
     }
     setExporting(true);
+    const filename = buildLogsExportFilename({
+      page: "statistics",
+      userSlug: userSlugFromMe(me),
+      categoryKey: "all-categories",
+    });
     apiFetchFile("/logs/export")
-      .then(({ blob, filename }) => downloadFile(blob, filename).then(() => toast.success(t("tiers.exportSuccess"))))
+      .then(({ blob }) => downloadFile(blob, filename).then(() => toast.success(t("tiers.exportSuccess"))))
       .catch((err) => showErrorToast(t, "E010", { originalError: err }))
       .finally(() => setExporting(false));
-  }, [isPro, t]);
+  }, [isPro, me, t]);
 
   useEffect(() => {
     setPageTitle?.(t("nav.statistics"));
