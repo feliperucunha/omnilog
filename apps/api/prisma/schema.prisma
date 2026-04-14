@@ -89,6 +89,23 @@ model User {
   followsFollowers  Follow[] @relation("FollowFollower")
   userBadges     UserBadge[]
   reviewStats    UserReviewStats?
+  /// Saved custom opponent names for board-game match logging (autocomplete).
+  boardGameCustomOpponents UserBoardGameCustomOpponent[]
+}
+
+/// Per-user saved display names for board-game match players (non–app-user opponents).
+model UserBoardGameCustomOpponent {
+  id         String   @id @default(cuid())
+  userId     String
+  label      String
+  /// Lowercase trimmed label for deduping / search within the owner account.
+  labelKey   String
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, labelKey])
+  @@index([userId, lastUsedAt])
 }
 
 model Badge {
@@ -200,7 +217,7 @@ model Log {
   genres         String?  // JSON array of genre names (for stats and badges)
   mechanics       String?  // JSON array of board-game mechanic names (BGG / Ludopedia); optional
   affinityContext String?  // JSON: recommendation snapshot (board stats, book subjects, manga themes, …)
-  // purchaseAmountMinor + purchaseCurrency: optional spend (minor units + ISO 4217) for games/boardgames/books/manga/comics
+  // purchaseAmountMinor + purchaseCurrency: optional cost (minor units + ISO 4217); kept when sold alongside sale* for net P&L
   purchaseAmountMinor Int?
   purchaseCurrency    String?
   // Sale proceeds when sold=true (same minor-unit + ISO 4217 convention as purchase)

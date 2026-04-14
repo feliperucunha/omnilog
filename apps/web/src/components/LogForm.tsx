@@ -40,6 +40,7 @@ import {
   mediaTypeHasBoardGameOnlyFields,
   mediaTypeHasCollectionOwnership,
   mediaTypeHasPurchaseAmount,
+  spendFieldsIncludePurchase,
 } from "@/lib/mediaTypeFeatures";
 import { DEFAULT_PURCHASE_CURRENCY, normalizeCurrencyCode } from "@/lib/currencies";
 
@@ -130,8 +131,9 @@ export function LogForm(props: LogFormProps) {
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
   const showHoursToBeat = mediaType === "games";
   const showPurchaseAmount = mediaTypeHasPurchaseAmount(mediaType);
-  /** Spend field when "Own" is selected; hidden for sold / wishlist / none. */
-  const showPurchaseAmountField = showPurchaseAmount && (!showCollectionOwnership || own);
+  /** Purchase price when owned or sold (kept with sale proceeds for balance). Hidden for wishlist / none. */
+  const showPurchaseAmountField =
+    showPurchaseAmount && spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
   const showSaleAmountField = showPurchaseAmount && (!showCollectionOwnership || sold);
   const showBoardGameTabs = isEdit && showBoardGameFields;
   const initialBoardGameTab = isEdit && "initialBoardGameTab" in props ? props.initialBoardGameTab : undefined;
@@ -256,7 +258,7 @@ export function LogForm(props: LogFormProps) {
         (!showBoardGameFields || toNum(matchesPlayed) === (log.matchesPlayed ?? null)) &&
         (!showPurchaseAmount ||
           (() => {
-            const includePurchase = !showCollectionOwnership || own;
+            const includePurchase = spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
             if (!includePurchase) {
               return (log.purchaseAmountMinor ?? null) == null;
             }
@@ -359,7 +361,7 @@ export function LogForm(props: LogFormProps) {
           payload.matchesPlayed = toNum(matchesPlayed);
         }
         if (showPurchaseAmount) {
-          const includePurchase = !showCollectionOwnership || own;
+          const includePurchase = spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
           if (!includePurchase || purchaseAmountMinor == null) {
             payload.purchaseAmountMinor = null;
             payload.purchaseCurrency = null;
@@ -396,7 +398,7 @@ export function LogForm(props: LogFormProps) {
             toNum(matchesPlayed) === (props.log.matchesPlayed ?? null)) &&
           (!showPurchaseAmount ||
             (() => {
-              const includePurchase = !showCollectionOwnership || own;
+              const includePurchase = spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
               if (!includePurchase) {
                 return (props.log.purchaseAmountMinor ?? null) == null;
               }
@@ -436,7 +438,7 @@ export function LogForm(props: LogFormProps) {
         invalidateLogsAndItemsCache();
         if (
           showPurchaseAmount &&
-          (((!showCollectionOwnership || own) && purchaseAmountMinor != null) ||
+          ((spendFieldsIncludePurchase(showCollectionOwnership, own, sold) && purchaseAmountMinor != null) ||
             ((!showCollectionOwnership || sold) && saleAmountMinor != null))
         ) {
           void refetchMe();
@@ -484,7 +486,7 @@ export function LogForm(props: LogFormProps) {
             ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
             ...(showPurchaseAmount &&
               (() => {
-                const includePurchase = !showCollectionOwnership || own;
+                const includePurchase = spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
                 const includeSale = !showCollectionOwnership || sold;
                 const purchasePart =
                   !includePurchase || purchaseAmountMinor == null
@@ -511,7 +513,7 @@ export function LogForm(props: LogFormProps) {
       invalidateLogsAndItemsCache();
       if (
         showPurchaseAmount &&
-        (((!showCollectionOwnership || own) && purchaseAmountMinor != null) ||
+        ((spendFieldsIncludePurchase(showCollectionOwnership, own, sold) && purchaseAmountMinor != null) ||
           ((!showCollectionOwnership || sold) && saleAmountMinor != null))
       ) {
         void refetchMe();
@@ -723,6 +725,7 @@ export function LogForm(props: LogFormProps) {
                           aria-label={t("itemReviewForm.episode")}
                           dropdownInPortal
                           optionsLoading={progressOptionsLoading}
+                          contentScrollable
                         />
                       </div>
                     </div>

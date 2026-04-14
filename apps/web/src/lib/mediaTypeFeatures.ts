@@ -10,3 +10,13 @@ export const mediaTypeHasBoardGameOnlyFields = (m: MediaType): boolean => m === 
 /** Optional purchase price / spend field (currency + amount). */
 export const mediaTypeHasPurchaseAmount = (m: MediaType): boolean =>
   (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(m);
+
+/**
+ * Whether to show and persist purchase amount for spend-tracked categories with collection ownership.
+ * Include when the user owns the copy or marked it sold (cost basis is kept with sale proceeds for net P&L).
+ */
+export const spendFieldsIncludePurchase = (
+  showCollectionOwnership: boolean,
+  own: boolean,
+  sold: boolean
+): boolean => !showCollectionOwnership || own || sold;

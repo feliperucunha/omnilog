@@ -80,6 +80,8 @@ const boardGameMatchPlayerSchema = z.object({
   name: z.string().min(1).max(PLAYER_NAME_MAX),
   score: z.number().finite().nullable().optional(),
   winner: z.boolean(),
+  /** When set, server resolves `name` from this user’s username. */
+  appUserId: z.string().min(1).max(40).optional().nullable(),
 });
 
 const createBoardGameMatchBodySchema = z.object({
@@ -102,7 +104,13 @@ function parseBoardGamePlayersJson(json: string): BoardGameMatchPlayer[] {
       let score: number | null = null;
       if (typeof o.score === "number" && Number.isFinite(o.score)) score = o.score;
       else if (o.score === null) score = null;
-      out.push({ name, score, winner });
+      let appUserId: string | null | undefined;
+      if (typeof o.appUserId === "string" && o.appUserId.trim().length > 0) {
+        appUserId = o.appUserId.trim();
+      } else if (o.appUserId === null) {
+        appUserId = null;
+      }
+      out.push({ name, score, winner, ...(appUserId !== undefined ? { appUserId } : {}) });
     }
     return out;
   } catch {
@@ -1502,22 +1510,64 @@ logsRouter.post("/:id/board-game-matches", async (req: AuthenticatedRequest, res
     res.status(400).json({ error: { playedAt: ["Invalid date"] } });
     return;
   }
-  const playersPayload: BoardGameMatchPlayer[] = parsed.data.players.map((p) => ({
-    name: sanitizeText(p.name.trim(), PLAYER_NAME_MAX) || "Player",
-    score: p.score === undefined ? null : p.score,
-    winner: p.winner,
-  }));
+
+  const playersPayload: BoardGameMatchPlayer[] = [];
+  for (const p of parsed.data.players) {
+    const appId = p.appUserId?.trim();
+    if (appId) {
+      const linked = await prisma.user.findFirst({
+        where: { id: appId, username: { not: null } },
+        select: { id: true, username: true },
+      });
+      if (!linked?.username) {
+        res.status(400).json({ error: { players: ["Unknown or invalid app user for a player row"] } });
+        return;
+      }
+      playersPayload.push({
+        name: sanitizeText(linked.username.trim(), PLAYER_NAME_MAX) || linked.username,
+        score: p.score === undefined ? null : p.score,
+        winner: p.winner,
+        appUserId: linked.id,
+      });
+    } else {
+      playersPayload.push({
+        name: sanitizeText(p.name.trim(), PLAYER_NAME_MAX) || "Player",
+        score: p.score === undefined ? null : p.score,
+        winner: p.winner,
+      });
+    }
+  }
   const notes = sanitizeReview(parsed.data.notes ?? null);
 
   try {
     const now = new Date();
     const bumpToPlayed = log.status !== "played";
     const [match, updatedLog] = await prisma.$transaction(async (tx) => {
+      for (const pl of playersPayload) {
+        if (pl.appUserId) continue;
+        const rawLabel = pl.name.trim();
+        const labelKey = rawLabel.toLowerCase();
+        if (!labelKey) continue;
+        const label = sanitizeText(rawLabel, PLAYER_NAME_MAX) || "Player";
+        await tx.userBoardGameCustomOpponent.upsert({
+          where: { userId_labelKey: { userId, labelKey } },
+          create: { userId, label, labelKey },
+          update: { label, lastUsedAt: now },
+        });
+      }
+      const playersJson = JSON.stringify(
+        playersPayload.map((pl) => ({
+          name: pl.name,
+          score: pl.score,
+          winner: pl.winner,
+          ...(pl.appUserId ? { appUserId: pl.appUserId } : {}),
+        }))
+      );
       const m = await tx.boardGameMatch.create({
         data: {
           logId,
           playedAt,
-          players: JSON.stringify(playersPayload),
+          players: playersJson,
           notes,
         },
       });

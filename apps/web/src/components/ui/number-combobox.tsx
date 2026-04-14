@@ -16,6 +16,8 @@ export interface NumberComboboxProps {
   dropdownInPortal?: boolean;
   /** When true, show a loading spinner instead of the chevron while options are being fetched. */
   optionsLoading?: boolean;
+  /** Limit dropdown height and scroll inside (same behavior as Select with contentScrollable). */
+  contentScrollable?: boolean;
 }
 
 /**
@@ -34,6 +36,7 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
       "aria-label": ariaLabel,
       dropdownInPortal = false,
       optionsLoading = false,
+      contentScrollable = false,
     },
     ref
   ) => {
@@ -98,6 +101,11 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
       }
     };
 
+    const scrollListClass =
+      contentScrollable === true
+        ? "max-h-[min(50dvh,20rem)] overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+        : undefined;
+
     return (
       <div ref={containerRef} className={cn("relative", className)}>
         <div className="relative">
@@ -138,45 +146,8 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
           )}
         </div>
         {open && options.length > 0 && !dropdownInPortal && (
-          <ul
-            role="listbox"
-            className="absolute z-50 mt-1 w-full overflow-x-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] py-1 shadow-[var(--shadow-lg)] [touch-action:manipulation]"
-          >
-            {options.map((n) => (
-              <li
-                key={n}
-                role="option"
-                aria-selected={value === n}
-                className={cn(
-                  "cursor-pointer min-h-[44px] flex items-center px-3 py-2 text-sm [touch-action:manipulation]",
-                  value === n
-                    ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
-                    : "text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/30 active:bg-[var(--color-mid)]/40"
-                )}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handleSelect(n);
-                }}
-                onClick={() => handleSelect(n)}
-              >
-                {n}
-              </li>
-            ))}
-          </ul>
-        )}
-        {open && options.length > 0 && dropdownInPortal && dropdownRect && typeof document !== "undefined" &&
-          createPortal(
-            <ul
-              id={listIdRef.current ?? undefined}
-              role="listbox"
-              data-dropdown-portal
-              className="fixed z-[100] overflow-x-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] py-1 shadow-[var(--shadow-lg)] [touch-action:manipulation]"
-              style={{
-                top: dropdownRect.top + 4,
-                left: dropdownRect.left,
-                width: dropdownRect.width,
-              }}
-            >
+          <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] shadow-[var(--shadow-lg)] [touch-action:manipulation]">
+            <ul role="listbox" className={cn("overflow-x-hidden py-1 [touch-action:manipulation]", scrollListClass)}>
               {options.map((n) => (
                 <li
                   key={n}
@@ -197,7 +168,59 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
                   {n}
                 </li>
               ))}
-            </ul>,
+            </ul>
+            {contentScrollable === true ? (
+              <div
+                className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-7 rounded-b-md bg-gradient-to-t from-[var(--color-dark)] via-[var(--color-dark)]/70 to-transparent"
+                aria-hidden
+              />
+            ) : null}
+          </div>
+        )}
+        {open && options.length > 0 && dropdownInPortal && dropdownRect && typeof document !== "undefined" &&
+          createPortal(
+            <div
+              data-dropdown-portal
+              className="fixed z-[100] overflow-hidden rounded-md border border-[var(--color-mid)]/50 bg-[var(--color-dark)] shadow-[var(--shadow-lg)] [touch-action:manipulation]"
+              style={{
+                top: dropdownRect.top + 4,
+                left: dropdownRect.left,
+                width: dropdownRect.width,
+              }}
+            >
+              <ul
+                id={listIdRef.current ?? undefined}
+                role="listbox"
+                className={cn("overflow-x-hidden py-1 [touch-action:manipulation]", scrollListClass)}
+              >
+                {options.map((n) => (
+                  <li
+                    key={n}
+                    role="option"
+                    aria-selected={value === n}
+                    className={cn(
+                      "cursor-pointer min-h-[44px] flex items-center px-3 py-2 text-sm [touch-action:manipulation]",
+                      value === n
+                        ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+                        : "text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/30 active:bg-[var(--color-mid)]/40"
+                    )}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelect(n);
+                    }}
+                    onClick={() => handleSelect(n)}
+                  >
+                    {n}
+                  </li>
+                ))}
+              </ul>
+              {contentScrollable === true ? (
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-7 rounded-b-md bg-gradient-to-t from-[var(--color-dark)] via-[var(--color-dark)]/70 to-transparent"
+                  aria-hidden
+                />
+              ) : null}
+            </div>,
             document.body
           )}
       </div>

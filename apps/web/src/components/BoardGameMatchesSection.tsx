@@ -1,18 +1,83 @@
-import { useCallback, useEffect, useState } from "react";
-import type { BoardGameMatch, Log } from "@geeklogs/shared";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { BoardGameMatch, BoardGameMatchPlayer, Log } from "@geeklogs/shared";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Logo } from "@/components/Logo";
 import { apiFetch, invalidateLogsAndItemsCache } from "@/lib/api";
-import { useLocale } from "@/contexts/LocaleContext";
+import { useLocale, type TFunction } from "@/contexts/LocaleContext";
+import { useMe } from "@/contexts/MeContext";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
-import { ChevronRight, Loader2, Trash2, UserPlus } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Calendar,
+  ChevronDown,
+  Dice5,
+  History,
+  Loader2,
+  Sparkles,
+  Trash2,
+  Trophy,
+  User,
+  UserPlus,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type PlayerRow = { name: string; score: string; winner: boolean };
+type PlayerRow = { name: string; score: string; winner: boolean; appUserId?: string | null };
+
+/** Oldest session first — used to find each match’s immediate predecessor in time. */
+function sortBoardGameMatchesChronologicalAsc(list: BoardGameMatch[]): BoardGameMatch[] {
+  return [...list].sort((a, b) => {
+    const ta = Date.parse(a.playedAt);
+    const tb = Date.parse(b.playedAt);
+    if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) return ta - tb;
+    const ca = Date.parse(a.createdAt);
+    const cb = Date.parse(b.createdAt);
+    if (Number.isFinite(ca) && Number.isFinite(cb) && ca !== cb) return ca - cb;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+function getChronologicalPreviousMatch(chronAsc: BoardGameMatch[], match: BoardGameMatch): BoardGameMatch | null {
+  const idx = chronAsc.findIndex((m) => m.id === match.id);
+  if (idx <= 0) return null;
+  return chronAsc[idx - 1] ?? null;
+}
+
+function boardGamePlayerIdentityKey(p: BoardGameMatchPlayer): string {
+  const id = p.appUserId?.trim();
+  if (id) return `id:${id}`;
+  return `n:${p.name.trim().toLowerCase()}`;
+}
+
+function findPreviousSessionScore(previousMatch: BoardGameMatch, player: BoardGameMatchPlayer): number | null {
+  const key = boardGamePlayerIdentityKey(player);
+  const prev = previousMatch.players.find((q) => boardGamePlayerIdentityKey(q) === key);
+  const s = prev?.score;
+  if (s == null || typeof s !== "number" || !Number.isFinite(s)) return null;
+  return s;
+}
+
+type ScoreTrendVsPrevious = "higher" | "lower";
+
+function scoreTrendVsPreviousSession(
+  player: BoardGameMatchPlayer,
+  previousMatch: BoardGameMatch | null
+): ScoreTrendVsPrevious | null {
+  if (!previousMatch) return null;
+  const cur = player.score;
+  if (cur == null || typeof cur !== "number" || !Number.isFinite(cur)) return null;
+  const prevScore = findPreviousSessionScore(previousMatch, player);
+  if (prevScore == null) return null;
+  if (cur > prevScore) return "higher";
+  if (cur < prevScore) return "lower";
+  return null;
+}
 
 function todayDateInput(): string {
   const d = new Date();
@@ -34,6 +99,228 @@ function dateInputToIso(yyyyMmDd: string): string | null {
   return dt.toISOString();
 }
 
+function initialsFromName(name: string): string {
+  const t = name.trim();
+  if (!t) return "?";
+  const parts = t.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const a = parts[0]![0] ?? "";
+    const b = parts[parts.length - 1]![0] ?? "";
+    return (a + b).toUpperCase() || "?";
+  }
+  return t.slice(0, 2).toUpperCase() || "?";
+}
+
+function huesFromName(name: string): { h1: number; h2: number } {
+  let h = 0;
+  const s = name.trim() || "?";
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const h1 = h % 360;
+  const h2 = (h1 + 48) % 360;
+  return { h1, h2 };
+}
+
+function PlayerAvatar({
+  name,
+  size = "md",
+  winner,
+  className,
+}: {
+  name: string;
+  size?: "sm" | "md" | "lg";
+  winner?: boolean;
+  className?: string;
+}) {
+  const initials = initialsFromName(name);
+  const { h1, h2 } = huesFromName(name);
+  const sizeClass =
+    size === "sm" ? "h-9 w-9 min-h-9 min-w-9 text-[11px]" : size === "lg" ? "h-14 w-14 min-h-14 min-w-14 text-lg" : "h-11 w-11 min-h-11 min-w-11 text-sm";
+
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full font-bold tracking-tight text-white shadow-md ring-1 ring-white/15",
+        sizeClass,
+        winner &&
+          "ring-2 ring-amber-400/95 ring-offset-2 ring-offset-[var(--color-darkest)] shadow-[0_0_18px_-2px_rgba(251,191,36,0.55)]",
+        className
+      )}
+      style={{
+        background: `linear-gradient(145deg, hsl(${h1} 58% 48%) 0%, hsl(${h2} 52% 36%) 100%)`,
+      }}
+      aria-hidden
+    >
+      {initials}
+    </div>
+  );
+}
+
+function MatchPlayerNameField({
+  value,
+  appUserId,
+  onChange,
+  excludeUserId,
+  t,
+}: {
+  value: string;
+  appUserId?: string | null;
+  onChange: (next: { name: string; appUserId?: string | null }) => void;
+  excludeUserId?: string;
+  t: TFunction;
+}) {
+  const [open, setOpen] = useState(false);
+  const [debounced, setDebounced] = useState(value);
+  const [loading, setLoading] = useState(false);
+  const [appHits, setAppHits] = useState<{ id: string; username?: string }[]>([]);
+  const [customHits, setCustomHits] = useState<{ id: string; label: string }[]>([]);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const fetchGen = useRef(0);
+
+  useEffect(() => {
+    const h = setTimeout(() => setDebounced(value), 220);
+    return () => clearTimeout(h);
+  }, [value]);
+
+  useEffect(() => {
+    function onDocMouseDown(e: MouseEvent) {
+      const el = wrapRef.current;
+      if (!el || el.contains(e.target as Node)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const q = debounced.trim();
+    const gen = ++fetchGen.current;
+    setLoading(true);
+    void (async () => {
+      try {
+        const customPath = q
+          ? `/me/board-game-custom-opponents?q=${encodeURIComponent(q)}`
+          : "/me/board-game-custom-opponents";
+        const [customRes, userRes] = await Promise.all([
+          apiFetch<{ data: { id: string; label: string }[] }>(customPath),
+          q.length >= 1
+            ? apiFetch<{ users: { id: string; username?: string }[] }>(`/search/users?q=${encodeURIComponent(q)}`)
+            : Promise.resolve({ users: [] as { id: string; username?: string }[] }),
+        ]);
+        if (gen !== fetchGen.current) return;
+        setCustomHits(customRes.data ?? []);
+        const users = (userRes.users ?? []).filter((u) => u.id !== excludeUserId && u.username);
+        setAppHits(users);
+      } catch {
+        if (gen !== fetchGen.current) return;
+        setCustomHits([]);
+        setAppHits([]);
+      } finally {
+        if (gen === fetchGen.current) setLoading(false);
+      }
+    })();
+  }, [open, debounced, excludeUserId]);
+
+  const trimmed = value.trim();
+  const showSuggestions = open && (loading || appHits.length > 0 || customHits.length > 0 || trimmed.length > 0);
+
+  return (
+    <div ref={wrapRef} className="relative min-w-0">
+      <Input
+        placeholder={t("boardGameMatches.playerName")}
+        value={value}
+        onChange={(e) => onChange({ name: e.target.value, appUserId: null })}
+        onFocus={() => setOpen(true)}
+        autoComplete="off"
+        aria-autocomplete="list"
+        aria-expanded={showSuggestions}
+        className="border-[var(--color-mid)]/35 bg-[var(--color-dark)]/80"
+        aria-label={t("boardGameMatches.playerName")}
+      />
+      {showSuggestions && (
+        <div
+          role="listbox"
+          className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-[var(--color-mid)]/35 bg-[var(--color-darkest)] py-1 shadow-xl ring-1 ring-black/20"
+        >
+          {loading && (
+            <div className="flex items-center justify-center gap-2 px-3 py-2.5 text-xs text-[var(--color-light)]">
+              <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
+            </div>
+          )}
+          {!loading && appHits.length > 0 && (
+            <div className="px-2 pt-1">
+              <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-light)]/80">
+                {t("boardGameMatches.suggestionsAppMembers")}
+              </p>
+              {appHits.map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  role="option"
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20",
+                    appUserId === u.id && "bg-[var(--color-mid)]/15 ring-1 ring-[var(--btn-gradient-start)]/25"
+                  )}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onChange({ name: u.username ?? "", appUserId: u.id });
+                    setOpen(false);
+                  }}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-mid)]/25 p-1 ring-1 ring-[var(--color-mid)]/30">
+                    <Logo className="h-5 w-5 object-contain" alt="" />
+                  </span>
+                  <span className="min-w-0 truncate font-medium">{u.username}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {!loading && customHits.length > 0 && (
+            <div className="px-2 pt-1">
+              <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-light)]/80">
+                {t("boardGameMatches.suggestionsSavedNames")}
+              </p>
+              {customHits.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="option"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onChange({ name: c.label, appUserId: null });
+                    setOpen(false);
+                  }}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-mid)]/20 text-[var(--color-light)] ring-1 ring-[var(--color-mid)]/25">
+                    <User className="h-4 w-4" aria-hidden />
+                  </span>
+                  <span className="min-w-0 truncate font-medium">{c.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {trimmed.length > 0 && (
+            <div className="border-t border-[var(--color-mid)]/20 px-2 py-1">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs text-[var(--color-light)] hover:bg-[var(--color-mid)]/15 hover:text-[var(--color-lightest)]"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange({ name: trimmed, appUserId: null });
+                  setOpen(false);
+                }}
+              >
+                {t("boardGameMatches.useTypedAsCustom", { name: trimmed })}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BoardGameMatchesSection({
   logId,
   onLogUpdated,
@@ -42,16 +329,19 @@ export function BoardGameMatchesSection({
   onLogUpdated: (log: Log) => void;
 }) {
   const { t, locale } = useLocale();
+  const { me } = useMe();
   const [matches, setMatches] = useState<BoardGameMatch[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [playedDate, setPlayedDate] = useState(todayDateInput);
   const [players, setPlayers] = useState<PlayerRow[]>([
-    { name: "", score: "", winner: false },
-    { name: "", score: "", winner: false },
+    { name: "", score: "", winner: false, appUserId: null },
+    { name: "", score: "", winner: false, appUserId: null },
   ]);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const matchesChronologicalAsc = useMemo(() => sortBoardGameMatchesChronologicalAsc(matches), [matches]);
 
   const loadMatches = useCallback(() => {
     setLoadingList(true);
@@ -68,8 +358,8 @@ export function BoardGameMatchesSection({
   const resetForm = () => {
     setPlayedDate(todayDateInput());
     setPlayers([
-      { name: "", score: "", winner: false },
-      { name: "", score: "", winner: false },
+      { name: "", score: "", winner: false, appUserId: null },
+      { name: "", score: "", winner: false, appUserId: null },
     ]);
     setNotes("");
   };
@@ -84,6 +374,7 @@ export function BoardGameMatchesSection({
       name: p.name.trim(),
       score: p.score.trim() === "" ? null : Number(p.score),
       winner: p.winner,
+      appUserId: p.appUserId?.trim() ? p.appUserId.trim() : undefined,
     }));
     const withNames = trimmed.filter((p) => p.name.length > 0);
     if (withNames.length === 0) {
@@ -106,6 +397,7 @@ export function BoardGameMatchesSection({
             name: p.name,
             score: p.score,
             winner: p.winner,
+            ...(p.appUserId ? { appUserId: p.appUserId } : {}),
           })),
           notes: notes.trim() || null,
         }),
@@ -147,197 +439,330 @@ export function BoardGameMatchesSection({
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--color-light)]">
-          {t("boardGameMatches.previousSessions")}
-        </h3>
+    <div className="flex flex-col gap-8">
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--btn-gradient-start)]/25 to-[var(--btn-gradient-end)]/20 text-[var(--color-lightest)] ring-1 ring-[var(--color-mid)]/30">
+            <History className="h-5 w-5" aria-hidden />
+          </span>
+          <div>
+            <h3 className="text-base font-semibold text-[var(--color-lightest)]">{t("boardGameMatches.previousSessions")}</h3>
+            <p className="text-xs text-[var(--color-light)]">{t("boardGameMatches.playHistorySubtitle")}</p>
+          </div>
+        </div>
         {loadingList ? (
-          <div className="flex justify-center py-6">
-            <Loader2 className="h-6 w-6 animate-spin text-[var(--color-mid)]" aria-hidden />
+          <div className="flex justify-center py-10">
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
           </div>
         ) : matches.length === 0 ? (
-          <p className="text-sm text-[var(--color-light)]">{t("boardGameMatches.noMatchesYet")}</p>
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--color-mid)]/40 bg-[var(--color-mid)]/5 px-6 py-10 text-center"
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--color-dark)] text-[var(--color-light)] ring-1 ring-[var(--color-mid)]/30">
+              <Dice5 className="h-7 w-7" aria-hidden />
+            </span>
+            <p className="max-w-sm text-sm text-[var(--color-light)]">{t("boardGameMatches.noMatchesYet")}</p>
+          </motion.div>
         ) : (
-          <ul className="flex flex-col gap-2 p-0 m-0 list-none">
-            {matches.map((m) => (
-              <MatchHistoryCard
+          <ul className="m-0 flex list-none flex-col gap-3 p-0">
+            {matches.map((m, i) => (
+              <motion.li
                 key={m.id}
-                match={m}
-                formatPlayed={formatPlayed}
-                deleting={deletingId === m.id}
-                onDelete={() => handleDelete(m.id)}
-                t={t}
-              />
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i * 0.04, 0.24), type: "spring", stiffness: 380, damping: 28 }}
+              >
+                <MatchHistoryCard
+                  match={m}
+                  previousMatch={getChronologicalPreviousMatch(matchesChronologicalAsc, m)}
+                  formatPlayed={formatPlayed}
+                  deleting={deletingId === m.id}
+                  onDelete={() => handleDelete(m.id)}
+                  t={t}
+                />
+              </motion.li>
             ))}
           </ul>
         )}
-      </div>
+      </section>
 
-      <div className="border-t border-[var(--color-surface-border)] pt-4">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--color-light)]">
-          {t("boardGameMatches.newMatch")}
-        </h3>
-        <div className="flex flex-col gap-4">
+      <section className="relative overflow-hidden rounded-2xl border border-[var(--color-mid)]/25 bg-gradient-to-b from-[var(--color-category-bg)]/80 to-[var(--color-dark)] p-5 shadow-[var(--shadow-category)] ring-1 ring-[var(--color-mid)]/10 sm:p-6">
+        <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-[var(--btn-gradient-start)]/10 blur-2xl" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-10 left-1/3 h-24 w-40 rounded-full bg-[var(--btn-gradient-end)]/10 blur-2xl" aria-hidden />
+
+        <div className="relative flex flex-col gap-5">
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] text-[var(--btn-text)] shadow-md">
+              <Sparkles className="h-5 w-5" aria-hidden />
+            </span>
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--color-lightest)]">{t("boardGameMatches.newMatch")}</h3>
+              <p className="text-xs text-[var(--color-light)]">{t("boardGameMatches.newMatchSubtitle")}</p>
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label className="text-[var(--color-lightest)]">{t("boardGameMatches.playedDate")}</Label>
+            <Label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-lightest)]">
+              <Calendar className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />
+              {t("boardGameMatches.playedDate")}
+            </Label>
             <Input
               type="date"
               value={playedDate}
               onChange={(e) => setPlayedDate(e.target.value)}
-              className="max-w-[12rem]"
+              className="max-w-[14rem] border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80"
               aria-label={t("boardGameMatches.playedDate")}
             />
           </div>
+
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <Label className="text-[var(--color-lightest)]">{t("boardGameMatches.players")}</Label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-lightest)]">
+                <Dice5 className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />
+                {t("boardGameMatches.players")}
+              </Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="gap-1"
-                onClick={() => setPlayers((prev) => [...prev, { name: "", score: "", winner: false }])}
+                className="gap-1.5 rounded-full border-[var(--color-mid)]/40 bg-[var(--color-dark)]/60 hover:bg-[var(--color-mid)]/20"
+                onClick={() => setPlayers((prev) => [...prev, { name: "", score: "", winner: false, appUserId: null }])}
               >
                 <UserPlus className="h-3.5 w-3.5" aria-hidden />
                 {t("boardGameMatches.addPlayer")}
               </Button>
             </div>
             {players.map((p, i) => (
-              <div
+              <motion.div
                 key={i}
-                className="grid grid-cols-1 gap-2 rounded-lg border border-[var(--color-mid)]/25 bg-[var(--color-darkest)]/40 p-3 sm:grid-cols-[1fr_6rem_auto_auto]"
+                layout
+                className="flex flex-col gap-3 rounded-2xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 ring-1 ring-white/5 sm:flex-row sm:items-center sm:gap-4 sm:p-4"
               >
-                <Input
-                  placeholder={t("boardGameMatches.playerName")}
-                  value={p.name}
-                  onChange={(e) =>
-                    setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, name: e.target.value } : row)))
-                  }
-                  aria-label={t("boardGameMatches.playerName")}
-                />
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder={t("boardGameMatches.score")}
-                  value={p.score}
-                  onChange={(e) =>
-                    setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, score: e.target.value } : row)))
-                  }
-                  aria-label={t("boardGameMatches.score")}
-                />
-                <div className="flex items-center gap-2 sm:justify-center">
-                  <Switch
-                    checked={p.winner}
-                    onCheckedChange={(v) =>
-                      setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, winner: v } : row)))
-                    }
-                    aria-label={t("boardGameMatches.winner")}
-                  />
-                  <span className="text-xs text-[var(--color-light)]">{t("boardGameMatches.winner")}</span>
+                <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-center sm:gap-1.5">
+                  <div className="relative shrink-0">
+                    <PlayerAvatar name={p.name} size="lg" winner={p.winner} />
+                    {p.appUserId && (
+                      <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-md bg-[var(--color-darkest)] p-0.5 ring-2 ring-[var(--color-dark)]">
+                        <Logo className="h-3.5 w-3.5 object-contain" alt="" />
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-light)] sm:hidden">
+                    {t("boardGameMatches.playerSlot", { n: String(i + 1) })}
+                  </span>
                 </div>
-                {players.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-red-400 hover:bg-red-500/20"
-                    onClick={() => setPlayers((prev) => prev.filter((_, j) => j !== i))}
-                    aria-label={t("boardGameMatches.removePlayer")}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+                <div className="grid min-w-0 flex-1 grid-cols-1 gap-3">
+                  <MatchPlayerNameField
+                    value={p.name}
+                    appUserId={p.appUserId}
+                    excludeUserId={me?.user?.id}
+                    t={t}
+                    onChange={(next) =>
+                      setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, ...next } : row)))
+                    }
+                  />
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={t("boardGameMatches.score")}
+                    value={p.score}
+                    onChange={(e) =>
+                      setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, score: e.target.value } : row)))
+                    }
+                    className="border-[var(--color-mid)]/35 bg-[var(--color-dark)]/80"
+                    aria-label={t("boardGameMatches.score")}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3 sm:flex-col sm:justify-center sm:px-1">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-[var(--color-mid)]/10 px-3 py-2 sm:flex-col sm:py-2.5">
+                    <Switch
+                      checked={p.winner}
+                      onCheckedChange={(v) =>
+                        setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, winner: v } : row)))
+                      }
+                      aria-label={t("boardGameMatches.winner")}
+                    />
+                    <span className="flex items-center gap-1 text-xs font-medium text-[var(--color-light)]">
+                      <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-400/90" aria-hidden />
+                      {t("boardGameMatches.winner")}
+                    </span>
+                  </div>
+                  {players.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-red-400/90 hover:bg-red-500/15 hover:text-red-300"
+                      onClick={() => setPlayers((prev) => prev.filter((_, j) => j !== i))}
+                      aria-label={t("boardGameMatches.removePlayer")}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </motion.div>
             ))}
           </div>
+
           <div className="space-y-2">
-            <Label className="text-[var(--color-lightest)]">{t("boardGameMatches.matchNotes")}</Label>
+            <Label className="text-sm font-medium text-[var(--color-lightest)]">{t("boardGameMatches.matchNotes")}</Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder={t("boardGameMatches.matchNotesPlaceholder")}
-              className="min-h-[72px]"
+              className="min-h-[88px] resize-none border-[var(--color-mid)]/35 bg-[var(--color-dark)]/80"
             />
           </div>
-          <Button type="button" className="w-full sm:w-auto" disabled={saving} onClick={() => void handleSaveNew()}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+
+          <Button
+            type="button"
+            className="w-full rounded-xl py-6 text-base font-semibold sm:w-auto sm:px-10 sm:py-5"
+            disabled={saving}
+            onClick={() => void handleSaveNew()}
+          >
+            {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden /> : <Dice5 className="mr-2 h-5 w-5 opacity-90" aria-hidden />}
             {saving ? t("common.saving") : t("boardGameMatches.saveMatch")}
           </Button>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
 
 function MatchHistoryCard({
   match,
+  previousMatch,
   formatPlayed,
   deleting,
   onDelete,
   t,
 }: {
   match: BoardGameMatch;
+  /** Chronologically earlier session for this log (same game), if any. */
+  previousMatch: BoardGameMatch | null;
   formatPlayed: (iso: string) => string;
   deleting: boolean;
   onDelete: () => void;
-  t: (k: string) => string;
+  t: TFunction;
 }) {
   const [open, setOpen] = useState(false);
   const winners = match.players.filter((p) => p.winner).map((p) => p.name);
 
   return (
-    <li className="overflow-hidden rounded-lg border border-[var(--color-mid)]/25 bg-[var(--color-darkest)]/30">
+    <article className="overflow-hidden rounded-2xl border border-[var(--color-mid)]/25 bg-gradient-to-br from-[var(--color-dark)] via-[var(--color-dark)] to-[var(--color-darkest)] shadow-[var(--shadow-md)] ring-1 ring-white/[0.04]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full min-h-[44px] items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--color-mid)]/15"
+        className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[var(--color-mid)]/10 sm:gap-4 sm:px-5 sm:py-4"
         aria-expanded={open}
       >
-        <ChevronRight
-          className={cn("h-4 w-4 shrink-0 text-[var(--color-light)] transition-transform", open && "rotate-90")}
+        <div className="flex shrink-0 -space-x-2.5">
+          {match.players.slice(0, 5).map((p, i) => (
+            <div key={i} className="relative ring-2 ring-[var(--color-dark)] rounded-full" style={{ zIndex: 10 - i }}>
+              <PlayerAvatar name={p.name || "?"} size="sm" winner={false} />
+            </div>
+          ))}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-mid)]/25 px-2.5 py-1 text-xs font-semibold text-[var(--color-lightest)] ring-1 ring-[var(--color-mid)]/20">
+              <Calendar className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+              {formatPlayed(match.playedAt)}
+            </span>
+            {winners.length > 0 && (
+              <span className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-200/95 ring-1 ring-amber-400/25">
+                <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden />
+                <span className="truncate">{winners.join(" · ")}</span>
+              </span>
+            )}
+          </div>
+        </div>
+        <ChevronDown
+          className={cn("h-5 w-5 shrink-0 text-[var(--color-light)] transition-transform duration-200", open && "rotate-180")}
           aria-hidden
         />
-        <span className="text-sm font-medium text-[var(--color-lightest)]">{formatPlayed(match.playedAt)}</span>
-        {winners.length > 0 && (
-          <span className="min-w-0 truncate text-xs text-[var(--color-mid)]">
-            {t("boardGameMatches.winners")}: {winners.join(", ")}
-          </span>
-        )}
       </button>
       {open && (
-        <div className="border-t border-[var(--color-mid)]/20 px-3 py-3 space-y-3">
-          <ul className="m-0 list-none space-y-1 p-0 text-sm text-[var(--color-light)]">
-            {match.players.map((p, i) => (
-              <li key={i}>
-                <span className="font-medium text-[var(--color-lightest)]">{p.name}</span>
-                {p.score != null && <span className="tabular-nums"> — {p.score}</span>}
-                {p.winner && (
-                  <span className="ml-1 text-[var(--color-mid)]">({t("boardGameMatches.winner")})</span>
-                )}
-              </li>
-            ))}
+        <div className="space-y-4 border-t border-[var(--color-mid)]/20 px-4 pb-4 pt-3 sm:px-5">
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {match.players.map((p, i) => {
+              const scoreTrend = scoreTrendVsPreviousSession(p, previousMatch);
+              return (
+                <li
+                  key={i}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border px-3 py-2.5 sm:gap-4 sm:px-4 sm:py-3",
+                    p.winner
+                      ? "border-amber-400/35 bg-gradient-to-r from-amber-500/10 to-transparent"
+                      : "border-[var(--color-mid)]/15 bg-[var(--color-mid)]/5"
+                  )}
+                >
+                  <PlayerAvatar name={p.name} size="md" winner={p.winner} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-center gap-2">
+                      {p.appUserId && (
+                        <Logo className="h-4 w-4 shrink-0 object-contain opacity-95" alt="" aria-hidden />
+                      )}
+                      <div className="truncate font-medium text-[var(--color-lightest)]">{p.name}</div>
+                    </div>
+                    {p.score != null && (
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-sm tabular-nums text-[var(--color-light)]">
+                        <span>
+                          {p.score}{" "}
+                          <span className="text-xs font-normal opacity-80">{t("boardGameMatches.points")}</span>
+                        </span>
+                        {scoreTrend === "higher" && (
+                          <span
+                            className="inline-flex shrink-0"
+                            title={t("boardGameMatches.scoreTrendHigherTitle")}
+                            aria-label={t("boardGameMatches.scoreTrendHigherAria")}
+                          >
+                            <ArrowUpRight className="h-4 w-4 text-emerald-400/95" strokeWidth={2.25} aria-hidden />
+                          </span>
+                        )}
+                        {scoreTrend === "lower" && (
+                          <span
+                            className="inline-flex shrink-0"
+                            title={t("boardGameMatches.scoreTrendLowerTitle")}
+                            aria-label={t("boardGameMatches.scoreTrendLowerAria")}
+                          >
+                            <ArrowDownRight className="h-4 w-4 text-rose-400/95" strokeWidth={2.25} aria-hidden />
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {p.winner && <Trophy className="h-5 w-5 shrink-0 text-amber-400" aria-hidden />}
+                </li>
+              );
+            })}
           </ul>
           {match.notes && match.notes.trim() !== "" && (
-            <p className="whitespace-pre-wrap text-sm text-[var(--color-light)]">{match.notes}</p>
+            <div className="rounded-xl border border-[var(--color-mid)]/15 bg-[var(--color-darkest)]/60 px-4 py-3">
+              <p className="m-0 whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-light)]">{match.notes}</p>
+            </div>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="text-red-400 border-red-500/40 hover:bg-red-500/10"
-            disabled={deleting}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-          >
-            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            <span className="ml-1">{t("boardGameMatches.removeSession")}</span>
-          </Button>
+          <div className="flex justify-end pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2 rounded-full border-red-500/35 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+              disabled={deleting}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Trash2 className="h-4 w-4" aria-hidden />}
+              {t("boardGameMatches.removeSession")}
+            </Button>
+          </div>
         </div>
       )}
-    </li>
+    </article>
   );
 }

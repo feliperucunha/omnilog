@@ -394,6 +394,8 @@ export interface BoardGameMatchPlayer {
   name: string;
   score: number | null;
   winner: boolean;
+  /** Present when this row references a registered app user (by id). */
+  appUserId?: string | null;
 }
 
 /** Board games only: a logged play session (separate from the main log review). */

@@ -26,6 +26,7 @@ import {
   mediaTypeHasBoardGameOnlyFields,
   mediaTypeHasCollectionOwnership,
   mediaTypeHasPurchaseAmount,
+  spendFieldsIncludePurchase,
 } from "@/lib/mediaTypeFeatures";
 import { MoneyAmountInput } from "@/components/MoneyAmountInput";
 import { DEFAULT_PURCHASE_CURRENCY, normalizeCurrencyCode } from "@/lib/currencies";
@@ -153,8 +154,9 @@ export function ItemReviewForm({
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
   const showPurchaseAmount = mediaTypeHasPurchaseAmount(mediaType);
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
-  /** Spend field when "Own" is selected. */
-  const showPurchaseAmountField = showPurchaseAmount && (!showCollectionOwnership || own);
+  /** Purchase when owned or sold (cost + sale for net balance). */
+  const showPurchaseAmountField =
+    showPurchaseAmount && spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
   const showSaleAmountField = showPurchaseAmount && (!showCollectionOwnership || sold);
 
   useEffect(() => {
@@ -301,7 +303,7 @@ export function ItemReviewForm({
         payload.matchesPlayed = toNum(matchesPlayed);
       }
       if (showPurchaseAmount) {
-        const includePurchase = !showCollectionOwnership || own;
+        const includePurchase = spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
         if (!includePurchase || purchaseAmountMinor == null) {
           payload.purchaseAmountMinor = null;
           payload.purchaseCurrency = null;
@@ -355,7 +357,7 @@ export function ItemReviewForm({
           (!showBoardGameFields || toNum(matchesPlayed) === (myLog.matchesPlayed ?? null)) &&
           (!showPurchaseAmount ||
             (() => {
-              const includePurchase = !showCollectionOwnership || own;
+              const includePurchase = spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
               if (!includePurchase) {
                 return (myLog.purchaseAmountMinor ?? null) == null;
               }
@@ -391,7 +393,7 @@ export function ItemReviewForm({
         invalidateLogsAndItemsCache();
         if (
           showPurchaseAmount &&
-          (((!showCollectionOwnership || own) && purchaseAmountMinor != null) ||
+          ((spendFieldsIncludePurchase(showCollectionOwnership, own, sold) && purchaseAmountMinor != null) ||
             ((!showCollectionOwnership || sold) && saleAmountMinor != null))
         ) {
           void refetchMe();
@@ -433,7 +435,7 @@ export function ItemReviewForm({
         invalidateLogsAndItemsCache();
         if (
           showPurchaseAmount &&
-          (((!showCollectionOwnership || own) && purchaseAmountMinor != null) ||
+          ((spendFieldsIncludePurchase(showCollectionOwnership, own, sold) && purchaseAmountMinor != null) ||
             ((!showCollectionOwnership || sold) && saleAmountMinor != null))
         ) {
           void refetchMe();
@@ -609,6 +611,7 @@ export function ItemReviewForm({
                     placeholder="—"
                     aria-label={t("itemReviewForm.episode")}
                     optionsLoading={progressOptionsLoading}
+                    contentScrollable
                   />
                 </div>
               </div>

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { MEDIA_TYPES } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
+import { sanitizeText } from "../lib/sanitize.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { getMilestoneProgress } from "../services/milestone.service.js";
@@ -202,4 +203,23 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       },
     },
   });
+});
+
+const BOARD_GAME_CUSTOM_OPPONENT_Q_MAX = 100;
+
+/** GET /me/board-game-custom-opponents?q= — saved custom opponent names for board-game match autocomplete. */
+meRouter.get("/board-game-custom-opponents", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const rawQ = typeof req.query.q === "string" ? req.query.q : "";
+  const q = sanitizeText(rawQ.trim(), BOARD_GAME_CUSTOM_OPPONENT_Q_MAX);
+  const rows = await prisma.userBoardGameCustomOpponent.findMany({
+    where: {
+      userId: req.user.userId,
+      ...(q ? { labelKey: { contains: q.toLowerCase() } } : {}),
+    },
+    orderBy: { lastUsedAt: "desc" },
+    take: 20,
+    select: { id: true, label: true },
+  });
+  res.json({ data: rows });
 });
