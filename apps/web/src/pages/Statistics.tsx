@@ -10,7 +10,6 @@ import {
   Clock,
   Layers,
   Scale,
-  Sparkles,
   Star,
   type LucideIcon,
 } from "lucide-react";
