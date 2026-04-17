@@ -249,6 +249,8 @@ const FREE_LOG_LIMIT = 500;
 
 const PAGINATION_LIMIT_DEFAULT = 25;
 const PAGINATION_LIMIT_MAX = 100;
+/** Recap list: allow a larger page than normal log pagination (still capped server-side). */
+const RECAP_LIMIT_MAX = 400;
 
 /** GET /logs/counts - Per-category log counts for tab labels. Returns { data: { [mediaType]: number } }. */
 logsRouter.get("/counts", async (req: AuthenticatedRequest, res) => {
@@ -324,9 +326,12 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const purchasedFilter = req.query.purchased === "true" || req.query.purchased === "1";
   const forStatistics =
     req.query.forStatistics === "1" || req.query.forStatistics === "true";
+  const recapFlag = req.query.recap === "1" || req.query.recap === "true";
   const limitParam = req.query.limit != null ? parseInt(String(req.query.limit), 10) : NaN;
-  const usePagination = Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= PAGINATION_LIMIT_MAX;
-  const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
+  const effectivePaginationMax = recapFlag ? RECAP_LIMIT_MAX : PAGINATION_LIMIT_MAX;
+  const usePagination =
+    Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= effectivePaginationMax;
+  const takeSize = usePagination ? Math.min(limitParam, effectivePaginationMax) : undefined;
   const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
   const tzRawList = req.query.timezoneOffsetMinutes;
@@ -337,14 +342,23 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
 
   let statisticsMonthWhereFree: Prisma.LogWhereInput | undefined;
   let isFreeTierForList = false;
-  if (forStatistics || purchasedFilter) {
+  let hasProFeaturesForList = false;
+  if (forStatistics || purchasedFilter || recapFlag) {
     const u = await prisma.user.findUnique({
       where: { id: userId },
       select: { tier: true },
     });
-    isFreeTierForList = u != null && !tierHasProFeatures(u.tier);
+    hasProFeaturesForList = u != null && tierHasProFeatures(u.tier);
+    isFreeTierForList = u != null && !hasProFeaturesForList;
     if (forStatistics && isFreeTierForList) {
       statisticsMonthWhereFree = freeTierStatisticsMonthWhere(tzOffsetMinutesList);
+    }
+  }
+
+  if (recapFlag) {
+    if (!usePagination || takeSize == null) {
+      res.status(400).json({ error: "Recap requires limit between 1 and 400." });
+      return;
     }
   }
 
@@ -415,6 +429,46 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
 
   if (statisticsMonthWhereFree) {
     where = mergeLogWhere(where, statisticsMonthWhereFree);
+  }
+
+  if (recapFlag) {
+    const recapPeriodRaw =
+      typeof req.query.recapPeriod === "string" ? req.query.recapPeriod.trim().toLowerCase() : "";
+    const recapPeriods = ["week", "month", "year"] as const;
+    if (!recapPeriods.includes(recapPeriodRaw as (typeof recapPeriods)[number])) {
+      res.status(400).json({ error: "Invalid recapPeriod (use week, month, or year)." });
+      return;
+    }
+    const recapPeriod = recapPeriodRaw as (typeof recapPeriods)[number];
+    const fromRaw = typeof req.query.updatedFrom === "string" ? req.query.updatedFrom.trim() : "";
+    const toRaw = typeof req.query.updatedTo === "string" ? req.query.updatedTo.trim() : "";
+    if (!fromRaw || !toRaw) {
+      res.status(400).json({ error: "Recap requires updatedFrom and updatedTo (ISO 8601)." });
+      return;
+    }
+    const fromD = new Date(fromRaw);
+    const toD = new Date(toRaw);
+    if (Number.isNaN(fromD.getTime()) || Number.isNaN(toD.getTime()) || fromD > toD) {
+      res.status(400).json({ error: "Invalid recap date range." });
+      return;
+    }
+    const spanMs = toD.getTime() - fromD.getTime();
+    const maxSpanFreeMs = 10 * 24 * 60 * 60 * 1000;
+    const maxSpanProMs = 370 * 24 * 60 * 60 * 1000;
+    if (!hasProFeaturesForList) {
+      if (recapPeriod !== "week") {
+        res.status(403).json({ error: "Recap beyond last week requires Pro.", code: "PRO_REQUIRED" });
+        return;
+      }
+      if (spanMs > maxSpanFreeMs) {
+        res.status(400).json({ error: "Recap date range too wide for the current plan." });
+        return;
+      }
+    } else if (spanMs > maxSpanProMs) {
+      res.status(400).json({ error: "Recap date range too wide." });
+      return;
+    }
+    where = mergeLogWhere(where, { updatedAt: { gte: fromD, lte: toD } });
   }
 
   const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =

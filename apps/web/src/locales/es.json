@@ -313,9 +313,9 @@
     "calendarNoActivity": "Ninguna actividad en este día."
   },
   "statistics": {
-    "freeMonthNotice": "Estás viendo solo este mes calendario. Pasa a Pro para historial completo, todos los períodos y exportación CSV.",
-    "proOnlyTitle": "La exportación CSV es una función Pro",
-    "proOnlyMessage": "Pasa a Pro para descargar todo tu historial de registros en CSV.",
+    "freeMonthNotice": "Estás viendo solo este mes calendario. Pasa a Pro para historial completo, todos los períodos, recaps más largos y exportación CSV.",
+    "proOnlyTitle": "Esta función es Pro",
+    "proOnlyMessage": "Pasa a Pro para historial completo en estadísticas, períodos de recap más allá de la última semana y exportación CSV desde las categorías y Ajustes.",
     "summaryTitle": "Resumen",
     "summaryTotalLogs": "Registros totales",
     "summaryCompleted": "Completados",
@@ -356,6 +356,23 @@
     "statItemsCount_other": "{{count}} elementos",
     "summaryHoursItems_one": "{{count}} elemento con tiempo registrado",
     "summaryHoursItems_other": "{{count}} elementos con tiempo registrado"
+  },
+  "recap": {
+    "button": "Recap",
+    "open": "Abrir recap",
+    "pickerTitle": "Tu recap",
+    "pickerSubtitle": "Elige una categoría y un periodo; luego verás un collage a pantalla completa de tus portadas (solo estrellas si valoraste el ítem).",
+    "categoryLabel": "Categoría",
+    "periodLabel": "Periodo",
+    "allMyMedia": "Todo mi contenido",
+    "periodLastWeek": "Última semana",
+    "periodLastMonth": "Último mes",
+    "periodLastYear": "Último año",
+    "seeRecap": "Ver mi recap",
+    "submitting": "Cargando…",
+    "empty": "No hay registros en este periodo para esta selección.",
+    "logoAlt": "Geeklogs",
+    "shareFileName": "geeklogs-recap.png"
   },
   "money": {
     "spentOnItem": "Importe gastado (opcional)",
@@ -400,6 +417,8 @@
     "noUsersFound": "Ningún usuario encontrado.",
     "userLogCount": "{{count}} logs",
     "recommendationsTitle": "Recomendado para ti",
+    "recommendationsExpand": "Mostrar recomendaciones",
+    "recommendationsCollapse": "Ocultar recomendaciones",
     "recommendationsNav": "Carrusel de recomendaciones",
     "recommendationsDotLabel": "Ir a la página {{index}}"
   },

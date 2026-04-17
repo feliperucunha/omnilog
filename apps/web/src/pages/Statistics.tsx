@@ -8,15 +8,14 @@ import {
   ChevronRight,
   CircleCheck,
   Clock,
-  Download,
   Layers,
   Scale,
+  Sparkles,
   Star,
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { apiFetch, apiFetchCached, apiFetchFile, downloadFile } from "@/lib/api";
-import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
+import { apiFetch, apiFetchCached, ApiError } from "@/lib/api";
 import {
   StatisticsSummarySkeleton,
   StatisticsBarsSkeleton,
@@ -33,7 +32,13 @@ import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
 import { tierHasProFeatures } from "@/lib/userTier";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, SPEND_TRACKED_MEDIA_TYPES, type Log } from "@geeklogs/shared";
+import {
+  COMPLETED_STATUSES,
+  IN_PROGRESS_STATUSES,
+  SPEND_TRACKED_MEDIA_TYPES,
+  type Log,
+  type MediaType,
+} from "@geeklogs/shared";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToBeatHours, formatTimeToFinish } from "@/lib/formatDuration";
@@ -50,7 +55,8 @@ import {
 } from "@/components/ui/dialog";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { showErrorToast } from "@/lib/errorToast";
-import { toast } from "sonner";
+import { buildRecapTitle, recapBoundsForPeriod, type RecapPeriod } from "@/lib/recapPeriodBounds";
+import { RecapView } from "@/components/RecapView";
 import * as storage from "@/lib/storage";
 import { paperShadow } from "@/lib/paperShadow";
 import { currencyMinorDecimals } from "@/lib/moneyInput";
@@ -294,7 +300,11 @@ export function Statistics() {
   const [calendarCollapsed, setCalendarCollapsedState] = useState(false);
   const [chartsCollapsed, setChartsCollapsedState] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [recapPickerOpen, setRecapPickerOpen] = useState(false);
+  const [recapView, setRecapView] = useState<{ title: string; logs: Log[] } | null>(null);
+  const [recapCategory, setRecapCategory] = useState<"all" | MediaType>("all");
+  const [recapPeriod, setRecapPeriod] = useState<RecapPeriod>("week");
+  const [recapSubmitting, setRecapSubmitting] = useState(false);
   const [purchasePeriod, setPurchasePeriod] = useState<PurchasePeriod>("month");
   const [purchaseSpending, setPurchaseSpending] = useState<Record<string, Record<string, number>> | null>(
     null
@@ -557,22 +567,71 @@ export function Statistics() {
       .finally(() => setLoading(false));
   }, [isPro, tzOffsetMinutes]);
 
-  const handleExportClick = useCallback(() => {
-    if (!isPro) {
-      setShowProModal(true);
-      return;
+  const recapCategoryOptions = useMemo(
+    () => [
+      { value: "all", label: t("recap.allMyMedia") },
+      ...visibleTypes.map((mt) => ({ value: mt, label: t(`nav.${mt}`) })),
+    ],
+    [visibleTypes, t]
+  );
+
+  const recapPeriodOptions = useMemo(
+    () => [
+      { value: "week" as const, label: t("recap.periodLastWeek"), disabled: false },
+      { value: "month" as const, label: t("recap.periodLastMonth"), disabled: !isPro },
+      { value: "year" as const, label: t("recap.periodLastYear"), disabled: !isPro },
+    ],
+    [isPro, t]
+  );
+
+  useEffect(() => {
+    if (recapPickerOpen && !isPro && recapPeriod !== "week") {
+      setRecapPeriod("week");
     }
-    setExporting(true);
-    const filename = buildLogsExportFilename({
-      page: "statistics",
-      userSlug: userSlugFromMe(me),
-      categoryKey: "all-categories",
-    });
-    apiFetchFile("/logs/export")
-      .then(({ blob }) => downloadFile(blob, filename).then(() => toast.success(t("tiers.exportSuccess"))))
-      .catch((err) => showErrorToast(t, "E010", { originalError: err }))
-      .finally(() => setExporting(false));
-  }, [isPro, me, t]);
+  }, [recapPickerOpen, isPro, recapPeriod]);
+
+  const handleOpenRecapPicker = useCallback(() => {
+    setRecapPickerOpen(true);
+  }, []);
+
+  const handleSeeRecap = useCallback(async () => {
+    const bounds = recapBoundsForPeriod(recapPeriod, tzOffsetMinutes);
+    setRecapSubmitting(true);
+    try {
+      const params = new URLSearchParams({
+        recap: "1",
+        recapPeriod,
+        updatedFrom: bounds.from.toISOString(),
+        updatedTo: bounds.to.toISOString(),
+        limit: "400",
+        sort: "dateDesc",
+        timezoneOffsetMinutes: String(tzOffsetMinutes),
+      });
+      if (recapCategory !== "all") {
+        params.set("mediaType", recapCategory);
+      }
+      const res = await apiFetch<{ data: Log[]; nextCursor: string | null }>(`/logs?${params.toString()}`);
+      const categoryLabel =
+        recapCategory === "all" ? t("recap.allMyMedia") : t(`nav.${recapCategory}`);
+      const title = buildRecapTitle({
+        period: recapPeriod,
+        categoryLabel,
+        locale,
+        tzOffsetMinutes,
+        weekLabel: t("recap.periodLastWeek"),
+      });
+      setRecapView({ title, logs: res.data ?? [] });
+      setRecapPickerOpen(false);
+    } catch (e) {
+      if (e instanceof ApiError && e.statusCode === 403) {
+        setShowProModal(true);
+        return;
+      }
+      showErrorToast(t, "E010", { originalError: e });
+    } finally {
+      setRecapSubmitting(false);
+    }
+  }, [recapPeriod, tzOffsetMinutes, recapCategory, t, locale]);
 
   useEffect(() => {
     setPageTitle?.(t("nav.statistics"));
@@ -581,19 +640,17 @@ export function Statistics() {
         variant="outline"
         size="sm"
         className="gap-2 shrink-0"
-        onClick={handleExportClick}
-        disabled={exporting}
-        aria-label={t("tiers.exportLogs")}
+        onClick={handleOpenRecapPicker}
+        aria-label={t("recap.open")}
       >
-        <Download className="h-4 w-4" aria-hidden />
-        {exporting ? t("common.saving") : t("tiers.exportLogs")}
+        {t("recap.button")}
       </Button>
     );
     return () => {
       setPageTitle?.(null);
       setRightSlot?.(null);
     };
-  }, [t, setPageTitle, setRightSlot, handleExportClick, exporting]);
+  }, [t, setPageTitle, setRightSlot, handleOpenRecapPicker]);
 
   useEffect(() => {
     void fetchLogs();
@@ -693,6 +750,108 @@ export function Statistics() {
           </Button>
         </DialogContent>
       </Dialog>
+
+      {recapPickerOpen ? (
+        isMobile ? (
+          <Drawer open onOpenChange={(open) => !open && setRecapPickerOpen(false)}>
+            <DrawerContent
+              mobileHeight="auto"
+              className="flex max-h-[min(92dvh,640px)] flex-col gap-4 p-4 sm:p-6"
+              onClose={() => setRecapPickerOpen(false)}
+            >
+              <div className="mt-4 space-y-1">
+                <h2 className="text-lg font-semibold text-[var(--color-lightest)]">{t("recap.pickerTitle")}</h2>
+                <p className="text-sm text-[var(--color-light)]">{t("recap.pickerSubtitle")}</p>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
+                    {t("recap.categoryLabel")}
+                  </p>
+                  <Select
+                    value={recapCategory}
+                    onValueChange={(v) => setRecapCategory(v === "all" ? "all" : (v as MediaType))}
+                    options={recapCategoryOptions}
+                    aria-label={t("recap.categoryLabel")}
+                    className="w-full min-w-0"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
+                    {t("recap.periodLabel")}
+                  </p>
+                  <Select
+                    value={recapPeriod}
+                    onValueChange={(v) => setRecapPeriod(v as RecapPeriod)}
+                    options={recapPeriodOptions}
+                    aria-label={t("recap.periodLabel")}
+                    className="w-full min-w-0"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  className="btn-gradient mt-2 w-full mb-4"
+                  disabled={recapSubmitting}
+                  onClick={() => void handleSeeRecap()}
+                >
+                  {recapSubmitting ? t("recap.submitting") : t("recap.seeRecap")}
+                </Button>
+              </div>
+            </DrawerContent>
+          </Drawer>
+        ) : (
+          <Dialog open onOpenChange={(open) => !open && setRecapPickerOpen(false)}>
+            <DialogContent className="max-w-md" onClose={() => setRecapPickerOpen(false)}>
+              <DialogHeader>
+                <DialogTitle className="min-w-0 text-[var(--color-lightest)]">{t("recap.pickerTitle")}</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-[var(--color-light)]">{t("recap.pickerSubtitle")}</p>
+              <div className="flex flex-col gap-3 pt-1">
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
+                    {t("recap.categoryLabel")}
+                  </p>
+                  <Select
+                    value={recapCategory}
+                    onValueChange={(v) => setRecapCategory(v === "all" ? "all" : (v as MediaType))}
+                    options={recapCategoryOptions}
+                    aria-label={t("recap.categoryLabel")}
+                    className="w-full min-w-0"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
+                    {t("recap.periodLabel")}
+                  </p>
+                  <Select
+                    value={recapPeriod}
+                    onValueChange={(v) => setRecapPeriod(v as RecapPeriod)}
+                    options={recapPeriodOptions}
+                    aria-label={t("recap.periodLabel")}
+                    className="w-full min-w-0"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  className="btn-gradient mt-2 w-full"
+                  disabled={recapSubmitting}
+                  onClick={() => void handleSeeRecap()}
+                >
+                  {recapSubmitting ? t("recap.submitting") : t("recap.seeRecap")}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )
+      ) : null}
+
+      {recapView ? (
+        <RecapView title={recapView.title} logs={recapView.logs} onClose={() => setRecapView(null)} />
+      ) : null}
 
       <div className="flex flex-col gap-12">
       {!isPro && (

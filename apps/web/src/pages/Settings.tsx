@@ -85,7 +85,11 @@ export function Settings() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportSelectedCategories, setExportSelectedCategories] = useState<Set<MediaType>>(() => new Set(MEDIA_TYPES));
   const [showCompleteModal, setShowCompleteModal] = useState(() => getShowCompleteModal());
-  const [draggedMediaTypeIndex, setDraggedMediaTypeIndex] = useState<number | null>(null);
+  /** Pointer-based reorder (HTML5 drag does not work on most mobile browsers). */
+  const mediaTypesOrderListRef = useRef<HTMLUListElement>(null);
+  const reorderDragFromRef = useRef<number | null>(null);
+  const [reorderDragFrom, setReorderDragFrom] = useState<number | null>(null);
+  const [reorderHoverIndex, setReorderHoverIndex] = useState<number | null>(null);
   const exportOpenSnapshotRef = useRef<Set<MediaType>>(new Set());
   const prevExportModalOpenRef = useRef(false);
   const isMobile = useIsMobile();
@@ -318,6 +322,27 @@ export function Settings() {
     setOrderedMediaTypes(next);
     const typesToSave = next.filter((t) => selectedMediaTypes.has(t));
     if (typesToSave.length > 0) saveVisibleMediaTypes(typesToSave);
+  };
+
+  const clearMediaTypeReorderGesture = () => {
+    reorderDragFromRef.current = null;
+    setReorderDragFrom(null);
+    setReorderHoverIndex(null);
+  };
+
+  const mediaTypeDropIndexAtPoint = (clientX: number, clientY: number): number | null => {
+    const root = mediaTypesOrderListRef.current;
+    if (!root) return null;
+    const stack = document.elementsFromPoint(clientX, clientY);
+    for (let i = 0; i < stack.length; i++) {
+      const el = stack[i];
+      if (!(el instanceof Element)) continue;
+      const row = el.closest("[data-media-type-reorder-index]");
+      if (!row || !root.contains(row)) continue;
+      const parsed = Number.parseInt(row.getAttribute("data-media-type-reorder-index") ?? "", 10);
+      if (Number.isFinite(parsed) && parsed >= 0 && parsed < orderedMediaTypes.length) return parsed;
+    }
+    return null;
   };
 
   const handleExportDownload = useCallback(
@@ -584,39 +609,82 @@ export function Settings() {
                 <p className="text-sm text-[var(--color-light)]">
                   {t("settings.visibleMediaTypesOrderHint")}
                 </p>
-                <ul className="flex flex-col gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1" aria-label={t("settings.visibleMediaTypesLabel")}>
+                <ul
+                  ref={mediaTypesOrderListRef}
+                  className="flex flex-col gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1"
+                  aria-label={t("settings.visibleMediaTypesLabel")}
+                >
                   {orderedMediaTypes.map((type, index) => (
                     <li
                       key={type}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
-                        if (Number.isNaN(fromIndex) || fromIndex === index) return;
-                        handleReorderMediaTypes(fromIndex, index);
-                      }}
+                      data-media-type-reorder-index={index}
                       className={cn(
                         "flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-[var(--color-darkest)]/80",
                         "focus-within:ring-2 focus-within:ring-[var(--color-mid)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--color-dark)]",
-                        draggedMediaTypeIndex === index && "opacity-50"
+                        reorderDragFrom === index && "opacity-60",
+                        reorderHoverIndex === index &&
+                          reorderDragFrom != null &&
+                          reorderHoverIndex !== reorderDragFrom &&
+                          "ring-2 ring-[var(--btn-gradient-start)]/45"
                       )}
                     >
-                      <span
-                        draggable
-                        onDragStart={(e) => {
-                          setDraggedMediaTypeIndex(index);
-                          e.dataTransfer.setData("text/plain", String(index));
-                          e.dataTransfer.effectAllowed = "move";
-                        }}
-                        onDragEnd={() => setDraggedMediaTypeIndex(null)}
-                        className="cursor-grab active:cursor-grabbing touch-none text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+                      <button
+                        type="button"
+                        disabled={savingMediaTypes}
+                        className={cn(
+                          "inline-flex min-h-10 min-w-10 shrink-0 cursor-grab touch-none select-none items-center justify-center rounded-md border-0 bg-transparent p-0",
+                          "text-[var(--color-light)] hover:bg-[var(--color-mid)]/25 hover:text-[var(--color-lightest)] active:cursor-grabbing",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-dark)]",
+                          savingMediaTypes && "pointer-events-none opacity-50"
+                        )}
                         aria-label={t("settings.dragToReorder")}
+                        onPointerDown={(e) => {
+                          if (e.button !== 0 || savingMediaTypes) return;
+                          e.preventDefault();
+                          e.currentTarget.setPointerCapture(e.pointerId);
+                          reorderDragFromRef.current = index;
+                          setReorderDragFrom(index);
+                          setReorderHoverIndex(index);
+                        }}
+                        onPointerMove={(e) => {
+                          if (reorderDragFromRef.current == null) return;
+                          setReorderHoverIndex(mediaTypeDropIndexAtPoint(e.clientX, e.clientY));
+                        }}
+                        onPointerUp={(e) => {
+                          if (reorderDragFromRef.current == null) return;
+                          const from = reorderDragFromRef.current;
+                          const x = e.clientX;
+                          const y = e.clientY;
+                          try {
+                            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                              e.currentTarget.releasePointerCapture(e.pointerId);
+                            }
+                          } catch {
+                            /* already released */
+                          }
+                          const to = mediaTypeDropIndexAtPoint(x, y);
+                          clearMediaTypeReorderGesture();
+                          if (to != null && to !== from) {
+                            handleReorderMediaTypes(from, to);
+                          }
+                        }}
+                        onPointerCancel={(e) => {
+                          if (reorderDragFromRef.current == null) return;
+                          try {
+                            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                              e.currentTarget.releasePointerCapture(e.pointerId);
+                            }
+                          } catch {
+                            /* ignore */
+                          }
+                          clearMediaTypeReorderGesture();
+                        }}
+                        onLostPointerCapture={() => {
+                          clearMediaTypeReorderGesture();
+                        }}
                       >
-                        <GripVertical className="h-4 w-4" aria-hidden />
-                      </span>
+                        <GripVertical className="h-5 w-5" aria-hidden />
+                      </button>
                       <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
                         <input
                           type="checkbox"

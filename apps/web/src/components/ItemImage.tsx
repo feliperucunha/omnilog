@@ -27,6 +27,8 @@ interface ItemImageProps {
   loading?: "lazy" | "eager";
   /** Optional referrerPolicy; use "no-referrer" if external CDN blocks referrer. */
   referrerPolicy?: React.ComponentProps<"img">["referrerPolicy"];
+  /** Called once the displayed image has natural dimensions (e.g. for aspect-aware layouts). */
+  onImageNaturalDimensions?: (width: number, height: number) => void;
 }
 
 /**
@@ -45,6 +47,7 @@ export function ItemImage({
   fitContent = false,
   loading,
   referrerPolicy,
+  onImageNaturalDimensions,
 }: ItemImageProps) {
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -79,6 +82,13 @@ export function ItemImage({
     referrerPolicy,
   } as const;
 
+  const emitNatural = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const el = e.currentTarget;
+    if (el.naturalWidth > 0 && el.naturalHeight > 0) {
+      onImageNaturalDimensions?.(el.naturalWidth, el.naturalHeight);
+    }
+  };
+
   return (
     <div className={rootClass}>
       {hasImage ? (
@@ -100,6 +110,7 @@ export function ItemImage({
                   : `${imgSizeClass} ${BGG_CONTAIN_FOREGROUND_IMG_CLASS}`
               }
               {...imgProps}
+              onLoad={emitNatural}
               onError={() => setError(true)}
             />
           </>
@@ -109,6 +120,7 @@ export function ItemImage({
             alt={alt}
             className={`${imgSizeClass} ${effectiveImgClassName}`.trim()}
             {...imgProps}
+            onLoad={emitNatural}
             onError={() => setError(true)}
           />
         )

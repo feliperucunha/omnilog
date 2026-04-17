@@ -13,7 +13,6 @@ import { apiFetch, apiFetchCached, invalidateApiCache } from "@/lib/api";
 import { APP_PTR_REFRESH_EVENT } from "@/lib/appPtrRefresh";
 import { SearchSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
-import { ApiKeyPrompt, type ApiKeyProvider } from "@/components/ApiKeyPrompt";
 import { ItemPageContent } from "@/components/ItemPageContent";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
@@ -27,9 +26,8 @@ import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { skipApiKeyMissingUi } from "@/lib/featureFlags";
 import type { BoardGameProvider } from "@geeklogs/shared";
-import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Search as SearchIcon, UserCheck, X } from "lucide-react";
+import { ChevronDown, Loader2, Search as SearchIcon, UserCheck, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
@@ -38,8 +36,8 @@ import * as storage from "@/lib/storage";
 import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
 import type { Log } from "@geeklogs/shared";
 import { paperShadow } from "@/lib/paperShadow";
+import { cn } from "@/lib/utils";
 
-const SEARCH_BANNER_DISMISSED_KEY = "search-api-key-banner-dismissed";
 const FREE_SEARCH_USAGE_STORAGE_KEY = "geeklogs_free_search_usage";
 
 function getFreeSearchUsageKey(type: MediaType, boardProvider: BoardGameProvider): string {
@@ -68,7 +66,7 @@ type SearchFilter = MediaType | typeof USERS_SEARCH_TYPE;
 
 interface SearchResponse {
   results: SearchResult[];
-  requiresApiKey?: ApiKeyProvider;
+  requiresApiKey?: string;
   link?: string;
   tutorial?: string;
   freeSearchUsed?: number;
@@ -79,7 +77,7 @@ interface SearchResponse {
 interface RecommendationsResponse {
   results: SearchResult[];
   personalization?: "from_logs" | "popular" | "none";
-  requiresApiKey?: ApiKeyProvider;
+  requiresApiKey?: string;
   link?: string;
   tutorial?: string;
 }
@@ -132,14 +130,6 @@ export function Search() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [requiresApiKey, setRequiresApiKey] = useState<{
-    provider: ApiKeyProvider;
-    link: string;
-    tutorial: string;
-    freeSearchUsed?: number;
-    freeSearchLimit?: number;
-    freeSearchLimitReached?: boolean;
-  } | null>(null);
   const [limitReachedByCategory, setLimitReachedByCategory] = useState<Partial<Record<MediaType, boolean>>>({});
   const [usageByCategory, setUsageByCategory] = useState<Partial<Record<MediaType, { used: number; limit: number }>>>(() => {
     const stored = loadFreeSearchUsageFromStorage(() => storage.getItemSync(FREE_SEARCH_USAGE_STORAGE_KEY));
@@ -159,42 +149,15 @@ export function Search() {
   const [logsByExternalId, setLogsByExternalId] = useState<Map<string, string>>(new Map());
   const [recResults, setRecResults] = useState<SearchResult[]>([]);
   const [recLoading, setRecLoading] = useState(false);
-  const [recKeyPrompt, setRecKeyPrompt] = useState<{
-    provider: ApiKeyProvider;
-    link: string;
-    tutorial: string;
-  } | null>(null);
   const [recRefreshNonce, setRecRefreshNonce] = useState(0);
+  /** Recommendations panel: collapsed by default; fetch still runs in the background (see useEffect below). */
+  const [recommendationsSectionOpen, setRecommendationsSectionOpen] = useState(false);
   /** Desktop: map vertical wheel to horizontal scroll (mobile uses native touch; unchanged). */
   const { token } = useAuth();
   const { me, loading: meLoading } = useMe();
   const boardGameProvider = me?.boardGameProvider ?? "bgg";
   const skipApiKeyReq = skipApiKeyMissingUi(me, { token: !!token, meLoading });
-  const provider = getApiKeyProviderForMediaType(mediaType, boardGameProvider);
   const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
-  const needsKeyBanner =
-    !skipApiKeyReq &&
-    provider != null &&
-    (mediaType === "boardgames" ? !hasBoardGameKey : me?.apiKeys && !me.apiKeys[provider]);
-  const [bannerDismissed, setBannerDismissed] = useState(() => {
-    if (typeof sessionStorage === "undefined") return false;
-    return sessionStorage.getItem(`${SEARCH_BANNER_DISMISSED_KEY}-${mediaType}`) === "1";
-  });
-  const showSearchKeyBanner = needsKeyBanner && !bannerDismissed;
-
-  const dismissSearchKeyBanner = () => {
-    setBannerDismissed(true);
-    try {
-      sessionStorage.setItem(`${SEARCH_BANNER_DISMISSED_KEY}-${mediaType}`, "1");
-    } catch {
-      // ignore
-    }
-  };
-
-  useEffect(() => {
-    const stored = sessionStorage.getItem(`${SEARCH_BANNER_DISMISSED_KEY}-${mediaType}`) === "1";
-    setBannerDismissed(stored);
-  }, [mediaType]);
 
   useEffect(() => {
     if (stateMediaType) setSearchFilter(stateMediaType);
@@ -256,7 +219,6 @@ export function Search() {
         setLoading(true);
         setResults([]);
         setUserResults([]);
-        setRequiresApiKey(null);
         try {
           const params = new URLSearchParams({ q: q.trim() });
           const data = await apiFetch<{ users: UserSearchResult[] }>(`/search/users?${params.toString()}`);
@@ -278,7 +240,6 @@ export function Search() {
       setLoading(true);
       setResults([]);
       setUserResults([]);
-      setRequiresApiKey(null);
       try {
         const params = new URLSearchParams({ type: searchType, q: q.trim() });
         if (sort && sort !== "relevance") params.set("sort", sort);
@@ -297,28 +258,14 @@ export function Search() {
           void storage.setItem(FREE_SEARCH_USAGE_STORAGE_KEY, JSON.stringify({ ...prev, [usageKey]: usage }));
           setUsageByCategory((prev) => ({ ...prev, [searchType]: usage }));
         }
-        const skipKeyUi = skipApiKeyMissingUi(me, { token: !!token, meLoading });
-        if (!skipKeyUi && "requiresApiKey" in data && data.requiresApiKey) {
-          setRequiresApiKey({
-            provider: data.requiresApiKey,
-            link: data.link ?? "#",
-            tutorial: data.tutorial ?? "",
-            freeSearchUsed: data.freeSearchUsed,
-            freeSearchLimit: data.freeSearchLimit,
-            freeSearchLimitReached: data.freeSearchLimitReached,
-          });
-        } else {
-          setRequiresApiKey(null);
-        }
       } catch (err) {
         setResults([]);
-        setRequiresApiKey(null);
         showErrorToast(t, "E016", { originalError: err });
       } finally {
         setLoading(false);
       }
     },
-    [searchFilter, sortBy, t, token, me, meLoading]
+    [searchFilter, sortBy, t, token, me]
   );
 
   const hasRunInitialSearch = useRef(false);
@@ -356,12 +303,10 @@ export function Search() {
     if (hasSearched || searchFilter === USERS_SEARCH_TYPE || !RECOMMENDATION_MEDIA_TYPES.includes(mediaType)) {
       setRecResults([]);
       setRecLoading(false);
-      setRecKeyPrompt(null);
       return;
     }
     let cancelled = false;
     setRecLoading(true);
-    setRecKeyPrompt(null);
     const params = new URLSearchParams({
       type: mediaType,
       // Split client cache: recommendations differ when logged in (seeds from logs).
@@ -376,21 +321,10 @@ export function Search() {
       .then((data) => {
         if (cancelled) return;
         setRecResults(data.results ?? []);
-        const skipKeyUi = skipApiKeyMissingUi(me, { token: !!token, meLoading });
-        if (!skipKeyUi && data.requiresApiKey && data.link) {
-          setRecKeyPrompt({
-            provider: data.requiresApiKey,
-            link: data.link,
-            tutorial: data.tutorial ?? "",
-          });
-        } else {
-          setRecKeyPrompt(null);
-        }
       })
       .catch(() => {
         if (!cancelled) {
           setRecResults([]);
-          setRecKeyPrompt(null);
         }
       })
       .finally(() => {
@@ -399,7 +333,11 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [hasSearched, mediaType, searchFilter, token, recRefreshNonce, me, meLoading, boardGameProvider]);
+  }, [hasSearched, mediaType, searchFilter, token, recRefreshNonce, me, boardGameProvider]);
+
+  useEffect(() => {
+    setRecommendationsSectionOpen(false);
+  }, [mediaType, searchFilter]);
 
   const handleSearch = async (e: React.FormEvent) => {
     setHasSearched(true);
@@ -420,16 +358,6 @@ export function Search() {
     window.addEventListener(APP_PTR_REFRESH_EVENT, onPtr);
     return () => window.removeEventListener(APP_PTR_REFRESH_EVENT, onPtr);
   }, [hasSearched, query, runSearch]);
-
-  const handleApiKeySaved = useCallback(() => {
-    setRequiresApiKey(null);
-    setRecKeyPrompt(null);
-    setLimitReachedByCategory({});
-    setUsageByCategory({});
-    invalidateApiCache("/search");
-    setRecRefreshNonce((n) => n + 1);
-    toast.success(t("toast.trySearchingAgain"));
-  }, [t]);
 
   const handleFollowClick = useCallback(
     async (e: React.MouseEvent, targetUserId: string, currentlyFollowing: boolean) => {
@@ -537,39 +465,61 @@ export function Search() {
       <div className="relative z-10 flex flex-col gap-6 flex-1 min-h-0">
       {!hasSearched && searchFilter !== USERS_SEARCH_TYPE && RECOMMENDATION_MEDIA_TYPES.includes(mediaType) && (
         <Card
-          className="relative z-10 flex w-full min-w-0 shrink-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
+          className="relative z-10 flex w-full min-w-0 shrink-0 flex-col border-[var(--color-surface-border)] bg-[var(--color-dark)] p-0"
           style={paperShadow}
         >
-          <h2 className="min-w-0 text-base font-semibold text-[var(--color-lightest)] sm:text-lg">
-            <OverflowMarquee>{t("search.recommendationsTitle")}</OverflowMarquee>
-          </h2>
-          {recLoading && (
-            <div
-              className="h-36 w-full animate-pulse rounded-lg bg-[var(--color-mid)]/20 sm:h-40"
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 rounded-t-lg px-4 py-3 text-left transition-colors hover:bg-[var(--color-mid)]/10 sm:py-3.5"
+            onClick={() => setRecommendationsSectionOpen((o) => !o)}
+            aria-expanded={recommendationsSectionOpen}
+            aria-controls="search-recommendations-panel"
+            aria-labelledby="search-recommendations-heading"
+          >
+            <h2
+              id="search-recommendations-heading"
+              className="min-w-0 flex-1 text-base font-semibold text-[var(--color-lightest)] sm:text-lg"
+            >
+              <OverflowMarquee>{t("search.recommendationsTitle")}</OverflowMarquee>
+            </h2>
+            {recLoading && !recommendationsSectionOpen && (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
+            )}
+            <ChevronDown
+              className={cn(
+                "h-5 w-5 shrink-0 text-[var(--color-light)] transition-transform duration-200",
+                recommendationsSectionOpen && "rotate-180"
+              )}
               aria-hidden
             />
-          )}
-          {recKeyPrompt && !recLoading && !skipApiKeyReq && (
-            <div className="border-t border-[var(--color-surface-border)] pt-4">
-              <p className="mb-3 text-sm text-[var(--color-light)]">{t("search.noResultsUntilApiKey")}</p>
-              <ApiKeyPrompt
-                provider={recKeyPrompt.provider}
-                name={t(`nav.${mediaType}`)}
-                link={recKeyPrompt.link}
-                tutorial={t(`settings.apiKeyTutorial.${recKeyPrompt.provider}`)}
-                onSaved={handleApiKeySaved}
-              />
+            <span className="sr-only">
+              {recommendationsSectionOpen ? t("search.recommendationsCollapse") : t("search.recommendationsExpand")}
+            </span>
+          </button>
+          {recommendationsSectionOpen && (
+            <div
+              id="search-recommendations-panel"
+              role="region"
+              aria-labelledby="search-recommendations-heading"
+              className="flex flex-col gap-3 border-t border-[var(--color-surface-border)] px-4 pb-4 pt-3"
+            >
+              {recLoading && (
+                <div
+                  className="h-36 w-full animate-pulse rounded-lg bg-[var(--color-mid)]/20 sm:h-40"
+                  aria-hidden
+                />
+              )}
+              {!recLoading && recResults.length > 0 && (
+                <SearchRecommendationsCarousel
+                  items={recResults}
+                  mediaType={mediaType}
+                  boardGameProvider={boardGameProvider}
+                  token={token}
+                  logsByExternalId={logsByExternalId}
+                  onItemOpen={(id) => setDrawerItem({ mediaType, id })}
+                />
+              )}
             </div>
-          )}
-          {!recLoading && !recKeyPrompt && recResults.length > 0 && (
-            <SearchRecommendationsCarousel
-              items={recResults}
-              mediaType={mediaType}
-              boardGameProvider={boardGameProvider}
-              token={token}
-              logsByExternalId={logsByExternalId}
-              onItemOpen={(id) => setDrawerItem({ mediaType, id })}
-            />
           )}
         </Card>
       )}
@@ -818,33 +768,7 @@ export function Search() {
         </motion.div>
       )}
 
-      {hasSearched && !loading && requiresApiKey && !skipApiKeyReq && (
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-[var(--color-light)]">
-            {requiresApiKey.freeSearchLimitReached
-              ? t("search.freeSearchLimitReached", {
-                  used: String(requiresApiKey.freeSearchUsed ?? 10),
-                  limit: String(requiresApiKey.freeSearchLimit ?? 10),
-                  type: t(`nav.${mediaType}`),
-                })
-              : requiresApiKey.freeSearchUsed != null && requiresApiKey.freeSearchLimit != null
-                ? t("search.freeSearchUsage", {
-                    used: String(requiresApiKey.freeSearchUsed),
-                    limit: String(requiresApiKey.freeSearchLimit),
-                  })
-                : t("search.noResultsUntilApiKey")}
-          </p>
-          <ApiKeyPrompt
-            provider={requiresApiKey.provider}
-            name={t(`nav.${mediaType}`)}
-            link={requiresApiKey.link}
-            tutorial={t(`settings.apiKeyTutorial.${requiresApiKey.provider}`)}
-            onSaved={handleApiKeySaved}
-          />
-        </div>
-      )}
-
-      {hasSearched && !loading && searchFilter !== USERS_SEARCH_TYPE && query && results.length === 0 && !requiresApiKey && (
+      {hasSearched && !loading && searchFilter !== USERS_SEARCH_TYPE && query && results.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -880,51 +804,6 @@ export function Search() {
                 onBack={() => setDrawerItem(null)}
               />
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showSearchKeyBanner && token && (
-          <motion.div
-            key="search-key-banner"
-            initial={{ opacity: 0, y: -16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className="fixed top-4 left-4 right-4 z-40 flex max-w-sm items-start gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-dark)] p-3 shadow-[var(--shadow-lg)] md:left-auto md:right-6 md:top-6"
-            role="status"
-          >
-          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)] mt-0.5" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm text-[var(--color-lightest)]">
-              {usageByCategory[mediaType]
-                ? t("apiKeyBanner.searchMessageWithCount", {
-                    category: t(`nav.${mediaType}`),
-                    provider: provider ? API_KEY_META[provider].name : "",
-                    used: String(usageByCategory[mediaType]!.used),
-                    limit: String(usageByCategory[mediaType]!.limit),
-                  })
-                : t("apiKeyBanner.searchMessage", {
-                    category: t(`nav.${mediaType}`),
-                    provider: provider ? API_KEY_META[provider].name : "",
-                  })}
-            </p>
-            <Link
-              to="/settings?open=api-keys"
-              className="mt-1.5 inline-block text-xs font-medium text-[var(--color-warning-text-muted)] underline hover:text-[var(--color-warning-text)]"
-            >
-              {t("apiKeyBanner.addKeyInSettings")}
-            </Link>
-          </div>
-          <button
-            type="button"
-            onClick={dismissSearchKeyBanner}
-            className="flex-shrink-0 rounded p-1 text-[var(--color-light)] hover:bg-[var(--color-mid)]/30 hover:text-[var(--color-lightest)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)]"
-            aria-label={t("common.close")}
-          >
-            <X className="h-4 w-4" />
-          </button>
           </motion.div>
         )}
       </AnimatePresence>

@@ -334,9 +334,9 @@
     "calendarNoActivity": "No activity on this day."
   },
   "statistics": {
-    "freeMonthNotice": "You're viewing this calendar month only. Upgrade to Pro for full history, all periods, and CSV export.",
-    "proOnlyTitle": "CSV export is a Pro feature",
-    "proOnlyMessage": "Upgrade to Pro to download your full log history as CSV.",
+    "freeMonthNotice": "You're viewing this calendar month only. Upgrade to Pro for full history, all periods, longer recaps, and CSV export.",
+    "proOnlyTitle": "This is a Pro feature",
+    "proOnlyMessage": "Upgrade to Pro for full statistics history, recap timeframes beyond last week, and CSV export from category views and Settings.",
     "summaryTitle": "Overview",
     "summaryTotalLogs": "Total logs",
     "summaryCompleted": "Completed",
@@ -377,6 +377,23 @@
     "statItemsCount_other": "{{count}} items",
     "summaryHoursItems_one": "{{count}} item with time logged",
     "summaryHoursItems_other": "{{count}} items with time logged"
+  },
+  "recap": {
+    "button": "Recap",
+    "open": "Open recap",
+    "pickerTitle": "Your recap",
+    "pickerSubtitle": "Pick a category and timeframe, then view a full-screen collage of your covers (stars only when you rated the item).",
+    "categoryLabel": "Category",
+    "periodLabel": "Timeframe",
+    "allMyMedia": "All my media",
+    "periodLastWeek": "Last week",
+    "periodLastMonth": "Last month",
+    "periodLastYear": "Last year",
+    "seeRecap": "See my recap",
+    "submitting": "Loading…",
+    "empty": "No logs in this period for this selection.",
+    "logoAlt": "Geeklogs",
+    "shareFileName": "geeklogs-recap.png"
   },
   "money": {
     "spentOnItem": "Amount spent (optional)",
@@ -421,6 +438,8 @@
     "noUsersFound": "No users found.",
     "userLogCount": "{{count}} logs",
     "recommendationsTitle": "Recommended for you",
+    "recommendationsExpand": "Show recommendations",
+    "recommendationsCollapse": "Hide recommendations",
     "recommendationsNav": "Recommended titles carousel",
     "recommendationsDotLabel": "Go to page {{index}}"
   },

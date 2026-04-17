@@ -110,6 +110,7 @@ SelectItem.displayName = SelectPrimitive.Item.displayName;
 export interface SelectOption {
   value: string;
   label: string;
+  disabled?: boolean;
 }
 
 export interface SelectProps {
@@ -178,7 +179,11 @@ export function Select({
         </SelectTrigger>
         <SelectContent viewportClassName={scrollViewportClass} scrollHint={contentScrollable === true}>
           {options.map((opt) => (
-            <SelectItem key={opt.value === "" ? "__empty" : opt.value} value={opt.value === "" ? "__empty" : opt.value}>
+            <SelectItem
+              key={opt.value === "" ? "__empty" : opt.value}
+              value={opt.value === "" ? "__empty" : opt.value}
+              disabled={opt.disabled === true}
+            >
               {opt.label}
             </SelectItem>
           ))}
