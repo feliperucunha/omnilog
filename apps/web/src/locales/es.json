@@ -363,6 +363,8 @@
     "pickerTitle": "Tu recap",
     "pickerSubtitle": "Elige una categoría y un periodo; luego verás un collage a pantalla completa de tus portadas (solo estrellas si valoraste el ítem).",
     "categoryLabel": "Categoría",
+    "statusLabel": "Estado",
+    "statusAll": "Todos los estados",
     "periodLabel": "Periodo",
     "allMyMedia": "Todo mi contenido",
     "periodLastWeek": "Última semana",

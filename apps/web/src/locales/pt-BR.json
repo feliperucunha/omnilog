@@ -383,6 +383,8 @@
     "pickerTitle": "Seu recap",
     "pickerSubtitle": "Escolha uma categoria e o período; em seguida veja uma colagem em tela cheia das capas (só estrelas quando você avaliou o item).",
     "categoryLabel": "Categoria",
+    "statusLabel": "Status",
+    "statusAll": "Todos os status",
     "periodLabel": "Período",
     "allMyMedia": "Toda a minha mídia",
     "periodLastWeek": "Última semana",

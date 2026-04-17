@@ -34,6 +34,7 @@ import { tierHasProFeatures } from "@/lib/userTier";
 import {
   COMPLETED_STATUSES,
   IN_PROGRESS_STATUSES,
+  LOG_STATUS_OPTIONS,
   SPEND_TRACKED_MEDIA_TYPES,
   type Log,
   type MediaType,
@@ -302,6 +303,8 @@ export function Statistics() {
   const [recapPickerOpen, setRecapPickerOpen] = useState(false);
   const [recapView, setRecapView] = useState<{ title: string; logs: Log[] } | null>(null);
   const [recapCategory, setRecapCategory] = useState<"all" | MediaType>("all");
+  /** Only used when `recapCategory` is a single media type; `"all"` = no status filter. */
+  const [recapStatusFilter, setRecapStatusFilter] = useState<"all" | string>("all");
   const [recapPeriod, setRecapPeriod] = useState<RecapPeriod>("week");
   const [recapSubmitting, setRecapSubmitting] = useState(false);
   const [purchasePeriod, setPurchasePeriod] = useState<PurchasePeriod>("month");
@@ -583,6 +586,21 @@ export function Statistics() {
     [isPro, t]
   );
 
+  const recapStatusOptions = useMemo(() => {
+    const allOpt = { value: "all", label: t("recap.statusAll") };
+    if (recapCategory === "all") {
+      return [allOpt];
+    }
+    const statuses = LOG_STATUS_OPTIONS[recapCategory];
+    return [
+      allOpt,
+      ...statuses.map((s) => ({
+        value: s,
+        label: getStatusLabel(t, s, recapCategory),
+      })),
+    ];
+  }, [recapCategory, t]);
+
   useEffect(() => {
     if (recapPickerOpen && !isPro && recapPeriod !== "week") {
       setRecapPeriod("week");
@@ -608,6 +626,9 @@ export function Statistics() {
       });
       if (recapCategory !== "all") {
         params.set("mediaType", recapCategory);
+        if (recapStatusFilter !== "all") {
+          params.set("status", recapStatusFilter);
+        }
       }
       const res = await apiFetch<{ data: Log[]; nextCursor: string | null }>(`/logs?${params.toString()}`);
       const categoryLabel =
@@ -630,7 +651,7 @@ export function Statistics() {
     } finally {
       setRecapSubmitting(false);
     }
-  }, [recapPeriod, tzOffsetMinutes, recapCategory, t, locale]);
+  }, [recapPeriod, tzOffsetMinutes, recapCategory, recapStatusFilter, t, locale]);
 
   useEffect(() => {
     setPageTitle?.(t("nav.statistics"));
@@ -769,11 +790,29 @@ export function Statistics() {
                   </p>
                   <Select
                     value={recapCategory}
-                    onValueChange={(v) => setRecapCategory(v === "all" ? "all" : (v as MediaType))}
+                    onValueChange={(v) => {
+                      setRecapStatusFilter("all");
+                      setRecapCategory(v === "all" ? "all" : (v as MediaType));
+                    }}
                     options={recapCategoryOptions}
                     aria-label={t("recap.categoryLabel")}
                     className="w-full min-w-0"
                     triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
+                    {t("recap.statusLabel")}
+                  </p>
+                  <Select
+                    value={recapStatusFilter}
+                    onValueChange={(v) => setRecapStatusFilter(v)}
+                    options={recapStatusOptions}
+                    disabled={recapCategory === "all"}
+                    aria-label={t("recap.statusLabel")}
+                    className="w-full min-w-0"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                    contentScrollable
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -814,11 +853,29 @@ export function Statistics() {
                   </p>
                   <Select
                     value={recapCategory}
-                    onValueChange={(v) => setRecapCategory(v === "all" ? "all" : (v as MediaType))}
+                    onValueChange={(v) => {
+                      setRecapStatusFilter("all");
+                      setRecapCategory(v === "all" ? "all" : (v as MediaType));
+                    }}
                     options={recapCategoryOptions}
                     aria-label={t("recap.categoryLabel")}
                     className="w-full min-w-0"
                     triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
+                    {t("recap.statusLabel")}
+                  </p>
+                  <Select
+                    value={recapStatusFilter}
+                    onValueChange={(v) => setRecapStatusFilter(v)}
+                    options={recapStatusOptions}
+                    disabled={recapCategory === "all"}
+                    aria-label={t("recap.statusLabel")}
+                    className="w-full min-w-0"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                    contentScrollable
                   />
                 </div>
                 <div className="space-y-1.5">

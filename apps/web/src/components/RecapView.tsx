@@ -359,7 +359,7 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
         />
         <h1
           className={cn(
-            "min-h-8 min-w-0 text-center text-sm font-semibold leading-snug tracking-tight text-[var(--color-lightest)] md:min-h-9 md:text-base",
+            "min-h-8 min-w-0 mt-4 text-center self-center text-sm font-semibold leading-snug tracking-tight text-[var(--color-lightest)] md:text-base",
             isNative
               ? "max-w-[min(100%,calc(100vw-7.5rem))] md:max-w-[min(100%,calc(100vw-8.5rem))]"
               : "max-w-[min(100%,calc(100vw-5rem))]"
@@ -376,7 +376,7 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
             disabled={shareInProgress || logs.length === 0 || !imagesLayoutReady}
             aria-label={t("common.share")}
             aria-busy={shareInProgress}
-            className="flex h-9 w-9 items-center justify-center rounded-full border-0 bg-black/80 text-white md:h-10 md:w-10 disabled:opacity-50"
+            className="flex h-7 w-7 items-center justify-center rounded-full border-0 bg-black/80 text-white md:h-10 md:w-10 disabled:opacity-50"
             style={{ transform: "none", willChange: "auto" }}
           >
             {shareInProgress ? (
@@ -391,7 +391,7 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
             type="button"
             onClick={onClose}
             aria-label={t("common.close")}
-            className="flex h-9 w-9 items-center justify-center rounded-full border-0 bg-black/80 text-white md:h-10 md:w-10"
+            className="flex h-7 w-7 items-center justify-center rounded-full border-0 bg-black/80 text-white md:h-10 md:w-10"
             style={{ transform: "none", willChange: "auto" }}
           >
             <X className="h-5 w-5" aria-hidden />
@@ -401,7 +401,7 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
             type="button"
             variant="ghost"
             size="icon"
-            className="h-9 w-9 shrink-0 rounded-full bg-black/75 text-white shadow-lg ring-1 ring-white/20 hover:bg-black/90 hover:text-white md:h-10 md:w-10"
+            className="h-7 w-7 shrink-0 rounded-full bg-black/75 text-white shadow-lg ring-1 ring-white/20 hover:bg-black/90 hover:text-white md:h-10 md:w-10"
             onClick={onClose}
             aria-label={t("common.close")}
           >

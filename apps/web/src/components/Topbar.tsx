@@ -142,7 +142,7 @@ export function Topbar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 max-md:min-h-[44px] max-md:min-w-[44px] max-md:h-11 max-md:w-11 rounded-full border border-[var(--color-light)] bg-[var(--color-mid)]/30 p-0 text-lg font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/50 focus-visible:ring-0 focus-visible:ring-offset-0"
+                className="h-10 w-10 max-md:min-h-[40px] max-md:min-w-[40px] max-md:h-10 max-md:10 rounded-full border border-[var(--color-light)] bg-[var(--color-mid)]/30 p-0 text-lg font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/50 focus-visible:ring-0 focus-visible:ring-offset-0"
                 aria-label={t("nav.settings")}
               >
                 {initial}

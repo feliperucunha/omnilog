@@ -384,6 +384,8 @@
     "pickerTitle": "Your recap",
     "pickerSubtitle": "Pick a category and timeframe, then view a full-screen collage of your covers (stars only when you rated the item).",
     "categoryLabel": "Category",
+    "statusLabel": "Status",
+    "statusAll": "All statuses",
     "periodLabel": "Timeframe",
     "allMyMedia": "All my media",
     "periodLastWeek": "Last week",
