@@ -29,6 +29,8 @@ interface ItemImageProps {
   referrerPolicy?: React.ComponentProps<"img">["referrerPolicy"];
   /** Called once the displayed image has natural dimensions (e.g. for aspect-aware layouts). */
   onImageNaturalDimensions?: (width: number, height: number) => void;
+  /** Called when the displayed image fails to load (after switching to placeholder). */
+  onImageError?: () => void;
 }
 
 /**
@@ -48,6 +50,7 @@ export function ItemImage({
   loading,
   referrerPolicy,
   onImageNaturalDimensions,
+  onImageError,
 }: ItemImageProps) {
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -111,7 +114,10 @@ export function ItemImage({
               }
               {...imgProps}
               onLoad={emitNatural}
-              onError={() => setError(true)}
+              onError={() => {
+                setError(true);
+                onImageError?.();
+              }}
             />
           </>
         ) : (
@@ -121,7 +127,10 @@ export function ItemImage({
             className={`${imgSizeClass} ${effectiveImgClassName}`.trim()}
             {...imgProps}
             onLoad={emitNatural}
-            onError={() => setError(true)}
+            onError={() => {
+              setError(true);
+              onImageError?.();
+            }}
           />
         )
       ) : (

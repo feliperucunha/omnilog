@@ -391,6 +391,7 @@
     "seeRecap": "Ver meu recap",
     "submitting": "Carregando…",
     "empty": "Nenhum log neste período para esta seleção.",
+    "loadingCovers": "Carregando capas…",
     "logoAlt": "Geeklogs",
     "shareFileName": "geeklogs-recap.png"
   },

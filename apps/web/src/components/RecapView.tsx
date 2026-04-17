@@ -9,7 +9,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useMe } from "@/contexts/MeContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Logo, getLogoSrc } from "@/components/Logo";
-import { getHeroImageUrl } from "@/lib/getHeroImageUrl";
+import { getHeroImageUrl, coerceImageUrlString } from "@/lib/getHeroImageUrl";
 import { showErrorToast } from "@/lib/errorToast";
 import { triggerImpact } from "@/lib/capacitorHaptics";
 import { cn } from "@/lib/utils";
@@ -17,9 +17,18 @@ import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
 
 const SHARE_CAPTURE_PIXEL_RATIO = 2;
 
+/**
+ * Off-screen share card: inner bounds passed to `computePack` (below header padding).
+ * Taller than wide so native shares read as a phone-style portrait story, not ~square.
+ */
+/** 1080 card width minus horizontal `p-8` (32+32). */
+const SHARE_PACK_INNER_WIDTH_PX = 1016;
+const SHARE_PACK_INNER_HEIGHT_PX = 2320;
+
 /** width / height when unknown (portrait-ish poster). */
 const DEFAULT_ASPECT = 2 / 3;
 const GRID_GAP_PX = 6;
+const DECODE_TIMEOUT_MS = 22_000;
 
 function useIsNative(): boolean {
   const [isNative, setIsNative] = useState(() => {
@@ -147,6 +156,7 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [aspectByLogId, setAspectByLogId] = useState<Record<string, number>>({});
+  const [imagesLayoutReady, setImagesLayoutReady] = useState(false);
   const [pack, setPack] = useState<{ H: number; rows: number[][]; scale: number }>({
     H: 80,
     rows: [],
@@ -155,30 +165,92 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
   const [shareInProgress, setShareInProgress] = useState(false);
 
   const logIdsKey = useMemo(() => logs.map((l) => l.id).join("\0"), [logs]);
+  const logIdsKeyRef = useRef(logIdsKey);
+  logIdsKeyRef.current = logIdsKey;
+  const logsRef = useRef(logs);
+  logsRef.current = logs;
 
-  useEffect(() => {
-    setAspectByLogId({});
-  }, [logIdsKey]);
+  const pendingAspectRef = useRef<Record<string, number>>({});
+  const readyIdsRef = useRef<Set<string>>(new Set());
 
   const aspectArr = useMemo(
     () => logs.map((l) => aspectByLogId[l.id] ?? DEFAULT_ASPECT),
     [logs, aspectByLogId]
   );
 
-  const setAspectForLog = useCallback((logId: string, width: number, height: number) => {
-    if (width <= 0 || height <= 0) return;
-    const ratio = width / height;
-    if (!Number.isFinite(ratio) || ratio < 0.2 || ratio > 5) return;
-    setAspectByLogId((prev) => {
-      if (prev[logId] === ratio) return prev;
-      return { ...prev, [logId]: ratio };
-    });
+  const tryFlushDecode = useCallback((decodeToken: string) => {
+    if (decodeToken !== logIdsKeyRef.current) return;
+    if (readyIdsRef.current.size < logsRef.current.length) return;
+    setAspectByLogId({ ...pendingAspectRef.current });
+    setImagesLayoutReady(true);
   }, []);
 
   useLayoutEffect(() => {
-    const el = viewportRef.current;
-    if (!el || logs.length === 0) {
+    if (logs.length === 0) {
+      setImagesLayoutReady(true);
+      setAspectByLogId({});
       setPack({ H: 48, rows: [], scale: 1 });
+      return;
+    }
+
+    const decodeToken = logIdsKey;
+    setImagesLayoutReady(false);
+    setAspectByLogId({});
+    pendingAspectRef.current = {};
+    readyIdsRef.current = new Set();
+
+    for (const log of logs) {
+      const url = coerceImageUrlString(getHeroImageUrl(log.image) ?? log.image);
+      if (!url) {
+        pendingAspectRef.current[log.id] = DEFAULT_ASPECT;
+        readyIdsRef.current.add(log.id);
+      }
+    }
+    tryFlushDecode(decodeToken);
+
+    const tout = window.setTimeout(() => {
+      if (decodeToken !== logIdsKeyRef.current) return;
+      for (const log of logsRef.current) {
+        if (readyIdsRef.current.has(log.id)) continue;
+        pendingAspectRef.current[log.id] = DEFAULT_ASPECT;
+        readyIdsRef.current.add(log.id);
+      }
+      tryFlushDecode(decodeToken);
+    }, DECODE_TIMEOUT_MS);
+
+    return () => window.clearTimeout(tout);
+  }, [logIdsKey, logs, tryFlushDecode]);
+
+  const onDecodeNatural = useCallback(
+    (logId: string, decodeToken: string, nw: number, nh: number) => {
+      if (decodeToken !== logIdsKeyRef.current) return;
+      if (!logsRef.current.some((l) => l.id === logId)) return;
+      let ratio = DEFAULT_ASPECT;
+      if (nw > 0 && nh > 0) {
+        const r = nw / nh;
+        if (Number.isFinite(r) && r >= 0.2 && r <= 5) ratio = r;
+      }
+      pendingAspectRef.current[logId] = ratio;
+      readyIdsRef.current.add(logId);
+      tryFlushDecode(decodeToken);
+    },
+    [tryFlushDecode]
+  );
+
+  const onDecodeError = useCallback(
+    (logId: string, decodeToken: string) => {
+      if (decodeToken !== logIdsKeyRef.current) return;
+      pendingAspectRef.current[logId] = DEFAULT_ASPECT;
+      readyIdsRef.current.add(logId);
+      tryFlushDecode(decodeToken);
+    },
+    [tryFlushDecode]
+  );
+
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    if (!el || logs.length === 0 || !imagesLayoutReady) {
+      if (logs.length === 0) setPack({ H: 48, rows: [], scale: 1 });
       return;
     }
     const measure = () => {
@@ -190,14 +262,20 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [logs.length, aspectArr, logIdsKey]);
+  }, [logs.length, aspectArr, logIdsKey, imagesLayoutReady]);
 
   const sharePack = useMemo(() => {
-    const sw = 980;
-    const sh = 1020;
+    if (!imagesLayoutReady || logs.length === 0) {
+      return { H: 80, rows: [] as number[][], scale: 1, boxW: 0, boxH: 0 };
+    }
     const gap = GRID_GAP_PX * 2;
-    return computePack(aspectArr, sw, sh, gap);
-  }, [aspectArr]);
+    return computePack(
+      aspectArr,
+      SHARE_PACK_INNER_WIDTH_PX,
+      SHARE_PACK_INNER_HEIGHT_PX,
+      gap
+    );
+  }, [aspectArr, imagesLayoutReady, logs.length]);
 
   const handleShare = useCallback(async (): Promise<void> => {
     if (shareInProgress) return;
@@ -259,26 +337,43 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
 
   useAndroidOverlayBack(true, onClose);
 
-  /** Slightly smaller than before so five stars read cleanly on narrow portrait tiles. */
   const starScale =
     Math.min(0.82, Math.max(0.36, (pack.H - 10) / 120)) * 0.78;
 
+  const skeletonCount = Math.min(logs.length, 28);
+
   const headerBlock = (
-    <div className="flex min-h-0 min-w-0 shrink-0 items-start gap-2 pb-2 pt-[max(0.25rem,env(safe-area-inset-top))]">
-      <Logo
-        src={getLogoSrc(theme.colorScheme)}
-        alt={t("recap.logoAlt")}
-        className="mt-0.5 h-8 w-8 shrink-0 rounded-md object-contain md:h-9 md:w-9"
-      />
-      <h1 className="min-w-0 flex-1 pt-0.5 text-left text-sm font-semibold leading-tight tracking-tight text-[var(--color-lightest)] md:text-base">
-        {title}
-      </h1>
-      <div className="flex shrink-0 items-center gap-1.5 pr-[max(0,env(safe-area-inset-right))]">
+    <div
+      className={cn(
+        "relative flex min-h-0 min-w-0 shrink-0 items-center justify-center px-2 pb-2 pt-[max(0.25rem,env(safe-area-inset-top))] pl-[max(0.5rem,env(safe-area-inset-left))]",
+        isNative
+          ? "pr-[max(5.75rem,env(safe-area-inset-right))] md:pr-[max(6.25rem,env(safe-area-inset-right))]"
+          : "pr-[max(3.25rem,env(safe-area-inset-right))]"
+      )}
+    >
+      <div className="flex min-w-0 max-w-full flex-wrap items-center justify-center gap-2 md:gap-2.5">
+        <Logo
+          src={getLogoSrc(theme.colorScheme)}
+          alt={t("recap.logoAlt")}
+          className="h-8 w-8 shrink-0 rounded-md object-contain md:h-9 md:w-9"
+        />
+        <h1
+          className={cn(
+            "min-h-8 min-w-0 text-center text-sm font-semibold leading-snug tracking-tight text-[var(--color-lightest)] md:min-h-9 md:text-base",
+            isNative
+              ? "max-w-[min(100%,calc(100vw-7.5rem))] md:max-w-[min(100%,calc(100vw-8.5rem))]"
+              : "max-w-[min(100%,calc(100vw-5rem))]"
+          )}
+        >
+          {title}
+        </h1>
+      </div>
+      <div className="absolute right-[max(0.25rem,env(safe-area-inset-right))] top-1/2 flex -translate-y-1/2 items-center gap-1.5">
         {isNative ? (
           <button
             type="button"
             onClick={() => void handleShare()}
-            disabled={shareInProgress || logs.length === 0}
+            disabled={shareInProgress || logs.length === 0 || !imagesLayoutReady}
             aria-label={t("common.share")}
             aria-busy={shareInProgress}
             className="flex h-9 w-9 items-center justify-center rounded-full border-0 bg-black/80 text-white md:h-10 md:w-10 disabled:opacity-50"
@@ -317,6 +412,33 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
     </div>
   );
 
+  const decodeImgs =
+    logs.length > 0 ? (
+      <div
+        className="pointer-events-none fixed left-0 top-0 -z-10 h-px w-px overflow-hidden opacity-0"
+        aria-hidden
+      >
+        {logs.map((log) => {
+          const url = coerceImageUrlString(getHeroImageUrl(log.image) ?? log.image);
+          if (!url) return null;
+          return (
+            <img
+              key={`decode-${logIdsKey}-${log.id}`}
+              src={url}
+              alt=""
+              decoding="async"
+              loading="eager"
+              onLoad={(e) => {
+                const el = e.currentTarget;
+                onDecodeNatural(log.id, logIdsKey, el.naturalWidth, el.naturalHeight);
+              }}
+              onError={() => onDecodeError(log.id, logIdsKey)}
+            />
+          );
+        })}
+      </div>
+    ) : null;
+
   const renderTile = (log: Log, logIndex: number, H: number) => {
     const hero = getHeroImageUrl(log.image) ?? log.image;
     const stars = log.grade != null ? gradeToStars(log.grade) : null;
@@ -337,7 +459,6 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
           boardGameSource={log.boardGameSource}
           activeBoardGameProvider={me?.boardGameProvider ?? null}
           loading="eager"
-          onImageNaturalDimensions={(nw, nh) => setAspectForLog(log.id, nw, nh)}
         />
         {stars != null ? (
           <div
@@ -350,6 +471,33 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
       </div>
     );
   };
+
+  const skeletonBody = (
+    <div
+      ref={viewportRef}
+      className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden px-2"
+      aria-busy="true"
+      aria-label={t("recap.loadingCovers")}
+    >
+      <div className="mb-4 flex items-center gap-2 text-sm text-[var(--color-light)]">
+        <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+        <span>{t("recap.loadingCovers")}</span>
+      </div>
+      <div
+        className="grid w-full max-w-4xl justify-items-center gap-2"
+        style={{
+          gridTemplateColumns: "repeat(auto-fill, minmax(3.5rem, 1fr))",
+        }}
+      >
+        {Array.from({ length: skeletonCount }, (_, i) => (
+          <div
+            key={i}
+            className="aspect-[2/3] w-full max-w-[5.5rem] animate-pulse rounded-lg bg-[var(--color-mid)]/20"
+          />
+        ))}
+      </div>
+    </div>
+  );
 
   const gridBody = (
     <div
@@ -374,55 +522,55 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
   );
 
   const shareGap = GRID_GAP_PX * 2;
-  const shareGrid = (
-    <div
-      className="flex flex-col items-center justify-center"
-      style={{
-        gap: shareGap,
-        transform: sharePack.scale < 0.999 ? `scale(${sharePack.scale})` : undefined,
-        transformOrigin: "center center",
-      }}
-    >
-      {sharePack.rows.map((row, ri) => (
-        <div key={`s-${ri}`} className="flex shrink-0 flex-row items-stretch justify-center" style={{ gap: shareGap }}>
-          {row.map((logIndex) => {
-            const log = logs[logIndex]!;
-            const hero = getHeroImageUrl(log.image) ?? log.image;
-            const stars = log.grade != null ? gradeToStars(log.grade) : null;
-            const ar = aspectArr[logIndex] ?? DEFAULT_ASPECT;
-            const w = sharePack.H * ar;
-            return (
-              <div
-                key={`share-${log.id}`}
-                className="relative shrink-0 overflow-hidden rounded-xl"
-                style={{ width: w, height: sharePack.H, backgroundColor: "#0f0f0f" }}
-              >
-                <ItemImage
-                  src={hero}
-                  alt=""
-                  className="absolute inset-0 h-full w-full"
-                  imgClassName="h-full w-full object-cover object-center"
-                  mediaType={log.mediaType}
-                  boardGameSource={log.boardGameSource}
-                  activeBoardGameProvider={me?.boardGameProvider ?? null}
-                  loading="eager"
-                  onImageNaturalDimensions={(nw, nh) => setAspectForLog(log.id, nw, nh)}
-                />
-                {stars != null ? (
-                  <div
-                    className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/75 to-transparent px-1 pb-1 pt-5"
-                    style={{ transform: "scale(0.82)", transformOrigin: "bottom center" }}
-                  >
-                    <StarRating value={stars} readOnly size="md" />
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
+  const shareGrid =
+    imagesLayoutReady && logs.length > 0 ? (
+      <div
+        className="flex flex-col items-center justify-center"
+        style={{
+          gap: shareGap,
+          transform: sharePack.scale < 0.999 ? `scale(${sharePack.scale})` : undefined,
+          transformOrigin: "center center",
+        }}
+      >
+        {sharePack.rows.map((row, ri) => (
+          <div key={`s-${ri}`} className="flex shrink-0 flex-row items-stretch justify-center" style={{ gap: shareGap }}>
+            {row.map((logIndex) => {
+              const log = logs[logIndex]!;
+              const hero = getHeroImageUrl(log.image) ?? log.image;
+              const stars = log.grade != null ? gradeToStars(log.grade) : null;
+              const ar = aspectArr[logIndex] ?? DEFAULT_ASPECT;
+              const w = sharePack.H * ar;
+              return (
+                <div
+                  key={`share-${log.id}`}
+                  className="relative shrink-0 overflow-hidden rounded-xl"
+                  style={{ width: w, height: sharePack.H, backgroundColor: "#0f0f0f" }}
+                >
+                  <ItemImage
+                    src={hero}
+                    alt=""
+                    className="absolute inset-0 h-full w-full"
+                    imgClassName="h-full w-full object-cover object-center"
+                    mediaType={log.mediaType}
+                    boardGameSource={log.boardGameSource}
+                    activeBoardGameProvider={me?.boardGameProvider ?? null}
+                    loading="eager"
+                  />
+                  {stars != null ? (
+                    <div
+                      className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/75 to-transparent px-1 pb-1 pt-5"
+                      style={{ transform: "scale(0.82)", transformOrigin: "bottom center" }}
+                    >
+                      <StarRating value={stars} readOnly size="md" />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    ) : null;
 
   return (
     <div
@@ -436,12 +584,15 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
       aria-modal="true"
       aria-label={title}
     >
+      {decodeImgs}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {headerBlock}
         {logs.length === 0 ? (
           <p className="flex flex-1 items-center justify-center px-4 text-center text-sm text-[var(--color-light)]">
             {t("recap.empty")}
           </p>
+        ) : !imagesLayoutReady ? (
+          skeletonBody
         ) : (
           gridBody
         )}
@@ -460,13 +611,21 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
             border: `1px solid ${nativeColors.border}`,
           }}
         >
-          <div className="mb-6 flex items-start gap-4">
+          <div className="mb-6 flex flex-wrap items-center justify-center gap-4 px-2">
             <img src={getLogoSrc(theme.colorScheme)} alt="" width={48} height={48} className="rounded-lg" />
-            <p className="min-w-0 flex-1 pt-1 text-3xl font-semibold leading-tight" style={{ color: nativeColors.text }}>
+            <p
+              className="max-w-full text-center text-3xl font-semibold leading-snug"
+              style={{ color: nativeColors.text }}
+            >
               {title}
             </p>
           </div>
-          <div className="flex min-h-[200px] w-full items-center justify-center">{shareGrid}</div>
+          <div
+            className="flex w-full items-center justify-center"
+            style={{ minHeight: SHARE_PACK_INNER_HEIGHT_PX }}
+          >
+            {shareGrid}
+          </div>
         </div>
       </div>
     </div>
