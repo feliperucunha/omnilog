@@ -27,7 +27,7 @@ import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { skipApiKeyMissingUi } from "@/lib/featureFlags";
 import type { BoardGameProvider } from "@geeklogs/shared";
 import { Link } from "react-router-dom";
-import { ArrowRight, ChevronDown, Loader2, Search as SearchIcon, UserCheck, X } from "lucide-react";
+import { ChevronDown, Loader2, Search as SearchIcon, UserCheck, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
@@ -536,16 +536,22 @@ export function Search() {
             transition={{ type: "spring", stiffness: 300, damping: 35 }}
             className={hasSearched ? "flex flex-col gap-4 w-full" : "flex flex-col gap-4"}
           >
-            <div className="relative w-full">
-              <SearchIcon
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]"
-                aria-hidden
-              />
+            <div
+              className={cn(
+                "flex w-full min-w-0 items-stretch overflow-hidden rounded-2xl border border-[var(--color-mid)]/55",
+                "bg-[var(--color-darkest)] shadow-[var(--shadow-md)]",
+                "transition-[border-color,box-shadow]",
+                "focus-within:border-[var(--btn-gradient-start)]/40",
+                "focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--btn-gradient-start)_18%,transparent),var(--shadow-md)]"
+              )}
+            >
               <Input
                 ref={searchInputRef}
                 className={cn(
-                  "w-full pl-10",
-                  query.trim() !== "" ? "pr-24" : "pr-14"
+                  "min-w-0 flex-1 rounded-none border-0 bg-transparent shadow-none",
+                  "h-11 max-md:min-h-[44px] pl-4 pr-2 text-[var(--color-lightest)] max-md:text-base",
+                  "placeholder:text-[var(--color-light)]",
+                  "focus-visible:ring-0 focus-visible:ring-offset-0"
                 )}
                 placeholder={
                   searchFilter === USERS_SEARCH_TYPE
@@ -559,24 +565,7 @@ export function Search() {
                 inputMode="search"
                 enterKeyHint="search"
               />
-              <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
-                <button
-                  type="submit"
-                  disabled={!query.trim() || loading}
-                  className={cn(
-                    "btn-gradient flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-md",
-                    "transition-[transform,box-shadow] hover:shadow-lg active:scale-[0.96]",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--btn-gradient-start)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-dark)]",
-                    "disabled:pointer-events-none disabled:opacity-40"
-                  )}
-                  aria-label={t("search.search")}
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  ) : (
-                    <ArrowRight className="h-4 w-4" aria-hidden />
-                  )}
-                </button>
+              <div className="flex shrink-0 items-center gap-0.5 border-l border-[var(--color-mid)]/40 bg-[var(--color-mid)]/[0.06] px-1.5 py-1 sm:px-2">
                 {query.trim() !== "" && (
                   <button
                     type="button"
@@ -585,12 +574,34 @@ export function Search() {
                       setQuery("");
                       searchInputRef.current?.focus();
                     }}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--color-light)] transition-colors hover:bg-[var(--color-mid)]/25 hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+                    className={cn(
+                      "flex size-10 shrink-0 items-center justify-center rounded-xl text-[var(--color-light)]",
+                      "transition-colors hover:bg-[var(--color-mid)]/35 hover:text-[var(--color-lightest)]",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] focus-visible:ring-offset-0"
+                    )}
                     aria-label={t("search.clearSearch")}
                   >
-                    <X className="h-4 w-4" />
+                    <X className="size-[1.125rem]" strokeWidth={2.25} aria-hidden />
                   </button>
                 )}
+                <button
+                  type="submit"
+                  disabled={!query.trim() || loading}
+                  className={cn(
+                    "flex size-10 shrink-0 items-center justify-center rounded-xl",
+                    "text-[var(--color-lightest)] transition-[color,transform,background-color]",
+                    "hover:bg-gradient-to-br hover:from-[var(--btn-gradient-start)]/18 hover:to-[var(--btn-gradient-end)]/12 active:scale-[0.96]",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--btn-gradient-start)]/60 focus-visible:ring-offset-0",
+                    "disabled:pointer-events-none disabled:text-[var(--color-light)]/35"
+                  )}
+                  aria-label={t("search.search")}
+                >
+                  {loading ? (
+                    <Loader2 className="size-[1.125rem] animate-spin" aria-hidden />
+                  ) : (
+                    <SearchIcon className="size-[1.125rem]" strokeWidth={2.25} aria-hidden />
+                  )}
+                </button>
               </div>
             </div>
             {hasSearched && searchFilter !== USERS_SEARCH_TYPE && (
