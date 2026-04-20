@@ -264,7 +264,8 @@ const DrawerContent = React.forwardRef<
       const flickDismiss =
         y >= DISMISS_VELOCITY_MIN_OFFSET_PX && velocity >= DISMISS_VELOCITY_PX_PER_MS;
       if (y >= threshold || flickDismiss) {
-        resetDragSurfaceStyles();
+        // Avoid resetDragSurfaceStyles here: it clears inline translate before `isClosing`,
+        // so the sheet snaps to open for a frame (worse on real devices after async work).
         handleClose();
         return;
       }
@@ -280,7 +281,7 @@ const DrawerContent = React.forwardRef<
         }
       }, 340);
     },
-    [dismissThresholdPx, handleClose, resetDragSurfaceStyles, restoreScrimAfterDragCancel]
+    [dismissThresholdPx, handleClose, restoreScrimAfterDragCancel]
   );
 
   const heightClass =
