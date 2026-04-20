@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Share2, AlertTriangle, User, ChevronDown, ChevronRight } from "lucide-react";
+import { Share2, User, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
@@ -13,9 +13,6 @@ import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
-import { API_KEY_META } from "@/lib/apiKeyMeta";
-import { skipApiKeyMissingUi } from "@/lib/featureFlags";
 import {
   COMPLETED_STATUSES,
   IN_PROGRESS_STATUSES,
@@ -111,7 +108,7 @@ function CategoryOrderSkeletonStrip() {
 export function Dashboard() {
   const { t } = useLocale();
   const { token } = useAuth();
-  const { me, loading: meLoading } = useMe();
+  const { me } = useMe();
   const { visibleTypes, visibleTypesOrderReady } = useVisibleMediaTypes();
   const { setPageTitle, setRightSlot, setBelowNavbar } = usePageTitle() ?? {};
   const [searchParams, setSearchParams] = useSearchParams();
@@ -250,6 +247,36 @@ export function Dashboard() {
     if (me?.user?.id) void storage.setItem(`${BETA_MODAL_STORAGE_KEY}.${me.user.id}`, "true");
     setShowBetaModal(false);
   }, [me?.user?.id]);
+
+  const handleEmbeddedMediaLogsFiltersChange = useCallback(
+    (f: SharedFilters) => {
+      shareFiltersRef.current = f;
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("category", selectedCategory);
+          if (f.status) next.set("status", f.status);
+          else next.delete("status");
+          if (f.sort !== "dateDesc") next.set("sort", f.sort);
+          else next.delete("sort");
+          if (f.search.trim()) next.set("q", f.search.trim());
+          else next.delete("q");
+          next.delete("own");
+          next.delete("wantToBuy");
+          if (f.collection === "owned") next.set("own", "true");
+          else if (f.collection === "wantToBuy") next.set("wantToBuy", "true");
+          if (f.genre.trim()) next.set("genre", f.genre.trim());
+          else next.delete("genre");
+          next.delete("purchased");
+          next.delete("purchaseDate");
+          if (next.toString() === prev.toString()) return prev;
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [selectedCategory, setSearchParams]
+  );
 
   useEffect(() => {
     if (!token) {
@@ -423,17 +450,6 @@ export function Dashboard() {
     MEDIA_TYPES.map((type) => [type, counts?.[type] ?? 0])
   ) as Record<MediaType, number>;
 
-  const boardGameProvider = me?.boardGameProvider ?? "bgg";
-  const apiKeyProvider = getApiKeyProviderForMediaType(selectedCategory, boardGameProvider);
-  const hasBoardGameKey = !!(me?.apiKeys?.bgg || me?.apiKeys?.ludopedia);
-  const skipApiKeyReq = skipApiKeyMissingUi(me, { token: !!token, meLoading });
-  const needsApiKeyBanner =
-    !skipApiKeyReq &&
-    apiKeyProvider != null &&
-    (selectedCategory === "boardgames"
-      ? !hasBoardGameKey
-      : me?.apiKeys && !me.apiKeys[apiKeyProvider]);
-
   const betaMessageParagraphs = t("dashboard.betaModalMessage").split("\n\n");
 
   const betaBody = (
@@ -535,23 +551,6 @@ export function Dashboard() {
               ))}
             </ToggleGroup>
           </div>
-            {needsApiKeyBanner && (
-            <Link
-              to="/settings?open=api-keys"
-              className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-4 py-3 max-md:min-h-[44px] text-left no-underline transition-colors text-[var(--color-warning-text)] hover:border-[var(--color-warning-hover-border)] hover:bg-[var(--color-warning-hover-bg)]"
-            >
-              <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--color-warning-icon)]" aria-hidden />
-              <OverflowMarquee className="min-w-0 flex-1 text-sm font-medium text-[var(--color-warning-text)]">
-                {t("apiKeyBanner.categoryMessage", {
-                  category: t(`nav.${selectedCategory}`),
-                  provider: API_KEY_META[apiKeyProvider].name,
-                })}
-              </OverflowMarquee>
-              <span className="shrink-0 text-xs font-medium text-[var(--color-warning-text-muted)]">
-                {t("apiKeyBanner.addKeyInSettings")} →
-              </span>
-            </Link>
-          )}
           <MediaLogs
             mediaType={selectedCategory}
             embedded
@@ -560,28 +559,7 @@ export function Dashboard() {
             }
             initialFilters={logsInitialFilters}
             initialFiltersSyncKey={searchParamsKey}
-            onFiltersChange={(f) => {
-              shareFiltersRef.current = f;
-              setSearchParams((prev) => {
-                const next = new URLSearchParams(prev);
-                next.set("category", selectedCategory);
-                if (f.status) next.set("status", f.status);
-                else next.delete("status");
-                if (f.sort !== "dateDesc") next.set("sort", f.sort);
-                else next.delete("sort");
-                if (f.search.trim()) next.set("q", f.search.trim());
-                else next.delete("q");
-                next.delete("own");
-                next.delete("wantToBuy");
-                if (f.collection === "owned") next.set("own", "true");
-                else if (f.collection === "wantToBuy") next.set("wantToBuy", "true");
-                if (f.genre.trim()) next.set("genre", f.genre.trim());
-                else next.delete("genre");
-                next.delete("purchased");
-                next.delete("purchaseDate");
-                return next;
-              }, { replace: true });
-            }}
+            onFiltersChange={handleEmbeddedMediaLogsFiltersChange}
           />
         </section>
       )}

@@ -1,4 +1,4 @@
-import type { SearchResult, ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
@@ -30,22 +30,33 @@ export async function getMovieById(id: string, apiKey?: string | null): Promise<
     spoken_languages?: Array<{ name?: string; english_name?: string }>;
   };
   const runtimeMinutes = data.runtime && data.runtime > 0 ? data.runtime : null;
-  const genres = data.genres?.map((g) => g.name).filter(Boolean) as string[] | undefined;
-  const productionCountries = data.production_countries?.map((c) => c.name).filter(Boolean) as string[] | undefined;
-  const spokenLanguages = data.spoken_languages?.map((l) => l.english_name ?? l.name).filter(Boolean) as string[] | undefined;
+  const genres = data.genres
+    ?.map((g) => g.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const productionCountries = data.production_countries
+    ?.map((c) => c.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const spokenLanguages = data.spoken_languages
+    ?.map((l) => l.english_name ?? l.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const overview = data.overview?.trim();
+  const taglineRaw = data.tagline?.trim();
   return {
     id: String(data.id ?? id),
-    title: data.title ?? "Unknown",
+    title: decodeHtmlEntities(data.title ?? "Unknown"),
     image: data.poster_path ? `${IMAGE_BASE}${data.poster_path}` : null,
     year: data.release_date?.slice(0, 4) ?? null,
     subtitle: null,
     runtimeMinutes,
-    description: data.overview?.trim() || null,
-    tagline: data.tagline?.trim() || null,
+    description: overview ? decodeHtmlEntities(overview) : null,
+    tagline: taglineRaw ? decodeHtmlEntities(taglineRaw) : null,
     score: typeof data.vote_average === "number" && data.vote_average > 0 ? data.vote_average : null,
     genres: genres?.length ? genres : null,
-    releaseDate: data.release_date?.trim() || null,
-    status: data.status?.trim() || null,
+    releaseDate: data.release_date?.trim() ? decodeHtmlEntities(data.release_date.trim()) : null,
+    status: data.status?.trim() ? decodeHtmlEntities(data.status.trim()) : null,
     productionCountries: productionCountries?.length ? productionCountries : null,
     spokenLanguages: spokenLanguages?.length ? spokenLanguages : null,
   };
@@ -76,23 +87,31 @@ export async function getTvById(id: string, apiKey?: string | null): Promise<Ite
   const runTimes = data.episode_run_time?.filter((t) => t != null && t > 0) ?? [];
   const avgMin = runTimes.length > 0 ? runTimes.reduce((a, b) => a + b, 0) / runTimes.length : 45;
   const runtimeMinutes = epCount > 0 ? Math.round(epCount * avgMin) : null;
-  const genres = data.genres?.map((g) => g.name).filter(Boolean) as string[] | undefined;
-  const networks = data.networks?.map((n) => n.name).filter(Boolean) as string[] | undefined;
+  const genres = data.genres
+    ?.map((g) => g.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const networks = data.networks
+    ?.map((n) => n.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const overviewTv = data.overview?.trim();
+  const taglineTv = data.tagline?.trim();
   return {
     id: String(data.id ?? id),
-    title: data.name ?? "Unknown",
+    title: decodeHtmlEntities(data.name ?? "Unknown"),
     image: data.poster_path ? `${IMAGE_BASE}${data.poster_path}` : null,
     year: data.first_air_date?.slice(0, 4) ?? null,
     subtitle: null,
     runtimeMinutes,
-    description: data.overview?.trim() || null,
-    tagline: data.tagline?.trim() || null,
+    description: overviewTv ? decodeHtmlEntities(overviewTv) : null,
+    tagline: taglineTv ? decodeHtmlEntities(taglineTv) : null,
     score: typeof data.vote_average === "number" && data.vote_average > 0 ? data.vote_average : null,
     genres: genres?.length ? genres : null,
     episodesCount: epCount > 0 ? epCount : null,
     seasonsCount: (data.number_of_seasons ?? 0) > 0 ? data.number_of_seasons! : null,
-    releaseDate: data.first_air_date?.trim() || null,
-    status: data.status?.trim() || null,
+    releaseDate: data.first_air_date?.trim() ? decodeHtmlEntities(data.first_air_date.trim()) : null,
+    status: data.status?.trim() ? decodeHtmlEntities(data.status.trim()) : null,
     networks: networks?.length ? networks : null,
   };
 }
@@ -144,7 +163,7 @@ export async function searchMovies(
   const data = (await res.json()) as { results?: Array<{ id: number; title?: string; release_date?: string; poster_path?: string }> };
   let results = (data.results ?? []).slice(0, 20).map((item) => ({
     id: String(item.id),
-    title: item.title ?? "Unknown",
+    title: decodeHtmlEntities(item.title ?? "Unknown"),
     image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,
     year: item.release_date?.slice(0, 4) ?? null,
     subtitle: null,
@@ -177,7 +196,7 @@ export async function searchTv(
   const data = (await res.json()) as { results?: Array<{ id: number; name?: string; first_air_date?: string; poster_path?: string }> };
   let results = (data.results ?? []).slice(0, 20).map((item) => ({
     id: String(item.id),
-    title: item.name ?? "Unknown",
+    title: decodeHtmlEntities(item.name ?? "Unknown"),
     image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,
     year: item.first_air_date?.slice(0, 4) ?? null,
     subtitle: null,
@@ -195,7 +214,7 @@ function mapMovieListItem(item: {
 }): SearchResult {
   return {
     id: String(item.id),
-    title: item.title ?? "Unknown",
+    title: decodeHtmlEntities(item.title ?? "Unknown"),
     image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,
     year: item.release_date?.slice(0, 4) ?? null,
     subtitle: null,
@@ -212,7 +231,7 @@ function mapTvListItem(item: {
 }): SearchResult {
   return {
     id: String(item.id),
-    title: item.name ?? "Unknown",
+    title: decodeHtmlEntities(item.name ?? "Unknown"),
     image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,
     year: item.first_air_date?.slice(0, 4) ?? null,
     subtitle: null,

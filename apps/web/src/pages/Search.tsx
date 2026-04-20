@@ -27,7 +27,7 @@ import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { skipApiKeyMissingUi } from "@/lib/featureFlags";
 import type { BoardGameProvider } from "@geeklogs/shared";
 import { Link } from "react-router-dom";
-import { ChevronDown, Loader2, Search as SearchIcon, UserCheck, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Loader2, Search as SearchIcon, UserCheck, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
@@ -542,7 +542,10 @@ export function Search() {
               />
               <Input
                 ref={searchInputRef}
-                className="w-full pl-10 pr-10"
+                className={cn(
+                  "w-full pl-10",
+                  query.trim() !== "" ? "pr-24" : "pr-14"
+                )}
                 placeholder={
                   searchFilter === USERS_SEARCH_TYPE
                     ? t("search.usersPlaceholder")
@@ -552,21 +555,42 @@ export function Search() {
                 onChange={(e) => setQuery(e.target.value)}
                 autoFocus={!hasSearched}
                 aria-label={t("search.search")}
+                inputMode="search"
+                enterKeyHint="search"
               />
-              {query.trim() !== "" && (
+              <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
                 <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    setQuery("");
-                    searchInputRef.current?.focus();
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
-                  aria-label={t("search.clearSearch")}
+                  type="submit"
+                  disabled={!query.trim() || loading}
+                  className={cn(
+                    "btn-gradient flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-md",
+                    "transition-[transform,box-shadow] hover:shadow-lg active:scale-[0.96]",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--btn-gradient-start)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-dark)]",
+                    "disabled:pointer-events-none disabled:opacity-40"
+                  )}
+                  aria-label={t("search.search")}
                 >
-                  <X className="h-4 w-4" />
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" aria-hidden />
+                  )}
                 </button>
-              )}
+                {query.trim() !== "" && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setQuery("");
+                      searchInputRef.current?.focus();
+                    }}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--color-light)] transition-colors hover:bg-[var(--color-mid)]/25 hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+                    aria-label={t("search.clearSearch")}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
             {hasSearched && searchFilter !== USERS_SEARCH_TYPE && (
               <div className="flex w-full min-w-0 flex-wrap items-center gap-4">

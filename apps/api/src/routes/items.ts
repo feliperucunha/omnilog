@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { MEDIA_TYPES } from "@geeklogs/shared";
+import { decodeHtmlEntities, MEDIA_TYPES } from "@geeklogs/shared";
 import type { MediaType } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
@@ -252,7 +252,7 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
       reviewerLevelIcon: last?.icon,
       reviewerReviewsInCategory,
       grade: l.grade,
-      review: l.review,
+      review: l.review != null ? decodeHtmlEntities(l.review) : null,
       listType: l.listType,
       status: l.status,
       season: l.season,
@@ -450,7 +450,7 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
       reviewerLevelIcon: last?.icon,
       reviewerReviewsInCategory,
       grade: l.grade,
-      review: l.review,
+      review: l.review != null ? decodeHtmlEntities(l.review) : null,
       listType: l.listType,
       status: l.status,
       season: l.season,

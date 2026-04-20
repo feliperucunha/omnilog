@@ -55,7 +55,7 @@ interface LogFormCreateProps {
   externalId: string;
   title: string;
   image: string | null;
-  onSaved: (completion?: LogCompleteState) => void;
+  onSaved: (completion?: LogCompleteState, savedLog?: Log) => void;
   onCancel: () => void;
 }
 
@@ -68,7 +68,7 @@ interface LogFormEditProps {
   initialBoardGameTab?: "review" | "matches";
   /** Board games: after a match is saved/deleted, parent should refresh `log` (e.g. matchesPlayed). */
   onLogRefreshed?: (log: Log) => void;
-  onSaved: (completion?: LogCompleteState) => void;
+  onSaved: (completion?: LogCompleteState, savedLog?: Log) => void;
   onCancel: () => void;
   /** Called when user confirms delete; modal will close after. */
   onDelete?: (logId: string) => void | Promise<void>;
@@ -77,6 +77,12 @@ interface LogFormEditProps {
 type LogFormProps = LogFormCreateProps | LogFormEditProps;
 
 const toNum = (v: number | ""): number | null => (v === "" ? null : v);
+
+function logFromApiResponse(res: Log & { newBadges?: NewBadge[] }): Log {
+  const { newBadges: _nb, ...rest } = res;
+  void _nb;
+  return rest;
+}
 
 export function LogForm(props: LogFormProps) {
   const { t } = useLocale();
@@ -443,6 +449,7 @@ export function LogForm(props: LogFormProps) {
         ) {
           void refetchMe();
         }
+        const savedLog = logFromApiResponse(updated);
         if (statusChanged) {
           const completion: LogCompleteState = {
             image,
@@ -460,9 +467,9 @@ export function LogForm(props: LogFormProps) {
                   : toNum(matchesPlayed),
             }),
           };
-          props.onSaved(completion);
+          props.onSaved(completion, savedLog);
         } else {
-          props.onSaved();
+          props.onSaved(undefined, savedLog);
         }
         return true;
       }
@@ -530,7 +537,7 @@ export function LogForm(props: LogFormProps) {
         ...(showCollectionOwnership && { own, wantToBuy, sold }),
         ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
       };
-      props.onSaved(completion);
+      props.onSaved(completion, logFromApiResponse(created));
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : "";

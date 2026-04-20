@@ -1,4 +1,4 @@
-import type { SearchResult, ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 
 const BASE = "https://openlibrary.org";
@@ -21,9 +21,11 @@ export async function getBookById(workId: string): Promise<ItemDetail | null> {
     ? `https://covers.openlibrary.org/b/id/${data.covers[0]}-M.jpg`
     : null;
   let description: string | null = null;
-  if (typeof data.description === "string") description = data.description.trim().slice(0, 2000) || null;
+  if (typeof data.description === "string")
+    description = data.description.trim().slice(0, 2000) || null;
   else if (data.description && typeof data.description === "object" && typeof data.description.value === "string")
     description = data.description.value.trim().slice(0, 2000) || null;
+  if (description) description = decodeHtmlEntities(description);
   let authors: string[] | null = null;
   if (Array.isArray(data.authors) && data.authors.length > 0) {
     const authorKeys = data.authors.slice(0, 3).map((a) => a.key).filter(Boolean) as string[];
@@ -35,17 +37,24 @@ export async function getBookById(workId: string): Promise<ItemDetail | null> {
           });
           if (!authRes.ok) return null;
           const auth = (await authRes.json()) as { name?: string };
-          return auth.name ?? null;
+          const nm = auth.name ?? null;
+          return nm != null ? decodeHtmlEntities(nm) : null;
         })
       );
       authors = names.filter((n): n is string => n != null);
     }
   }
-  const subjects = Array.isArray(data.subjects) ? data.subjects.filter((s): s is string => typeof s === "string").slice(0, 15) : [];
+  const subjects = Array.isArray(data.subjects)
+    ? data.subjects
+        .filter((s): s is string => typeof s === "string")
+        .slice(0, 15)
+        .map((s) => decodeHtmlEntities(s))
+    : [];
   const genres = subjects.length > 0 ? subjects : null;
+  const title = decodeHtmlEntities(data.title ?? "Unknown");
   return {
     id: workId,
-    title: data.title ?? "Unknown",
+    title,
     image,
     year,
     subtitle: authors?.length ? authors.join(", ") : null,
@@ -90,12 +99,14 @@ export async function searchBooks(
   const docs = data.docs ?? [];
   let results = docs.map((doc) => ({
     id: doc.key.replace(/^\/works\//, ""),
-    title: doc.title ?? "Unknown",
+    title: decodeHtmlEntities(doc.title ?? "Unknown"),
     image: doc.cover_i
       ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
       : null,
     year: doc.first_publish_year != null ? String(doc.first_publish_year) : null,
-    subtitle: Array.isArray(doc.author_name) ? doc.author_name.join(", ") : null,
+    subtitle: Array.isArray(doc.author_name)
+      ? doc.author_name.map((a) => decodeHtmlEntities(a)).join(", ")
+      : null,
     score:
       typeof doc.ratings_average === "number" && doc.ratings_average > 0 ? doc.ratings_average : null,
   }));

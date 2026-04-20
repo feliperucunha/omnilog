@@ -126,6 +126,9 @@ export function MediaLogs({
   initialFiltersSyncKey,
   onFiltersChange,
 }: MediaLogsProps) {
+  const onFiltersChangeRef = useRef(onFiltersChange);
+  onFiltersChangeRef.current = onFiltersChange;
+
   const { t } = useLocale();
   const navigate = useNavigate();
   const { showLogComplete } = useLogComplete();
@@ -181,16 +184,17 @@ export function MediaLogs({
   const milestoneProgress = milestoneProgressProp ?? (readOnly ? null : milestoneProgressFetched);
 
   useEffect(() => {
-    if (embedded && onFiltersChange) {
-      onFiltersChange({
-        status: statusFilter,
-        sort: sortBy,
-        search: categorySearchQuery,
-        collection: collectionFilter,
-        genre: genreFilter,
-      });
-    }
-  }, [embedded, onFiltersChange, statusFilter, sortBy, categorySearchQuery, collectionFilter, genreFilter]);
+    if (!embedded) return;
+    const notify = onFiltersChangeRef.current;
+    if (!notify) return;
+    notify({
+      status: statusFilter,
+      sort: sortBy,
+      search: categorySearchQuery,
+      collection: collectionFilter,
+      genre: genreFilter,
+    });
+  }, [embedded, statusFilter, sortBy, categorySearchQuery, collectionFilter, genreFilter]);
 
   useEffect(() => {
     if (initialFiltersSyncKey == null) return;
@@ -448,11 +452,19 @@ export function MediaLogs({
     }
   };
 
-  const handleSaved = (completion?: LogCompleteState) => {
+  const handleSaved = (completion?: LogCompleteState, savedLog?: Log) => {
     setEditingLog(null);
     setBoardGameEditTab("review");
-    invalidateLogsAndItemsCache();
-    fetchLogs();
+    if (savedLog) {
+      setLogs((prev) => {
+        const idx = prev.findIndex((l) => l.id === savedLog.id);
+        if (idx >= 0) return prev.map((l) => (l.id === savedLog.id ? savedLog : l));
+        return [savedLog, ...prev];
+      });
+    } else {
+      invalidateLogsAndItemsCache();
+      fetchLogs();
+    }
     fetchStatusCounts();
     if (completion) showLogComplete(completion);
   };

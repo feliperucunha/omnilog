@@ -22,6 +22,7 @@ export type {
   CreateBoardGameMatchInput,
 } from "./types.js";
 export { APP_VERSION } from "./version.js";
+export { decodeHtmlEntities } from "./htmlEntities.js";
 export {
   MEDIA_TYPES,
   SPEND_TRACKED_MEDIA_TYPES,

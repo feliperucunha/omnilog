@@ -1,4 +1,4 @@
-import type { SearchResult, ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
 
 /** Map our sort value to Jikan order_by and sort (asc/desc). */
 function jikanOrderParams(sort: string | undefined): { order_by?: string; sort?: string } {
@@ -22,7 +22,7 @@ function toItemDetail(
   const year = d.published?.from ? d.published.from.slice(0, 4) : null;
   return {
     id: String(d.mal_id ?? id),
-    title: d.title ?? "Unknown",
+    title: decodeHtmlEntities(d.title ?? "Unknown"),
     image: d.images?.jpg?.image_url ?? null,
     year: year ?? null,
     subtitle: null,
@@ -50,20 +50,30 @@ export async function getAnimeById(id: string): Promise<ItemDetail | null> {
   };
   const d = data.data;
   if (!d) return null;
-  const description = d.synopsis?.trim().slice(0, 2000) || null;
-  const genres = d.genres?.map((g) => g.name).filter(Boolean) as string[] | undefined;
-  const studios = d.studios?.map((s) => s.name).filter(Boolean) as string[] | undefined;
-  const themes = d.themes?.map((t) => t.name).filter(Boolean) as string[] | undefined;
-  const duration = (typeof d.duration === "string" && d.duration.trim()) ? d.duration.trim() : null;
+  const synopsisRaw = d.synopsis?.trim().slice(0, 2000) || null;
+  const description = synopsisRaw ? decodeHtmlEntities(synopsisRaw) : null;
+  const genres = d.genres
+    ?.map((g) => g.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const studios = d.studios
+    ?.map((s) => s.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const themes = d.themes
+    ?.map((t) => t.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const duration = (typeof d.duration === "string" && d.duration.trim()) ? decodeHtmlEntities(d.duration.trim()) : null;
   return {
     id: String(d.mal_id ?? id),
-    title: d.title ?? "Unknown",
+    title: decodeHtmlEntities(d.title ?? "Unknown"),
     image: d.images?.jpg?.image_url ?? null,
     year: d.year != null ? String(d.year) : null,
     subtitle: null,
     description: description ?? null,
     score: typeof d.score === "number" && d.score > 0 ? d.score : null,
-    contentRating: d.rating?.trim() || null,
+    contentRating: d.rating?.trim() ? decodeHtmlEntities(d.rating.trim()) : null,
     episodesCount: (d.episodes ?? 0) > 0 ? d.episodes! : null,
     genres: genres?.length ? genres : null,
     studios: studios?.length ? studios : null,
@@ -93,7 +103,7 @@ export async function searchAnime(q: string, sort?: string): Promise<SearchResul
   const list = data.data ?? [];
   return list.map((item) => ({
     id: String(item.mal_id),
-    title: item.title ?? "Unknown",
+    title: decodeHtmlEntities(item.title ?? "Unknown"),
     image: item.images?.jpg?.image_url ?? null,
     year: item.year != null ? String(item.year) : null,
     subtitle: null,
@@ -124,17 +134,28 @@ export async function getMangaById(id: string): Promise<ItemDetail | null> {
   const d = data.data;
   if (!d) return null;
   const year = d.published?.from ? d.published.from.slice(0, 4) : null;
-  const description = d.synopsis?.trim().slice(0, 2000) || null;
-  const genres = d.genres?.map((g) => g.name).filter(Boolean) as string[] | undefined;
-  const themes = d.themes?.map((t) => t.name).filter(Boolean) as string[] | undefined;
-  const demographics = d.demographics?.map((x) => x.name).filter(Boolean) as string[] | undefined;
-  const serialization =
+  const synopsisManga = d.synopsis?.trim().slice(0, 2000) || null;
+  const description = synopsisManga ? decodeHtmlEntities(synopsisManga) : null;
+  const genres = d.genres
+    ?.map((g) => g.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const themes = d.themes
+    ?.map((t) => t.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const demographics = d.demographics
+    ?.map((x) => x.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const serializationRaw =
     (Array.isArray(d.serializations) && d.serializations.length > 0
       ? d.serializations[0]?.name?.trim()
       : d.serialization?.name?.trim()) || null;
+  const serialization = serializationRaw ? decodeHtmlEntities(serializationRaw) : null;
   return {
     id: String(d.mal_id ?? id),
-    title: d.title ?? "Unknown",
+    title: decodeHtmlEntities(d.title ?? "Unknown"),
     image: d.images?.jpg?.image_url ?? null,
     year: year ?? null,
     subtitle: null,
@@ -172,7 +193,7 @@ export async function searchManga(q: string, sort?: string): Promise<SearchResul
     const year = item.published?.from ? item.published.from.slice(0, 4) : null;
     return {
       id: String(item.mal_id),
-      title: item.title ?? "Unknown",
+      title: decodeHtmlEntities(item.title ?? "Unknown"),
       image: item.images?.jpg?.image_url ?? null,
       year: year ?? null,
       subtitle: null,
@@ -201,7 +222,7 @@ export async function getAnimeRecommendationsForId(animeId: string, maxTotal = 1
     if (e?.mal_id == null) continue;
     out.push({
       id: String(e.mal_id),
-      title: e.title ?? "Unknown",
+      title: decodeHtmlEntities(e.title ?? "Unknown"),
       image: e.images?.jpg?.image_url ?? null,
       year: e.year != null ? String(e.year) : null,
       subtitle: null,
@@ -228,7 +249,7 @@ export async function getTopMangaByScore(max = 12): Promise<SearchResult[]> {
     const year = item.published?.from ? item.published.from.slice(0, 4) : null;
     return {
       id: String(item.mal_id),
-      title: item.title ?? "Unknown",
+      title: decodeHtmlEntities(item.title ?? "Unknown"),
       image: item.images?.jpg?.image_url ?? null,
       year: year ?? null,
       subtitle: null,
@@ -255,7 +276,7 @@ export async function getTopAnimeByScore(max = 12): Promise<SearchResult[]> {
   };
   return (data.data ?? []).map((item) => ({
     id: String(item.mal_id),
-    title: item.title ?? "Unknown",
+    title: decodeHtmlEntities(item.title ?? "Unknown"),
     image: item.images?.jpg?.image_url ?? null,
     year: item.year != null ? String(item.year) : null,
     subtitle: null,

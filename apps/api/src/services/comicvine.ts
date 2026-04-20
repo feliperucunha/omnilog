@@ -1,4 +1,4 @@
-import type { SearchResult, ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
@@ -41,15 +41,18 @@ export async function getVolumeById(
   };
   if (data.status_code !== 1 || !data.results) return null;
   const d = data.results;
-  const description = typeof d.description === "string" ? d.description.replace(/<[^>]+>/g, "").trim().slice(0, 2000) || null : null;
+  const descriptionStripped =
+    typeof d.description === "string" ? d.description.replace(/<[^>]+>/g, "").trim().slice(0, 2000) || null : null;
+  const description = descriptionStripped ? decodeHtmlEntities(descriptionStripped) : null;
+  const publisherRaw = d.publisher?.name?.trim();
   return {
     id: String(d.id ?? id),
-    title: d.name ?? "Unknown",
+    title: decodeHtmlEntities(d.name ?? "Unknown"),
     image: d.image?.medium_url ?? null,
     year: d.start_year ?? null,
     subtitle: null,
     description: description ?? null,
-    publisher: d.publisher?.name?.trim() || null,
+    publisher: publisherRaw ? decodeHtmlEntities(publisherRaw) : null,
     issuesCount: (d.count_of_issues ?? 0) > 0 ? d.count_of_issues! : null,
   };
 }
@@ -88,7 +91,7 @@ export async function searchComics(
   if (data.status_code !== 1 || !Array.isArray(data.results)) return { results: [] };
   const list: SearchResult[] = data.results.slice(0, 20).map((item) => ({
     id: String(item.id),
-    title: item.name ?? "Unknown",
+    title: decodeHtmlEntities(item.name ?? "Unknown"),
     image: item.image?.medium_url ?? item.image?.small_url ?? null,
     year: item.start_year ?? null,
     subtitle: null,

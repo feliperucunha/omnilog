@@ -3,7 +3,7 @@
  * Docs: https://ludopedia.com.br/api/documentacao.html
  * Auth: Bearer token (obtain via Ludopedia OAuth / aplicativos).
  */
-import type { SearchResult, ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
@@ -45,13 +45,20 @@ function mapJogoToItemDetail(raw: {
   const id = raw.id_jogo != null ? String(raw.id_jogo) : "";
   const year = raw.ano_publicacao != null ? String(raw.ano_publicacao).slice(0, 4) : null;
   const categories = Array.isArray(raw.categorias)
-    ? raw.categorias.map((c) => (typeof c === "string" ? c : (c as { nm_categoria?: string }).nm_categoria)).filter(Boolean) as string[]
+    ? (raw.categorias
+        .map((c) => (typeof c === "string" ? c : (c as { nm_categoria?: string }).nm_categoria))
+        .filter(Boolean) as string[]
+    ).map((c) => decodeHtmlEntities(c))
     : [];
   const mechanics = Array.isArray(raw.mecanicas)
-    ? raw.mecanicas.map((m) => (typeof m === "string" ? m : (m as { nm_mecanica?: string }).nm_mecanica)).filter(Boolean) as string[]
+    ? (raw.mecanicas
+        .map((m) => (typeof m === "string" ? m : (m as { nm_mecanica?: string }).nm_mecanica))
+        .filter(Boolean) as string[]
+    ).map((m) => decodeHtmlEntities(m))
     : [];
-  const description =
+  const descriptionRaw =
     typeof raw.descricao === "string" ? raw.descricao.replace(/<[^>]+>/g, "").trim().slice(0, 2000) || null : null;
+  const description = descriptionRaw ? decodeHtmlEntities(descriptionRaw) : null;
   const thumb = raw.thumb?.trim() || null;
   const full = raw.url_imagem?.trim() || null;
   const playersMin = raw.qt_jogadores_min ?? raw.qt_min_jogadores;
@@ -60,7 +67,7 @@ function mapJogoToItemDetail(raw: {
   const genres = categories.length > 0 ? categories : null;
   return {
     id,
-    title: raw.nm_jogo ?? "Unknown",
+    title: decodeHtmlEntities(raw.nm_jogo ?? "Unknown"),
     image: full,
     thumbnail: thumb,
     year,
@@ -115,7 +122,7 @@ function parseJogosResponse(data: JogosResponse): SearchResult[] {
     const image = (item.thumb ?? item.url_imagem)?.trim() || null;
     return {
       id: String(item.id_jogo ?? ""),
-      title: item.nm_jogo ?? "Unknown",
+      title: decodeHtmlEntities(item.nm_jogo ?? "Unknown"),
       image,
       year: item.ano_publicacao != null ? String(item.ano_publicacao).slice(0, 4) : null,
       subtitle: null,

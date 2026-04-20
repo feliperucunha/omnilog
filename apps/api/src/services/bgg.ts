@@ -1,5 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
-import type { SearchResult, ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
@@ -151,8 +151,9 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
   }
   const year = item.yearpublished?.["@_value"] ?? null;
   const rawDesc = item.description;
-  const description =
+  const descriptionStripped =
     typeof rawDesc === "string" ? rawDesc.replace(/<[^>]+>/g, "").trim().slice(0, 2000) || null : null;
+  const description = descriptionStripped ? decodeHtmlEntities(descriptionStripped) : null;
   const minP = item.minplayers?.["@_value"];
   const maxP = item.maxplayers?.["@_value"];
   const playTime = item.playingtime?.["@_value"];
@@ -163,15 +164,23 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
   const minAge = minAgeVal != null && minAgeVal !== "" ? parseInt(minAgeVal, 10) : null;
   const links = item.link;
   const linkList = Array.isArray(links) ? links : links ? [links] : [];
-  const categories = linkList.filter((l) => l["@_type"] === "boardgamecategory").map((l) => l["@_value"]).filter(Boolean) as string[];
-  const mechanics = linkList.filter((l) => l["@_type"] === "boardgamemechanic").map((l) => l["@_value"]).filter(Boolean) as string[];
+  const categories = linkList
+    .filter((l) => l["@_type"] === "boardgamecategory")
+    .map((l) => l["@_value"])
+    .filter(Boolean)
+    .map((v) => decodeHtmlEntities(v as string)) as string[];
+  const mechanics = linkList
+    .filter((l) => l["@_type"] === "boardgamemechanic")
+    .map((l) => l["@_value"])
+    .filter(Boolean)
+    .map((v) => decodeHtmlEntities(v as string)) as string[];
   const genres = categories.length > 0 ? categories : null;
   const fullImage = bggExtractImageUrl(item.image);
   const thumbImage = bggExtractImageUrl(item.thumbnail);
   const averageWeight = bggExtractAverageWeight(itemRec);
   return {
     id: item["@_id"],
-    title,
+    title: decodeHtmlEntities(title),
     image: fullImage,
     thumbnail: thumbImage,
     year,
@@ -256,7 +265,7 @@ export async function searchBoardGames(
     const score = bggExtractBayesAverage(itemRec);
     return {
       id: item["@_id"],
-      title,
+      title: decodeHtmlEntities(title),
       image: bggExtractImageUrl(row.image) ?? bggExtractImageUrl(row.thumbnail),
       year,
       subtitle: null,

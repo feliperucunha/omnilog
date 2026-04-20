@@ -1,4 +1,4 @@
-import type { SearchResult, ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const BASE = "https://api.rawg.io/api";
@@ -20,10 +20,13 @@ type RawgGameListRow = {
 function mapRawgGameToSearchResult(item: RawgGameListRow): SearchResult {
   const timeToBeatHours =
     typeof item.playtime === "number" && item.playtime > 0 ? item.playtime : null;
-  const genres = item.genres?.map((g) => g.name).filter(Boolean) as string[] | undefined;
+  const genres = item.genres
+    ?.map((g) => g.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
   return {
     id: String(item.id),
-    title: item.name ?? "Unknown",
+    title: decodeHtmlEntities(item.name ?? "Unknown"),
     image: item.background_image ?? null,
     year: item.released?.slice(0, 4) ?? null,
     subtitle: null,
@@ -115,17 +118,34 @@ export async function getGameById(id: string, apiKey?: string | null): Promise<I
   };
   const timeToBeatHours =
     typeof data.playtime === "number" && data.playtime > 0 ? data.playtime : null;
-  const description = (data.description_raw ?? data.description)?.trim();
-  const genres = data.genres?.map((g) => g.name).filter(Boolean) as string[] | undefined;
-  const platforms = data.platforms?.map((p) => p.platform?.name).filter(Boolean) as string[] | undefined;
-  const developers = data.developers?.map((d) => d.name).filter(Boolean) as string[] | undefined;
-  const publishers = data.publishers?.map((p) => p.name).filter(Boolean) as string[] | undefined;
-  const tags = data.tags?.map((t) => t.name).filter(Boolean) as string[] | undefined;
+  const descriptionRaw = (data.description_raw ?? data.description)?.trim();
+  const description = descriptionRaw ? decodeHtmlEntities(descriptionRaw) : undefined;
+  const genres = data.genres
+    ?.map((g) => g.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const platforms = data.platforms
+    ?.map((p) => p.platform?.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const developers = data.developers
+    ?.map((d) => d.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const publishers = data.publishers
+    ?.map((p) => p.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const tags = data.tags
+    ?.map((t) => t.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
   const score = typeof data.metacritic === "number" && data.metacritic > 0 ? data.metacritic / 10 : null;
-  const esrbRating = data.esrb_rating?.name?.trim() || null;
+  const esrbRaw = data.esrb_rating?.name?.trim();
+  const esrbRating = esrbRaw ? decodeHtmlEntities(esrbRaw) : null;
   return {
     id: String(data.id ?? id),
-    title: data.name ?? "Unknown",
+    title: decodeHtmlEntities(data.name ?? "Unknown"),
     image: data.background_image ?? null,
     year: data.released?.slice(0, 4) ?? null,
     subtitle: null,
@@ -134,7 +154,7 @@ export async function getGameById(id: string, apiKey?: string | null): Promise<I
     genres: genres?.length ? genres : null,
     score: score ?? null,
     platforms: platforms?.length ? platforms : null,
-    releaseDate: data.released?.trim() || null,
+    releaseDate: data.released?.trim() ? decodeHtmlEntities(data.released.trim()) : null,
     developers: developers?.length ? developers : null,
     publishers: publishers?.length ? publishers : null,
     esrbRating: esrbRating ?? null,
