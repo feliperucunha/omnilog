@@ -7,6 +7,7 @@ import {
   LOG_STATUS_OPTIONS,
   MEDIA_TYPES,
   SPEND_TRACKED_MEDIA_TYPES,
+  decodeHtmlEntities,
 } from "@geeklogs/shared";
 import type { BoardGameMatchPlayer, MediaType } from "@geeklogs/shared";
 import type { Prisma } from "@prisma/client";
@@ -1232,7 +1233,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       boardGameSource = user?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
     }
   }
-  const sanitizedTitle = sanitizeText(title, TITLE_MAX_LENGTH);
+  const sanitizedTitle = sanitizeText(decodeHtmlEntities(title), TITLE_MAX_LENGTH);
   const sanitizedExternalId = sanitizeText(externalId, EXTERNAL_ID_MAX_LENGTH);
   if (!sanitizedTitle || !sanitizedExternalId) {
     res.status(400).json({ error: "Invalid title or externalId" });

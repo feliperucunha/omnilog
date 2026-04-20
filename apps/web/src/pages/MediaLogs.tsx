@@ -46,6 +46,7 @@ import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 import { mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
 import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
+import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
 
@@ -145,7 +146,9 @@ export function MediaLogs({
   const readOnly = !!publicUserId;
   const showCollectionOwnershipFilters = mediaTypeHasCollectionOwnership(mediaType);
   const hasInitialData = embedded && initialLogsProp !== undefined;
-  const [logs, setLogs] = useState<Log[]>(() => (hasInitialData && initialLogsProp) ? initialLogsProp : []);
+  const [logs, setLogs] = useState<Log[]>(() =>
+    hasInitialData && initialLogsProp ? initialLogsProp.map(decodeLogForDisplay) : []
+  );
   const [nextCursor, setNextCursor] = useState<string | null>(() => (hasInitialData && initialNextCursorProp !== undefined) ? initialNextCursorProp : null);
   const [loading, setLoading] = useState(!(hasInitialData && initialLogsProp !== undefined));
   const [loadingMore, setLoadingMore] = useState(false);
@@ -286,8 +289,9 @@ export function MediaLogs({
       fetcher()
         .then((response) => {
           const list = Array.isArray(response) ? response : response.data;
+          const decoded = list.map(decodeLogForDisplay);
           const cursor = Array.isArray(response) ? null : response.nextCursor;
-          setLogs((prev) => (reset ? list : [...prev, ...list]));
+          setLogs((prev) => (reset ? decoded : [...prev, ...decoded]));
           setNextCursor(cursor);
         })
         .catch((err) => {
@@ -368,7 +372,7 @@ export function MediaLogs({
       categorySearchQuery.trim() === "";
     const useInitial = embedded && initialLogsProp !== undefined && defaultsMatch;
     if (useInitial) {
-      setLogs(initialLogsProp ?? []);
+      setLogs((initialLogsProp ?? []).map(decodeLogForDisplay));
       setNextCursor(initialNextCursorProp ?? null);
       setError(null);
       setLoading(false);
@@ -456,10 +460,11 @@ export function MediaLogs({
     setEditingLog(null);
     setBoardGameEditTab("review");
     if (savedLog) {
+      const normalized = decodeLogForDisplay(savedLog);
       setLogs((prev) => {
-        const idx = prev.findIndex((l) => l.id === savedLog.id);
-        if (idx >= 0) return prev.map((l) => (l.id === savedLog.id ? savedLog : l));
-        return [savedLog, ...prev];
+        const idx = prev.findIndex((l) => l.id === normalized.id);
+        if (idx >= 0) return prev.map((l) => (l.id === normalized.id ? normalized : l));
+        return [normalized, ...prev];
       });
     } else {
       invalidateLogsAndItemsCache();
@@ -480,7 +485,9 @@ export function MediaLogs({
       );
       if (updated.newBadges?.length) showAchievementToasts(updated.newBadges, t("dashboard.badgesAchievementUnlocked"));
       invalidateLogsAndItemsCache();
-      setLogs((prev) => prev.map((l) => (l.id === log.id ? updated : l)));
+      const { newBadges: _nb, ...logRest } = updated;
+      void _nb;
+      setLogs((prev) => prev.map((l) => (l.id === log.id ? decodeLogForDisplay(logRest as Log) : l)));
       toast.success(t("toast.logUpdated"));
     } catch (err) {
       showErrorToast(t, "E008", { originalError: err });
@@ -1378,8 +1385,9 @@ export function MediaLogs({
           episodesCount={editingLogEpisodesCount}
           initialBoardGameTab={editingLog.mediaType === "boardgames" ? boardGameEditTab : undefined}
           onLogRefreshed={(lg) => {
-            setEditingLog(lg);
-            setLogs((prev) => prev.map((l) => (l.id === lg.id ? lg : l)));
+            const normalized = decodeLogForDisplay(lg);
+            setEditingLog(normalized);
+            setLogs((prev) => prev.map((l) => (l.id === normalized.id ? normalized : l)));
           }}
           onSaved={handleSaved}
           onCancel={() => {

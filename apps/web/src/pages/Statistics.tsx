@@ -43,6 +43,7 @@ import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToBeatHours, formatTimeToFinish } from "@/lib/formatDuration";
 import { getStatusLabel } from "@/lib/statusLabel";
+import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -532,7 +533,7 @@ export function Statistics() {
     void apiFetch<{ data: Log[]; nextCursor: string | null }>(`/logs?${params.toString()}`)
       .then((res) => {
         if (cancelled) return;
-        setSpendDetailLogs(res.data ?? []);
+        setSpendDetailLogs((res.data ?? []).map(decodeLogForDisplay));
       })
       .catch((err) => {
         if (cancelled) return;
@@ -555,7 +556,10 @@ export function Statistics() {
     Promise.all([
       apiFetchCached<Log[] | { data: Log[]; nextCursor: string | null }>(logsQuery, {
         ttlMs: 2 * 60 * 1000,
-      }).then((res) => setLogs(Array.isArray(res) ? res : res.data)),
+      }).then((res) => {
+        const raw = Array.isArray(res) ? res : res.data;
+        setLogs((raw ?? []).map(decodeLogForDisplay));
+      }),
       apiFetch<{ data: LogStatsSummary }>(
         `/logs/stats?group=summary&timezoneOffsetMinutes=${tzOffsetMinutes}`
       )
@@ -640,7 +644,7 @@ export function Statistics() {
         tzOffsetMinutes,
         weekLabel: t("recap.periodLastWeek"),
       });
-      setRecapView({ title, logs: res.data ?? [] });
+      setRecapView({ title, logs: (res.data ?? []).map(decodeLogForDisplay) });
       setRecapPickerOpen(false);
     } catch (e) {
       if (e instanceof ApiError && e.statusCode === 403) {

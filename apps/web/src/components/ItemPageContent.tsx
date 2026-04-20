@@ -16,6 +16,7 @@ import {
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetchCached } from "@/lib/api";
+import { decodeItemPageDataForDisplay, decodeItemReviewForDisplay } from "@/lib/decodeDisplayFields";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLogComplete } from "@/contexts/LogCompleteContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -445,7 +446,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
       `/items/${mediaType}/${id}?${params.toString()}`,
       { ttlMs: 5 * 60 * 1000 }
     )
-      .then(setData)
+      .then((d) => setData(decodeItemPageDataForDisplay(d)))
       .catch((err) => setError(err instanceof Error ? err.message : t("dashboard.couldntLoadLogs")))
       .finally(() => setLoading(false));
   }, [mediaType, id, t]);
@@ -467,7 +468,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             prev
               ? {
                   ...prev,
-                  reviews: res.reviews,
+                  reviews: res.reviews.map(decodeItemReviewForDisplay),
                   meanGrade: res.meanGrade,
                   reviewsTotal: res.reviewsTotal,
                   reviewsPage: res.reviewsPage,

@@ -37,6 +37,7 @@ import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
 import type { Log } from "@geeklogs/shared";
 import { paperShadow } from "@/lib/paperShadow";
 import { cn } from "@/lib/utils";
+import { decodeSearchResultForDisplay } from "@/lib/decodeDisplayFields";
 
 const FREE_SEARCH_USAGE_STORAGE_KEY = "geeklogs_free_search_usage";
 
@@ -247,7 +248,7 @@ export function Search() {
         const data = await apiFetch<SearchResponse>(`/search?${params.toString()}`, {
           headers: { "X-Free-Search-Used": String(clientUsed) },
         });
-        const list = data.results ?? [];
+        const list = (data.results ?? []).map(decodeSearchResultForDisplay);
         setResults(list);
         if (data.freeSearchLimitReached) {
           setLimitReachedByCategory((prev) => ({ ...prev, [searchType]: true }));
@@ -320,7 +321,7 @@ export function Search() {
     })
       .then((data) => {
         if (cancelled) return;
-        setRecResults(data.results ?? []);
+        setRecResults((data.results ?? []).map(decodeSearchResultForDisplay));
       })
       .catch(() => {
         if (!cancelled) {

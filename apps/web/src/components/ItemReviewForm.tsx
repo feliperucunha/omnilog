@@ -12,6 +12,7 @@ import type { LogAffinityContext, MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
+import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
@@ -178,7 +179,7 @@ export function ItemReviewForm({
       { ttlMs: 2 * 60 * 1000 }
     )
       .then((logs) => {
-        const log = logs[0] ?? null;
+        const log = logs[0] != null ? decodeLogForDisplay(logs[0]) : null;
         setMyLog(log);
         if (log) {
           const isInProgressLog = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);

@@ -46,6 +46,7 @@ import * as storage from "@/lib/storage";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { paperShadow } from "@/lib/paperShadow";
+import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 
 interface FeedEntry {
   log: Log;
@@ -296,7 +297,9 @@ export function Dashboard() {
     setFeedLoading(true);
     const url = feedFriendFilter === "all" ? "/logs/feed" : `/logs/feed?userId=${encodeURIComponent(feedFriendFilter)}`;
     apiFetch<{ data: FeedEntry[] }>(url)
-      .then((res) => setFeed(res.data ?? []))
+      .then((res) =>
+        setFeed((res.data ?? []).map((e) => ({ ...e, log: decodeLogForDisplay(e.log) })))
+      )
       .catch(() => setFeed([]))
       .finally(() => setFeedLoading(false));
   }, [token, feedFriendFilter]);
@@ -324,7 +327,9 @@ export function Dashboard() {
           ? "/logs/feed"
           : `/logs/feed?userId=${encodeURIComponent(feedFriendFilter)}`;
       apiFetch<{ data: FeedEntry[] }>(feedUrl)
-        .then((res) => setFeed(res.data ?? []))
+        .then((res) =>
+          setFeed((res.data ?? []).map((e) => ({ ...e, log: decodeLogForDisplay(e.log) })))
+        )
         .catch(() => setFeed([]))
         .finally(() => setFeedLoading(false));
       invalidateApiCache("/logs");

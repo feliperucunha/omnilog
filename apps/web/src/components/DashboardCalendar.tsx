@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
+import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { ItemImage } from "@/components/ItemImage";
@@ -121,7 +122,7 @@ export function DashboardCalendar({
       const res = await apiFetch<{ data: Log[] }>(
         `/logs/by-date?date=${dateKey}&timezoneOffsetMinutes=${tzOffsetMinutes}`
       );
-      setDayLogs(res.data ?? []);
+      setDayLogs((res.data ?? []).map(decodeLogForDisplay));
     } catch {
       setDayLogs([]);
     } finally {
