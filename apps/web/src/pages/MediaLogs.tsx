@@ -2,10 +2,9 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { MotionLink } from "@/components/MotionLink";
 import { motion } from "framer-motion";
-import { Search, AlertTriangle, Plus, Download, Pencil, Loader2, X } from "lucide-react";
+import { AlertTriangle, Plus, Download, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import type { MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
@@ -47,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
 import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
+import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
 
@@ -788,37 +788,23 @@ export function MediaLogs({
               onSubmit={handleListSearchSubmit}
               className="relative min-h-10 min-w-0 [flex:1_1_12rem]"
             >
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
-              <Input
+              <UnifiedSearchBar
                 ref={categorySearchInputRef}
-                type="text"
-                inputMode="search"
-                enterKeyHint="search"
-                placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
                 value={categorySearchDraft}
                 onChange={handleCategorySearchDraftChange}
+                placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
                 title={t("mediaLogs.searchConfirmHint")}
-                className={cn(
-                  "w-full border-[var(--color-mid)] bg-[var(--color-darkest)] pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)]",
-                  showCategorySearchClear ? "pr-9" : "pr-3"
-                )}
-                aria-label={t("mediaLogs.searchTitlesLabel")}
+                inputAriaLabel={t("mediaLogs.searchTitlesLabel")}
+                clearAriaLabel={t("search.clearSearch")}
+                submitAriaLabel={t("search.search")}
+                showClear={showCategorySearchClear}
+                onClear={() => {
+                  setCategorySearchDraft("");
+                  setCategorySearchQuery("");
+                  categorySearchInputRef.current?.focus();
+                }}
+                disableSubmitWhenEmpty={false}
               />
-              {showCategorySearchClear && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    setCategorySearchDraft("");
-                    setCategorySearchQuery("");
-                    categorySearchInputRef.current?.focus();
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
-                  aria-label={t("search.clearSearch")}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
             </form>
           </div>
         </div>
@@ -1058,37 +1044,23 @@ export function MediaLogs({
       {/* 3. Search */}
       {(embedded || readOnly) && (
         <form onSubmit={handleListSearchSubmit} className="relative min-h-10 w-full min-w-0">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-light)]" aria-hidden />
-          <Input
+          <UnifiedSearchBar
             ref={categorySearchInputRef}
-            type="text"
-            inputMode="search"
-            enterKeyHint="search"
-            placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
             value={categorySearchDraft}
             onChange={handleCategorySearchDraftChange}
+            placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
             title={t("mediaLogs.searchConfirmHint")}
-            className={cn(
-              "w-full border-[var(--color-mid)] bg-[var(--color-darkest)] pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)]",
-              showCategorySearchClear ? "pr-9" : "pr-3"
-            )}
-            aria-label={t("mediaLogs.searchTitlesLabel")}
+            inputAriaLabel={t("mediaLogs.searchTitlesLabel")}
+            clearAriaLabel={t("search.clearSearch")}
+            submitAriaLabel={t("search.search")}
+            showClear={showCategorySearchClear}
+            onClear={() => {
+              setCategorySearchDraft("");
+              setCategorySearchQuery("");
+              categorySearchInputRef.current?.focus();
+            }}
+            disableSubmitWhenEmpty={false}
           />
-          {showCategorySearchClear && (
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                setCategorySearchDraft("");
-                setCategorySearchQuery("");
-                categorySearchInputRef.current?.focus();
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
-              aria-label={t("search.clearSearch")}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
         </form>
       )}
 
@@ -1404,44 +1376,23 @@ export function MediaLogs({
         className="fixed left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-4 bottom-[max(5rem,calc(5rem+env(safe-area-inset-bottom)))] md:bottom-6 md:left-[calc(127.5px+50vw)]"
         aria-label={t("search.search")}
       >
-        <div className="relative flex rounded-lg border-2 border-[var(--color-mid)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">
-          <span
-            className="pointer-events-none absolute left-3 top-1/2 flex -translate-y-1/2 items-center text-[var(--color-lightest)]"
-            aria-hidden
-          >
-            <Search className="size-5" />
-          </span>
-          <Input
-            ref={categorySearchInputRef}
-            type="text"
-            inputMode="search"
-            enterKeyHint="search"
-            placeholder={t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })}
-            value={categorySearchDraft}
-            onChange={handleCategorySearchDraftChange}
-            title={t("mediaLogs.searchConfirmHint")}
-            className={cn(
-              "h-11 min-w-0 flex-1 border-0 bg-transparent pl-10 text-[var(--color-lightest)] placeholder:text-[var(--color-light)] focus-visible:ring-0 focus-visible:ring-offset-0",
-              showCategorySearchClear ? "pr-10" : "pr-4"
-            )}
-            aria-label={t("search.search")}
-          />
-          {showCategorySearchClear && (
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                setCategorySearchDraft("");
-                setCategorySearchQuery("");
-                categorySearchInputRef.current?.focus();
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--color-light)] hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
-              aria-label={t("search.clearSearch")}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+        <UnifiedSearchBar
+          ref={categorySearchInputRef}
+          value={categorySearchDraft}
+          onChange={handleCategorySearchDraftChange}
+          placeholder={t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })}
+          title={t("mediaLogs.searchConfirmHint")}
+          inputAriaLabel={t("search.search")}
+          clearAriaLabel={t("search.clearSearch")}
+          submitAriaLabel={t("search.search")}
+          showClear={showCategorySearchClear}
+          onClear={() => {
+            setCategorySearchDraft("");
+            setCategorySearchQuery("");
+            categorySearchInputRef.current?.focus();
+          }}
+          disableSubmitWhenEmpty={false}
+        />
       </form>
       )}
       </div>
