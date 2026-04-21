@@ -3,7 +3,7 @@
  * Docs: https://ludopedia.com.br/api/documentacao.html
  * Auth: Bearer token (obtain via Ludopedia OAuth / aplicativos).
  */
-import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail, SEARCH_RESULTS_PAGE_SIZE } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
@@ -118,7 +118,7 @@ type JogosResponse = {
 
 function parseJogosResponse(data: JogosResponse): SearchResult[] {
   const list = data.jogos ?? data.itens ?? data.resultados ?? [];
-  return list.slice(0, 20).map((item) => {
+  return list.slice(0, SEARCH_RESULTS_PAGE_SIZE).map((item) => {
     const image = (item.thumb ?? item.url_imagem)?.trim() || null;
     return {
       id: String(item.id_jogo ?? ""),
@@ -152,7 +152,7 @@ export async function searchBoardGamesLudopedia(
   const params = new URLSearchParams();
   params.set("search", searchTerm);
   params.set("tp_jogo", "b");
-  params.set("rows", "20");
+  params.set("rows", String(SEARCH_RESULTS_PAGE_SIZE));
   params.set("page", "1");
 
   const url = `${BASE}/jogos?${params.toString()}`;

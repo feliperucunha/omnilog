@@ -66,6 +66,9 @@ export const IN_PROGRESS_STATUSES = ["watching", "reading", "playing"] as const;
 /** Statuses that mean "completed" - set completedAt when user picks these */
 export const COMPLETED_STATUSES = ["watched", "completed", "read", "played"] as const;
 
+/** Max hits returned for catalog search (`GET /search`) and user search (`GET /search/users`). */
+export const SEARCH_RESULTS_PAGE_SIZE = 30;
+
 export interface SearchResult {
   id: string;
   title: string;

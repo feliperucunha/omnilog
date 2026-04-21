@@ -1,9 +1,12 @@
 import { XMLParser } from "fast-xml-parser";
-import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail, SEARCH_RESULTS_PAGE_SIZE } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const BASE = "https://boardgamegeek.com/xmlapi2";
+
+/** BGG `/thing` accepts at most 20 comma-separated ids per request (wiki); larger batches fail and yield empty. */
+const BGG_THING_ID_BATCH_MAX = 20;
 
 /**
  * Coerce BGG `<image>` / `<thumbnail>` XML nodes to a single URL string.
@@ -228,29 +231,41 @@ export async function searchBoardGames(
   const itemsList = Array.isArray(items) ? items : items ? [items] : [];
   if (itemsList.length === 0) return { results: [] };
 
-  const ids = itemsList.slice(0, 20).map((i) => i["@_id"]).join(",");
-  const thingRes = await fetch(`${BASE}/thing?id=${ids}&stats=1`, { headers: bggHeaders(token) });
-  if (thingRes.status === 401 || thingRes.status === 403) throw new InvalidApiKeyError("bgg");
-  if (!thingRes.ok) return { results: [] };
-  const thingXml = await thingRes.text();
-  const thingParsed = parser.parse(thingXml) as {
-    items?: {
-      item?: Array<{
-        "@_id": string;
-        name?: { "#text"?: string; "@_value"?: string; "@_type"?: string } | Array<{ "#text"?: string; "@_value"?: string; "@_type"?: string }>;
-        yearpublished?: { "@_value"?: string };
-        image?: string | { "#text"?: string };
-        thumbnail?: string | { "#text"?: string };
-      }>;
-    };
+  const idsOrdered = itemsList.slice(0, SEARCH_RESULTS_PAGE_SIZE).map((i) => i["@_id"]);
+
+  type ThingRow = {
+    "@_id": string;
+    name?: { "#text"?: string; "@_value"?: string; "@_type"?: string } | Array<{ "#text"?: string; "@_value"?: string; "@_type"?: string }>;
+    yearpublished?: { "@_value"?: string };
+    image?: string | { "#text"?: string };
+    thumbnail?: string | { "#text"?: string };
   };
-  const rawItems = thingParsed.items?.item;
-  const thingItems = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
-  if (thingItems.length === 0) return { results: [] };
+
+  const thingById = new Map<string, ThingRow>();
+  for (let offset = 0; offset < idsOrdered.length; offset += BGG_THING_ID_BATCH_MAX) {
+    const chunk = idsOrdered.slice(offset, offset + BGG_THING_ID_BATCH_MAX);
+    const thingRes = await fetch(`${BASE}/thing?id=${chunk.join(",")}&stats=1`, { headers: bggHeaders(token) });
+    if (thingRes.status === 401 || thingRes.status === 403) throw new InvalidApiKeyError("bgg");
+    if (!thingRes.ok) return { results: [] };
+    const thingXml = await thingRes.text();
+    const thingParsed = parser.parse(thingXml) as {
+      items?: { item?: ThingRow | ThingRow[] };
+    };
+    const rawItems = thingParsed.items?.item;
+    const thingItems = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+    for (const item of thingItems) {
+      thingById.set(item["@_id"], item);
+    }
+  }
+
+  const thingItemsOrdered = idsOrdered
+    .map((id) => thingById.get(id))
+    .filter((row): row is ThingRow => row != null);
+  if (thingItemsOrdered.length === 0) return { results: [] };
 
   const getTitle = (n: { "#text"?: string; "@_value"?: string } | undefined): string =>
     (n?.["@_value"] ?? n?.["#text"] ?? "Unknown").trim() || "Unknown";
-  let results = thingItems.map((item) => {
+  let results = thingItemsOrdered.map((item) => {
     const names = item.name;
     let title = "Unknown";
     if (Array.isArray(names)) {

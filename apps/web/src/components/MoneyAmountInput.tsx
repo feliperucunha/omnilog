@@ -97,14 +97,14 @@ export function MoneyAmountInput({
             aria-label={triggerAria}
             title={selectedCurrencyFullLabel}
             className={cn(
-              "h-auto min-h-[44px] w-[min(5.25rem,32vw)] shrink-0 rounded-none border-0 border-r border-[var(--color-mid)]/30",
+              "h-full min-h-[44px] w-[min(5.25rem,32vw)] shrink-0 self-stretch rounded-none border-0 border-r border-[var(--color-mid)]/30",
               "bg-[var(--color-mid)]/[0.06] px-2.5 py-2.5 sm:px-3",
               "text-sm font-semibold tabular-nums tracking-wide text-[var(--color-light)]",
               "shadow-none ring-0 ring-offset-0 outline-none",
               "focus:ring-0 focus-visible:ring-0",
               "hover:bg-[var(--color-mid)]/10 data-[state=open]:bg-[var(--color-mid)]/12",
               "[&>div]:max-w-[3.25rem] [&>div]:min-w-0 [&>div]:text-left",
-              "[&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 [&>svg]:opacity-45"
+              "[&>svg]:pointer-events-none [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 [&>svg]:opacity-45"
             )}
           >
             <span className="block truncate text-sm font-semibold tabular-nums tracking-wide text-[var(--color-light)]">

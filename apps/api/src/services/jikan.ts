@@ -1,4 +1,10 @@
-import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
+import {
+  decodeHtmlEntities,
+  type SearchResult,
+  type ItemDetail,
+  SEARCH_RESULTS_PAGE_SIZE,
+} from "@geeklogs/shared";
+import { sortSearchResults } from "../lib/sortSearchResults.js";
 
 /** Map our sort value to Jikan order_by and sort (asc/desc). */
 function jikanOrderParams(sort: string | undefined): { order_by?: string; sort?: string } {
@@ -14,6 +20,52 @@ function jikanOrderParams(sort: string | undefined): { order_by?: string; sort?:
 }
 
 const BASE = "https://api.jikan.moe/v4";
+
+/** Jikan caps `limit` at 25 per page; merge two pages for up to `SEARCH_RESULTS_PAGE_SIZE` unique MAL ids. */
+const JIKAN_SEARCH_PAGE_LIMIT = 25;
+
+function mergeJikanRowsByMalId<T extends { mal_id: number }>(rows: T[]): T[] {
+  const seen = new Set<number>();
+  const out: T[] = [];
+  for (const row of rows) {
+    if (seen.has(row.mal_id)) continue;
+    seen.add(row.mal_id);
+    out.push(row);
+    if (out.length >= SEARCH_RESULTS_PAGE_SIZE) break;
+  }
+  return out;
+}
+
+async function fetchJikanSearchPages<T extends { mal_id: number }>(
+  path: "anime" | "manga",
+  q: string,
+  sort: string | undefined
+): Promise<T[]> {
+  const buildParams = (page: string) => {
+    const params = new URLSearchParams({
+      q,
+      limit: String(JIKAN_SEARCH_PAGE_LIMIT),
+      page,
+    });
+    const order = jikanOrderParams(sort);
+    if (order.order_by) params.set("order_by", order.order_by);
+    if (order.sort) params.set("sort", order.sort);
+    return params;
+  };
+  const [res1, res2] = await Promise.all([
+    fetch(`${BASE}/${path}?${buildParams("1").toString()}`),
+    fetch(`${BASE}/${path}?${buildParams("2").toString()}`),
+  ]);
+  if (!res1.ok) return [];
+  const data1 = (await res1.json()) as { data?: T[] };
+  const page1 = data1.data ?? [];
+  let page2: T[] = [];
+  if (res2.ok) {
+    const data2 = (await res2.json()) as { data?: T[] };
+    page2 = data2.data ?? [];
+  }
+  return mergeJikanRowsByMalId([...page1, ...page2]);
+}
 
 function toItemDetail(
   d: { mal_id?: number; title?: string; published?: { from?: string }; images?: { jpg?: { image_url?: string } } },
@@ -83,25 +135,15 @@ export async function getAnimeById(id: string): Promise<ItemDetail | null> {
 }
 
 export async function searchAnime(q: string, sort?: string): Promise<SearchResult[]> {
-  const params = new URLSearchParams({ q, limit: "20" });
-  const order = jikanOrderParams(sort);
-  if (order.order_by) params.set("order_by", order.order_by);
-  if (order.sort) params.set("sort", order.sort);
-  const res = await fetch(
-    `${BASE}/anime?${params.toString()}`
-  );
-  if (!res.ok) return [];
-  const data = (await res.json()) as {
-    data?: Array<{
-      mal_id: number;
-      title?: string;
-      year?: number;
-      score?: number;
-      images?: { jpg?: { image_url?: string } };
-    }>;
+  type Row = {
+    mal_id: number;
+    title?: string;
+    year?: number;
+    score?: number;
+    images?: { jpg?: { image_url?: string } };
   };
-  const list = data.data ?? [];
-  return list.map((item) => ({
+  const list = await fetchJikanSearchPages<Row>("anime", q, sort);
+  const results = list.map((item) => ({
     id: String(item.mal_id),
     title: decodeHtmlEntities(item.title ?? "Unknown"),
     image: item.images?.jpg?.image_url ?? null,
@@ -109,6 +151,7 @@ export async function searchAnime(q: string, sort?: string): Promise<SearchResul
     subtitle: null,
     score: typeof item.score === "number" && item.score > 0 ? item.score : null,
   }));
+  return sortSearchResults(results, sort);
 }
 
 export async function getMangaById(id: string): Promise<ItemDetail | null> {
@@ -171,25 +214,15 @@ export async function getMangaById(id: string): Promise<ItemDetail | null> {
 }
 
 export async function searchManga(q: string, sort?: string): Promise<SearchResult[]> {
-  const params = new URLSearchParams({ q, limit: "20" });
-  const order = jikanOrderParams(sort);
-  if (order.order_by) params.set("order_by", order.order_by);
-  if (order.sort) params.set("sort", order.sort);
-  const res = await fetch(
-    `${BASE}/manga?${params.toString()}`
-  );
-  if (!res.ok) return [];
-  const data = (await res.json()) as {
-    data?: Array<{
-      mal_id: number;
-      title?: string;
-      published?: { from?: string };
-      score?: number;
-      images?: { jpg?: { image_url?: string } };
-    }>;
+  type Row = {
+    mal_id: number;
+    title?: string;
+    published?: { from?: string };
+    score?: number;
+    images?: { jpg?: { image_url?: string } };
   };
-  const list = data.data ?? [];
-  return list.map((item) => {
+  const list = await fetchJikanSearchPages<Row>("manga", q, sort);
+  const results = list.map((item) => {
     const year = item.published?.from ? item.published.from.slice(0, 4) : null;
     return {
       id: String(item.mal_id),
@@ -200,6 +233,7 @@ export async function searchManga(q: string, sort?: string): Promise<SearchResul
       score: typeof item.score === "number" && item.score > 0 ? item.score : null,
     };
   });
+  return sortSearchResults(results, sort);
 }
 
 /** Jikan /anime/{id}/recommendations (rate-limit friendly: caller should not burst). */

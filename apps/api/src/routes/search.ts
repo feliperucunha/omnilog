@@ -1,7 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
-import { MEDIA_TYPES, SEARCH_SORT_OPTIONS } from "@geeklogs/shared";
+import { MEDIA_TYPES, SEARCH_RESULTS_PAGE_SIZE, SEARCH_SORT_OPTIONS } from "@geeklogs/shared";
 import type { MediaType, SearchResult } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { sanitizeText, SEARCH_QUERY_MAX_LENGTH } from "../lib/sanitize.js";
@@ -771,7 +771,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
   }
 });
 
-const USER_SEARCH_MAX = 20;
+const USER_SEARCH_MAX = SEARCH_RESULTS_PAGE_SIZE;
 
 /** GET /search/users?q= - Search users by username (for Social / Follow). Returns { users: Array<{ id, username, logCount, following? }> }. */
 searchRouter.get("/users", async (req: AuthenticatedRequest, res) => {

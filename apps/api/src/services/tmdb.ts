@@ -1,4 +1,9 @@
-import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
+import {
+  decodeHtmlEntities,
+  type SearchResult,
+  type ItemDetail,
+  SEARCH_RESULTS_PAGE_SIZE,
+} from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
@@ -143,6 +148,51 @@ export type SearchMoviesResult =
   | { results: SearchResult[] }
   | { results: []; requiresApiKey: "tmdb"; link: string; tutorial: string };
 
+type TmdbMovieSearchRow = {
+  id: number;
+  title?: string;
+  release_date?: string;
+  poster_path?: string;
+};
+
+type TmdbTvSearchRow = {
+  id: number;
+  name?: string;
+  first_air_date?: string;
+  poster_path?: string;
+};
+
+/** TMDB returns at most 20 hits per page; merge pages 1–2 for up to `SEARCH_RESULTS_PAGE_SIZE` unique ids. */
+async function fetchMergedTmdbSearchRows<T extends { id: number }>(
+  key: string,
+  q: string,
+  endpoint: "movie" | "tv"
+): Promise<T[]> {
+  const qEnc = encodeURIComponent(q);
+  const res1 = await fetch(`${BASE}/search/${endpoint}?api_key=${key}&query=${qEnc}&page=1`);
+  if (res1.status === 401 || res1.status === 403) throw new InvalidApiKeyError("tmdb");
+  if (!res1.ok) return [];
+  const data1 = (await res1.json()) as { results?: T[] };
+  const page1 = data1.results ?? [];
+
+  const res2 = await fetch(`${BASE}/search/${endpoint}?api_key=${key}&query=${qEnc}&page=2`);
+  let page2: T[] = [];
+  if (res2.ok) {
+    const data2 = (await res2.json()) as { results?: T[] };
+    page2 = data2.results ?? [];
+  }
+
+  const seen = new Set<number>();
+  const merged: T[] = [];
+  for (const item of [...page1, ...page2]) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    merged.push(item);
+    if (merged.length >= SEARCH_RESULTS_PAGE_SIZE) break;
+  }
+  return merged;
+}
+
 export async function searchMovies(
   q: string,
   apiKey?: string | null,
@@ -155,13 +205,8 @@ export async function searchMovies(
       ? { results: [], requiresApiKey: "tmdb", link: meta.link, tutorial: meta.tutorial }
       : { results: [] };
   }
-  const res = await fetch(
-    `${BASE}/search/movie?api_key=${key}&query=${encodeURIComponent(q)}`
-  );
-  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
-  if (!res.ok) return { results: [] };
-  const data = (await res.json()) as { results?: Array<{ id: number; title?: string; release_date?: string; poster_path?: string }> };
-  let results = (data.results ?? []).slice(0, 20).map((item) => ({
+  const rows = await fetchMergedTmdbSearchRows<TmdbMovieSearchRow>(key, q, "movie");
+  let results = rows.map((item) => ({
     id: String(item.id),
     title: decodeHtmlEntities(item.title ?? "Unknown"),
     image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,
@@ -188,13 +233,8 @@ export async function searchTv(
       ? { results: [], requiresApiKey: "tmdb", link: meta.link, tutorial: meta.tutorial }
       : { results: [] };
   }
-  const res = await fetch(
-    `${BASE}/search/tv?api_key=${key}&query=${encodeURIComponent(q)}`
-  );
-  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
-  if (!res.ok) return { results: [] };
-  const data = (await res.json()) as { results?: Array<{ id: number; name?: string; first_air_date?: string; poster_path?: string }> };
-  let results = (data.results ?? []).slice(0, 20).map((item) => ({
+  const rows = await fetchMergedTmdbSearchRows<TmdbTvSearchRow>(key, q, "tv");
+  let results = rows.map((item) => ({
     id: String(item.id),
     title: decodeHtmlEntities(item.name ?? "Unknown"),
     image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null,

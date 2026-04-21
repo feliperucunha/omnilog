@@ -15,11 +15,12 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-10 w-full max-md:min-h-[44px] items-center justify-between gap-2 rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] transition-colors",
+      "flex h-full min-h-10 w-full max-md:min-h-[44px] items-center justify-between gap-2 rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] transition-colors [touch-action:manipulation]",
       "placeholder:text-[var(--color-light)]",
       "focus:outline-none",
       "disabled:cursor-not-allowed disabled:opacity-50",
       "[&>:first-child]:min-w-0 [&>:first-child]:flex-1 [&>:first-child]:overflow-hidden [&>:first-child]:text-left",
+      "[&_svg]:pointer-events-none",
       className
     )}
     {...props}
@@ -157,14 +158,20 @@ export function Select({
       ? "max-h-[min(50dvh,20rem)] overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
       : undefined;
   return (
-    <div className={cn("min-w-0", className)}>
+    <div
+      className={cn(
+        "flex h-full min-h-0 min-w-0 flex-col self-stretch",
+        /* Stretched height + h-full trigger = entire row is tappable (mobile toolbars). */
+        className
+      )}
+    >
       <SelectRoot
         value={rootValue}
         onValueChange={(v) => onValueChange(v === "__empty" ? "" : v)}
         disabled={disabled}
       >
         <SelectTrigger
-          className={cn("min-w-0 w-full max-w-full", triggerClassName)}
+          className={cn("min-h-0 min-w-0 w-full max-w-full flex-1", triggerClassName)}
           aria-label={triggerAccessibleName}
           title={
             triggerTitle ??

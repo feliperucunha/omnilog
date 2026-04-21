@@ -1,4 +1,4 @@
-import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail, SEARCH_RESULTS_PAGE_SIZE } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 
 const BASE = "https://openlibrary.org";
@@ -77,7 +77,7 @@ export async function searchBooks(
   sort?: string,
   options?: OpenLibrarySearchOptions
 ): Promise<SearchResult[]> {
-  const params = new URLSearchParams({ q, limit: "20" });
+  const params = new URLSearchParams({ q, limit: String(SEARCH_RESULTS_PAGE_SIZE) });
   if (options?.openLibraryApiSort) {
     params.set("sort", options.openLibraryApiSort);
     params.set("fields", OL_FIELDS_WITH_RATING);

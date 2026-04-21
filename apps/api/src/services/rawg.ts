@@ -1,4 +1,4 @@
-import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail, SEARCH_RESULTS_PAGE_SIZE } from "@geeklogs/shared";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const BASE = "https://api.rawg.io/api";
@@ -192,7 +192,11 @@ export async function searchGames(
       : { results: [] };
   }
   const ordering = rawgOrdering(sort);
-  const params = new URLSearchParams({ key, search: q, page_size: "20" });
+  const params = new URLSearchParams({
+    key,
+    search: q,
+    page_size: String(Math.min(40, SEARCH_RESULTS_PAGE_SIZE)),
+  });
   if (ordering) params.set("ordering", ordering);
   const res = await fetch(
     `${BASE}/games?${params.toString()}`

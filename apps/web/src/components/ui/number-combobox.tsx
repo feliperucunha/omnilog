@@ -123,11 +123,11 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
             aria-label={ariaLabel}
             aria-expanded={open}
             aria-haspopup="listbox"
-            className="pr-9 bg-[var(--color-darkest)] focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="bg-[var(--color-darkest)] pr-14 focus-visible:ring-0 focus-visible:ring-offset-0 max-md:pr-[3.75rem]"
           />
           {optionsLoading && (
             <span
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-light)]"
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-light)]"
               aria-hidden
             >
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -138,10 +138,14 @@ export const NumberCombobox = React.forwardRef<HTMLInputElement, NumberComboboxP
               type="button"
               tabIndex={-1}
               onClick={() => setOpen((o) => !o)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+              className={cn(
+                "absolute inset-y-0 right-0 z-[1] flex min-w-[44px] max-w-[40%] items-center justify-center px-2",
+                "text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)] active:bg-[var(--color-mid)]/30",
+                "[touch-action:manipulation]"
+              )}
               aria-label="Toggle list"
             >
-              <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+              <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", open && "rotate-180")} />
             </button>
           )}
         </div>

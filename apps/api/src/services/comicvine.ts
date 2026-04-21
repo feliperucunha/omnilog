@@ -1,4 +1,4 @@
-import { decodeHtmlEntities, type SearchResult, type ItemDetail } from "@geeklogs/shared";
+import { decodeHtmlEntities, type SearchResult, type ItemDetail, SEARCH_RESULTS_PAGE_SIZE } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
@@ -74,7 +74,7 @@ export async function searchComics(
   const url = buildUrl("/search/", key, {
     query: q,
     resources: "volume",
-    limit: "20",
+    limit: String(SEARCH_RESULTS_PAGE_SIZE),
   });
   const res = await fetch(url);
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("comicvine");
@@ -89,7 +89,7 @@ export async function searchComics(
     }>;
   };
   if (data.status_code !== 1 || !Array.isArray(data.results)) return { results: [] };
-  const list: SearchResult[] = data.results.slice(0, 20).map((item) => ({
+  const list: SearchResult[] = data.results.slice(0, SEARCH_RESULTS_PAGE_SIZE).map((item) => ({
     id: String(item.id),
     title: decodeHtmlEntities(item.name ?? "Unknown"),
     image: item.image?.medium_url ?? item.image?.small_url ?? null,
