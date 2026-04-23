@@ -116,6 +116,249 @@ function SpendCategorySegmentBar({
   );
 }
 
+type SpendFinanceT = (key: string, values?: Record<string, string>) => string;
+
+function getLogCashFlow(log: Log): {
+  hasPurchase: boolean;
+  hasSale: boolean;
+  purchaseMinor: number | null;
+  purchaseCurrency: string | null;
+  saleMinor: number | null;
+  saleCurrency: string | null;
+  netMinor: number | null;
+  netCurrency: string | null;
+  netMixed: boolean;
+} {
+  const pm = log.purchaseAmountMinor ?? null;
+  const pc = log.purchaseCurrency?.trim() || null;
+  const sm = log.saleAmountMinor ?? null;
+  const sc = log.saleCurrency?.trim() || null;
+  const hasPurchase = pm != null && !!pc;
+  const hasSale = sm != null && !!sc;
+  let netMinor: number | null = null;
+  let netCurrency: string | null = null;
+  let netMixed = false;
+  if (hasPurchase && hasSale) {
+    if (pc === sc) {
+      netMinor = sm! - pm!;
+      netCurrency = pc;
+    } else {
+      netMixed = true;
+    }
+  } else if (hasPurchase) {
+    netMinor = -pm!;
+    netCurrency = pc;
+  } else if (hasSale) {
+    netMinor = sm!;
+    netCurrency = sc;
+  }
+  return {
+    hasPurchase,
+    hasSale,
+    purchaseMinor: pm,
+    purchaseCurrency: pc,
+    saleMinor: sm,
+    saleCurrency: sc,
+    netMinor,
+    netCurrency,
+    netMixed,
+  };
+}
+
+/** Stock-style row: cost / proceeds columns and signed net when computable. */
+function SpendFinanceLogRow({ log, t, onNavigate }: { log: Log; t: SpendFinanceT; onNavigate: () => void }) {
+  const cf = getLogCashFlow(log);
+  const netTone =
+    cf.netMinor != null
+      ? cf.netMinor > 0
+        ? "text-emerald-400"
+        : cf.netMinor < 0
+          ? "text-rose-400/95"
+          : "text-[var(--color-lightest)]"
+      : "text-[var(--color-light)]";
+
+  const cellBase =
+    "flex min-w-0 flex-col items-center justify-center rounded-lg bg-[var(--color-dark)]/50 px-1.5 py-2 ring-1 ring-[var(--color-mid)]/25";
+
+  return (
+    <Link
+      to={itemDetailPath(log.mediaType, log.externalId)}
+      onClick={onNavigate}
+      className="block rounded-xl border border-[var(--color-surface-border)]/55 bg-gradient-to-b from-[var(--color-darkest)]/90 to-[var(--color-dark)]/40 p-3.5 text-inherit no-underline shadow-sm transition-[border-color,box-shadow,transform] hover:border-[var(--color-mid)]/45 hover:shadow-md active:scale-[0.99]"
+    >
+      <div className="flex gap-3">
+        <ItemImage
+          src={log.image}
+          className="h-[4.5rem] w-[3.25rem] shrink-0 rounded-lg object-cover ring-1 ring-black/20"
+          mediaType={log.mediaType}
+          boardGameSource={log.boardGameSource}
+        />
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+          <OverflowMarquee className="text-[15px] font-semibold leading-snug tracking-tight text-[var(--color-lightest)]">
+            {log.title}
+          </OverflowMarquee>
+          <p className="text-[11px] text-[var(--color-light)]">
+            {t(`nav.${log.mediaType}`)}
+            {(() => {
+              const duration =
+                log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
+              return duration ? <> · {t("dashboard.finishedIn", { duration })}</> : null;
+            })()}
+          </p>
+          {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
+            <span className="w-fit rounded-full bg-amber-600/95 px-2 py-0.5 text-[10px] font-medium text-white">
+              {t("common.inProgress")}
+            </span>
+          ) : log.grade != null ? (
+            <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+          ) : null}
+        </div>
+      </div>
+
+      {cf.hasPurchase && cf.hasSale ? (
+        cf.netMixed ? (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className={cellBase}>
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-rose-300/80">
+                {t("statistics.detailCost")}
+              </span>
+              <span className="mt-1 text-sm font-semibold tabular-nums text-rose-100/95">
+                {cf.purchaseMinor != null && cf.purchaseCurrency
+                  ? formatMinorAsMoney(cf.purchaseMinor, cf.purchaseCurrency)
+                  : "—"}
+              </span>
+            </div>
+            <div className={cellBase}>
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-emerald-300/85">
+                {t("statistics.detailProceeds")}
+              </span>
+              <span className="mt-1 text-sm font-semibold tabular-nums text-emerald-200/95">
+                {cf.saleMinor != null && cf.saleCurrency
+                  ? formatMinorAsMoney(cf.saleMinor, cf.saleCurrency)
+                  : "—"}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className={cellBase}>
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-rose-300/80">
+                {t("statistics.detailCost")}
+              </span>
+              <span className="mt-1 text-sm font-semibold tabular-nums text-rose-100/95">
+                {cf.purchaseMinor != null && cf.purchaseCurrency
+                  ? formatMinorAsMoney(cf.purchaseMinor, cf.purchaseCurrency)
+                  : "—"}
+              </span>
+            </div>
+            <div className={cellBase}>
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-emerald-300/85">
+                {t("statistics.detailProceeds")}
+              </span>
+              <span className="mt-1 text-sm font-semibold tabular-nums text-emerald-200/95">
+                {cf.saleMinor != null && cf.saleCurrency
+                  ? formatMinorAsMoney(cf.saleMinor, cf.saleCurrency)
+                  : "—"}
+              </span>
+            </div>
+            <div className={cellBase}>
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--color-light)]">
+                {t("statistics.detailNet")}
+              </span>
+              <span className={cn("mt-1 text-sm font-bold tabular-nums tracking-tight", netTone)}>
+                {cf.netMinor != null && cf.netCurrency
+                  ? formatSignedMinorAsMoney(cf.netMinor, cf.netCurrency)
+                  : "—"}
+              </span>
+            </div>
+          </div>
+        )
+      ) : cf.hasPurchase ? (
+        <div className="mt-3">
+          <div className={cn(cellBase, "w-full")}>
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-rose-300/80">
+              {t("statistics.detailCost")}
+            </span>
+            <span className="mt-1 text-sm font-semibold tabular-nums text-rose-100/95">
+              {cf.purchaseMinor != null && cf.purchaseCurrency
+                ? formatMinorAsMoney(cf.purchaseMinor, cf.purchaseCurrency)
+                : "—"}
+            </span>
+          </div>
+        </div>
+      ) : cf.hasSale ? (
+        <div className="mt-3">
+          <div className={cn(cellBase, "w-full")}>
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-emerald-300/85">
+              {t("statistics.detailProceeds")}
+            </span>
+            <span className="mt-1 text-sm font-semibold tabular-nums text-emerald-200/95">
+              {cf.saleMinor != null && cf.saleCurrency
+                ? formatMinorAsMoney(cf.saleMinor, cf.saleCurrency)
+                : "—"}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      {cf.netMixed ? (
+        <p className="mt-2 text-center text-[10px] leading-snug text-[var(--color-light)]">
+          {t("statistics.detailNetMixed")}
+        </p>
+      ) : null}
+    </Link>
+  );
+}
+
+function SpendFinanceDetailHeader({ categoryKey, t }: { categoryKey: string; t: SpendFinanceT }) {
+  return (
+    <div className="space-y-1 shrink-0">
+      <OverflowMarquee className="min-w-0 text-xl font-semibold tracking-tight text-[var(--color-lightest)]">
+        {t(`nav.${categoryKey}`)}
+      </OverflowMarquee>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-light)]">
+        {t("statistics.financeDetailSubtitle")}
+      </p>
+    </div>
+  );
+}
+
+function SpendFinanceDetailList({
+  loading,
+  logs,
+  t,
+  onNavigate,
+  listGapClassName,
+}: {
+  loading: boolean;
+  logs: Log[];
+  t: SpendFinanceT;
+  onNavigate: () => void;
+  listGapClassName?: string;
+}) {
+  if (loading) {
+    return (
+      <div className="flex justify-center py-10">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
+      </div>
+    );
+  }
+  if (logs.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-[var(--color-light)]">{t("statistics.financeDetailEmpty")}</p>
+    );
+  }
+  return (
+    <ul className={cn("m-0 flex list-none flex-col p-0", listGapClassName ?? "gap-3")}>
+      {logs.map((log) => (
+        <li key={log.id}>
+          <SpendFinanceLogRow log={log} t={t} onNavigate={onNavigate} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Section divider for time-based stats (replaces raw `YYYY-MM` labels). */
 function StatsTimeSectionDivider({ label }: { label: string }) {
   return (
@@ -663,7 +906,7 @@ export function Statistics() {
       <Button
         variant="outline"
         size="sm"
-        className="gap-2 shrink-0"
+        className="gap-2 shrink-0 btn-recap-attention"
         onClick={handleOpenRecapPicker}
         aria-label={t("recap.open")}
       >
@@ -801,7 +1044,7 @@ export function Statistics() {
                     options={recapCategoryOptions}
                     aria-label={t("recap.categoryLabel")}
                     className="w-full min-w-0"
-                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -815,7 +1058,7 @@ export function Statistics() {
                     disabled={recapCategory === "all"}
                     aria-label={t("recap.statusLabel")}
                     className="w-full min-w-0"
-                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
                     contentScrollable
                   />
                 </div>
@@ -829,7 +1072,7 @@ export function Statistics() {
                     options={recapPeriodOptions}
                     aria-label={t("recap.periodLabel")}
                     className="w-full min-w-0"
-                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
                   />
                 </div>
                 <Button
@@ -864,7 +1107,7 @@ export function Statistics() {
                     options={recapCategoryOptions}
                     aria-label={t("recap.categoryLabel")}
                     className="w-full min-w-0"
-                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -878,7 +1121,7 @@ export function Statistics() {
                     disabled={recapCategory === "all"}
                     aria-label={t("recap.statusLabel")}
                     className="w-full min-w-0"
-                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
                     contentScrollable
                   />
                 </div>
@@ -892,7 +1135,7 @@ export function Statistics() {
                     options={recapPeriodOptions}
                     aria-label={t("recap.periodLabel")}
                     className="w-full min-w-0"
-                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
                   />
                 </div>
                 <Button
@@ -1062,7 +1305,7 @@ export function Statistics() {
                   }
                   aria-label={t("statistics.purchasePeriodLabel")}
                   className="w-full min-w-0"
-                  triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
+                  triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
                 />
               </div>
             </div>
@@ -1192,93 +1435,24 @@ export function Statistics() {
         </div>
       )}
 
-      {spendDetailMediaType && (
-        isMobile ? (
+      {spendDetailMediaType &&
+        (isMobile ? (
           <Drawer open onOpenChange={(open) => !open && setSpendDetailMediaType(null)}>
             <DrawerContent
               mobileHeight="95%"
               className="flex flex-col p-4 sm:p-6"
               onClose={() => setSpendDetailMediaType(null)}
             >
-              <div className="mt-6">
-                <OverflowMarquee className="mb-4 min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
-                  {t("statistics.financeDetailTitle", {
-                    category: t(`nav.${spendDetailMediaType}`),
-                  })}
-                </OverflowMarquee>
-                {spendDetailLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
-                  </div>
-                ) : spendDetailLogs.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-[var(--color-light)]">
-                    {t("statistics.financeDetailEmpty")}
-                  </p>
-                ) : (
-                  <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                    {spendDetailLogs.map((log) => (
-                      <li key={log.id}>
-                        <Link
-                          to={itemDetailPath(log.mediaType, log.externalId)}
-                          className="flex items-center gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
-                          onClick={() => setSpendDetailMediaType(null)}
-                        >
-                          <ItemImage
-                            src={log.image}
-                            className="h-14 w-10 shrink-0 rounded object-cover"
-                            mediaType={log.mediaType}
-                            boardGameSource={log.boardGameSource}
-                          />
-                          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-                            <OverflowMarquee className="text-sm font-medium text-[var(--color-lightest)]">
-                              {log.title}
-                            </OverflowMarquee>
-                            <p className="text-xs text-[var(--color-light)]">
-                              {t(`nav.${log.mediaType}`)}
-                              {(() => {
-                                const duration =
-                                  log.startedAt && log.completedAt
-                                    ? formatTimeToFinish(log.startedAt, log.completedAt)
-                                    : "";
-                                return duration ? <> · {t("dashboard.finishedIn", { duration })}</> : null;
-                              })()}
-                            </p>
-                            {log.status != null &&
-                            (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
-                              <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
-                                {t("common.inProgress")}
-                              </span>
-                            ) : log.grade != null ? (
-                              <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
-                            ) : null}
-                          </div>
-                          <div className="flex shrink-0 flex-col items-end justify-center gap-0.5 text-xs tabular-nums">
-                            {log.purchaseAmountMinor != null && log.purchaseCurrency ? (
-                              <span className="text-right text-[var(--color-light)]">
-                                <span className="block text-[9px] uppercase tracking-wide">
-                                  {t("statistics.detailSpent")}
-                                </span>
-                                <span className="font-medium text-[var(--color-lightest)]">
-                                  {formatMinorAsMoney(log.purchaseAmountMinor, log.purchaseCurrency)}
-                                </span>
-                              </span>
-                            ) : null}
-                            {log.saleAmountMinor != null && log.saleCurrency ? (
-                              <span className="text-right text-emerald-400/90">
-                                <span className="block text-[9px] uppercase tracking-wide text-emerald-400/70">
-                                  {t("statistics.detailProceeds")}
-                                </span>
-                                <span className="font-medium">
-                                  {formatMinorAsMoney(log.saleAmountMinor, log.saleCurrency)}
-                                </span>
-                              </span>
-                            ) : null}
-                          </div>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+              <div className="mt-6 flex min-h-0 flex-1 flex-col gap-4">
+                <SpendFinanceDetailHeader categoryKey={spendDetailMediaType} t={t} />
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5 [-webkit-overflow-scrolling:touch]">
+                  <SpendFinanceDetailList
+                    loading={spendDetailLoading}
+                    logs={spendDetailLogs}
+                    t={t}
+                    onNavigate={() => setSpendDetailMediaType(null)}
+                  />
+                </div>
               </div>
             </DrawerContent>
           </Drawer>
@@ -1288,94 +1462,25 @@ export function Statistics() {
               className="flex max-h-[85vh] max-w-md flex-col"
               onClose={() => setSpendDetailMediaType(null)}
             >
-              <DialogHeader className="shrink-0 space-y-0 pr-8 text-left sm:pr-10">
-                <DialogTitle className="min-w-0 text-[var(--color-lightest)]">
-                  <OverflowMarquee>
-                    {t("statistics.financeDetailTitle", {
-                      category: t(`nav.${spendDetailMediaType}`),
-                    })}
-                  </OverflowMarquee>
+              <DialogHeader className="shrink-0 space-y-2 pr-8 text-left sm:pr-10">
+                <DialogTitle asChild>
+                  <div className="min-w-0">
+                    <SpendFinanceDetailHeader categoryKey={spendDetailMediaType} t={t} />
+                  </div>
                 </DialogTitle>
               </DialogHeader>
-              <div className="min-h-0 -mx-1 max-h-[min(60vh,520px)] overflow-y-auto px-1">
-                {spendDetailLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
-                  </div>
-                ) : spendDetailLogs.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-[var(--color-light)]">
-                    {t("statistics.financeDetailEmpty")}
-                  </p>
-                ) : (
-                  <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                    {spendDetailLogs.map((log) => (
-                      <li key={log.id}>
-                        <Link
-                          to={itemDetailPath(log.mediaType, log.externalId)}
-                          className="flex items-center gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
-                          onClick={() => setSpendDetailMediaType(null)}
-                        >
-                          <ItemImage
-                            src={log.image}
-                            className="h-14 w-10 shrink-0 rounded object-cover"
-                            mediaType={log.mediaType}
-                            boardGameSource={log.boardGameSource}
-                          />
-                          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-                            <OverflowMarquee className="text-sm font-medium text-[var(--color-lightest)]">
-                              {log.title}
-                            </OverflowMarquee>
-                            <p className="text-xs text-[var(--color-light)]">
-                              {t(`nav.${log.mediaType}`)}
-                              {(() => {
-                                const duration =
-                                  log.startedAt && log.completedAt
-                                    ? formatTimeToFinish(log.startedAt, log.completedAt)
-                                    : "";
-                                return duration ? <> · {t("dashboard.finishedIn", { duration })}</> : null;
-                              })()}
-                            </p>
-                            {log.status != null &&
-                            (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
-                              <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
-                                {t("common.inProgress")}
-                              </span>
-                            ) : log.grade != null ? (
-                              <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
-                            ) : null}
-                          </div>
-                          <div className="flex shrink-0 flex-col items-end justify-center gap-0.5 text-xs tabular-nums">
-                            {log.purchaseAmountMinor != null && log.purchaseCurrency ? (
-                              <span className="text-right text-[var(--color-light)]">
-                                <span className="block text-[9px] uppercase tracking-wide">
-                                  {t("statistics.detailSpent")}
-                                </span>
-                                <span className="font-medium text-[var(--color-lightest)]">
-                                  {formatMinorAsMoney(log.purchaseAmountMinor, log.purchaseCurrency)}
-                                </span>
-                              </span>
-                            ) : null}
-                            {log.saleAmountMinor != null && log.saleCurrency ? (
-                              <span className="text-right text-emerald-400/90">
-                                <span className="block text-[9px] uppercase tracking-wide text-emerald-400/70">
-                                  {t("statistics.detailProceeds")}
-                                </span>
-                                <span className="font-medium">
-                                  {formatMinorAsMoney(log.saleAmountMinor, log.saleCurrency)}
-                                </span>
-                              </span>
-                            ) : null}
-                          </div>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+              <div className="min-h-0 -mx-1 max-h-[min(60vh,520px)] flex-1 overflow-y-auto overscroll-contain px-1 [-webkit-overflow-scrolling:touch]">
+                <SpendFinanceDetailList
+                  loading={spendDetailLoading}
+                  logs={spendDetailLogs}
+                  t={t}
+                  onNavigate={() => setSpendDetailMediaType(null)}
+                  listGapClassName="gap-3"
+                />
               </div>
             </DialogContent>
           </Dialog>
-        )
-      )}
+        ))}
 
       <div className="grid min-w-0 grid-cols-1 gap-6 overflow-hidden md:grid-cols-2 md:items-stretch md:gap-8">
         <div className="flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden md:h-full">

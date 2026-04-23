@@ -15,7 +15,9 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-full min-h-10 w-full max-md:min-h-[44px] items-center justify-between gap-2 rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] transition-colors [touch-action:manipulation]",
+      "flex w-full items-center justify-between gap-2 rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] transition-colors [touch-action:manipulation]",
+      "max-md:h-full max-md:min-h-[44px]",
+      "md:h-9 md:min-h-9 md:max-h-9 md:py-1",
       "placeholder:text-[var(--color-light)]",
       "focus:outline-none",
       "disabled:cursor-not-allowed disabled:opacity-50",
@@ -160,8 +162,10 @@ export function Select({
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 min-w-0 flex-col self-stretch",
-        /* Stretched height + h-full trigger = entire row is tappable (mobile toolbars). */
+        "flex min-h-0 min-w-0 flex-col",
+        /* Mobile toolbars: stretch to row height + full-height trigger for tap targets. */
+        "max-md:h-full max-md:self-stretch",
+        "md:h-auto md:self-auto",
         className
       )}
     >
@@ -171,7 +175,7 @@ export function Select({
         disabled={disabled}
       >
         <SelectTrigger
-          className={cn("min-h-0 min-w-0 w-full max-w-full flex-1", triggerClassName)}
+          className={cn("min-h-0 min-w-0 w-full max-w-full max-md:flex-1", triggerClassName)}
           aria-label={triggerAccessibleName}
           title={
             triggerTitle ??

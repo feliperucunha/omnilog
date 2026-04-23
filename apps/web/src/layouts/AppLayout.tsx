@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Nav } from "@/components/Nav";
 import { Topbar } from "@/components/Topbar";
@@ -7,6 +7,10 @@ import { InvalidApiKeyBanner } from "@/components/InvalidApiKeyBanner";
 import { PageTitleProvider, usePageTitle } from "@/contexts/PageTitleContext";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
+import { useAuth } from "@/contexts/AuthContext";
+import { FORCE_ONBOARDING_UI } from "@/lib/onboardingDev";
+import { OnboardingForm } from "@/pages/Onboarding";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 function AppLayoutContent() {
   const pageTitle = usePageTitle();
@@ -45,6 +49,14 @@ function AppLayoutContent() {
 }
 
 export function AppLayout() {
+  const { user } = useAuth();
+  const [devOnboardingOpen, setDevOnboardingOpen] = useState(false);
+
+  useEffect(() => {
+    if (!FORCE_ONBOARDING_UI || !user?.onboarded) return;
+    setDevOnboardingOpen(true);
+  }, [user?.onboarded, user?.id]);
+
   return (
     <div className="flex h-dvh min-h-0 min-w-0">
       <Nav />
@@ -55,6 +67,17 @@ export function AppLayout() {
           <AppLayoutContent />
         </PageTitleProvider>
       </main>
+      {FORCE_ONBOARDING_UI && user?.onboarded ? (
+        <Dialog open={devOnboardingOpen} onOpenChange={(open) => setDevOnboardingOpen(open)}>
+          <DialogContent className="sm:max-w-xl" onClose={() => setDevOnboardingOpen(false)}>
+            <OnboardingForm
+              layout="embed"
+              previewMode
+              onPreviewDismiss={() => setDevOnboardingOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

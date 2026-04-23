@@ -97,8 +97,8 @@ export function MoneyAmountInput({
             aria-label={triggerAria}
             title={selectedCurrencyFullLabel}
             className={cn(
-              "h-full min-h-[44px] w-[min(5.25rem,32vw)] shrink-0 self-stretch rounded-none border-0 border-r border-[var(--color-mid)]/30",
-              "bg-[var(--color-mid)]/[0.06] px-2.5 py-2.5 sm:px-3",
+              "h-full max-md:min-h-[44px] md:min-h-10 w-[min(5.25rem,32vw)] shrink-0 self-stretch rounded-none border-0 border-r border-[var(--color-mid)]/30",
+              "bg-[var(--color-mid)]/[0.06] px-2.5 py-2.5 sm:px-3 md:py-2",
               "text-sm font-semibold tabular-nums tracking-wide text-[var(--color-light)]",
               "shadow-none ring-0 ring-offset-0 outline-none",
               "focus:ring-0 focus-visible:ring-0",
@@ -143,8 +143,8 @@ export function MoneyAmountInput({
             setText(minorToAmountString(m, cur));
           }}
           className={cn(
-            "min-h-[44px] min-w-0 flex-1 rounded-none border-0 bg-transparent",
-            "px-3 py-2.5 text-sm text-[var(--color-lightest)]",
+            "max-md:min-h-[44px] md:min-h-10 min-w-0 flex-1 rounded-none border-0 bg-transparent",
+            "px-3 py-2.5 text-sm text-[var(--color-lightest)] md:py-2",
             "shadow-none ring-0 outline-none placeholder:text-[var(--color-light)]/65",
             "focus-visible:ring-0"
           )}

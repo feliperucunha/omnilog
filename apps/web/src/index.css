@@ -184,6 +184,35 @@ body {
       transition-duration: 0.15s;
     }
   }
+
+  @keyframes recap-glow-pulse {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--btn-gradient-start) 70%, transparent),
+        0 0 10px 0 color-mix(in srgb, var(--btn-gradient-start) 35%, transparent),
+        0 0 22px -4px color-mix(in srgb, var(--btn-gradient-end) 28%, transparent);
+    }
+    50% {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--btn-gradient-start) 90%, transparent),
+        0 0 16px 1px color-mix(in srgb, var(--btn-gradient-start) 50%, transparent),
+        0 0 32px -2px color-mix(in srgb, var(--btn-gradient-end) 40%, transparent);
+    }
+  }
+
+  .btn-recap-attention {
+    animation: recap-glow-pulse 2.5s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn-recap-attention {
+      animation: none;
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--btn-gradient-start) 75%, transparent),
+        0 0 12px 0 color-mix(in srgb, var(--btn-gradient-start) 38%, transparent);
+    }
+  }
 }
 
 /* Typography – local fonts from src/fonts */
