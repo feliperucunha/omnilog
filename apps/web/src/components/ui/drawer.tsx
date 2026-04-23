@@ -377,7 +377,7 @@ const DrawerContent = React.forwardRef<
               {/* Scrollable body: fixed-height sheets use flex-1; auto-height sheets size to content (cap scroll). */}
               <div
                 className={cn(
-                  "min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain",
+                  "min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]",
                   isAutoMobileHeight
                     ? "max-md:max-h-[min(72dvh,620px)] max-md:flex-shrink-0"
                     : "flex-1 basis-0"

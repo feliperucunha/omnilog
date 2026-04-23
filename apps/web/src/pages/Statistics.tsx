@@ -184,7 +184,7 @@ function SpendFinanceLogRow({ log, t, onNavigate }: { log: Log; t: SpendFinanceT
     <Link
       to={itemDetailPath(log.mediaType, log.externalId)}
       onClick={onNavigate}
-      className="block rounded-xl border border-[var(--color-surface-border)]/55 bg-gradient-to-b from-[var(--color-darkest)]/90 to-[var(--color-dark)]/40 p-3.5 text-inherit no-underline shadow-sm transition-[border-color,box-shadow,transform] hover:border-[var(--color-mid)]/45 hover:shadow-md active:scale-[0.99]"
+      className="relative z-0 block rounded-xl border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-3.5 text-inherit no-underline shadow-sm transition-[border-color,box-shadow,transform] hover:border-[var(--color-mid)]/60 hover:shadow-md active:scale-[0.99]"
     >
       <div className="flex gap-3">
         <ItemImage
@@ -1439,20 +1439,19 @@ export function Statistics() {
         (isMobile ? (
           <Drawer open onOpenChange={(open) => !open && setSpendDetailMediaType(null)}>
             <DrawerContent
-              mobileHeight="95%"
-              className="flex flex-col p-4 sm:p-6"
+              mobileHeight="auto"
+              className="flex max-h-[min(92dvh,640px)] flex-col gap-4 p-4 sm:p-6"
               onClose={() => setSpendDetailMediaType(null)}
             >
-              <div className="mt-6 flex min-h-0 flex-1 flex-col gap-4">
+              {/* Single scroll surface: DrawerContent already wraps body in overflow-y-auto on mobile (nested flex+overflow breaks touch scroll on WebKit). */}
+              <div className="mt-2 flex min-w-0 flex-col gap-4">
                 <SpendFinanceDetailHeader categoryKey={spendDetailMediaType} t={t} />
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5 [-webkit-overflow-scrolling:touch]">
-                  <SpendFinanceDetailList
-                    loading={spendDetailLoading}
-                    logs={spendDetailLogs}
-                    t={t}
-                    onNavigate={() => setSpendDetailMediaType(null)}
-                  />
-                </div>
+                <SpendFinanceDetailList
+                  loading={spendDetailLoading}
+                  logs={spendDetailLogs}
+                  t={t}
+                  onNavigate={() => setSpendDetailMediaType(null)}
+                />
               </div>
             </DrawerContent>
           </Drawer>
