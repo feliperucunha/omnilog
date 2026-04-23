@@ -10,7 +10,8 @@ import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import { useAuth } from "@/contexts/AuthContext";
 import { FORCE_ONBOARDING_UI } from "@/lib/onboardingDev";
 import { OnboardingForm } from "@/pages/Onboarding";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useLocale } from "@/contexts/LocaleContext";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 function AppLayoutContent() {
   const pageTitle = usePageTitle();
@@ -48,6 +49,30 @@ function AppLayoutContent() {
   );
 }
 
+function DevOnboardingDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useLocale();
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="z-[120] flex min-h-0 flex-col gap-0 overflow-hidden p-4 sm:max-w-xl sm:gap-3 sm:p-5"
+        overlayClassName="z-[120]"
+        onClose={() => onOpenChange(false)}
+      >
+        <DialogTitle className="sr-only shrink-0">{t("onboarding.a11yWizardTitle")}</DialogTitle>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <OnboardingForm layout="embed" previewMode onPreviewDismiss={() => onOpenChange(false)} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function AppLayout() {
   const { user } = useAuth();
   const [devOnboardingOpen, setDevOnboardingOpen] = useState(false);
@@ -68,15 +93,7 @@ export function AppLayout() {
         </PageTitleProvider>
       </main>
       {FORCE_ONBOARDING_UI && user?.onboarded ? (
-        <Dialog open={devOnboardingOpen} onOpenChange={(open) => setDevOnboardingOpen(open)}>
-          <DialogContent className="sm:max-w-xl" onClose={() => setDevOnboardingOpen(false)}>
-            <OnboardingForm
-              layout="embed"
-              previewMode
-              onPreviewDismiss={() => setDevOnboardingOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <DevOnboardingDialog open={devOnboardingOpen} onOpenChange={setDevOnboardingOpen} />
       ) : null}
     </div>
   );

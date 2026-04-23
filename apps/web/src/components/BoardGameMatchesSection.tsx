@@ -494,6 +494,7 @@ export function BoardGameMatchesSection({
         <div className="relative flex flex-col gap-5">
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] text-[var(--btn-text)] shadow-md">
+              <Dice5 className="h-6 w-6 shrink-0" aria-hidden />
             </span>
             <div>
               <h3 className="text-lg font-semibold text-[var(--color-lightest)]">{t("boardGameMatches.newMatch")}</h3>

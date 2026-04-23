@@ -11,6 +11,7 @@ const onboardingSchema = z.object({
   theme: z.enum(["light", "dark"]),
   types: z.array(z.enum(MEDIA_TYPES as unknown as [string, ...string[]])),
   boardGameProvider: z.enum(BOARD_GAME_PROVIDERS as unknown as [string, ...string[]]).optional(),
+  locale: z.enum(["en", "pt-BR", "es"]).optional(),
 });
 
 export const settingsRouter = Router();
@@ -294,6 +295,7 @@ settingsRouter.put("/onboarding", async (req: AuthenticatedRequest, res) => {
     visibleMediaTypes: string;
     onboarded: boolean;
     boardGameProvider?: string;
+    preferredLocale?: string;
   } = {
     preferredTheme: parsed.data.theme,
     visibleMediaTypes: JSON.stringify(parsed.data.types),
@@ -301,6 +303,9 @@ settingsRouter.put("/onboarding", async (req: AuthenticatedRequest, res) => {
   };
   if (typesSet.has("boardgames")) {
     data.boardGameProvider = parsed.data.boardGameProvider ?? "bgg";
+  }
+  if (parsed.data.locale) {
+    data.preferredLocale = parsed.data.locale;
   }
 
   await prisma.user.update({

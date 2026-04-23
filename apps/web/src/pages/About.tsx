@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Heart, Github, ChevronDown } from "lucide-react";
+import { Heart, Github } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { StarRating } from "@/components/StarRating";
 import { apiFetch } from "@/lib/api";
 import * as storage from "@/lib/storage";
-import { ALL_ERROR_CODES, getErrorDocKey } from "@/lib/errorCodes";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
@@ -51,6 +50,8 @@ const TEAM_MEMBERS = [
 
 type DonationLinkConfig = (typeof DONATION_LINKS)[number];
 
+type TeamMember = (typeof TEAM_MEMBERS)[number];
+
 function resolveDonationUrl(link: DonationLinkConfig): string | null {
   const raw = import.meta.env[link.envKey] as string | undefined;
   const trimmed = typeof raw === "string" && raw.trim() !== "" ? raw.trim() : "";
@@ -58,52 +59,21 @@ function resolveDonationUrl(link: DonationLinkConfig): string | null {
   return trimmed || null;
 }
 
-function ErrorCodesCollapsible({ t }: { t: (key: string) => string }) {
-  const [open, setOpen] = useState(false);
+function TeamMemberCard({ member, t }: { member: TeamMember; t: (key: string) => string }) {
   return (
     <Card
-      className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 sm:p-6 flex flex-col"
+      className="h-full overflow-hidden border-[var(--color-surface-border)] bg-[var(--color-dark)] p-0 flex flex-col"
       style={paperShadow}
     >
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] rounded-md"
-        aria-expanded={open}
-      >
-        <h2 className="min-w-0 flex-1 text-lg font-semibold text-[var(--color-lightest)]">
-          <OverflowMarquee>{t("errorCodes.docsTitle")}</OverflowMarquee>
-        </h2>
-        <ChevronDown
-          className={`h-5 w-5 shrink-0 text-[var(--color-light)] transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          aria-hidden
-        />
-      </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <p className="mt-2 mb-4 text-[var(--color-light)] text-sm sm:text-base">
-              {t("errorCodes.docsIntro")}
-            </p>
-            <dl className="space-y-2 text-sm">
-              {ALL_ERROR_CODES.map((code) => (
-                <div key={code} className="flex gap-2">
-                  <dt className="font-mono font-semibold text-[var(--color-lightest)] shrink-0 w-10">
-                    {code}
-                  </dt>
-                  <dd className="text-[var(--color-light)]">{t(getErrorDocKey(code))}</dd>
-                </div>
-              ))}
-            </dl>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <img
+        src={member.image}
+        alt={t(member.nameKey)}
+        className="aspect-square w-full object-cover rounded-t-lg"
+      />
+      <div className="flex flex-1 flex-col justify-center p-4 text-center sm:p-5">
+        <p className="text-base font-semibold text-[var(--color-lightest)] sm:text-lg">{t(member.nameKey)}</p>
+        <p className="mt-0.5 text-sm text-[var(--color-light)]">{t(member.roleKey)}</p>
+      </div>
     </Card>
   );
 }
@@ -219,32 +189,32 @@ export function About() {
         </Card>
       </section>
 
-      {/* Team */}
-      <section className="w-full">
-        <h2 className="mb-3 min-w-0 text-base font-semibold text-[var(--color-lightest)] sm:mb-4 sm:text-lg">
+      {/* Team: horizontal snap carousel on small screens to save vertical space */}
+      <section className="w-full" aria-labelledby="about-team-heading">
+        <h2
+          id="about-team-heading"
+          className="mb-3 min-w-0 text-base font-semibold text-[var(--color-lightest)] sm:mb-4 sm:text-lg"
+        >
           <OverflowMarquee>{t("about.teamTitle")}</OverflowMarquee>
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div
+          className="md:hidden scrollbar-hide -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden scroll-smooth scroll-pl-4 scroll-pr-4 px-4 pb-1 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]"
+          role="list"
+          aria-label={t("about.teamTitle")}
+        >
           {TEAM_MEMBERS.map((member) => (
-            <Card
+            <div
               key={member.roleKey}
-              className="overflow-hidden border-[var(--color-surface-border)] bg-[var(--color-dark)] p-0 flex flex-col"
-              style={paperShadow}
+              role="listitem"
+              className="w-[min(78vw,17.5rem)] shrink-0 snap-center"
             >
-              <img
-                src={member.image}
-                alt={t(member.nameKey)}
-                className="w-full aspect-square object-cover rounded-t-lg"
-              />
-              <div className="p-4 text-center sm:p-5">
-                <p className="font-semibold text-[var(--color-lightest)] text-base sm:text-lg">
-                  {t(member.nameKey)}
-                </p>
-                <p className="text-sm text-[var(--color-light)] mt-0.5">
-                  {t(member.roleKey)}
-                </p>
-              </div>
-            </Card>
+              <TeamMemberCard member={member} t={t} />
+            </div>
+          ))}
+        </div>
+        <div className="hidden gap-4 sm:gap-6 md:grid md:grid-cols-2 md:gap-6 lg:grid-cols-4">
+          {TEAM_MEMBERS.map((member) => (
+            <TeamMemberCard key={member.roleKey} member={member} t={t} />
           ))}
         </div>
       </section>
@@ -401,9 +371,6 @@ export function About() {
           )}
         </AnimatePresence>
       </Card>
-
-      {/* Error code reference (collapsible, collapsed by default) */}
-      <ErrorCodesCollapsible t={t} />
     </motion.div>
   );
 }

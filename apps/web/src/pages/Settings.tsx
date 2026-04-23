@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronRight, Download, GripVertical, HelpCircle, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, HelpCircle, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { MediaCategoryDragList } from "@/components/MediaCategoryDragList";
 
 type KeysStatus = { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
 
@@ -85,11 +86,6 @@ export function Settings() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportSelectedCategories, setExportSelectedCategories] = useState<Set<MediaType>>(() => new Set(MEDIA_TYPES));
   const [showCompleteModal, setShowCompleteModal] = useState(() => getShowCompleteModal());
-  /** Pointer-based reorder (HTML5 drag does not work on most mobile browsers). */
-  const mediaTypesOrderListRef = useRef<HTMLUListElement>(null);
-  const reorderDragFromRef = useRef<number | null>(null);
-  const [reorderDragFrom, setReorderDragFrom] = useState<number | null>(null);
-  const [reorderHoverIndex, setReorderHoverIndex] = useState<number | null>(null);
   const exportOpenSnapshotRef = useRef<Set<MediaType>>(new Set());
   const prevExportModalOpenRef = useRef(false);
   const isMobile = useIsMobile();
@@ -314,37 +310,6 @@ export function Settings() {
     await saveVisibleMediaTypes(typesArray);
   };
 
-  const handleReorderMediaTypes = (fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex) return;
-    const next = [...orderedMediaTypes];
-    const [removed] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, removed);
-    setOrderedMediaTypes(next);
-    const typesToSave = next.filter((t) => selectedMediaTypes.has(t));
-    if (typesToSave.length > 0) saveVisibleMediaTypes(typesToSave);
-  };
-
-  const clearMediaTypeReorderGesture = () => {
-    reorderDragFromRef.current = null;
-    setReorderDragFrom(null);
-    setReorderHoverIndex(null);
-  };
-
-  const mediaTypeDropIndexAtPoint = (clientX: number, clientY: number): number | null => {
-    const root = mediaTypesOrderListRef.current;
-    if (!root) return null;
-    const stack = document.elementsFromPoint(clientX, clientY);
-    for (let i = 0; i < stack.length; i++) {
-      const el = stack[i];
-      if (!(el instanceof Element)) continue;
-      const row = el.closest("[data-media-type-reorder-index]");
-      if (!row || !root.contains(row)) continue;
-      const parsed = Number.parseInt(row.getAttribute("data-media-type-reorder-index") ?? "", 10);
-      if (Number.isFinite(parsed) && parsed >= 0 && parsed < orderedMediaTypes.length) return parsed;
-    }
-    return null;
-  };
-
   const handleExportDownload = useCallback(
     async (onClose?: () => void): Promise<boolean> => {
       const selected = Array.from(exportSelectedCategories);
@@ -554,12 +519,11 @@ export function Settings() {
                 <ThemeSwitcher />
               </div>
             </div>
-            <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <div className="min-w-0">
                 <span className="text-sm font-medium text-[var(--color-lightest)]">
                   {t("settings.recapEmailsTitle")}
                 </span>
-                <p className="mt-1 max-w-xl text-xs text-[var(--color-light)]">{t("settings.recapEmailsIntro")}</p>
               </div>
               <div className="shrink-0 pt-0.5">
                 <Switch
@@ -571,25 +535,19 @@ export function Settings() {
               </div>
             </div>
             <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 last:pb-0">
-              <label className="flex cursor-pointer flex-col gap-1 min-w-0 focus-within:outline-none">
+              <div className="min-w-0">
                 <span className="text-sm font-medium text-[var(--color-lightest)]">
                   {t("settings.showCompleteModal")}
                 </span>
-                <span id="show-complete-modal-desc" className="text-xs text-[var(--color-light)]">
-                  {t("settings.showCompleteModalIntro")}
-                </span>
-              </label>
-              <div className="shrink-0">
-                <input
-                  type="checkbox"
+              </div>
+              <div className="shrink-0 pt-0.5">
+                <Switch
                   checked={showCompleteModal}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
+                  onCheckedChange={(checked) => {
                     setShowCompleteModal(checked);
                     void storage.setItem(SHOW_COMPLETE_MODAL_STORAGE_KEY, checked ? "true" : "false");
                   }}
-                  className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--btn-gradient-start)] focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)]"
-                  aria-describedby="show-complete-modal-desc"
+                  aria-label={t("settings.showCompleteModal")}
                 />
               </div>
             </div>
@@ -609,97 +567,22 @@ export function Settings() {
                 <p className="text-sm text-[var(--color-light)]">
                   {t("settings.visibleMediaTypesOrderHint")}
                 </p>
-                <ul
-                  ref={mediaTypesOrderListRef}
-                  className="flex flex-col gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1"
-                  aria-label={t("settings.visibleMediaTypesLabel")}
-                >
-                  {orderedMediaTypes.map((type, index) => (
-                    <li
-                      key={type}
-                      data-media-type-reorder-index={index}
-                      className={cn(
-                        "flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-[var(--color-darkest)]/80",
-                        "focus-within:ring-2 focus-within:ring-[var(--color-mid)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--color-dark)]",
-                        reorderDragFrom === index && "opacity-60",
-                        reorderHoverIndex === index &&
-                          reorderDragFrom != null &&
-                          reorderHoverIndex !== reorderDragFrom &&
-                          "ring-2 ring-[var(--btn-gradient-start)]/45"
-                      )}
-                    >
-                      <button
-                        type="button"
-                        disabled={savingMediaTypes}
-                        className={cn(
-                          "inline-flex min-h-10 min-w-10 shrink-0 cursor-grab touch-none select-none items-center justify-center rounded-md border-0 bg-transparent p-0",
-                          "text-[var(--color-light)] hover:bg-[var(--color-mid)]/25 hover:text-[var(--color-lightest)] active:cursor-grabbing",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-dark)]",
-                          savingMediaTypes && "pointer-events-none opacity-50"
-                        )}
-                        aria-label={t("settings.dragToReorder")}
-                        onPointerDown={(e) => {
-                          if (e.button !== 0 || savingMediaTypes) return;
-                          e.preventDefault();
-                          e.currentTarget.setPointerCapture(e.pointerId);
-                          reorderDragFromRef.current = index;
-                          setReorderDragFrom(index);
-                          setReorderHoverIndex(index);
-                        }}
-                        onPointerMove={(e) => {
-                          if (reorderDragFromRef.current == null) return;
-                          setReorderHoverIndex(mediaTypeDropIndexAtPoint(e.clientX, e.clientY));
-                        }}
-                        onPointerUp={(e) => {
-                          if (reorderDragFromRef.current == null) return;
-                          const from = reorderDragFromRef.current;
-                          const x = e.clientX;
-                          const y = e.clientY;
-                          try {
-                            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-                              e.currentTarget.releasePointerCapture(e.pointerId);
-                            }
-                          } catch {
-                            /* already released */
-                          }
-                          const to = mediaTypeDropIndexAtPoint(x, y);
-                          clearMediaTypeReorderGesture();
-                          if (to != null && to !== from) {
-                            handleReorderMediaTypes(from, to);
-                          }
-                        }}
-                        onPointerCancel={(e) => {
-                          if (reorderDragFromRef.current == null) return;
-                          try {
-                            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-                              e.currentTarget.releasePointerCapture(e.pointerId);
-                            }
-                          } catch {
-                            /* ignore */
-                          }
-                          clearMediaTypeReorderGesture();
-                        }}
-                        onLostPointerCapture={() => {
-                          clearMediaTypeReorderGesture();
-                        }}
-                      >
-                        <GripVertical className="h-5 w-5" aria-hidden />
-                      </button>
-                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedMediaTypes.has(type)}
-                          onChange={() => handleToggleMediaType(type)}
-                          disabled={savingMediaTypes}
-                          className="h-4 w-4 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
-                        />
-                        <span className="text-sm text-[var(--color-lightest)]">
-                          {t(`nav.${type}`)}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
+                <MediaCategoryDragList
+                  order={orderedMediaTypes}
+                  onReorder={(next) => {
+                    setOrderedMediaTypes(next);
+                    const typesToSave = next.filter((t) => selectedMediaTypes.has(t));
+                    if (typesToSave.length > 0) void saveVisibleMediaTypes(typesToSave);
+                  }}
+                  selected={selectedMediaTypes}
+                  onToggle={handleToggleMediaType}
+                  disabled={savingMediaTypes}
+                  isPending={savingMediaTypes}
+                  pendingLabel={t("settings.saving")}
+                  labelForType={(type) => t(`nav.${type}`)}
+                  gripAriaLabel={t("settings.dragToReorder")}
+                  listAriaLabel={t("settings.visibleMediaTypesLabel")}
+                />
               </>
             ) : (
               <>
