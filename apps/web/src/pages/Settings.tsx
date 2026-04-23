@@ -22,7 +22,7 @@ import { useMe } from "@/contexts/MeContext";
 import { getShowCompleteModal, SHOW_COMPLETE_MODAL_STORAGE_KEY } from "@/contexts/LogCompleteContext";
 import * as storage from "@/lib/storage";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
-import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
+import { MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 import { tierHasProFeatures } from "@/lib/userTier";
@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { BoardGameProviderSelector } from "@/components/BoardGameProviderSelector";
 import { MediaCategoryDragList } from "@/components/MediaCategoryDragList";
 
 type KeysStatus = { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
@@ -671,27 +672,11 @@ export function Settings() {
             <p className="text-sm text-[var(--color-light)]">
               {t("settings.boardGameProviderIntro")}
             </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <ToggleGroup
-                type="single"
-                value={me?.boardGameProvider ?? "bgg"}
-                onValueChange={(v) => v && handleBoardGameProviderChange(v as BoardGameProvider)}
-                disabled={savingBoardGameProvider}
-                className="inline-flex rounded-md border border-[var(--color-mid)]/30 p-0.5"
-                aria-label={t("settings.boardGameProviderLabel")}
-              >
-                {BOARD_GAME_PROVIDERS.map((provider) => (
-                  <ToggleGroupItem
-                    key={provider}
-                    value={provider}
-                    className="h-8 px-3 text-sm"
-                    aria-label={provider === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
-                  >
-                    {provider === "bgg" ? t("settings.boardGameProviderBgg") : t("settings.boardGameProviderLudopedia")}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
+            <BoardGameProviderSelector
+              value={me?.boardGameProvider ?? "bgg"}
+              onValueChange={(next) => void handleBoardGameProviderChange(next)}
+              disabled={savingBoardGameProvider}
+            />
           </div>
           {savingBoardGameProvider && (
             <div

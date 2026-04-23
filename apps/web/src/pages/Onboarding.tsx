@@ -3,7 +3,7 @@ import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { BoardGameProviderSelector } from "@/components/BoardGameProviderSelector";
 import { useLocale, LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -12,7 +12,7 @@ import { useMe } from "@/contexts/MeContext";
 import { apiFetch, invalidateApiCache } from "@/lib/api";
 import { showErrorToast } from "@/lib/errorToast";
 import { FORCE_ONBOARDING_UI } from "@/lib/onboardingDev";
-import { BOARD_GAME_PROVIDERS, MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
+import { MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
 import { MediaCategoryDragList } from "@/components/MediaCategoryDragList";
 import { cn } from "@/lib/utils";
 import { trackProductEvent } from "@/lib/productAnalytics";
@@ -297,31 +297,11 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
               </h2>
               <p className="text-xs text-[var(--color-light)]">{t("onboarding.stepBoardGamesHint")}</p>
             </div>
-            <ToggleGroup
-              type="single"
+            <BoardGameProviderSelector
               value={boardGameProvider}
-              onValueChange={(v) => v && setBoardGameProvider(v as BoardGameProvider)}
+              onValueChange={setBoardGameProvider}
               disabled={loading}
-              className="inline-flex w-full rounded-xl border border-[var(--color-surface-border)]/60 p-1"
-              aria-label={t("settings.boardGameProviderLabel")}
-            >
-              {BOARD_GAME_PROVIDERS.map((provider) => (
-                <ToggleGroupItem
-                  key={provider}
-                  value={provider}
-                  className="h-11 flex-1 rounded-lg px-3 text-sm data-[state=on]:bg-[var(--color-mid)]/35 data-[state=on]:text-[var(--color-lightest)]"
-                  aria-label={
-                    provider === "bgg"
-                      ? t("settings.boardGameProviderBgg")
-                      : t("settings.boardGameProviderLudopedia")
-                  }
-                >
-                  {provider === "bgg"
-                    ? t("settings.boardGameProviderBgg")
-                    : t("settings.boardGameProviderLudopedia")}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+            />
           </>
         ) : null}
       </motion.div>
