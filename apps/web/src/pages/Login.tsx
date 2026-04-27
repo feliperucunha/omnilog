@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { showErrorToast } from "@/lib/errorToast";
 import { apiFetch, ApiValidationError } from "@/lib/api";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
+import { safeInternalPathFromQuery } from "@/lib/safeInternalPath";
 import * as storage from "@/lib/storage";
 import type { AuthResponse } from "@geeklogs/shared";
 import { modalContentVariants } from "@/lib/animations";
@@ -32,6 +33,7 @@ export function Login() {
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   /** Load remember-me from persistent storage (works on Android/Capacitor). */
   useEffect(() => {
@@ -90,6 +92,11 @@ export function Login() {
       }
       await login(data.token, { ...data.user, onboarded: data.user.onboarded ?? true });
       toast.success(t("toast.welcomeBack"));
+      const from = safeInternalPathFromQuery(searchParams.get("from"));
+      if (from) {
+        navigate(from, { replace: true });
+        return;
+      }
       navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("toast.loginFailed");

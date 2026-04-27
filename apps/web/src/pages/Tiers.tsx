@@ -9,14 +9,15 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch, ApiError, invalidateLogsAndItemsCache } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { TiersSkeleton } from "@/components/skeletons";
 import { tierHasUnlimitedLogs } from "@/lib/userTier";
-import { isCapacitorAndroid } from "@/lib/androidOverlayBack";
-import { isNativePurchaseUserCanceled, PlayBilling } from "@/lib/playBilling";
+import { isCapacitorNative } from "@/lib/androidOverlayBack";
+import { openExternalUrl } from "@/lib/openExternalUrl";
+import { buildNativeProCheckoutUrl, buildWebLoginUrlWithFromPath } from "@/lib/publicWebOrigin";
 
 const FREE_LOG_LIMIT = 500;
 
@@ -32,11 +33,16 @@ export function Tiers() {
   const { me, refetch, loading } = useMe();
   const { setPageTitle } = usePageTitle() ?? {};
   const [searchParams, setSearchParams] = useSearchParams();
+  const initialInterval: "monthly" | "yearly" = (() => {
+    const v = searchParams.get("interval");
+    if (v === "monthly" || v === "yearly") return v;
+    return "yearly";
+  })();
+  const [interval, setInterval] = useState<"monthly" | "yearly">(initialInterval);
   useEffect(() => {
     setPageTitle?.(t("tiers.title"));
     return () => setPageTitle?.(null);
   }, [t, setPageTitle]);
-  const [interval, setInterval] = useState<"monthly" | "yearly">("yearly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -68,9 +74,9 @@ export function Tiers() {
     })();
   }, [searchParams, setSearchParams, refetch, t]);
 
-  /** After Play Store / external flows, refresh subscription state (standard Capacitor pattern). */
+  /** When returning to the native shell (e.g. from the browser after paying on the website), refresh tier. */
   useEffect(() => {
-    if (!isCapacitorAndroid() || !token) return;
+    if (!isCapacitorNative() || !token) return;
     let remove: (() => void) | undefined;
     void import("@capacitor/app").then(({ App }) => {
       void App.addListener("resume", () => {
@@ -100,66 +106,29 @@ export function Tiers() {
 
   if (token && loading) return <TiersSkeleton />;
 
-  const subscribeViaGooglePlay = async () => {
-    if (!me?.user.id) {
-      toast.error(t("tiers.playBillingLoginRequired"));
-      return;
+  const openGeeklogsWebForBilling = async (pathWithQuery: string) => {
+    const url = buildWebLoginUrlWithFromPath(pathWithQuery);
+    if (isCapacitorNative()) {
+      await openExternalUrl(url);
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
     }
-    const monthly = import.meta.env.VITE_GOOGLE_PLAY_PRODUCT_MONTHLY?.trim();
-    const yearly = import.meta.env.VITE_GOOGLE_PLAY_PRODUCT_YEARLY?.trim();
-    const productId = interval === "yearly" ? yearly : monthly;
-    if (!productId) {
-      toast.error(t("tiers.playBillingProductsNotConfigured"));
-      return;
-    }
-    const productIds = [monthly, yearly].filter((x): x is string => Boolean(x && x.length > 0));
-    if (productIds.length === 0) {
-      toast.error(t("tiers.playBillingProductsNotConfigured"));
-      return;
-    }
-    const q = await PlayBilling.querySubscriptionProducts({ productIds });
-    const row = q.products.find((p) => p.productId === productId);
-    if (!row?.offerToken) {
-      toast.error(t("tiers.playBillingOfferMissing"));
-      return;
-    }
-    const uid = me.user.id;
-    const purchase = await PlayBilling.purchaseSubscription({
-      productId,
-      offerToken: row.offerToken,
-      ...(uid
-        ? { obfuscatedAccountId: uid.length > 64 ? uid.slice(0, 64) : uid }
-        : {}),
-    });
-    await apiFetch("/billing/google-play/verify", {
-      method: "POST",
-      body: JSON.stringify({
-        purchaseToken: purchase.purchaseToken,
-        productId,
-      }),
-    });
-    invalidateLogsAndItemsCache();
-    await refetch();
-    toast.success(t("tiers.upgradeSuccess"));
+    toast.info(t("tiers.billingOnGeeklogsWeb"));
   };
 
   const handleSubscribe = async () => {
     if (checkoutInFlightRef.current) return;
     checkoutInFlightRef.current = true;
 
-    if (isCapacitorAndroid()) {
+    // Native: open geeklogs.com.br (login → /tiers) in the system browser. Web: in-app Stripe checkout.
+    if (isCapacitorNative()) {
       setCheckoutLoading(true);
       try {
-        await subscribeViaGooglePlay();
+        const url = buildNativeProCheckoutUrl(interval);
+        await openExternalUrl(url);
+        toast.info(t("tiers.paymentCompleteInBrowser"));
       } catch (err) {
-        if (isNativePurchaseUserCanceled(err)) {
-          toast.info(t("tiers.upgradeCanceled"));
-        } else if (err instanceof ApiError && err.statusCode === 409) {
-          toast.error(err.message);
-          console.error("[checkout conflict]", err);
-        } else {
-          showErrorToast(t, "E025", { originalError: err });
-        }
+        showErrorToast(t, "E025", { originalError: err });
       } finally {
         setCheckoutLoading(false);
         checkoutInFlightRef.current = false;
@@ -195,17 +164,10 @@ export function Tiers() {
     if (portalInFlightRef.current) return;
     portalInFlightRef.current = true;
 
-    if (isCapacitorAndroid() && me?.billingProvider === "google_play") {
+    if (me?.billingProvider === "google_play") {
       setPortalLoading(true);
       try {
-        const pkg =
-          import.meta.env.VITE_ANDROID_PACKAGE_ID?.trim() || "com.geeklogs.app";
-        const sku = me.googlePlayProductId?.trim() || "";
-        const url = sku
-          ? `https://play.google.com/store/account/subscriptions?package=${encodeURIComponent(pkg)}&sku=${encodeURIComponent(sku)}`
-          : `https://play.google.com/store/account/subscriptions?package=${encodeURIComponent(pkg)}`;
-        const { Browser } = await import("@capacitor/browser");
-        await Browser.open({ url });
+        await openGeeklogsWebForBilling("/tiers");
       } catch (err) {
         showErrorToast(t, "E099", { originalError: err });
       } finally {
@@ -241,7 +203,17 @@ export function Tiers() {
 
   const handleCancelSubscription = async () => {
     if (me?.billingProvider === "google_play") {
-      toast.info(t("tiers.cancelInPlayStore"));
+      if (cancelInFlightRef.current) return;
+      cancelInFlightRef.current = true;
+      setCancelLoading(true);
+      try {
+        await openGeeklogsWebForBilling("/tiers");
+      } catch (err) {
+        showErrorToast(t, "E023", { originalError: err });
+      } finally {
+        setCancelLoading(false);
+        cancelInFlightRef.current = false;
+      }
       return;
     }
 
@@ -283,9 +255,9 @@ export function Tiers() {
         <p className="mt-2 text-[var(--color-light)]">
           {t("tiers.subtitle")}
         </p>
-        {isCapacitorAndroid() ? (
+        {isCapacitorNative() ? (
           <p className="mt-2 text-xs text-[var(--color-light)]">
-            {t("tiers.paymentMethodGooglePlay")}
+            {t("tiers.paymentMethodWebsite")}
           </p>
         ) : (
           <p className="mt-2 text-xs text-[var(--color-light)]">
@@ -338,17 +310,15 @@ export function Tiers() {
               >
                 {portalLoading ? t("tiers.redirecting") : t("tiers.manageSubscription")}
               </Button>
-              {me.billingProvider !== "google_play" ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-red-500/50 text-red-400 hover:bg-red-500/20"
-                  disabled={portalLoading || cancelLoading}
-                  onClick={handleCancelSubscription}
-                >
-                  {cancelLoading ? t("tiers.canceling") : t("tiers.cancelSubscription")}
-                </Button>
-              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                className="border-red-500/50 text-red-400 hover:bg-red-500/20"
+                disabled={portalLoading || cancelLoading}
+                onClick={handleCancelSubscription}
+              >
+                {cancelLoading ? t("tiers.canceling") : t("tiers.cancelSubscription")}
+              </Button>
             </div>
           )}
         </Card>
@@ -492,9 +462,7 @@ export function Tiers() {
               {checkoutLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
-                  {isCapacitorAndroid()
-                    ? t("tiers.processingPurchase")
-                    : t("tiers.redirecting")}
+                  {t("tiers.redirecting")}
                 </>
               ) : (
                 t("tiers.upgradeToPro")

@@ -47,11 +47,12 @@ export function Register() {
     e.preventDefault();
     const errors: FieldErrors = {};
     if (!username.trim()) errors.username = t("register.username") + " is required";
-    else if (username.trim().length < 2) errors.username = "At least 2 characters";
+    else if (username.trim().length < 4) errors.username = t("validation.usernameMinLength");
     else if (!/^[a-zA-Z0-9_-]+$/.test(username.trim()))
-      errors.username = "Only letters, numbers, underscore and hyphen";
+      errors.username = t("validation.usernameFormat");
     if (!email.trim()) errors.email = t("register.email") + " is required";
     if (!password) errors.password = t("validation.passwordLettersAndNumbers");
+    else if (password.length < 4) errors.password = t("validation.passwordMinLength");
     else if (!isValidPassword(password)) errors.password = t("validation.passwordLettersAndNumbers");
     if (password !== confirmPassword) errors.confirmPassword = t("register.passwordsDoNotMatch");
     if (Object.keys(errors).length > 0) {
@@ -124,7 +125,7 @@ export function Register() {
                     value={username}
                     onChange={(e) => { setUsername(e.target.value); clearFieldError("username"); }}
                     required
-                    minLength={2}
+                    minLength={4}
                     maxLength={32}
                     className={cn(fieldErrors.username && "border-red-500 focus-visible:ring-red-500")}
                     aria-invalid={!!fieldErrors.username}
@@ -182,7 +183,7 @@ export function Register() {
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); clearFieldError("password"); }}
                     required
-                    minLength={8}
+                    minLength={4}
                     className={cn(fieldErrors.password && "border-red-500 focus-visible:ring-red-500")}
                     aria-invalid={!!fieldErrors.password}
                     aria-describedby={fieldErrors.password ? "register-password-error" : undefined}
@@ -201,7 +202,7 @@ export function Register() {
                     value={confirmPassword}
                     onChange={(e) => { setConfirmPassword(e.target.value); clearFieldError("confirmPassword"); }}
                     required
-                    minLength={8}
+                    minLength={4}
                     className={cn(fieldErrors.confirmPassword && "border-red-500 focus-visible:ring-red-500")}
                     aria-invalid={!!fieldErrors.confirmPassword}
                     aria-describedby={fieldErrors.confirmPassword ? "register-confirmPassword-error" : undefined}

@@ -67,6 +67,9 @@
     "passwordsDoNotMatch": "As senhas não coincidem"
   },
   "validation": {
+    "usernameMinLength": "O nome de usuário deve ter pelo menos 4 caracteres",
+    "usernameFormat": "Apenas letras, números, sublinhado e hífen",
+    "passwordMinLength": "A senha deve ter pelo menos 4 caracteres",
     "passwordLettersAndNumbers": "A senha deve ter pelo menos 8 caracteres e incluir letras e números"
   },
   "forgotPassword": {
@@ -787,12 +790,10 @@
   "tiers": {
     "title": "Planos",
     "subtitle": "Escolha o plano que combina com a forma como você registra.",
-    "paymentMethodGooglePlay": "Assinaturas Pro neste app são cobradas pela Google Play.",
+    "paymentMethodWebsite": "Para assinar o Pro, abrimos o geeklogs.com.br: você entra na conta, depois vai à página de planos. Pagamento com Stripe, igual ao site. Ao voltar ao app, o plano atualiza após atualizar a tela.",
     "paymentMethodStripe": "Assinaturas Pro na web são cobradas com segurança pelo Stripe.",
-    "playBillingLoginRequired": "Entre na conta para assinar pela Google Play.",
-    "playBillingProductsNotConfigured": "Os produtos de assinatura não estão configurados neste build. Defina VITE_GOOGLE_PLAY_PRODUCT_MONTHLY e VITE_GOOGLE_PLAY_PRODUCT_YEARLY.",
-    "playBillingOfferMissing": "Não foi possível carregar ofertas da Google Play. Verifique o Play Console e os IDs dos produtos.",
-    "cancelInPlayStore": "Para cancelar, abra a Google Play → Pagamentos e assinaturas → Assinaturas.",
+    "paymentCompleteInBrowser": "Depois de pagar no site, volte ao app e puxe para atualizar (ou reabra) para ver o Pro.",
+    "billingOnGeeklogsWeb": "Abrimos o site do Geeklogs. Entre com o mesmo e-mail e senha do app para continuar.",
     "admin": "Admin",
     "beta": "Beta",
     "free": "Grátis",
@@ -823,7 +824,6 @@
     "usageUnlimited": "{{count}} logs",
     "upgradeToPro": "Assinar Pro",
     "redirecting": "Redirecionando…",
-    "processingPurchase": "Processando…",
     "upgradeSuccess": "Você agora é Pro. Obrigado por assinar!",
     "upgradeCanceled": "O pagamento foi cancelado.",
     "manageSubscription": "Gerenciar assinatura",

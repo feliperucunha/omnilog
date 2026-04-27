@@ -67,6 +67,9 @@
     "passwordsDoNotMatch": "Passwords do not match"
   },
   "validation": {
+    "usernameMinLength": "Username must be at least 4 characters",
+    "usernameFormat": "Only letters, numbers, underscore and hyphen",
+    "passwordMinLength": "Password must be at least 4 characters",
     "passwordLettersAndNumbers": "Password must be at least 8 characters and include both letters and numbers"
   },
   "forgotPassword": {
@@ -788,12 +791,10 @@
   "tiers": {
     "title": "Plans",
     "subtitle": "Choose the plan that fits how you log.",
-    "paymentMethodGooglePlay": "Pro subscriptions on this app are billed through Google Play.",
+    "paymentMethodWebsite": "To upgrade, we open geeklogs.com.br: you’ll sign in, then we take you to Plans. Pay with Stripe (same as the site). When you return to the app, your plan updates after refresh.",
     "paymentMethodStripe": "Pro subscriptions on the web are billed securely through Stripe.",
-    "playBillingLoginRequired": "Sign in to subscribe with Google Play.",
-    "playBillingProductsNotConfigured": "Subscription products are not configured in this build. Set VITE_GOOGLE_PLAY_PRODUCT_MONTHLY and VITE_GOOGLE_PLAY_PRODUCT_YEARLY.",
-    "playBillingOfferMissing": "Could not load subscription offers from Google Play. Check Play Console and product IDs.",
-    "cancelInPlayStore": "To cancel, open Google Play → Payments & subscriptions → Subscriptions.",
+    "paymentCompleteInBrowser": "After paying on the site, return to the app and pull to refresh (or reopen) to see Pro.",
+    "billingOnGeeklogsWeb": "We opened the Geeklogs site. Sign in there to continue — same email and password as the app.",
     "admin": "Admin",
     "beta": "Beta",
     "free": "Free",
@@ -824,7 +825,6 @@
     "usageUnlimited": "{{count}} logs",
     "upgradeToPro": "Upgrade to Pro",
     "redirecting": "Redirecting…",
-    "processingPurchase": "Processing…",
     "upgradeSuccess": "You're now Pro. Thanks for subscribing!",
     "upgradeCanceled": "Checkout was canceled.",
     "manageSubscription": "Manage subscription",

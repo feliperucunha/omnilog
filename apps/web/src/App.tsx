@@ -52,6 +52,7 @@ const RequireOnboarded = ({ children }: { children: React.ReactNode }) => {
       "/faq",
       "/privacy",
       "/terms",
+      "/tiers",
     ];
     if (!allowed.includes(location.pathname)) return <Navigate to="/onboarding" replace />;
   }
