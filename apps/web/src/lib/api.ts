@@ -61,7 +61,7 @@ const COOKIE_SESSION = "cookie";
 
 export const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
 
-function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(): HeadersInit {
   const token = getItemSync("geeklogs_token");
   const headers: HeadersInit = {
     "Content-Type": "application/json",

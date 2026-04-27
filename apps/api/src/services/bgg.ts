@@ -105,7 +105,7 @@ function bggExtractBayesAverage(item: Record<string, unknown>): number | null {
   return Math.round(n * 100) / 100;
 }
 
-function bggHeaders(token?: string | null): HeadersInit {
+export function bggHeaders(token?: string | null): HeadersInit {
   const t = token ?? process.env.BGG_API_TOKEN;
   const headers: HeadersInit = {
     "User-Agent": "Geeklogs/1.0 (https://github.com/geeklogs)",

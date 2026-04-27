@@ -77,3 +77,83 @@ export function BoardGameProviderSelector({
     </ToggleGroup>
   );
 }
+
+const cardClass = (active: boolean) =>
+  cn(
+    "group relative flex h-auto min-h-[112px] w-full flex-col items-stretch justify-start gap-2.5 rounded-xl border px-3.5 py-3 text-left shadow-none transition-all",
+    "border-[var(--color-surface-border)]/60 bg-[var(--color-darkest)]/35 text-[var(--color-lightest)]",
+    active
+      ? "border-[var(--color-mid)] bg-[var(--color-mid)]/18 shadow-[var(--shadow-md)]"
+      : "hover:border-[var(--color-mid)]/40 hover:bg-[var(--color-darkest)]/55",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-dark)]"
+  );
+
+const bulletClass = (active: boolean) =>
+  cn(
+    "mt-[0.35rem] h-1 w-1 shrink-0 rounded-full opacity-80",
+    active ? "bg-[var(--color-lightest)]" : "bg-[var(--color-mid)]"
+  );
+
+const textClass = (active: boolean) =>
+  cn("text-xs leading-snug", active ? "text-[var(--color-lightest)]/90" : "text-[var(--color-light)] group-hover:text-[var(--color-lightest)]/80");
+
+const titleClass = (active: boolean) =>
+  cn("text-sm font-semibold tracking-tight", active ? "text-[var(--color-lightest)]" : "text-[var(--color-lightest)] group-hover:text-[var(--color-lightest)]");
+
+/**
+ * Two-tap catalog choice with visible selection. Use in onboarding: stack import UI below, don’t replace.
+ */
+export function BoardGameProviderSelectGrid({
+  value,
+  onSelect,
+  disabled,
+  className,
+}: {
+  value: BoardGameProvider | null;
+  onSelect: (p: BoardGameProvider) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const { t } = useLocale();
+  return (
+    <div
+      className={cn("grid w-full grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-2.5", className)}
+      role="listbox"
+      aria-label={t("settings.boardGameProviderLabel")}
+    >
+      {BOARD_GAME_PROVIDERS.map((provider) => {
+        const titleKey =
+          provider === "bgg" ? "settings.boardGameProviderBgg" : "settings.boardGameProviderLudopedia";
+        const bullets = BULLETS[provider];
+        const selected = value === provider;
+        return (
+          <button
+            key={provider}
+            type="button"
+            role="option"
+            aria-selected={selected}
+            disabled={disabled}
+            onClick={() => onSelect(provider)}
+            className={cardClass(selected)}
+          >
+            <span className={titleClass(selected)}>{t(titleKey)}</span>
+            <ul className="flex flex-col gap-1.5 text-left">
+              {bullets.map((key) => (
+                <li
+                  key={key}
+                  className={cn(
+                    "flex items-start gap-2",
+                    textClass(selected)
+                  )}
+                >
+                  <span className={bulletClass(selected)} aria-hidden />
+                  <span>{t(key)}</span>
+                </li>
+              ))}
+            </ul>
+          </button>
+        );
+      })}
+    </div>
+  );
+}

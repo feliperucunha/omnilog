@@ -3,7 +3,8 @@ import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BoardGameProviderSelector } from "@/components/BoardGameProviderSelector";
+import { BoardGameProviderSelectGrid } from "@/components/BoardGameProviderSelector";
+import { BoardGameCollectionImportPanel } from "@/components/BoardGameCollectionImportPanel";
 import { useLocale, LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -38,7 +39,10 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
   const [orderedTypes, setOrderedTypes] = useState<MediaType[]>(() => [...MEDIA_TYPES]);
   const [selectedTypes, setSelectedTypes] = useState<Set<MediaType>>(() => new Set(MEDIA_TYPES));
   const [theme, setTheme] = useState<"light" | "dark">(colorScheme);
+  /** Saved preference for onboarding complete; BGG is the default until a successful import sets otherwise. */
   const [boardGameProvider, setBoardGameProvider] = useState<BoardGameProvider>("bgg");
+  const [boardGameImportSource, setBoardGameImportSource] = useState<BoardGameProvider | null>(null);
+  const [boardGameImportRunning, setBoardGameImportRunning] = useState(false);
   const [draftLocale, setDraftLocale] = useState<Locale>(locale);
   const [loading, setLoading] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
@@ -69,6 +73,12 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
 
   const currentStep = stepSequence[stepIndex] ?? "language";
   const isLastStep = stepIndex >= stepSequence.length - 1;
+
+  useEffect(() => {
+    if (currentStep !== "boardgames") {
+      setBoardGameImportSource(null);
+    }
+  }, [currentStep]);
 
   const typesPayload = orderedTypes.filter((x) => selectedTypes.has(x));
 
@@ -133,7 +143,7 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
       theme,
       types: typesPayload,
       locale: draftLocale,
-      boardGameProvider: selectedTypes.has("boardgames") ? boardGameProvider : undefined,
+      boardGameProvider: selectedTypes.has("boardgames") ? (boardGameProvider as BoardGameProvider) : undefined,
       analyticsPath: "custom",
     });
   };
@@ -172,8 +182,13 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
       ? t("onboarding.enterApp")
       : t("onboarding.next");
 
+  const boardGamesBlocked = currentStep === "boardgames" && selectedTypes.has("boardgames") && boardGameImportRunning;
+
   const primaryDisabled =
-    loading || (isLastStep && typesPayload.length === 0) || (!isLastStep && currentStep === "categories" && !canAdvanceFromCategories);
+    loading ||
+    boardGamesBlocked ||
+    (isLastStep && typesPayload.length === 0) ||
+    (!isLastStep && currentStep === "categories" && !canAdvanceFromCategories);
 
   const pickLocale = (next: Locale) => {
     setDraftLocale(next);
@@ -290,19 +305,38 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
         ) : null}
 
         {currentStep === "boardgames" ? (
-          <>
+          <div className="flex min-h-0 w-full min-w-0 flex-col gap-3">
             <div className="space-y-1 text-center">
               <h2 className="text-xl font-semibold tracking-tight text-[var(--color-lightest)]">
                 {t("onboarding.stepBoardGamesTitle")}
               </h2>
-              <p className="text-xs text-[var(--color-light)]">{t("onboarding.stepBoardGamesHint")}</p>
+              <p className="text-xs text-[var(--color-light)]">{t("onboarding.stepBoardGamesHintShort")}</p>
             </div>
-            <BoardGameProviderSelector
-              value={boardGameProvider}
-              onValueChange={setBoardGameProvider}
-              disabled={loading}
+            <BoardGameProviderSelectGrid
+              value={boardGameImportSource}
+              onSelect={(p) =>
+                setBoardGameImportSource((prev) => (boardGameImportRunning ? prev : prev === p ? null : p))
+              }
+              disabled={loading || boardGameImportRunning}
             />
-          </>
+            {boardGameImportSource != null ? (
+              <div className="min-w-0 border-t border-[var(--color-surface-border)]/50 pt-3">
+                <BoardGameCollectionImportPanel
+                  key={boardGameImportSource}
+                  source={boardGameImportSource}
+                  variant="onboarding"
+                  onPhaseChange={(ph) => setBoardGameImportRunning(ph === "running")}
+                  onTerminal={(o) => {
+                    setBoardGameImportRunning(false);
+                    if (o.success) {
+                      setBoardGameProvider(o.source);
+                    }
+                    setBoardGameImportSource(null);
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
         ) : null}
       </motion.div>
     </AnimatePresence>
@@ -366,7 +400,7 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
           type="button"
           variant="ghost"
           className="relative z-10 h-10 w-full text-sm font-normal text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-          disabled={loading}
+          disabled={loading || boardGamesBlocked}
           onClick={() => void handleConfigureLater()}
         >
           {t("onboarding.configureLaterInSettings")}
@@ -374,7 +408,7 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
         {stepIndex > 0 ? (
           <button
             type="button"
-            disabled={loading}
+            disabled={loading || boardGamesBlocked}
             onClick={handleBack}
             className="relative z-10 w-full text-center text-sm text-[var(--color-light)] underline-offset-4 hover:text-[var(--color-lightest)] hover:underline disabled:opacity-50"
           >

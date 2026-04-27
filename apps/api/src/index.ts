@@ -20,6 +20,7 @@ import { usersRouter } from "./routes/users.js";
 import { feedbackRouter } from "./routes/feedback.js";
 import { followsRouter } from "./routes/follows.js";
 import { adminRouter } from "./routes/admin.js";
+import { boardGameCollectionImportRouter } from "./routes/boardGameCollectionImport.js";
 import { prisma } from "./lib/prisma.js";
 import { runMonthlyDigestIfDue } from "./lib/monthlyDigest.js";
 import { isWakeApiPingEnabled } from "./lib/featureFlags.js";
@@ -109,6 +110,7 @@ app.use("/api/users", usersRouter);
 app.use("/api/feedback", feedbackRouter);
 app.use("/api/follows", followsRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/board-games", boardGameCollectionImportRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, version: APP_VERSION });

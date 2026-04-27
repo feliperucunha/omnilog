@@ -32,6 +32,8 @@ export interface MeResponse {
   apiKeys: { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
   /** App-wide flags from server (e.g. admin-toggled UX). */
   featureFlags?: { disableApiKeyRequirements: boolean };
+  /** ISO time when the user may start the next board-game collection import (24h cooldown); null if allowed now. */
+  boardGameCollectionImportNextAt?: string | null;
   announcements?: {
     betaBanner?: {
       enabled: boolean;

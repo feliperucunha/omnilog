@@ -20,6 +20,266 @@ function ludopediaHeaders(apiToken?: string | null): HeadersInit {
   return headers;
 }
 
+function normLogin(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function parseLudopediaColecaoJson(data: unknown): string[] {
+  const objectIds: string[] = [];
+  const pushId = (v: unknown) => {
+    if (v == null) return;
+    if (typeof v === "number" && Number.isFinite(v)) {
+      objectIds.push(String(Math.floor(v)));
+      return;
+    }
+    if (typeof v === "string" && v.trim() !== "") objectIds.push(v.trim());
+  };
+  if (Array.isArray(data)) {
+    for (const el of data) {
+      if (el != null && typeof el === "object") {
+        const o = el as Record<string, unknown>;
+        pushId(o.id_jogo ?? o.idJogo);
+      }
+    }
+  } else if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    const list = (o.jogos ?? o.colecao ?? o.data ?? o.items) as unknown;
+    const arr = Array.isArray(list) ? list : [];
+    for (const el of arr) {
+      if (el != null && typeof el === "object") {
+        const row = el as Record<string, unknown>;
+        pushId(row.id_jogo ?? row.idJogo);
+      }
+    }
+  }
+  return [...new Set(objectIds)];
+}
+
+function extractUsuarioRowsFromUsuariosJson(data: unknown): Record<string, unknown>[] {
+  if (Array.isArray(data)) {
+    return data.filter((x): x is Record<string, unknown> => x != null && typeof x === "object");
+  }
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    for (const k of ["usuarios", "users", "data", "itens", "resultados", "list"]) {
+      const v = o[k];
+      if (Array.isArray(v)) {
+        return v.filter((x): x is Record<string, unknown> => x != null && typeof x === "object");
+      }
+    }
+  }
+  return [];
+}
+
+/**
+ * Resolves a Ludopedia profile id (best effort via GET /usuarios) to load another member's collection
+ * when the API returns matching rows.
+ */
+async function tryResolveLudopediaUserIdByLogin(
+  token: string,
+  profileName: string
+): Promise<string | null> {
+  const want = normLogin(profileName);
+  if (want.length === 0) return null;
+
+  const userSearchUrls = [
+    `${BASE}/usuarios?search=${encodeURIComponent(profileName.trim())}`,
+    `${BASE}/usuarios?nm_apelido=${encodeURIComponent(profileName.trim())}`,
+    `${BASE}/usuarios?login=${encodeURIComponent(profileName.trim())}`,
+    `${BASE}/usuarios?nm_login=${encodeURIComponent(profileName.trim())}`,
+  ];
+  for (const url of userSearchUrls) {
+    const res = await fetch(url, { headers: ludopediaHeaders(token) });
+    if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("ludopedia");
+    if (!res.ok) continue;
+    const data = (await res.json()) as unknown;
+    const rows = extractUsuarioRowsFromUsuariosJson(data);
+    for (const row of rows) {
+      const idRaw = row.id_usuario ?? row.idUsuario ?? row.id;
+      if (idRaw == null || idRaw === "") continue;
+      const idStr = String(idRaw);
+      const names: string[] = [row.nm_apelido, row.nm_login, row.login, row.nm_usuario, row.username, row.nome].filter(
+        (x): x is string => typeof x === "string" && x.trim() !== ""
+      );
+      for (const n of names) {
+        if (normLogin(n) === want) {
+          return idStr;
+        }
+      }
+    }
+    if (rows.length === 1) {
+      const one = rows[0]!;
+      const idOnly = one.id_usuario ?? one.idUsuario ?? one.id;
+      if (idOnly != null && idOnly !== "") {
+        return String(idOnly);
+      }
+    }
+  }
+  return null;
+}
+
+type ColecaoGetResult =
+  | { type: "ok"; data: unknown }
+  | { type: "unauth" }
+  | { type: "ratelimit" }
+  | { type: "server"; status: number }
+  | { type: "other"; status: number };
+
+async function getLudopediaColecaoResponse(token: string, pathWithQuery: string): Promise<ColecaoGetResult> {
+  const res = await fetch(`${BASE}/${pathWithQuery.replace(/^\//, "")}`, { headers: ludopediaHeaders(token) });
+  if (res.status === 401 || res.status === 403) {
+    return { type: "unauth" };
+  }
+  if (res.status === 429) {
+    return { type: "ratelimit" };
+  }
+  if (res.status >= 500) {
+    return { type: "server", status: res.status };
+  }
+  if (!res.ok) {
+    return { type: "other", status: res.status };
+  }
+  return { type: "ok", data: await res.json() };
+}
+
+function unauthColecioResult(): { objectIds: string[]; error: string; errorCode: "LUDOPEDIA_UNAUTHORIZED" } {
+  return {
+    objectIds: [],
+    error:
+      "Your Ludopedia access token is invalid or expired. Create a new token at Ludopedia (Applications) and add it in Settings, then try again.",
+    errorCode: "LUDOPEDIA_UNAUTHORIZED",
+  };
+}
+
+/**
+ * List game ids in a collection for the given public profile (best effort).
+ * Uses server or user `LUDOPEDIA_API_TOKEN` in headers; may hit GET /usuarios then GET /colecao?…id_usuario…
+ * and falls back to the token owner’s /colecao if no user id was resolved (same as before when only “own” collection existed).
+ */
+export async function fetchLudopediaColecaoObjectIdsForProfileName(
+  apiToken: string,
+  profileName: string
+): Promise<{ objectIds: string[]; error?: string; errorCode?: string }> {
+  const token = apiToken?.trim();
+  if (!token) return { objectIds: [], error: "Ludopedia token required", errorCode: "LUDOPEDIA_UNAUTHORIZED" };
+  const profile = profileName.trim();
+  if (!profile) {
+    return { objectIds: [], error: "Enter a Ludopedia profile name to import a collection." };
+  }
+
+  let userId: string | null = null;
+  try {
+    userId = await tryResolveLudopediaUserIdByLogin(token, profile);
+  } catch (e) {
+    if (e instanceof InvalidApiKeyError) {
+      return unauthColecioResult();
+    }
+    throw e;
+  }
+
+  if (userId) {
+    const idParams = [
+      `id_usuario=${encodeURIComponent(userId)}`,
+      `idUsuario=${encodeURIComponent(userId)}`,
+    ];
+    let sawOkResponse = false;
+    for (const q of idParams) {
+      const out = await getLudopediaColecaoResponse(token, `colecao?${q}`);
+      if (out.type === "unauth") return unauthColecioResult();
+      if (out.type === "ratelimit") {
+        return {
+          objectIds: [],
+          error:
+            "Ludopedia is rate limiting requests. Wait a few minutes, then try again. Collection imports are limited to once per 24 hours in Geeklogs to protect API quotas.",
+          errorCode: "LUDOPEDIA_RATE_LIMIT",
+        };
+      }
+      if (out.type === "server") {
+        return {
+          objectIds: [],
+          error: `Ludopedia is temporarily unavailable (${out.status}). Try again later.`,
+          errorCode: "LUDOPEDIA_SERVER_ERROR",
+        };
+      }
+      if (out.type === "ok") {
+        sawOkResponse = true;
+        const objectIds = parseLudopediaColecaoJson(out.data);
+        if (objectIds.length > 0) {
+          return { objectIds };
+        }
+      }
+    }
+    if (sawOkResponse) {
+      return {
+        objectIds: [],
+        error: "We found that profile on Ludopedia but their collection came back empty (or not visible with your token).",
+        errorCode: "LUDOPEDIA_COLECAO_EMPTY",
+      };
+    }
+  }
+
+  return fetchLudopediaColecaoObjectIds(token);
+}
+
+/**
+ * GET /me — current user (LudoAPI).
+ */
+export async function fetchLudopediaMe(apiToken: string): Promise<{
+  raw: Record<string, unknown>;
+  loginLike: string | null;
+} | null> {
+  const token = apiToken?.trim();
+  if (!token) return null;
+  const res = await fetch(`${BASE}/me`, { headers: ludopediaHeaders(token) });
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("ludopedia");
+  if (!res.ok) return null;
+  const data = (await res.json()) as Record<string, unknown>;
+  const loginLike =
+    [data.login, data.username, data.nm_usuario, data.nm_login, data.nm_apelido]
+      .map((v) => (typeof v === "string" ? v.trim() : ""))
+      .find((s) => s.length > 0) ?? null;
+  return { raw: data, loginLike };
+}
+
+/**
+ * GET /colecao — collection for the token owner. Doc: LudoAPI Coleção.
+ * Response shape may be an array of items with `id_jogo` or an object with `jogos` / `colecao` / `data`.
+ */
+export async function fetchLudopediaColecaoObjectIds(
+  apiToken: string
+): Promise<{ objectIds: string[]; error?: string; errorCode?: string }> {
+  const token = apiToken?.trim();
+  if (!token) return { objectIds: [], error: "Ludopedia token required", errorCode: "LUDOPEDIA_UNAUTHORIZED" };
+  const res = await getLudopediaColecaoResponse(token, "colecao");
+  if (res.type === "unauth") {
+    return unauthColecioResult();
+  }
+  if (res.type === "ratelimit") {
+    return {
+      objectIds: [],
+      error:
+        "Ludopedia is rate limiting requests. Wait a few minutes, then try again. Collection imports are limited to once per 24 hours in Geeklogs to protect API quotas.",
+      errorCode: "LUDOPEDIA_RATE_LIMIT",
+    };
+  }
+  if (res.type === "server") {
+    return {
+      objectIds: [],
+      error: `Ludopedia is temporarily unavailable (${res.status}). Try again later.`,
+      errorCode: "LUDOPEDIA_SERVER_ERROR",
+    };
+  }
+  if (res.type === "other") {
+    return {
+      objectIds: [],
+      error: `We couldn’t load your Ludopedia collection (HTTP ${res.status}). If this keeps happening, check Ludopedia’s status and your token in Settings.`,
+      errorCode: "LUDOPEDIA_UNKNOWN",
+    };
+  }
+  const objectIds = parseLudopediaColecaoJson(res.data);
+  return { objectIds };
+}
+
 /**
  * Map Ludopedia GET /jogos/{id_jogo} response to ItemDetail.
  * Doc: id_jogo, nm_jogo, thumb, ano_publicacao, qt_jogadores_min/max, vl_tempo_jogo,

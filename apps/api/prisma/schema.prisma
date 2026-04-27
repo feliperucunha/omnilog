@@ -80,6 +80,8 @@ model User {
   selectedBadgeIds    String?  // JSON array of up to 3 badge IDs for profile display
   loginCount          Int      @default(0)  // number of times the user has logged in
   lastLoginAt         DateTime?            // last login timestamp
+  /// Last time a board-game collection import was started (24h cooldown between imports).
+  lastBoardGameCollectionImportAt DateTime?
   createdAt           DateTime @default(now())
   updatedAt      DateTime @updatedAt
   logs          Log[]

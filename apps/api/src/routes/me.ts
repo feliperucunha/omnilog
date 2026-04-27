@@ -6,6 +6,7 @@ import { sanitizeText } from "../lib/sanitize.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { getMilestoneProgress } from "../services/milestone.service.js";
+import { getNextBoardGameCollectionImportTime } from "../services/boardGameCollectionImport.service.js";
 import { isBetaBannerEnabled, isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
 import { APP_SETTING_KEYS, getAppSettingValue } from "../lib/appSettings.js";
 
@@ -97,6 +98,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       bggApiToken: true,
       ludopediaApiToken: true,
       comicVineApiKey: true,
+      lastBoardGameCollectionImportAt: true,
     },
   });
   if (!user) {
@@ -166,6 +168,10 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     "Thanks for joining the Geeklogs beta.\n\nAs a beta user, you will have all features for free — forever.\n\nWe’ll keep shipping improvements and may use this banner for important announcements.";
   const betaBannerMessage = (betaBannerMessageFromDb ?? betaBannerMessageDefault).trim();
 
+  const boardGameCollectionImportNextAt = getNextBoardGameCollectionImportTime(
+    user.lastBoardGameCollectionImportAt
+  );
+
   res.json({
     user: {
       id: user.id,
@@ -196,6 +202,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     featureFlags: {
       disableApiKeyRequirements,
     },
+    boardGameCollectionImportNextAt,
     announcements: {
       betaBanner: {
         enabled: betaBannerEnabled,
