@@ -1,22 +1,33 @@
-import { useRef, useState } from "react";
-import { Star } from "lucide-react";
+import { useState } from "react";
+import { Star, X } from "lucide-react";
+import { useLocale } from "@/contexts/LocaleContext";
 import { cn } from "@/lib/utils";
 
-/** Value in stars: 0, 0.5, 1, ..., 5, or null for unset (gray). DB stores 0–10 (value * 2). */
+const STAR_COUNT = 10;
+
+/** 1–10 = filled stars, null = no selection (read-only: no rating). */
 interface StarRatingProps {
   value: number | null;
-  onChange?: (stars: number) => void;
+  onChange?: (grade: number | null) => void;
   readOnly?: boolean;
   size?: "sm" | "md" | "lg";
   className?: string;
   "aria-required"?: boolean;
+  /** When set, the clear control is not shown. */
+  allowClear?: boolean;
+  /** When true, shows `n/10` when a value is set. Default true. */
+  showGradeText?: boolean;
 }
 
 const sizeClasses = {
-  sm: "h-4 w-4",
-  md: "h-6 w-6",
-  lg: "h-8 w-8",
-};
+  /** Compact for dense rows and small screens (10 stars). */
+  sm: "h-3.5 w-3.5",
+  md: "h-5 w-5",
+  lg: "h-6 w-6",
+} as const;
+
+const starIndexWidth = (size: keyof typeof sizeClasses) =>
+  size === "sm" ? 14 : size === "md" ? 20 : 24;
 
 export function StarRating({
   value,
@@ -25,84 +36,149 @@ export function StarRating({
   size = "md",
   className,
   "aria-required": ariaRequired,
+  allowClear: allowClearProp,
+  showGradeText = true,
 }: StarRatingProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { t } = useLocale();
   const [hoverValue, setHoverValue] = useState<number | null>(null);
-  const displayValue = hoverValue ?? value ?? 0;
-  const clamped = Math.max(0, Math.min(5, displayValue));
+  const allowClear = allowClearProp !== undefined ? allowClearProp : !readOnly;
 
-  const handlePointer = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (readOnly || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const pct = x / rect.width;
-    const raw = pct * 5;
-    const stars = Math.round(raw * 2) / 2;
-    const clampedStars = Math.max(0, Math.min(5, stars));
-    if (e.type === "click") {
-      onChange?.(clampedStars);
-    } else {
-      setHoverValue(clampedStars);
-    }
+  const displayN = (() => {
+    if (readOnly) return value ?? 0;
+    return hoverValue ?? value ?? 0;
+  })();
+  const clampedN = Math.max(0, Math.min(STAR_COUNT, displayN));
+
+  const setRating = (n: number | null) => {
+    if (readOnly) return;
+    onChange?.(n);
   };
 
-  const handlePointerLeave = () => {
-    if (!readOnly) setHoverValue(null);
-  };
+  const maxStr = String(STAR_COUNT);
+  const clearLabel = t("starRating.clear");
+  const readonlyLabel =
+    value == null
+      ? t("starRating.ariaNoRating")
+      : t("starRating.ariaReadonly", { n: String(value), max: maxStr });
 
   return (
     <div
-      ref={containerRef}
-      role={readOnly ? "img" : "slider"}
-      aria-label={readOnly ? `${value ?? 0} stars` : "Rating"}
-      aria-required={ariaRequired}
-      aria-valuemin={readOnly ? undefined : 0}
-      aria-valuemax={readOnly ? undefined : 5}
-      aria-valuenow={readOnly ? undefined : (value ?? 0)}
-      aria-valuetext={readOnly ? undefined : value == null ? "No rating" : `${value} stars`}
       className={cn(
-        "inline-flex items-center gap-0.5",
-        !readOnly && "cursor-pointer select-none",
+        "inline-flex max-w-full min-w-0 flex-wrap items-center gap-px sm:gap-0.5",
+        !readOnly && "select-none",
         className
       )}
-      onPointerMove={handlePointer}
-      onPointerLeave={handlePointerLeave}
-      onClick={handlePointer}
     >
-      {[0, 1, 2, 3, 4].map((i) => {
-        const fill = clamped - i;
-        const filled = fill >= 1 ? 1 : fill >= 0.5 ? 0.5 : 0;
-        return (
-          <div
-            key={i}
-            className="relative inline-flex"
-            style={{ width: size === "sm" ? 16 : size === "md" ? 24 : 32 }}
-          >
-            <Star
-              className={cn(
-                sizeClasses[size],
-                "fill-transparent",
-                "text-[var(--color-lightest)]"
-              )}
-              strokeWidth={1.5}
-              aria-hidden
-            />
-            <div
-              className="absolute inset-0 overflow-hidden"
-              style={{ width: `${filled * 100}%` }}
-            >
-              <Star
-                className={cn(
-                  sizeClasses[size],
-                  "text-amber-400 fill-amber-400"
-                )}
-                strokeWidth={1.5}
+      <div
+        role={readOnly ? "img" : "group"}
+        aria-label={readOnly ? readonlyLabel : t("starRating.ariaGroup")}
+        aria-required={readOnly ? undefined : ariaRequired}
+        className="inline-flex min-w-0 max-w-full items-center gap-px sm:gap-0.5"
+        onMouseLeave={readOnly ? undefined : () => setHoverValue(null)}
+      >
+        {Array.from({ length: STAR_COUNT }, (_, i) => {
+          const n = i + 1;
+          const filled = clampedN >= n;
+          const w = starIndexWidth(size);
+          if (readOnly) {
+            return (
+              <div
+                key={i}
+                className="relative inline-flex shrink-0"
+                style={{ width: w }}
                 aria-hidden
-              />
-            </div>
-          </div>
-        );
-      })}
+              >
+                <Star
+                  className={cn(
+                    sizeClasses[size],
+                    "fill-transparent",
+                    "text-[var(--color-lightest)]"
+                  )}
+                  strokeWidth={1.5}
+                />
+                {filled && (
+                  <div className="absolute inset-0 flex overflow-hidden">
+                    <span className="h-full" style={{ width: w, flexShrink: 0 }}>
+                      <Star
+                        className={cn(sizeClasses[size], "text-amber-400 fill-amber-400")}
+                        strokeWidth={1.5}
+                      />
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          }
+          return (
+            <button
+              key={i}
+              type="button"
+              className={cn("relative -m-0.5 shrink-0 p-0.5", "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-mid)]")}
+              onMouseEnter={() => setHoverValue(n)}
+              onClick={() => setRating(n)}
+              onKeyDown={(e) => {
+                if (e.key === "Home") {
+                  e.preventDefault();
+                  setRating(1);
+                  return;
+                }
+                if (e.key === "End") {
+                  e.preventDefault();
+                  setRating(STAR_COUNT);
+                  return;
+                }
+                if (e.key === "Escape") setHoverValue(null);
+              }}
+              tabIndex={0}
+              aria-label={t("starRating.setN", { n: String(n), max: maxStr })}
+            >
+              <span className="relative inline-flex" style={{ width: w }} aria-hidden>
+                <Star
+                  className={cn(
+                    sizeClasses[size],
+                    "fill-transparent",
+                    "text-[var(--color-lightest)]"
+                  )}
+                  strokeWidth={1.5}
+                />
+                {filled && (
+                  <div className="absolute inset-0 flex overflow-hidden">
+                    <span className="h-full" style={{ width: w, flexShrink: 0 }}>
+                      <Star
+                        className={cn(sizeClasses[size], "text-amber-400 fill-amber-400")}
+                        strokeWidth={1.5}
+                      />
+                    </span>
+                  </div>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {showGradeText && value != null && value > 0 && (
+        <span
+          className={cn(
+            "shrink-0 text-[var(--color-light)] tabular-nums",
+            size === "sm" && "text-[11px] leading-tight",
+            size === "md" && "text-sm",
+            size === "lg" && "text-sm font-medium"
+          )}
+        >
+          {t("starRating.outOf", { n: String(value), max: maxStr })}
+        </span>
+      )}
+      {allowClear && !readOnly && value != null && onChange && (
+        <button
+          type="button"
+          className="inline-flex shrink-0 items-center justify-center gap-0.5 rounded p-0.5 text-xs text-[var(--color-mid)] hover:text-[var(--color-light)] focus-visible:outline focus-visible:ring-1 focus-visible:ring-[var(--color-mid)]"
+          onClick={() => onChange(null)}
+          aria-label={clearLabel}
+          title={clearLabel}
+        >
+          <X className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+        </button>
+      )}
     </div>
   );
 }

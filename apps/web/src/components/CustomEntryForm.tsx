@@ -412,7 +412,15 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
                 <Label className="mb-1 block text-sm font-medium text-[var(--color-lightest)]">
                   {t("itemReviewForm.rating")}
                 </Label>
-                <StarRating value={stars} onChange={(s) => setStars(s)} size="lg" />
+                <div className="w-full min-w-0 overflow-x-auto [scrollbar-width:none] sm:overflow-visible">
+                  <StarRating
+                    value={stars}
+                    onChange={(s) => setStars(s)}
+                    size="md"
+                    showGradeText={false}
+                    className="w-max min-w-0 max-w-full"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>{t("logForm.review")}</Label>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useIsPresent } from "framer-motion";
 import { Loader2, Share2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StarRating } from "@/components/StarRating";
+import { GradeDisplay } from "@/components/GradeDisplay";
 import { gradeToStars } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { ItemImage } from "@/components/ItemImage";
@@ -136,7 +136,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
     showCollectionOwnershipMeta &&
     (hasOwnershipFields ||
       (showBoardGameMatchesMeta && matchesPlayed != null && matchesPlayed > 0));
-  const stars = grade != null ? gradeToStars(grade) : 0;
+  const stars = grade != null ? gradeToStars(grade) : null;
   const statusLabel = status ? getStatusLabel(t, status, state.mediaType) : t("logComplete.logged");
   const heroImageUrl = getHeroImageUrl(image) ?? image;
   const bggBoardFraming = isBggBoardGameImageContext(
@@ -421,7 +421,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       </div>
       {grade != null && (
         <div className="mb-2 flex items-center gap-1 md:mb-3">
-          <StarRating value={stars} readOnly size="lg" />
+          <GradeDisplay grade={grade} size="lg" />
         </div>
       )}
       {showCollectionMetaBlock && (
@@ -690,7 +690,10 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
               </h1>
               {grade != null && (
                 <div style={{ marginBottom: sz(6), color: "#fbbf24", fontSize: sz(18), letterSpacing: "0.05em" }}>
-                  {"★".repeat(Math.round(stars))}{"☆".repeat(5 - Math.round(stars))}
+                  {(() => {
+                    const n = Math.max(0, Math.min(10, Math.round(stars ?? 0)));
+                    return "★".repeat(n) + "☆".repeat(10 - n);
+                  })()}
                 </div>
               )}
               {showCollectionMetaBlock && (

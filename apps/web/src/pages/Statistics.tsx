@@ -39,8 +39,7 @@ import {
   type Log,
   type MediaType,
 } from "@geeklogs/shared";
-import { StarRating } from "@/components/StarRating";
-import { gradeToStars } from "@/lib/gradeStars";
+import { GradeDisplay } from "@/components/GradeDisplay";
 import { formatTimeToBeatHours, formatTimeToFinish } from "@/lib/formatDuration";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
@@ -63,6 +62,8 @@ import { paperShadow } from "@/lib/paperShadow";
 import { currencyMinorDecimals } from "@/lib/moneyInput";
 import { formatStatsTimeAxisLabel } from "@/lib/formatStatsPeriod";
 import { cn } from "@/lib/utils";
+import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
+import { ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
 
 function formatMinorAsMoney(minor: number, currency: string): string {
   const d = currencyMinorDecimals(currency);
@@ -210,7 +211,7 @@ function SpendFinanceLogRow({ log, t, onNavigate }: { log: Log; t: SpendFinanceT
               {t("common.inProgress")}
             </span>
           ) : log.grade != null ? (
-            <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+            <GradeDisplay grade={log.grade} size="sm" />
           ) : null}
         </div>
       </div>
@@ -904,6 +905,7 @@ export function Statistics() {
     setPageTitle?.(t("nav.statistics"));
     setRightSlot?.(
       <Button
+        id="onboarding-statistics-recap"
         variant="outline"
         size="sm"
         className="gap-2 shrink-0 btn-recap-attention"
@@ -996,6 +998,11 @@ export function Statistics() {
         return spend || sale;
       }),
     [purchaseItemCounts, saleItemCounts, purchaseSpending, saleProceedsByCategory]
+  );
+
+  const getRecapSpotlightTarget = useCallback(
+    () => document.getElementById("onboarding-statistics-recap"),
+    []
   );
 
   return (
@@ -1943,7 +1950,7 @@ export function Statistics() {
                                 <GenreBadges genres={log.genres} maxCount={1} />
                               )}
                               {!isInProgress && log.grade != null && (
-                                <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+                                <GradeDisplay grade={log.grade} size="sm" />
                               )}
                               <OverflowMarquee className="text-xs leading-snug text-[var(--color-light)]">
                                 {(() => {
@@ -1981,6 +1988,11 @@ export function Statistics() {
         </div>
       </div>
       </div>
+      <OnboardingSpotlight
+        storageKey={ONBOARDING_SPOTLIGHT_KEYS.statisticsRecap}
+        getTarget={getRecapSpotlightTarget}
+        message={t("onboarding.spotlightStatisticsRecap")}
+      />
     </div>
   );
 }

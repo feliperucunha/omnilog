@@ -17,8 +17,7 @@ import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
 import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
-import { StarRating } from "@/components/StarRating";
-import { gradeToStars } from "@/lib/gradeStars";
+import { GradeDisplay } from "@/components/GradeDisplay";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { MediaLogsSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
@@ -711,7 +710,12 @@ export function MediaLogs({
             })()}
             <div className="flex min-w-0 flex-shrink-0 flex-wrap items-center gap-3">
               <motion.div whileTap={tapScale} transition={tapTransition}>
-                <Button type="button" variant="outline" onClick={() => setShowCustomEntry(true)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  id="onboarding-dashboard-import-desktop"
+                  onClick={() => setShowCustomEntry(true)}
+                >
                   <span className="inline-flex items-center gap-2">
                     <Plus className="size-4 shrink-0" aria-hidden />
                     {t("customEntry.addCustomBatchEntry")}
@@ -893,6 +897,7 @@ export function MediaLogs({
                 variant="outline"
                 size="icon"
                 className="h-8 w-8 shrink-0 md:h-9 md:w-auto md:px-4 md:py-2"
+                id={embedded ? "onboarding-dashboard-import-mobile" : undefined}
                 onClick={() => setShowCustomEntry(true)}
                 title={t("customEntry.addCustomBatchEntry")}
                 aria-label={t("customEntry.addCustomBatchEntry")}
@@ -1164,7 +1169,7 @@ export function MediaLogs({
                       </MotionLink>
                       <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                         {log.grade != null ? (
-                          <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+                          <GradeDisplay grade={log.grade} size="sm" />
                         ) : (
                           <span className="text-[var(--color-light)]">—</span>
                         )}

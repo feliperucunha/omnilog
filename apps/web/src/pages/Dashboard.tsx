@@ -35,8 +35,7 @@ import {
 import { Select } from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
-import { StarRating } from "@/components/StarRating";
-import { gradeToStars } from "@/lib/gradeStars";
+import { GradeDisplay } from "@/components/GradeDisplay";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
@@ -47,6 +46,8 @@ import { ReactionButtons } from "@/components/ReactionButtons";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { paperShadow } from "@/lib/paperShadow";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
+import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
+import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
 
 interface FeedEntry {
   log: Log;
@@ -487,6 +488,15 @@ export function Dashboard() {
   const categoryCountSuffix = (type: MediaType) =>
     counts != null ? ` (${byType[type] ?? 0})` : countsLoading ? " (…)" : "";
 
+  const getDashboardImportSpotlightTarget = useCallback(
+    () =>
+      getFirstVisibleByIds([
+        "onboarding-dashboard-import-desktop",
+        "onboarding-dashboard-import-mobile",
+      ]),
+    []
+  );
+
   return (
     <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden">
       {countsError != null && counts === null && (
@@ -719,11 +729,7 @@ export function Dashboard() {
                           </OverflowMarquee>
                         </MotionLink>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-light)] shrink-0">
-                          {log.grade != null ? (
-                            <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
-                          ) : (
-                            <span>—</span>
-                          )}
+                          {log.grade != null ? <GradeDisplay grade={log.grade} size="sm" /> : <span>—</span>}
                           {(() => {
                             const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
                             return duration ? (
@@ -853,6 +859,12 @@ export function Dashboard() {
           )}
         </section>
       )}
+      <OnboardingSpotlight
+        storageKey={ONBOARDING_SPOTLIGHT_KEYS.dashboardImport}
+        getTarget={getDashboardImportSpotlightTarget}
+        message={t("onboarding.spotlightDashboardImport")}
+        enabled={visibleTypes.length > 0 && visibleTypesOrderReady}
+      />
     </div>
   );
 }

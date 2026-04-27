@@ -106,7 +106,11 @@
     "enterApp": "Get started",
     "configureLaterInSettings": "Configure later in Settings",
     "back": "Back",
-    "continuing": "Continuing…"
+    "continuing": "Continuing…",
+    "spotlightOk": "OK",
+    "spotlightSearchCategory": "Select the category you want to search in here.",
+    "spotlightDashboardImport": "You can import your spreadsheets from here.",
+    "spotlightStatisticsRecap": "View and share your personalized retrospective from here."
   },
   "faq": {
     "title": "FAQ",
@@ -236,6 +240,14 @@
     "adminDigestSend": "Send recap to my email",
     "adminDigestSent": "Recap email sent for {{month}}.",
     "adminDigestFailed": "Email was not sent. Check API SMTP settings."
+  },
+  "starRating": {
+    "clear": "Remove rating",
+    "ariaNoRating": "No rating",
+    "ariaReadonly": "Rated {{n}} out of {{max}}",
+    "ariaGroup": "Your rating",
+    "setN": "Set rating to {{n}} of {{max}}",
+    "outOf": "{{n}}/{{max}}"
   },
   "common": {
     "tryAgain": "Try again",

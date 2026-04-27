@@ -2,8 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Loader2, Share2, X } from "lucide-react";
 import type { Log } from "@geeklogs/shared";
 import { Button } from "@/components/ui/button";
-import { StarRating } from "@/components/StarRating";
-import { gradeToStars } from "@/lib/gradeStars";
+import { GradeDisplay } from "@/components/GradeDisplay";
 import { ItemImage } from "@/components/ItemImage";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMe } from "@/contexts/MeContext";
@@ -441,7 +440,6 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
 
   const renderTile = (log: Log, logIndex: number, H: number) => {
     const hero = getHeroImageUrl(log.image) ?? log.image;
-    const stars = log.grade != null ? gradeToStars(log.grade) : null;
     const ar = aspectArr[logIndex] ?? DEFAULT_ASPECT;
     const w = H * ar;
     return (
@@ -460,12 +458,17 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
           activeBoardGameProvider={me?.boardGameProvider ?? null}
           loading="eager"
         />
-        {stars != null ? (
+        {log.grade != null ? (
           <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/70 to-transparent px-0.5 pb-0.5 pt-3"
+            className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/70 to-transparent px-0.5 pb-0.5 pt-2"
             style={{ transform: `scale(${starScale})`, transformOrigin: "bottom center" }}
           >
-            <StarRating value={stars} readOnly size="sm" className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]" />
+            <GradeDisplay
+              grade={log.grade}
+              size="sm"
+              variant="onDark"
+              className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+            />
           </div>
         ) : null}
       </div>
@@ -537,7 +540,6 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
             {row.map((logIndex) => {
               const log = logs[logIndex]!;
               const hero = getHeroImageUrl(log.image) ?? log.image;
-              const stars = log.grade != null ? gradeToStars(log.grade) : null;
               const ar = aspectArr[logIndex] ?? DEFAULT_ASPECT;
               const w = sharePack.H * ar;
               return (
@@ -556,12 +558,17 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
                     activeBoardGameProvider={me?.boardGameProvider ?? null}
                     loading="eager"
                   />
-                  {stars != null ? (
+                  {log.grade != null ? (
                     <div
-                      className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/75 to-transparent px-1 pb-1 pt-5"
+                      className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/75 to-transparent px-1 pb-1 pt-3"
                       style={{ transform: "scale(0.82)", transformOrigin: "bottom center" }}
                     >
-                      <StarRating value={stars} readOnly size="md" />
+                      <GradeDisplay
+                        grade={log.grade}
+                        size="md"
+                        variant="onDark"
+                        className="drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                      />
                     </div>
                   ) : null}
                 </div>

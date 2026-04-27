@@ -4,8 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
-import { StarRating } from "@/components/StarRating";
-import { gradeToStars } from "@/lib/gradeStars";
+import { GradeDisplay } from "@/components/GradeDisplay";
 import type { MediaType, SearchResult } from "@geeklogs/shared";
 import {
   MEDIA_TYPES,
@@ -861,7 +860,7 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
               </p>
               {previewRow.grade != null && (
                 <div className="mt-1">
-                  <StarRating value={gradeToStars(previewRow.grade)} readOnly size="sm" />
+                  <GradeDisplay grade={previewRow.grade} size="sm" />
                 </div>
               )}
               {previewRow.review && (

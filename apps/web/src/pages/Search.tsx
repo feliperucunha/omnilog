@@ -38,6 +38,8 @@ import { paperShadow } from "@/lib/paperShadow";
 import { cn } from "@/lib/utils";
 import { decodeSearchResultForDisplay } from "@/lib/decodeDisplayFields";
 import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
+import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
+import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
 
 const FREE_SEARCH_USAGE_STORAGE_KEY = "geeklogs_free_search_usage";
 
@@ -391,8 +393,14 @@ export function Search() {
     [token, loadingFollowId, t]
   );
 
+  const getSearchCategorySpotlightTarget = useCallback(
+    () => getFirstVisibleByIds(["onboarding-search-category-wrap"]),
+    []
+  );
+
   useEffect(() => {
     setBelowNavbar?.(
+      <div id="onboarding-search-category-wrap" className="w-full min-w-0">
       <StickyCategoryStrip
         items={[
           ...effectiveVisibleTypes.map((type) => {
@@ -430,6 +438,7 @@ export function Search() {
         bare
         aria-label={t("dashboard.category")}
       />
+      </div>
     );
     return () => setBelowNavbar?.(null);
   }, [
@@ -796,6 +805,11 @@ export function Search() {
           </motion.div>
         )}
       </AnimatePresence>
+      <OnboardingSpotlight
+        storageKey={ONBOARDING_SPOTLIGHT_KEYS.searchCategory}
+        getTarget={getSearchCategorySpotlightTarget}
+        message={t("onboarding.spotlightSearchCategory")}
+      />
     </div>
   );
 }

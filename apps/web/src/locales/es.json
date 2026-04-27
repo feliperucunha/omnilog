@@ -106,7 +106,11 @@
     "enterApp": "Empezar",
     "configureLaterInSettings": "Configurar después en Ajustes",
     "back": "Atrás",
-    "continuing": "Continuando…"
+    "continuing": "Continuando…",
+    "spotlightOk": "Aceptar",
+    "spotlightSearchCategory": "Elige aquí la categoría en la que quieres buscar.",
+    "spotlightDashboardImport": "Puedes importar tus hojas de cálculo desde aquí.",
+    "spotlightStatisticsRecap": "Mira y comparte tu retrospective personal aquí."
   },
   "faq": {
     "title": "Preguntas frecuentes",
@@ -215,6 +219,14 @@
     "adminDigestSend": "Enviar resumen a mi correo",
     "adminDigestSent": "Correo de resumen enviado — {{month}}.",
     "adminDigestFailed": "No se envió el correo. Revisa el SMTP de la API."
+  },
+  "starRating": {
+    "clear": "Quitar puntuación",
+    "ariaNoRating": "Sin puntuación",
+    "ariaReadonly": "Puntuación {{n}} de {{max}}",
+    "ariaGroup": "Tu puntuación",
+    "setN": "Establecer puntuación {{n}} de {{max}}",
+    "outOf": "{{n}}/{{max}}"
   },
   "common": {
     "tryAgain": "Reintentar",

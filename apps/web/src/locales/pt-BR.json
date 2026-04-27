@@ -106,7 +106,11 @@
     "enterApp": "Começar",
     "configureLaterInSettings": "Configurar depois em Ajustes",
     "back": "Voltar",
-    "continuing": "Continuando…"
+    "continuing": "Continuando…",
+    "spotlightOk": "OK",
+    "spotlightSearchCategory": "Selecione aqui a categoria em que deseja buscar.",
+    "spotlightDashboardImport": "Você pode importar suas planilhas por aqui.",
+    "spotlightStatisticsRecap": "Veja e compartilhe seu retrospecto personalizado daqui."
   },
   "faq": {
     "title": "Perguntas frequentes",
@@ -235,6 +239,14 @@
     "adminDigestSend": "Enviar resumo para meu e-mail",
     "adminDigestSent": "E-mail de resumo enviado — {{month}}.",
     "adminDigestFailed": "E-mail não enviado. Verifique o SMTP da API."
+  },
+  "starRating": {
+    "clear": "Remover nota",
+    "ariaNoRating": "Sem nota",
+    "ariaReadonly": "Nota {{n}} de {{max}}",
+    "ariaGroup": "Sua nota",
+    "setN": "Definir nota {{n}} de {{max}}",
+    "outOf": "{{n}}/{{max}}"
   },
   "common": {
     "tryAgain": "Tentar novamente",

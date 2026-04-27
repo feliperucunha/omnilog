@@ -342,12 +342,18 @@ export function About() {
                   <label id="feedback-rating-label" className="block text-sm font-medium text-[var(--color-light)] mb-1">
                     {t("about.feedbackRatingLabel")}
                   </label>
-                  <StarRating
-                    value={rating / 2}
-                    onChange={(stars) => setRating(Math.max(1, Math.min(10, Math.round(stars * 2))))}
-                    size="lg"
-                    aria-required
-                  />
+                  <div className="w-full min-w-0 overflow-x-auto [scrollbar-width:none] sm:overflow-visible">
+                    <StarRating
+                      value={rating}
+                      onChange={(g) => {
+                        if (g != null) setRating(g);
+                      }}
+                      size="md"
+                      aria-required
+                      allowClear={false}
+                      className="w-max min-w-0 max-w-full"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="feedback-comments" className="block text-sm font-medium text-[var(--color-light)] mb-1">
