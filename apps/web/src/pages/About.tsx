@@ -348,7 +348,7 @@ export function About() {
                       onChange={(g) => {
                         if (g != null) setRating(g);
                       }}
-                      size="md"
+                      size="lg"
                       aria-required
                       allowClear={false}
                       className="w-max min-w-0 max-w-full"

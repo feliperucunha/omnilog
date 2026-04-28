@@ -743,7 +743,7 @@ export function ItemReviewForm({
                 <StarRating
                   value={stars}
                   onChange={(s) => setStars(s)}
-                  size="md"
+                  size="lg"
                   showGradeText={false}
                   className="w-max min-w-0 max-w-full"
                 />
