@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, type ComponentType } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/layouts/AppLayout";
@@ -12,15 +12,56 @@ import { Onboarding } from "@/pages/Onboarding";
 import { Dashboard } from "@/pages/Dashboard";
 import { PublicProfile } from "@/pages/PublicProfile";
 import { PublicProfileLayout } from "@/layouts/PublicProfileLayout";
-const Statistics = lazy(() => import("@/pages/Statistics").then((m) => ({ default: m.Statistics })));
-const Search = lazy(() => import("@/pages/Search").then((m) => ({ default: m.Search })));
-const ItemPage = lazy(() => import("@/pages/ItemPage").then((m) => ({ default: m.ItemPage })));
-const Settings = lazy(() => import("@/pages/Settings").then((m) => ({ default: m.Settings })));
-const About = lazy(() => import("@/pages/About").then((m) => ({ default: m.About })));
-const Tiers = lazy(() => import("@/pages/Tiers").then((m) => ({ default: m.Tiers })));
-const FAQ = lazy(() => import("@/pages/FAQ").then((m) => ({ default: m.FAQ })));
-const Privacy = lazy(() => import("@/pages/Privacy").then((m) => ({ default: m.Privacy })));
-const Terms = lazy(() => import("@/pages/Terms").then((m) => ({ default: m.Terms })));
+const CHUNK_RELOAD_ONCE_KEY = "geeklogs_chunk_reload_once";
+
+const isChunkLoadError = (error: unknown): boolean => {
+  const message =
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+        ? error.message
+        : "";
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("failed to fetch dynamically imported module") ||
+    lower.includes("importing a module script failed") ||
+    lower.includes("loading chunk")
+  );
+};
+
+const lazyWithChunkRecovery = <T extends ComponentType<unknown>>(
+  importer: () => Promise<{ default: T }>
+) =>
+  lazy(async () => {
+    try {
+      const mod = await importer();
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem(CHUNK_RELOAD_ONCE_KEY);
+      }
+      return mod;
+    } catch (error) {
+      if (
+        typeof window !== "undefined" &&
+        isChunkLoadError(error) &&
+        sessionStorage.getItem(CHUNK_RELOAD_ONCE_KEY) !== "1"
+      ) {
+        sessionStorage.setItem(CHUNK_RELOAD_ONCE_KEY, "1");
+        window.location.reload();
+        return new Promise<never>(() => {});
+      }
+      throw error;
+    }
+  });
+
+const Statistics = lazyWithChunkRecovery(() => import("@/pages/Statistics").then((m) => ({ default: m.Statistics })));
+const Search = lazyWithChunkRecovery(() => import("@/pages/Search").then((m) => ({ default: m.Search })));
+const ItemPage = lazyWithChunkRecovery(() => import("@/pages/ItemPage").then((m) => ({ default: m.ItemPage })));
+const Settings = lazyWithChunkRecovery(() => import("@/pages/Settings").then((m) => ({ default: m.Settings })));
+const About = lazyWithChunkRecovery(() => import("@/pages/About").then((m) => ({ default: m.About })));
+const Tiers = lazyWithChunkRecovery(() => import("@/pages/Tiers").then((m) => ({ default: m.Tiers })));
+const FAQ = lazyWithChunkRecovery(() => import("@/pages/FAQ").then((m) => ({ default: m.FAQ })));
+const Privacy = lazyWithChunkRecovery(() => import("@/pages/Privacy").then((m) => ({ default: m.Privacy })));
+const Terms = lazyWithChunkRecovery(() => import("@/pages/Terms").then((m) => ({ default: m.Terms })));
 
 function LazyRouteFallback() {
   return (

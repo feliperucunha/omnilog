@@ -10,7 +10,7 @@ const USER_KEY = "geeklogs_user";
 const COOKIE_NAME = "geeklogs_token";
 const COOKIE_MAX_AGE_DAYS = 365;
 
-function isNativePlatform(): boolean {
+export function isNativePlatform(): boolean {
   if (typeof window === "undefined") return false;
   const w = window as Window & { Capacitor?: { isNativePlatform?: () => boolean } };
   return Boolean(w?.Capacitor?.isNativePlatform?.());

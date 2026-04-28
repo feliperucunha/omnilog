@@ -3,10 +3,12 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/contexts/LocaleContext";
 import {
-  isOnboardingSpotlightDone,
-  setOnboardingSpotlightDone,
+  isOnboardingSpotlightDoneSync,
+  loadOnboardingSpotlightDismissed,
+  saveOnboardingSpotlightDismissed,
   type OnboardingSpotlightKey,
 } from "@/lib/onboardingSpotlightStorage";
+import { isNativePlatform } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 const PAD = 8;
@@ -51,14 +53,30 @@ export function OnboardingSpotlight({
   const { t } = useLocale();
   const titleId = useId().replace(/:/g, "");
   const maskId = useId().replace(/:/g, "");
-  const [dismissed, setDismissed] = useState(() => isOnboardingSpotlightDone(storageKey));
+  const [dismissed, setDismissed] = useState<boolean | null>(() => {
+    if (typeof window === "undefined") return true;
+    if (isNativePlatform()) return null;
+    return isOnboardingSpotlightDoneSync(storageKey);
+  });
   const [active, setActive] = useState(false);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
   const [cardStyle, setCardStyle] = useState<CSSProperties>({});
   const [arrow, setArrow] = useState<"top" | "bottom" | null>(null);
 
+  useEffect(() => {
+    if (!enabled || !isNativePlatform()) return;
+    if (dismissed !== null) return;
+    let cancelled = false;
+    void loadOnboardingSpotlightDismissed(storageKey).then((done) => {
+      if (!cancelled) setDismissed(done);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storageKey, enabled, dismissed]);
+
   const updateLayout = useCallback(() => {
-    if (dismissed || !enabled) {
+    if (dismissed !== false || !enabled) {
       setActive(false);
       setTargetRect(null);
       return;
@@ -105,7 +123,7 @@ export function OnboardingSpotlight({
   }, [dismissed, enabled, getTarget]);
 
   useLayoutEffect(() => {
-    if (dismissed || !enabled) return;
+    if (dismissed !== false || !enabled) return;
     let cancelled = false;
     let raf = 0;
     const run = (n: number) => {
@@ -131,7 +149,7 @@ export function OnboardingSpotlight({
   }, [dismissed, enabled, getTarget, updateLayout]);
 
   useLayoutEffect(() => {
-    if (!active || !enabled || dismissed) return;
+    if (!active || !enabled || dismissed !== false) return;
     const on = () => updateLayout();
     window.addEventListener("scroll", on, true);
     window.addEventListener("resize", on);
@@ -142,13 +160,14 @@ export function OnboardingSpotlight({
   }, [active, enabled, dismissed, updateLayout]);
 
   const close = useCallback(() => {
-    setOnboardingSpotlightDone(storageKey);
-    setDismissed(true);
-    setActive(false);
+    void saveOnboardingSpotlightDismissed(storageKey).finally(() => {
+      setDismissed(true);
+      setActive(false);
+    });
   }, [storageKey]);
 
   useEffect(() => {
-    if (!active || !enabled) return;
+    if (!active || !enabled || dismissed !== false) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
@@ -159,9 +178,9 @@ export function OnboardingSpotlight({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [active, close, enabled]);
+  }, [active, close, enabled, dismissed]);
 
-  if (typeof document === "undefined" || !enabled || dismissed || !active || !targetRect) {
+  if (typeof document === "undefined" || !enabled || dismissed !== false || !active || !targetRect) {
     return null;
   }
 
