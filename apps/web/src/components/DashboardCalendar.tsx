@@ -9,7 +9,8 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { ItemImage } from "@/components/ItemImage";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GradeDisplay } from "@/components/GradeDisplay";
+import { StarRating } from "@/components/StarRating";
+import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import {
   Dialog,
@@ -357,7 +358,7 @@ export function DashboardCalendar({
                               {t("common.inProgress")}
                             </span>
                           ) : log.grade != null ? (
-                            <GradeDisplay grade={log.grade} size="sm" />
+                            <StarRating value={gradeToStars(log.grade)} readOnly size="sm" showGradeText={false} />
                           ) : null}
                         </div>
                         </Link>
@@ -421,7 +422,7 @@ export function DashboardCalendar({
                                 {t("common.inProgress")}
                               </span>
                             ) : log.grade != null ? (
-                              <GradeDisplay grade={log.grade} size="sm" />
+                              <StarRating value={gradeToStars(log.grade)} readOnly size="sm" showGradeText={false} />
                             ) : null}
                           </div>
                         </Link>

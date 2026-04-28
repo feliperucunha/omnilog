@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useIsPresent } from "framer-motion";
 import { Loader2, Share2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { GradeDisplay } from "@/components/GradeDisplay";
+import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { ItemImage } from "@/components/ItemImage";
@@ -421,7 +421,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       </div>
       {grade != null && (
         <div className="mb-2 flex items-center gap-1 md:mb-3">
-          <GradeDisplay grade={grade} size="lg" />
+          <StarRating value={stars} readOnly size="lg" showGradeText={false} />
         </div>
       )}
       {showCollectionMetaBlock && (
@@ -691,8 +691,8 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
               {grade != null && (
                 <div style={{ marginBottom: sz(6), color: "#fbbf24", fontSize: sz(18), letterSpacing: "0.05em" }}>
                   {(() => {
-                    const n = Math.max(0, Math.min(10, Math.round(stars ?? 0)));
-                    return "★".repeat(n) + "☆".repeat(10 - n);
+                    const n = Math.max(0, Math.min(5, Math.round(stars ?? 0)));
+                    return "★".repeat(n) + "☆".repeat(5 - n);
                   })()}
                 </div>
               )}

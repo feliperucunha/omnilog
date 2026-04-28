@@ -108,7 +108,7 @@
     "back": "Back",
     "continuing": "Continuing…",
     "spotlightOk": "OK",
-    "spotlightSearchCategory": "Select the category you want to search in here.",
+    "spotlightSearchCategory": "Select the category you want to search in here. You can rearrange the order of these categories for search in Settings.",
     "spotlightDashboardImport": "You can import your spreadsheets from here.",
     "spotlightStatisticsRecap": "View and share your personalized retrospective from here."
   },

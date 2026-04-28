@@ -108,7 +108,7 @@
     "back": "Voltar",
     "continuing": "Continuando…",
     "spotlightOk": "OK",
-    "spotlightSearchCategory": "Selecione aqui a categoria em que deseja buscar.",
+    "spotlightSearchCategory": "Selecione aqui a categoria em que deseja buscar. Você pode alterar a ordem dessas categorias na busca em Configurações.",
     "spotlightDashboardImport": "Você pode importar suas planilhas por aqui.",
     "spotlightStatisticsRecap": "Veja e compartilhe seu retrospecto personalizado daqui."
   },

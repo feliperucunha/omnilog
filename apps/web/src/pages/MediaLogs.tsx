@@ -17,7 +17,8 @@ import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
 import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
-import { GradeDisplay } from "@/components/GradeDisplay";
+import { StarRating } from "@/components/StarRating";
+import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { MediaLogsSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
@@ -1169,7 +1170,7 @@ export function MediaLogs({
                       </MotionLink>
                       <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                         {log.grade != null ? (
-                          <GradeDisplay grade={log.grade} size="sm" />
+                          <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                         ) : (
                           <span className="text-[var(--color-light)]">—</span>
                         )}

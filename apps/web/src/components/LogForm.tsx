@@ -854,15 +854,14 @@ export function LogForm(props: LogFormProps) {
                 <Label className="mb-1 block text-sm font-medium text-[var(--color-lightest)]">
                   {t("itemReviewForm.rating")}
                 </Label>
-                <div className="w-full min-w-0 overflow-x-auto [scrollbar-width:none] sm:overflow-visible">
-                  <StarRating
-                    value={stars}
-                    onChange={(s) => setStars(s)}
-                    size="lg"
-                    showGradeText={false}
-                    className="w-max min-w-0 max-w-full"
-                  />
-                </div>
+                <StarRating
+                  value={stars}
+                  onChange={(s) => setStars(s)}
+                  size="xl"
+                  fullWidth
+                  showGradeText={false}
+                  className="w-full"
+                />
               </div>
               <div className="space-y-2">
                 <Label>{t("logForm.review")}</Label>

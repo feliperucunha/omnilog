@@ -26,7 +26,8 @@ import { Select } from "@/components/ui/select";
 import { GenreBadges } from "@/components/GenreBadges";
 import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
-import { GradeDisplay } from "@/components/GradeDisplay";
+import { StarRating } from "@/components/StarRating";
+import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { getItemDisplayImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
 import {
@@ -681,8 +682,8 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                 );
               })()}
             {meanGrade != null && (
-              <div className="mt-2 flex min-w-0 max-w-full flex-wrap items-center gap-2 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
-                <GradeDisplay grade={meanGrade} size="lg" variant="onDark" className="shrink-0" />
+              <div className="mt-2 flex min-w-0 max-w-full flex-wrap items-center gap-2 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] [--color-light:rgb(255,255,255,0.9)] [--color-lightest:white]">
+                <StarRating value={gradeToStars(meanGrade)} readOnly size="xl" />
                 <span className="min-w-0 text-sm text-white/90">
                   ({reviewsTotal} review{reviewsTotal === 1 ? "" : "s"})
                 </span>
@@ -838,7 +839,9 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                           {/* Rating + date; on mobile status/episode badges go on next line */}
                           <div className="flex flex-col gap-2 border-b border-[var(--color-surface-border)]/60 pb-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                              {r.grade != null && <GradeDisplay grade={r.grade} size="md" />}
+                              {r.grade != null && (
+                                <StarRating value={gradeToStars(r.grade)} readOnly size="md" />
+                              )}
                               <time
                                 className="text-xs text-[var(--color-light)]"
                                 dateTime={r.createdAt}

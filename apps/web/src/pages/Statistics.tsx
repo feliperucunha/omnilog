@@ -39,7 +39,8 @@ import {
   type Log,
   type MediaType,
 } from "@geeklogs/shared";
-import { GradeDisplay } from "@/components/GradeDisplay";
+import { StarRating } from "@/components/StarRating";
+import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToBeatHours, formatTimeToFinish } from "@/lib/formatDuration";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
@@ -211,7 +212,7 @@ function SpendFinanceLogRow({ log, t, onNavigate }: { log: Log; t: SpendFinanceT
               {t("common.inProgress")}
             </span>
           ) : log.grade != null ? (
-            <GradeDisplay grade={log.grade} size="sm" />
+            <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
           ) : null}
         </div>
       </div>
@@ -1950,7 +1951,7 @@ export function Statistics() {
                                 <GenreBadges genres={log.genres} maxCount={1} />
                               )}
                               {!isInProgress && log.grade != null && (
-                                <GradeDisplay grade={log.grade} size="sm" />
+                                <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                               )}
                               <OverflowMarquee className="text-xs leading-snug text-[var(--color-light)]">
                                 {(() => {

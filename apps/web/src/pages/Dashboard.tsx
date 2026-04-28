@@ -35,7 +35,8 @@ import {
 import { Select } from "@/components/ui/select";
 import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
-import { GradeDisplay } from "@/components/GradeDisplay";
+import { StarRating } from "@/components/StarRating";
+import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
@@ -729,7 +730,11 @@ export function Dashboard() {
                           </OverflowMarquee>
                         </MotionLink>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-light)] shrink-0">
-                          {log.grade != null ? <GradeDisplay grade={log.grade} size="sm" /> : <span>—</span>}
+                          {log.grade != null ? (
+                            <StarRating value={gradeToStars(log.grade)} readOnly size="sm" showGradeText={false} />
+                          ) : (
+                            <span>—</span>
+                          )}
                           {(() => {
                             const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
                             return duration ? (

@@ -108,7 +108,7 @@
     "back": "Atrás",
     "continuing": "Continuando…",
     "spotlightOk": "Aceptar",
-    "spotlightSearchCategory": "Elige aquí la categoría en la que quieres buscar.",
+    "spotlightSearchCategory": "Elige aquí la categoría en la que quieres buscar. Puedes cambiar el orden de estas categorías para la búsqueda en Ajustes.",
     "spotlightDashboardImport": "Puedes importar tus hojas de cálculo desde aquí.",
     "spotlightStatisticsRecap": "Mira y comparte tu retrospective personal aquí."
   },

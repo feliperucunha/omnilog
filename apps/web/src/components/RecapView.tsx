@@ -2,7 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Loader2, Share2, X } from "lucide-react";
 import type { Log } from "@geeklogs/shared";
 import { Button } from "@/components/ui/button";
-import { GradeDisplay } from "@/components/GradeDisplay";
+import { StarRating } from "@/components/StarRating";
+import { gradeToStars } from "@/lib/gradeStars";
 import { ItemImage } from "@/components/ItemImage";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMe } from "@/contexts/MeContext";
@@ -463,11 +464,11 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
             className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/70 to-transparent px-0.5 pb-0.5 pt-2"
             style={{ transform: `scale(${starScale})`, transformOrigin: "bottom center" }}
           >
-            <GradeDisplay
-              grade={log.grade}
+            <StarRating
+              value={gradeToStars(log.grade)}
+              readOnly
               size="sm"
-              variant="onDark"
-              className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+              className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
             />
           </div>
         ) : null}
@@ -563,12 +564,7 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
                       className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/75 to-transparent px-1 pb-1 pt-3"
                       style={{ transform: "scale(0.82)", transformOrigin: "bottom center" }}
                     >
-                      <GradeDisplay
-                        grade={log.grade}
-                        size="md"
-                        variant="onDark"
-                        className="drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
-                      />
+                      <StarRating value={gradeToStars(log.grade)} readOnly size="md" />
                     </div>
                   ) : null}
                 </div>

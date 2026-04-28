@@ -3,12 +3,10 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/contexts/LocaleContext";
 import {
-  isOnboardingSpotlightDoneSync,
   loadOnboardingSpotlightDismissed,
   saveOnboardingSpotlightDismissed,
   type OnboardingSpotlightKey,
 } from "@/lib/onboardingSpotlightStorage";
-import { isNativePlatform } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 const PAD = 8;
@@ -53,18 +51,14 @@ export function OnboardingSpotlight({
   const { t } = useLocale();
   const titleId = useId().replace(/:/g, "");
   const maskId = useId().replace(/:/g, "");
-  const [dismissed, setDismissed] = useState<boolean | null>(() => {
-    if (typeof window === "undefined") return true;
-    if (isNativePlatform()) return null;
-    return isOnboardingSpotlightDoneSync(storageKey);
-  });
+  const [dismissed, setDismissed] = useState<boolean | null>(null);
   const [active, setActive] = useState(false);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
   const [cardStyle, setCardStyle] = useState<CSSProperties>({});
   const [arrow, setArrow] = useState<"top" | "bottom" | null>(null);
 
   useEffect(() => {
-    if (!enabled || !isNativePlatform()) return;
+    if (!enabled) return;
     if (dismissed !== null) return;
     let cancelled = false;
     void loadOnboardingSpotlightDismissed(storageKey).then((done) => {

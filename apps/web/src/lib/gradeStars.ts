@@ -1,13 +1,12 @@
-/**
- * Grades in the API/DB are 0–10 (0 = no rating). The UI uses 10 stars and
- * integer grades 1–10 when a rating is set.
- */
+/** Grade in DB/API is 0–10. UI uses 0.5 steps across 0–5 stars. */
 export function gradeToStars(grade: number | null | undefined): number | null {
   if (grade == null || !Number.isFinite(grade) || grade <= 0) return null;
-  return Math.max(1, Math.min(10, Math.round(grade)));
+  const stars = Math.max(0, Math.min(5, grade / 2));
+  return Math.round(stars * 2) / 2;
 }
 
-/** Full-star count (1–10) to DB grade (1–10). */
+/** UI stars (0–5, half-steps) to API grade (0–10). */
 export function starsToGrade(stars: number): number {
-  return Math.max(1, Math.min(10, Math.round(stars)));
+  const safe = Math.max(0, Math.min(5, stars));
+  return Math.round(safe * 2);
 }
