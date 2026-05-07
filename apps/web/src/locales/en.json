@@ -235,6 +235,8 @@
     "adminFlag_wake_api_ping_hint": "While the app is open, periodically pings the API so free hosts that sleep after idle (e.g. Koyeb) stay warm. The app also pings once on every load to start waking the API. You can set API env WAKE_API_PING_ENABLED=true instead of this flag. Turn off when you move to a paid always-on plan.",
     "adminFlag_beta_banner_enabled": "Show initial welcome banner",
     "adminFlag_beta_banner_enabled_hint": "When on, users who have not dismissed it yet see the welcome / beta announcement modal on the dashboard (content is editable under Beta banner message). When off, that modal is not shown.",
+    "adminFlag_ignore_app_version_check": "Ignore native app version gate",
+    "adminFlag_ignore_app_version_check_hint": "When on, the API accepts any X-App-Version and native clients do not show the update-required screen. Use for testing or temporary compatibility; leave off in production.",
     "adminDigestTitle": "Monthly recap email",
     "adminDigestIntro": "Sends a digest for the previous calendar month (UTC) to your account email. The API must have SMTP configured.",
     "adminDigestSend": "Send recap to my email",
@@ -334,7 +336,6 @@
     "byYear": "By year",
     "byGenre": "By genre",
     "byStatusOverTime": "Status over time",
-    "byCategory": "By category",
     "logsCount": "{{count}}",
     "completedCount": "{{count}} completed",
     "noStatsYet": "Complete items with runtimes to see stats here.",
@@ -850,8 +851,8 @@
     "logLimitReached": "You've reached the 500-log limit on the Free plan. Upgrade to Pro for unlimited logs."
   },
   "appVersion": {
-    "title": "Update required",
-    "message": "A new version of the app is available. Please update from the Play Store or App Store to continue."
+    "title": "Update available",
+    "message": "A new version of Geeklogs is available. Install the latest build from the Play Store or App Store to keep using the app."
   },
   "coldStart": {
     "error": "Geeklogs couldn’t finish loading. Check that you’re online, then tap Try again. If you haven’t opened the app in a while, it may need a little extra time the first time.",

@@ -300,7 +300,7 @@ export function ItemReviewForm({
         payload.wantToBuy = wantToBuy;
         payload.sold = sold;
       }
-      if (showBoardGameFields && !myLog) {
+      if (showBoardGameFields) {
         payload.matchesPlayed = toNum(matchesPlayed);
       }
       if (showPurchaseAmount) {

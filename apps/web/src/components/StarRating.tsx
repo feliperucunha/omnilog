@@ -199,7 +199,7 @@ export function StarRating({
                       <Star
                         className={cn(
                           sizeClasses[size],
-                          "fill-amber-400 text-amber-300 drop-shadow-[0_1px_6px_rgba(251,191,36,0.35)]"
+                          "fill-amber-400 text-amber-300"
                         )}
                         strokeWidth={1.5}
                       />
@@ -274,7 +274,7 @@ export function StarRating({
                       <Star
                         className={cn(
                           sizeClasses[size],
-                          "fill-amber-400 text-amber-300 drop-shadow-[0_1px_6px_rgba(251,191,36,0.35)]"
+                          "fill-amber-400 text-amber-300"
                         )}
                         strokeWidth={1.5}
                       />

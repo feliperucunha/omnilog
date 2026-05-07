@@ -114,33 +114,22 @@ export function bggHeaders(token?: string | null): HeadersInit {
   return headers;
 }
 
-export async function getBoardGameById(id: string, apiToken?: string | null): Promise<ItemDetail | null> {
-  const token = apiToken ?? process.env.BGG_API_TOKEN;
-  if (!token) return null;
-  const res = await fetch(`${BASE}/thing?id=${id}&stats=1`, { headers: bggHeaders(token) });
-  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("bgg");
-  if (!res.ok) return null;
-  const xml = await res.text();
-  const parser = new XMLParser({ ignoreAttributes: false });
-  const parsed = parser.parse(xml) as {
-    items?: {
-      item?: {
-        "@_id": string;
-        name?: { "#text"?: string; "@_value"?: string; "@_type"?: string } | Array<{ "#text"?: string; "@_value"?: string; "@_type"?: string }>;
-        yearpublished?: { "@_value"?: string };
-        image?: string | { "#text"?: string };
-        thumbnail?: string | { "#text"?: string };
-        description?: string;
-        minplayers?: { "@_value"?: string };
-        maxplayers?: { "@_value"?: string };
-        playingtime?: { "@_value"?: string };
-        minage?: { "@_value"?: string };
-        link?: { "@_type": string; "@_value": string } | Array<{ "@_type": string; "@_value": string }>;
-      };
-    };
-  };
-  const item = bggNormalizeThingItem(parsed.items?.item);
-  if (!item) return null;
+type BggThingXmlItem = {
+  "@_id": string;
+  name?: { "#text"?: string; "@_value"?: string; "@_type"?: string } | Array<{ "#text"?: string; "@_value"?: string; "@_type"?: string }>;
+  yearpublished?: { "@_value"?: string };
+  image?: string | { "#text"?: string };
+  thumbnail?: string | { "#text"?: string };
+  description?: string;
+  minplayers?: { "@_value"?: string };
+  maxplayers?: { "@_value"?: string };
+  playingtime?: { "@_value"?: string };
+  minage?: { "@_value"?: string };
+  link?: { "@_type": string; "@_value": string } | Array<{ "@_type": string; "@_value": string }>;
+};
+
+function mapBggThingXmlItemToItemDetail(item: BggThingXmlItem): ItemDetail | null {
+  if (item == null || typeof item !== "object" || !item["@_id"]) return null;
   const itemRec = item as unknown as Record<string, unknown>;
   const names = item.name;
   const getTitle = (n: { "#text"?: string; "@_value"?: string } | undefined): string =>
@@ -198,6 +187,65 @@ export async function getBoardGameById(id: string, apiToken?: string | null): Pr
     mechanics: mechanics.length > 0 ? mechanics : null,
     genres,
   };
+}
+
+function delayMs(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Batch-fetch thing details for collection import (max 20 ids per BGG request).
+ * Uses a short delay between batches to reduce BGG throttling (503/429).
+ */
+export async function getBoardGamesByIdsForImport(ids: string[], apiToken?: string | null): Promise<Map<string, ItemDetail>> {
+  const token = apiToken ?? process.env.BGG_API_TOKEN;
+  const out = new Map<string, ItemDetail>();
+  if (!token || ids.length === 0) return out;
+  const parser = new XMLParser({ ignoreAttributes: false });
+  for (let offset = 0; offset < ids.length; offset += BGG_THING_ID_BATCH_MAX) {
+    const chunk = ids.slice(offset, offset + BGG_THING_ID_BATCH_MAX);
+    const res = await fetch(`${BASE}/thing?id=${chunk.map((id) => encodeURIComponent(id)).join(",")}&stats=1`, {
+      headers: bggHeaders(token),
+    });
+    if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("bgg");
+    if (!res.ok) {
+      for (const id of chunk) {
+        const one = await getBoardGameById(id, token);
+        if (one) out.set(id, one);
+        await delayMs(250);
+      }
+      if (offset + BGG_THING_ID_BATCH_MAX < ids.length) await delayMs(2000);
+      continue;
+    }
+    const xml = await res.text();
+    const parsed = parser.parse(xml) as { items?: { item?: BggThingXmlItem | BggThingXmlItem[] } };
+    const rawItems = parsed.items?.item;
+    const thingItems = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+    for (const row of thingItems) {
+      const detail = mapBggThingXmlItemToItemDetail(row);
+      if (detail) out.set(detail.id, detail);
+    }
+    if (offset + BGG_THING_ID_BATCH_MAX < ids.length) await delayMs(2000);
+  }
+  return out;
+}
+
+export async function getBoardGameById(id: string, apiToken?: string | null): Promise<ItemDetail | null> {
+  const token = apiToken ?? process.env.BGG_API_TOKEN;
+  if (!token) return null;
+  const res = await fetch(`${BASE}/thing?id=${encodeURIComponent(id)}&stats=1`, { headers: bggHeaders(token) });
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("bgg");
+  if (!res.ok) return null;
+  const xml = await res.text();
+  const parser = new XMLParser({ ignoreAttributes: false });
+  const parsed = parser.parse(xml) as {
+    items?: {
+      item?: BggThingXmlItem | BggThingXmlItem[];
+    };
+  };
+  const item = bggNormalizeThingItem(parsed.items?.item);
+  if (!item) return null;
+  return mapBggThingXmlItemToItemDetail(item as BggThingXmlItem);
 }
 
 export type SearchBoardGamesResult =

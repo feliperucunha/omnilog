@@ -151,6 +151,73 @@ function unauthColecioResult(): { objectIds: string[]; error: string; errorCode:
   };
 }
 
+function delayMs(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+const LUDOPEDIA_COLECAO_ROWS = 100;
+const LUDOPEDIA_COLECAO_MAX_PAGES = 500;
+
+async function fetchLudopediaColecaoAllPages(
+  token: string,
+  baseQuery: string
+): Promise<{ objectIds: string[]; sawSuccessfulOk: boolean; error?: string; errorCode?: string }> {
+  const all = new Set<string>();
+  let sawSuccessfulOk = false;
+  for (let page = 1; page <= LUDOPEDIA_COLECAO_MAX_PAGES; page++) {
+    const path =
+      baseQuery.length > 0
+        ? `colecao?${baseQuery}&rows=${LUDOPEDIA_COLECAO_ROWS}&page=${page}`
+        : `colecao?rows=${LUDOPEDIA_COLECAO_ROWS}&page=${page}`;
+    const out = await getLudopediaColecaoResponse(token, path);
+    if (out.type === "unauth") {
+      return { ...unauthColecioResult(), sawSuccessfulOk: false };
+    }
+    if (out.type === "ratelimit") {
+      return {
+        objectIds: [],
+        sawSuccessfulOk,
+        error:
+          "Ludopedia is rate limiting requests. Wait a few minutes, then try again. Collection imports are limited to once per 24 hours in Geeklogs to protect API quotas.",
+        errorCode: "LUDOPEDIA_RATE_LIMIT",
+      };
+    }
+    if (out.type === "server") {
+      return {
+        objectIds: [],
+        sawSuccessfulOk,
+        error: `Ludopedia is temporarily unavailable (${out.status}). Try again later.`,
+        errorCode: "LUDOPEDIA_SERVER_ERROR",
+      };
+    }
+    if (out.type === "other") {
+      if (page === 1) {
+        return {
+          objectIds: [],
+          sawSuccessfulOk: false,
+          error: `We couldn’t load your Ludopedia collection (HTTP ${out.status}). If this keeps happening, check Ludopedia’s status and your token in Settings.`,
+          errorCode: "LUDOPEDIA_UNKNOWN",
+        };
+      }
+      break;
+    }
+    if (out.type === "ok") {
+      sawSuccessfulOk = true;
+      const ids = parseLudopediaColecaoJson(out.data);
+      const sizeBefore = all.size;
+      for (const id of ids) all.add(id);
+      if (ids.length === 0) {
+        break;
+      }
+      if (page > 1 && all.size === sizeBefore) {
+        break;
+      }
+      await delayMs(300);
+    }
+  }
+  return { objectIds: [...all], sawSuccessfulOk };
+}
+
 /**
  * List game ids in a collection for the given public profile (best effort).
  * Uses server or user `LUDOPEDIA_API_TOKEN` in headers; may hit GET /usuarios then GET /colecao?…id_usuario…
@@ -184,29 +251,22 @@ export async function fetchLudopediaColecaoObjectIdsForProfileName(
     ];
     let sawOkResponse = false;
     for (const q of idParams) {
-      const out = await getLudopediaColecaoResponse(token, `colecao?${q}`);
-      if (out.type === "unauth") return unauthColecioResult();
-      if (out.type === "ratelimit") {
-        return {
-          objectIds: [],
-          error:
-            "Ludopedia is rate limiting requests. Wait a few minutes, then try again. Collection imports are limited to once per 24 hours in Geeklogs to protect API quotas.",
-          errorCode: "LUDOPEDIA_RATE_LIMIT",
-        };
-      }
-      if (out.type === "server") {
-        return {
-          objectIds: [],
-          error: `Ludopedia is temporarily unavailable (${out.status}). Try again later.`,
-          errorCode: "LUDOPEDIA_SERVER_ERROR",
-        };
-      }
-      if (out.type === "ok") {
-        sawOkResponse = true;
-        const objectIds = parseLudopediaColecaoJson(out.data);
-        if (objectIds.length > 0) {
-          return { objectIds };
+      const result = await fetchLudopediaColecaoAllPages(token, q);
+      if (result.error) {
+        if (
+          result.errorCode === "LUDOPEDIA_UNAUTHORIZED" ||
+          result.errorCode === "LUDOPEDIA_RATE_LIMIT" ||
+          result.errorCode === "LUDOPEDIA_SERVER_ERROR"
+        ) {
+          return { objectIds: result.objectIds, error: result.error, errorCode: result.errorCode };
         }
+        continue;
+      }
+      if (result.sawSuccessfulOk) {
+        sawOkResponse = true;
+      }
+      if (result.objectIds.length > 0) {
+        return { objectIds: result.objectIds };
       }
     }
     if (sawOkResponse) {
@@ -250,34 +310,11 @@ export async function fetchLudopediaColecaoObjectIds(
 ): Promise<{ objectIds: string[]; error?: string; errorCode?: string }> {
   const token = apiToken?.trim();
   if (!token) return { objectIds: [], error: "Ludopedia token required", errorCode: "LUDOPEDIA_UNAUTHORIZED" };
-  const res = await getLudopediaColecaoResponse(token, "colecao");
-  if (res.type === "unauth") {
-    return unauthColecioResult();
+  const result = await fetchLudopediaColecaoAllPages(token, "");
+  if (result.error) {
+    return { objectIds: result.objectIds, error: result.error, errorCode: result.errorCode };
   }
-  if (res.type === "ratelimit") {
-    return {
-      objectIds: [],
-      error:
-        "Ludopedia is rate limiting requests. Wait a few minutes, then try again. Collection imports are limited to once per 24 hours in Geeklogs to protect API quotas.",
-      errorCode: "LUDOPEDIA_RATE_LIMIT",
-    };
-  }
-  if (res.type === "server") {
-    return {
-      objectIds: [],
-      error: `Ludopedia is temporarily unavailable (${res.status}). Try again later.`,
-      errorCode: "LUDOPEDIA_SERVER_ERROR",
-    };
-  }
-  if (res.type === "other") {
-    return {
-      objectIds: [],
-      error: `We couldn’t load your Ludopedia collection (HTTP ${res.status}). If this keeps happening, check Ludopedia’s status and your token in Settings.`,
-      errorCode: "LUDOPEDIA_UNKNOWN",
-    };
-  }
-  const objectIds = parseLudopediaColecaoJson(res.data);
-  return { objectIds };
+  return { objectIds: result.objectIds };
 }
 
 /**

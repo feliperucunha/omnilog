@@ -31,7 +31,13 @@ export function AppVersionProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch(`${getApiBase()}/health`, { credentials: "omit" });
       if (!res.ok) return;
-      const data = (await res.json()) as { version?: string };
+      const data = (await res.json()) as {
+        version?: string;
+        ignoreClientVersionCheck?: boolean;
+      };
+      if (data.ignoreClientVersionCheck === true) {
+        return;
+      }
       if (data.version != null && data.version !== APP_VERSION) {
         setShowVersionModal(true);
       }

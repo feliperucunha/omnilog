@@ -23,7 +23,7 @@ import { adminRouter } from "./routes/admin.js";
 import { boardGameCollectionImportRouter } from "./routes/boardGameCollectionImport.js";
 import { prisma } from "./lib/prisma.js";
 import { runMonthlyDigestIfDue } from "./lib/monthlyDigest.js";
-import { isWakeApiPingEnabled } from "./lib/featureFlags.js";
+import { isWakeApiPingEnabled, shouldSkipAppVersionMiddleware } from "./lib/featureFlags.js";
 import { runSeedBadges } from "./scripts/seedBadges.js";
 import { runSeedMilestones } from "./scripts/seedMilestones.js";
 import { APP_VERSION } from "@geeklogs/shared";
@@ -65,7 +65,7 @@ app.post("/api/billing/google-play/pubsub", (req, res) =>
 );
 
 /** Require X-App-Version to match API version for all /api routes except /api/health and /api/wake-ping-config. Returns 401 when out of sync. */
-app.use("/api", (req, res, next) => {
+app.use("/api", async (req, res, next) => {
   if (
     req.path === "/health" ||
     req.path === "/health/" ||
@@ -74,6 +74,9 @@ app.use("/api", (req, res, next) => {
     req.path === "/billing/google-play/pubsub" ||
     req.path === "/billing/google-play/pubsub/"
   ) {
+    return next();
+  }
+  if (await shouldSkipAppVersionMiddleware()) {
     return next();
   }
   const clientVersion = req.headers["x-app-version"];
@@ -112,8 +115,9 @@ app.use("/api/follows", followsRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/board-games", boardGameCollectionImportRouter);
 
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, version: APP_VERSION });
+app.get("/api/health", async (_req, res) => {
+  const ignoreClientVersionCheck = await shouldSkipAppVersionMiddleware();
+  res.json({ ok: true, version: APP_VERSION, ignoreClientVersionCheck });
 });
 
 /** Public: whether clients should ping /api/health on an interval (free-tier sleep). No auth / no app version header. */

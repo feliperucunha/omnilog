@@ -3,15 +3,16 @@ import { decodeHtmlEntities } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { tierHasUnlimitedLogs } from "../lib/userTier.js";
 import { sanitizeText, sanitizeUrl, TITLE_MAX_LENGTH, EXTERNAL_ID_MAX_LENGTH } from "../lib/sanitize.js";
-import { getBoardGameById } from "./bgg.js";
+import { getBoardGameById, getBoardGamesByIdsForImport } from "./bgg.js";
 import { getBoardGameByIdLudopedia, fetchLudopediaColecaoObjectIdsForProfileName } from "./ludopedia.js";
 import { fetchBggCollectionObjectIds } from "./bggCollection.js";
 import { handleLogCreated } from "./gamification.service.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const FREE_LOG_LIMIT = 500;
-const MAX_IMPORT_ITEMS = 200;
-const MAX_JOB_MS = 180_000;
+const MAX_IMPORT_ITEMS = 50_000;
+const MAX_JOB_MS = 45 * 60 * 1000;
+const BGG_IMPORT_BATCH = 20;
 
 /** Rolling window between collection imports (protects BGG / Ludopedia daily quotas). */
 export const COLLECTION_IMPORT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -210,6 +211,10 @@ async function canCreateOneMoreLog(userId: string, tier: string): Promise<boolea
   return c < FREE_LOG_LIMIT;
 }
 
+function delayMs(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 async function runImportJob(
   job: JobState,
   objectIds: string[],
@@ -233,137 +238,215 @@ async function runImportJob(
     return;
   }
 
-  for (let i = 0; i < objectIds.length; i++) {
-    if (nowMs() - jobStartMs > MAX_JOB_MS) {
-      job.status = "timeout";
-      job.error =
-        "The import hit the per-run time cap. If your list is long, your catalog was only partly imported. Run the import again after 24 hours and choose to skip games already in Geeklogs to pull in the rest more quickly.";
-      job.updated = nowMs();
-      void handleLogCreated(userId).catch(() => {});
+  const processRow = async (extId: string, item: Awaited<ReturnType<typeof getBoardGameById>>, index: number) => {
+    job.current = index + 1;
+    job.updated = nowMs();
+
+    if (item == null) {
+      job.failed += 1;
       return;
     }
+
+    const title = sanitizeText(decodeHtmlEntities(item.title), TITLE_MAX_LENGTH);
+    const ext = sanitizeText(extId, EXTERNAL_ID_MAX_LENGTH);
+    if (!title || !ext) {
+      job.failed += 1;
+      return;
+    }
+    job.lastTitle = title;
+    const rawImage = item.image ?? item.thumbnail ?? null;
+    const image = rawImage != null ? sanitizeUrl(rawImage) : null;
+    const genres = item.genres?.length
+      ? JSON.stringify(item.genres.slice(0, 20).map((g) => decodeHtmlEntities(g)))
+      : item.categories?.length
+        ? JSON.stringify(item.categories.slice(0, 20).map((g) => decodeHtmlEntities(g)))
+        : null;
+    const mechanics =
+      item.mechanics && item.mechanics.length > 0
+        ? JSON.stringify(item.mechanics.slice(0, 20).map((m) => decodeHtmlEntities(m)))
+        : null;
+    const boardGameSource: "bgg" | "ludopedia" = source;
+
+    const existing = await prisma.log.findUnique({
+      where: { userId_mediaType_externalId: { userId, mediaType: "boardgames", externalId: ext } },
+    });
+    if (existing) {
+      if (duplicateMode === "replace") {
+        await prisma.log.update({
+          where: { id: existing.id },
+          data: {
+            title,
+            image: image ?? null,
+            genres: genres,
+            mechanics: mechanics,
+            boardGameSource,
+            own: true,
+            wantToBuy: false,
+            sold: false,
+          },
+        });
+        job.replaced += 1;
+      } else {
+        job.skipped += 1;
+      }
+      return;
+    }
+
     if (!(await canCreateOneMoreLog(userId, tier))) {
       job.status = "limit_reached";
       job.code = "LOG_LIMIT_REACHED";
-      job.error = "Your log limit for this plan was reached during the import. Upgrade or free space, then use Import again (after 24h).";
+      job.error = "Your log limit for this plan was reached during the import.";
       job.updated = nowMs();
       void handleLogCreated(userId).catch(() => {});
-      return;
+      throw new Error("LOG_LIMIT");
     }
 
-    const extId = objectIds[i]!;
-    job.current = i + 1;
-    job.updated = nowMs();
+    await prisma.log.create({
+      data: {
+        userId,
+        mediaType: "boardgames",
+        externalId: ext,
+        title,
+        image: image ?? null,
+        grade: null,
+        review: null,
+        listType: null,
+        status: "plan to play",
+        startedAt: null,
+        completedAt: null,
+        contentHours: null,
+        hoursToBeat: null,
+        season: null,
+        episode: null,
+        chapter: null,
+        volume: null,
+        genres: genres,
+        mechanics: mechanics,
+        affinityContext: null,
+        boardGameSource,
+        own: true,
+        wantToBuy: false,
+        sold: false,
+        matchesPlayed: 0,
+        purchaseAmountMinor: null,
+        purchaseCurrency: null,
+        saleAmountMinor: null,
+        saleCurrency: null,
+        spendFieldsAt: null,
+      },
+    });
+    job.imported += 1;
+  };
 
-    try {
-      const item =
-        source === "bgg"
-          ? await getBoardGameById(extId, detailToken)
-          : await getBoardGameByIdLudopedia(extId, detailToken);
-      if (item == null) {
-        job.failed += 1;
-        continue;
+  if (source === "bgg") {
+    for (let batchStart = 0; batchStart < objectIds.length; batchStart += BGG_IMPORT_BATCH) {
+      if (nowMs() - jobStartMs > MAX_JOB_MS) {
+        job.status = "timeout";
+        job.error =
+          "The import hit the per-run time cap. If your list is long, your catalog was only partly imported. Run the import again after 24 hours and choose to skip games already in Geeklogs to pull in the rest more quickly.";
+        job.updated = nowMs();
+        void handleLogCreated(userId).catch(() => {});
+        return;
       }
-
-      const title = sanitizeText(decodeHtmlEntities(item.title), TITLE_MAX_LENGTH);
-      const ext = sanitizeText(extId, EXTERNAL_ID_MAX_LENGTH);
-      if (!title || !ext) {
-        job.failed += 1;
-        continue;
-      }
-      job.lastTitle = title;
-      const rawImage = item.image ?? item.thumbnail ?? null;
-      const image = rawImage != null ? sanitizeUrl(rawImage) : null;
-      const genres = item.genres?.length
-        ? JSON.stringify(item.genres.slice(0, 20).map((g) => decodeHtmlEntities(g)))
-        : item.categories?.length
-          ? JSON.stringify(item.categories.slice(0, 20).map((g) => decodeHtmlEntities(g)))
-          : null;
-      const mechanics =
-        item.mechanics && item.mechanics.length > 0
-          ? JSON.stringify(item.mechanics.slice(0, 20).map((m) => decodeHtmlEntities(m)))
-          : null;
-      const boardGameSource: "bgg" | "ludopedia" = source;
-
-      const existing = await prisma.log.findUnique({
-        where: { userId_mediaType_externalId: { userId, mediaType: "boardgames", externalId: ext } },
-      });
-      if (existing) {
-        if (duplicateMode === "replace") {
-          await prisma.log.update({
-            where: { id: existing.id },
-            data: {
-              title,
-              image: image ?? null,
-              genres: genres,
-              mechanics: mechanics,
-              boardGameSource,
-              own: true,
-              wantToBuy: false,
-              sold: false,
-            },
-          });
-          job.replaced += 1;
-        } else {
-          job.skipped += 1;
-        }
-        continue;
-      }
-
       if (!(await canCreateOneMoreLog(userId, tier))) {
         job.status = "limit_reached";
         job.code = "LOG_LIMIT_REACHED";
-        job.error = "Your log limit for this plan was reached during the import.";
+        job.error = "Your log limit for this plan was reached during the import. Upgrade or free space, then use Import again (after 24h).";
         job.updated = nowMs();
         void handleLogCreated(userId).catch(() => {});
         return;
       }
 
-      await prisma.log.create({
-        data: {
-          userId,
-          mediaType: "boardgames",
-          externalId: ext,
-          title,
-          image: image ?? null,
-          grade: null,
-          review: null,
-          listType: null,
-          status: "plan to play",
-          startedAt: null,
-          completedAt: null,
-          contentHours: null,
-          hoursToBeat: null,
-          season: null,
-          episode: null,
-          chapter: null,
-          volume: null,
-          genres: genres,
-          mechanics: mechanics,
-          affinityContext: null,
-          boardGameSource,
-          own: true,
-          wantToBuy: false,
-          sold: false,
-          matchesPlayed: 0,
-          purchaseAmountMinor: null,
-          purchaseCurrency: null,
-          saleAmountMinor: null,
-          saleCurrency: null,
-          spendFieldsAt: null,
-        },
-      });
-      job.imported += 1;
-    } catch (e) {
-      if (e instanceof InvalidApiKeyError) {
-        job.status = "failed";
-        job.error = "The API key was rejected while importing. Update it in Settings and try again after 24 hours.";
-        job.code = "API_KEY_INVALID";
+      const chunk = objectIds.slice(batchStart, batchStart + BGG_IMPORT_BATCH);
+      let batchMap: Map<string, NonNullable<Awaited<ReturnType<typeof getBoardGameById>>>>;
+      try {
+        batchMap = await getBoardGamesByIdsForImport(chunk, detailToken);
+      } catch (e) {
+        if (e instanceof InvalidApiKeyError) {
+          job.status = "failed";
+          job.error = "The API key was rejected while importing. Update it in Settings and try again after 24 hours.";
+          job.code = "API_KEY_INVALID";
+          job.updated = nowMs();
+          void handleLogCreated(userId).catch(() => {});
+          return;
+        }
+        throw e;
+      }
+
+      for (let j = 0; j < chunk.length; j++) {
+        if (nowMs() - jobStartMs > MAX_JOB_MS) {
+          job.status = "timeout";
+          job.error =
+            "The import hit the per-run time cap. If your list is long, your catalog was only partly imported. Run the import again after 24 hours and choose to skip games already in Geeklogs to pull in the rest more quickly.";
+          job.updated = nowMs();
+          void handleLogCreated(userId).catch(() => {});
+          return;
+        }
+
+        const extId = chunk[j]!;
+        const i = batchStart + j;
+
+        try {
+          let item = batchMap.get(extId) ?? null;
+          if (item == null) {
+            item = await getBoardGameById(extId, detailToken);
+          }
+          await processRow(extId, item, i);
+        } catch (e) {
+          if (e instanceof Error && e.message === "LOG_LIMIT") {
+            return;
+          }
+          if (e instanceof InvalidApiKeyError) {
+            job.status = "failed";
+            job.error = "The API key was rejected while importing. Update it in Settings and try again after 24 hours.";
+            job.code = "API_KEY_INVALID";
+            job.updated = nowMs();
+            void handleLogCreated(userId).catch(() => {});
+            return;
+          }
+          job.failed += 1;
+        }
+      }
+    }
+  } else {
+    for (let i = 0; i < objectIds.length; i++) {
+      if (nowMs() - jobStartMs > MAX_JOB_MS) {
+        job.status = "timeout";
+        job.error =
+          "The import hit the per-run time cap. If your list is long, your catalog was only partly imported. Run the import again after 24 hours and choose to skip games already in Geeklogs to pull in the rest more quickly.";
         job.updated = nowMs();
         void handleLogCreated(userId).catch(() => {});
         return;
       }
-      job.failed += 1;
+      if (!(await canCreateOneMoreLog(userId, tier))) {
+        job.status = "limit_reached";
+        job.code = "LOG_LIMIT_REACHED";
+        job.error = "Your log limit for this plan was reached during the import. Upgrade or free space, then use Import again (after 24h).";
+        job.updated = nowMs();
+        void handleLogCreated(userId).catch(() => {});
+        return;
+      }
+
+      const extId = objectIds[i]!;
+
+      try {
+        const item = await getBoardGameByIdLudopedia(extId, detailToken);
+        await processRow(extId, item, i);
+        await delayMs(120);
+      } catch (e) {
+        if (e instanceof Error && e.message === "LOG_LIMIT") {
+          return;
+        }
+        if (e instanceof InvalidApiKeyError) {
+          job.status = "failed";
+          job.error = "The API key was rejected while importing. Update it in Settings and try again after 24 hours.";
+          job.code = "API_KEY_INVALID";
+          job.updated = nowMs();
+          void handleLogCreated(userId).catch(() => {});
+          return;
+        }
+        job.failed += 1;
+      }
     }
   }
 

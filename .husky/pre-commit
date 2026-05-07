@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+node scripts/bump-app-version.mjs
+git add packages/shared/src/version.ts

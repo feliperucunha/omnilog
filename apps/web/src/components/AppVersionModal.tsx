@@ -9,9 +9,8 @@ import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { useLocale } from "@/contexts/LocaleContext";
 
 /**
- * Unclosable modal shown on mobile when the app version is behind the API.
- * Prevents Android/iOS users from using an outdated app. API also returns 401
- * for version mismatch so bypassing the modal still blocks requests.
+ * Native-only modal when the bundled APP_VERSION is older than the API’s release.
+ * Admin feature flag “Ignore native app version gate” disables both this UI and API enforcement.
  */
 export function AppVersionModal() {
   const { t } = useLocale();

@@ -334,12 +334,19 @@ export function LogForm(props: LogFormProps) {
     saleCurrency,
   ]);
 
-  const performSave = useCallback(async (options?: { optimisticClose?: boolean }): Promise<boolean> => {
+  const performSave = useCallback(
+    async (options?: {
+      optimisticClose?: boolean;
+      quiet?: boolean;
+      skipCancelIfUnchanged?: boolean;
+    }): Promise<boolean> => {
     const optimisticClose = options?.optimisticClose === true;
+    const quiet = options?.quiet === true;
+    const skipCancelIfUnchanged = options?.skipCancelIfUnchanged === true;
     const wasFirstLog = !isEdit && (me?.logCount ?? 0) === 0;
     const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
     const grade = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
-    if (!optimisticClose) setLoading(true);
+    if (!optimisticClose && !quiet) setLoading(true);
     try {
       if (isEdit && log) {
         const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
@@ -363,7 +370,7 @@ export function LogForm(props: LogFormProps) {
           payload.wantToBuy = wantToBuy;
           payload.sold = sold;
         }
-        if (showBoardGameFields && !(isEdit && mediaType === "boardgames")) {
+        if (showBoardGameFields) {
           payload.matchesPlayed = toNum(matchesPlayed);
         }
         if (showPurchaseAmount) {
@@ -400,7 +407,6 @@ export function LogForm(props: LogFormProps) {
               wantToBuy === (props.log.wantToBuy ?? false) &&
               sold === (props.log.sold ?? false))) &&
           (!showBoardGameFields ||
-            (isEdit && mediaType === "boardgames") ||
             toNum(matchesPlayed) === (props.log.matchesPlayed ?? null)) &&
           (!showPurchaseAmount ||
             (() => {
@@ -427,8 +433,10 @@ export function LogForm(props: LogFormProps) {
               );
             })());
         if (noChange) {
-          if (!optimisticClose) setLoading(false);
-          onCancel();
+          if (!optimisticClose && !quiet) setLoading(false);
+          if (!skipCancelIfUnchanged) {
+            onCancel();
+          }
           return true;
         }
         if (optimisticClose) {
@@ -548,7 +556,7 @@ export function LogForm(props: LogFormProps) {
       }
       return false;
     } finally {
-      if (!optimisticClose) setLoading(false);
+      if (!optimisticClose && !quiet) setLoading(false);
     }
   }, [
     isEdit,
@@ -589,7 +597,8 @@ export function LogForm(props: LogFormProps) {
 
   const handleDrawerBeforeDismiss = useCallback(async (): Promise<boolean> => {
     if (!isDirty) return true;
-    return performSave();
+    void performSave({ quiet: true, skipCancelIfUnchanged: true });
+    return true;
   }, [isDirty, performSave]);
 
   const handleDialogRequestClose = useCallback(() => {

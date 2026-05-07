@@ -13,6 +13,11 @@ export const FEATURE_FLAG_KEYS = {
    * Temporary ops toggle; remove when on a paid always-on plan.
    */
   WAKE_API_PING: "wake_api_ping",
+  /**
+   * When enabled, native apps are not blocked by X-App-Version checks and the update-required modal is suppressed.
+   * Use for testing or temporary compatibility; leave off in production so clients stay on supported builds.
+   */
+  IGNORE_APP_VERSION_CHECK: "ignore_app_version_check",
 } as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[keyof typeof FEATURE_FLAG_KEYS];
@@ -63,6 +68,34 @@ export async function isWakeApiPingEnabled(): Promise<boolean> {
   return row.enabled;
 }
 
+/** Default off — when true, API skips matching X-App-Version and clients hide the native update gate. */
+export async function isIgnoreAppVersionCheckEnabled(): Promise<boolean> {
+  const row = await prisma.featureFlag.findUnique({
+    where: { key: FEATURE_FLAG_KEYS.IGNORE_APP_VERSION_CHECK },
+    select: { enabled: true },
+  });
+  if (row == null) return false;
+  return row.enabled;
+}
+
+let ignoreAppVersionCache: { value: boolean; expiresAt: number } | null = null;
+const IGNORE_APP_VERSION_CACHE_MS = 15_000;
+
+/** Cached read for hot-path middleware; invalidated when admin toggles the flag. */
+export async function shouldSkipAppVersionMiddleware(): Promise<boolean> {
+  const now = Date.now();
+  if (ignoreAppVersionCache != null && now < ignoreAppVersionCache.expiresAt) {
+    return ignoreAppVersionCache.value;
+  }
+  const value = await isIgnoreAppVersionCheckEnabled();
+  ignoreAppVersionCache = { value, expiresAt: now + IGNORE_APP_VERSION_CACHE_MS };
+  return value;
+}
+
+export function invalidateIgnoreAppVersionCheckCache(): void {
+  ignoreAppVersionCache = null;
+}
+
 /** When no DB row exists, admin list and toggles use these defaults (same as the `is*` readers). */
 function defaultEnabledWhenMissing(key: FeatureFlagKey): boolean {
   switch (key) {
@@ -73,6 +106,8 @@ function defaultEnabledWhenMissing(key: FeatureFlagKey): boolean {
     case FEATURE_FLAG_KEYS.BETA_BANNER_ENABLED:
       return true;
     case FEATURE_FLAG_KEYS.WAKE_API_PING:
+      return false;
+    case FEATURE_FLAG_KEYS.IGNORE_APP_VERSION_CHECK:
       return false;
     default:
       return false;
