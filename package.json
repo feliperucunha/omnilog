@@ -2,7 +2,7 @@
   "name": "geeklogs",
   "private": true,
   "scripts": {
-    "prepare": "husky",
+    "prepare": "node scripts/run-husky-if-git.mjs",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "heroku-build": "pnpm exec turbo run build --filter=@geeklogs/api...",
