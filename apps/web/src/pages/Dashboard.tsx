@@ -58,6 +58,14 @@ interface FeedEntry {
 const BETA_MODAL_STORAGE_KEY = "geeklogs.betaModalSeen";
 const SOCIAL_COLLAPSED_STORAGE_KEY = "geeklogs.dashboard.socialCollapsed";
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+const FEED_SCORE_SOURCE_LABELS: Partial<Record<MediaType, string>> = {
+  movies: "IMDB",
+  tv: "IMDB",
+  anime: "MAL",
+  manga: "MAL",
+  games: "RAWG",
+};
 /** Base URL for share profile link (always prod so shared links work). */
 const PROFILE_SHARE_BASE_URL = "https://geeklogs.com.br";
 
@@ -708,9 +716,22 @@ export function Dashboard() {
                             boardGameSource={log.boardGameSource}
                           />
                         </div>
+                        {(() => {
+                          const sourceLabel = FEED_SCORE_SOURCE_LABELS[log.mediaType];
+                          const showScore = sourceLabel != null && typeof log.apiScore === "number" && log.apiScore > 0;
+                          if (!showScore) return null;
+                          return (
+                            <span
+                              className="absolute top-1 right-1 z-10 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-semibold text-yellow-300 backdrop-blur-sm sm:top-1.5 sm:right-1.5 sm:text-[10px] whitespace-nowrap"
+                              title={`${sourceLabel} ${log.apiScore!.toFixed(1)} / 10`}
+                            >
+                              {sourceLabel} {log.apiScore!.toFixed(1)}
+                            </span>
+                          );
+                        })()}
                         {log.status && (
                           <span
-                            className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
+                            className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] whitespace-nowrap ${badgeClass}`}
                             title={getStatusLabel(t, log.status, log.mediaType)}
                           >
                             {getStatusLabel(t, log.status, log.mediaType)}
@@ -735,6 +756,25 @@ export function Dashboard() {
                           ) : (
                             <span>—</span>
                           )}
+                          {log.mediaType === "books" && typeof log.pagesCount === "number" && log.pagesCount > 0 && (
+                            <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
+                              {t("mediaLogs.bookPagesBadge", { count: String(log.pagesCount) })}
+                            </span>
+                          )}
+                          {log.mediaType === "boardgames" && (() => {
+                            const min = typeof log.playersMin === "number" && log.playersMin > 0 ? log.playersMin : null;
+                            const max = typeof log.playersMax === "number" && log.playersMax > 0 ? log.playersMax : null;
+                            if (min == null && max == null) return null;
+                            const label =
+                              min != null && max != null && min !== max
+                                ? t("mediaLogs.boardgamePlayersBadgeRange", { min: String(min), max: String(max) })
+                                : t("mediaLogs.boardgamePlayersBadgeSingle", { count: String(min ?? max) });
+                            return (
+                              <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
+                                {label}
+                              </span>
+                            );
+                          })()}
                           {(() => {
                             const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
                             return duration ? (

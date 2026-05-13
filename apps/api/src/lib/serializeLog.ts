@@ -25,6 +25,8 @@ export function parseMechanicsJson(json: string | null): string[] | null {
 
 export function serializeLog<
   T extends {
+    mediaType: string;
+    externalId: string;
     title: string;
     review?: string | null;
     startedAt?: Date | null;

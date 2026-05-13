@@ -138,6 +138,21 @@ const DialogBody = ({
   <div className={cn("", className)} {...props} />
 );
 
+/** Pinned footer for action buttons inside DialogContent (mirrors DrawerFooter). */
+const DialogFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--color-surface-border)] bg-[var(--color-dark)] pt-4",
+        className
+      )}
+      {...props}
+    />
+  )
+);
+DialogFooter.displayName = "DialogFooter";
+
 export {
   Dialog,
   DialogPortal,
@@ -148,4 +163,5 @@ export {
   DialogHeader,
   DialogTitle,
   DialogBody,
+  DialogFooter,
 };

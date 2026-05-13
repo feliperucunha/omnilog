@@ -12,6 +12,7 @@ import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, 
 import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
+import { ExportLogsModal, type ExportLogsOptions } from "@/components/ExportLogsModal";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
@@ -49,6 +50,24 @@ import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
 
 const cardShadow = { boxShadow: "var(--shadow-card)" };
+
+const SCORE_SOURCE_LABELS: Partial<Record<MediaType, string>> = {
+  movies: "IMDB",
+  tv: "IMDB",
+  anime: "MAL",
+  manga: "MAL",
+  games: "RAWG",
+};
+
+const TV_ENDED_STATUSES = new Set(["ended", "canceled", "cancelled"]);
+const TV_ONGOING_STATUSES = new Set(["returning series", "in production", "pilot", "planned"]);
+const getTvAirState = (status: string | null | undefined): "ongoing" | "ended" | null => {
+  if (!status) return null;
+  const s = status.trim().toLowerCase();
+  if (TV_ENDED_STATUSES.has(s)) return "ended";
+  if (TV_ONGOING_STATUSES.has(s)) return "ongoing";
+  return null;
+};
 
 const LOGS_PAGE_SIZE = 24;
 /** Character count for review preview before "View more". ~2 lines on mobile. */
@@ -171,6 +190,7 @@ export function MediaLogs({
   const [genreFilter, setGenreFilter] = useState(() => (initialFilters?.genre ?? "").trim());
   const [sortBy, setSortBy] = useState<MediaLogsSort>(() => (initialFilters?.sort as MediaLogsSort) ?? DEFAULT_SORT);
   const [showCustomEntry, setShowCustomEntry] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   /** Applied filter (API + URL); updated on submit, not on every keystroke. */
   const [categorySearchQuery, setCategorySearchQuery] = useState(() => (initialFilters?.search ?? "").trim());
   /** In-progress text in the search field. */
@@ -558,21 +578,37 @@ export function MediaLogs({
   };
 
   const hasProFeatures = tierHasProFeatures(me?.tier);
-  const handleExportCategory = async () => {
+  const handleOpenExport = () => {
     if (!hasProFeatures) {
+      setShowProModal(true);
+      return;
+    }
+    setShowExportModal(true);
+  };
+  const handleConfirmExport = async (opts: ExportLogsOptions) => {
+    if (!hasProFeatures) {
+      setShowExportModal(false);
       setShowProModal(true);
       return;
     }
     setExportingCategory(true);
     try {
-      const { blob } = await apiFetchFile(`/logs/export?mediaType=${encodeURIComponent(mediaType)}`);
+      const params = new URLSearchParams();
+      if (opts.mediaType !== "all") params.set("mediaType", opts.mediaType);
+      if (opts.status) params.set("status", opts.status);
+      if (opts.collection === "owned") params.set("own", "true");
+      if (opts.collection === "wantToBuy") params.set("wantToBuy", "true");
+      if (opts.sort) params.set("sort", opts.sort);
+      const qs = params.toString();
+      const { blob } = await apiFetchFile(`/logs/export${qs ? `?${qs}` : ""}`);
       const filename = buildLogsExportFilename({
         page: embedded ? "dashboard" : "logs",
         userSlug: userSlugFromMe(me),
-        categoryKey: mediaType,
+        categoryKey: opts.mediaType === "all" ? "all-categories" : opts.mediaType,
       });
       await downloadFile(blob, filename);
       toast.success(t("mediaLogs.exportCategorySuccess"));
+      setShowExportModal(false);
     } catch (err) {
       showErrorToast(t, "E010", { originalError: err });
     } finally {
@@ -718,8 +754,7 @@ export function MediaLogs({
                   onClick={() => setShowCustomEntry(true)}
                 >
                   <span className="inline-flex items-center gap-2">
-                    <Plus className="size-4 shrink-0" aria-hidden />
-                    {t("customEntry.addCustomBatchEntry")}
+                    {t("customEntry.importButton")}
                   </span>
                 </Button>
               </motion.div>
@@ -728,7 +763,7 @@ export function MediaLogs({
                 variant="outline"
                 size="icon"
                 className={cn("shrink-0", !hasProFeatures && "opacity-60 cursor-pointer")}
-                onClick={handleExportCategory}
+                onClick={handleOpenExport}
                 disabled={exportingCategory}
                 title={t("mediaLogs.exportCategory")}
                 aria-label={t("mediaLogs.exportCategory")}
@@ -826,6 +861,18 @@ export function MediaLogs({
         />
       )}
 
+      {!readOnly && showExportModal && (
+        <ExportLogsModal
+          defaultMediaType={mediaType}
+          defaultStatus={statusFilter}
+          defaultCollection={collectionFilter}
+          defaultSort={sortBy}
+          exporting={exportingCategory}
+          onExport={handleConfirmExport}
+          onCancel={() => setShowExportModal(false)}
+        />
+      )}
+
       {/* Mobile when embedded: header, filters, search. Desktop when embedded uses the block above. When not embedded wrapper is always visible. */}
       <div className={cn("flex min-w-0 flex-col gap-3", embedded && "md:hidden")}>
       {/* 1. Header: left = title + experience bar; right = action buttons; bar shorter on mobile to fit one line */}
@@ -896,17 +943,13 @@ export function MediaLogs({
               <Button
                 type="button"
                 variant="outline"
-                size="icon"
-                className="h-8 w-8 shrink-0 md:h-9 md:w-auto md:px-4 md:py-2"
+                className="h-8 shrink-0 px-2 text-xs md:h-9 md:px-4 md:py-2 md:text-sm"
                 id={embedded ? "onboarding-dashboard-import-mobile" : undefined}
                 onClick={() => setShowCustomEntry(true)}
-                title={t("customEntry.addCustomBatchEntry")}
-                aria-label={t("customEntry.addCustomBatchEntry")}
+                title={t("customEntry.importButton")}
+                aria-label={t("customEntry.importButton")}
               >
-                <Plus className="size-4 shrink-0" aria-hidden />
-                <span className="hidden md:inline-flex md:items-center md:gap-2">
-                  {t("customEntry.addCustomBatchEntry")}
-                </span>
+                {t("customEntry.importButton")}
               </Button>
             </motion.div>
             <Button
@@ -917,7 +960,7 @@ export function MediaLogs({
                 "h-8 w-8 shrink-0 md:h-9 md:w-9",
                 !hasProFeatures && "opacity-60 cursor-pointer"
               )}
-              onClick={handleExportCategory}
+              onClick={handleOpenExport}
               disabled={exportingCategory}
               title={t("mediaLogs.exportCategory")}
               aria-label={t("mediaLogs.exportCategory")}
@@ -1149,9 +1192,22 @@ export function MediaLogs({
                           boardGameSource={log.boardGameSource}
                         />
                       </div>
+                      {(() => {
+                        const sourceLabel = SCORE_SOURCE_LABELS[log.mediaType];
+                        const showScore = sourceLabel != null && typeof log.apiScore === "number" && log.apiScore > 0;
+                        if (!showScore) return null;
+                        return (
+                          <span
+                            className="absolute top-1 right-1 z-10 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-semibold text-yellow-300 backdrop-blur-sm sm:top-1.5 sm:right-1.5 sm:text-[10px] whitespace-nowrap"
+                            title={`${sourceLabel} ${log.apiScore!.toFixed(1)} / 10`}
+                          >
+                            {sourceLabel} {log.apiScore!.toFixed(1)}
+                          </span>
+                        );
+                      })()}
                       {log.status && (
                         <span
-                          className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
+                          className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] whitespace-nowrap ${badgeClass}`}
                           title={getStatusLabel(t, log.status, log.mediaType)}
                         >
                           {getStatusLabel(t, log.status, log.mediaType)}
@@ -1175,6 +1231,48 @@ export function MediaLogs({
                           <span className="text-[var(--color-light)]">—</span>
                         )}
                         <GenreBadges genres={log.genres} maxCount={1} />
+                        {log.mediaType === "tv" && log.networks?.[0] && (
+                          <span className="rounded-full bg-[var(--color-mid)]/30 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
+                            {log.networks[0]}
+                          </span>
+                        )}
+                        {log.mediaType === "tv" && (() => {
+                          const air = getTvAirState(log.tvStatus);
+                          if (air === "ongoing") {
+                            return (
+                              <span className="rounded-full border border-amber-400/30 bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-200 whitespace-nowrap">
+                                {t("mediaLogs.tvOngoing")}
+                              </span>
+                            );
+                          }
+                          if (air === "ended") {
+                            return (
+                              <span className="rounded-full border border-emerald-500/30 bg-emerald-600/20 px-2 py-0.5 text-[10px] font-medium text-emerald-200 whitespace-nowrap">
+                                {t("mediaLogs.tvEnded")}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
+                        {log.mediaType === "books" && typeof log.pagesCount === "number" && log.pagesCount > 0 && (
+                          <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
+                            {t("mediaLogs.bookPagesBadge", { count: String(log.pagesCount) })}
+                          </span>
+                        )}
+                        {log.mediaType === "boardgames" && (() => {
+                          const min = typeof log.playersMin === "number" && log.playersMin > 0 ? log.playersMin : null;
+                          const max = typeof log.playersMax === "number" && log.playersMax > 0 ? log.playersMax : null;
+                          if (min == null && max == null) return null;
+                          const label =
+                            min != null && max != null && min !== max
+                              ? t("mediaLogs.boardgamePlayersBadgeRange", { min: String(min), max: String(max) })
+                              : t("mediaLogs.boardgamePlayersBadgeSingle", { count: String(min ?? max) });
+                          return (
+                            <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
+                              {label}
+                            </span>
+                          );
+                        })()}
                         {(() => {
                           const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
                           return duration ? (
@@ -1208,7 +1306,21 @@ export function MediaLogs({
                           </>
                         )}
                       </div>
-                      {hasProgressButton && (() => {
+                      {hasProgressButton && !isCompleted && (() => {
+                        const isEpisodeMedia = (EPISODE_TYPES as readonly MediaType[]).includes(log.mediaType);
+                        if (isEpisodeMedia) {
+                          const seasonValue = log.season ?? 0;
+                          const episodeValue = log.episode ?? 0;
+                          if (episodeValue <= 0 && seasonValue <= 0) return null;
+                          const label = seasonValue > 0
+                            ? t("mediaLogs.tvSeasonEpisode", { season: String(seasonValue), episode: String(episodeValue) })
+                            : t("mediaLogs.tvEpisodeOnly", { episode: String(episodeValue) });
+                          return (
+                            <span className="text-xs text-[var(--color-light)] whitespace-nowrap">
+                              {label}
+                            </span>
+                          );
+                        }
                         const p = getProgress(log);
                         return (
                           <span className="text-xs text-[var(--color-light)]">

@@ -195,6 +195,8 @@ export interface ItemDetail {
   playingTimeMinutes?: number | null;
   /** Board games: BGG community average weight (complexity), ~1–5 when from BGG with stats. */
   averageWeight?: number | null;
+  /** Books: representative page count (median across editions when available). */
+  pagesCount?: number | null;
   /** Books: author names */
   authors?: string[] | null;
   /** Comics/Books: publisher name */
@@ -332,6 +334,18 @@ export interface Log {
   genres: string[] | null;
   /** Board games: mechanic names from BGG / Ludopedia when logging. */
   mechanics?: string[] | null;
+  /** Upstream API rating on a 0-10 scale (TMDB / MAL / RAWG metacritic), lazily enriched server-side. */
+  apiScore?: number | null;
+  /** TV only: network names lazily enriched by the API from TMDB (undefined for non-TV logs). */
+  networks?: string[] | null;
+  /** TV only: raw TMDB status (e.g. "Ended", "Returning Series", "Canceled"); lazily enriched. */
+  tvStatus?: string | null;
+  /** Books only: page count (Open Library editions median), lazily enriched server-side. */
+  pagesCount?: number | null;
+  /** Boardgames only: min players from BGG / Ludopedia, lazily enriched server-side. */
+  playersMin?: number | null;
+  /** Boardgames only: max players from BGG / Ludopedia, lazily enriched server-side. */
+  playersMax?: number | null;
   /** Snapshot for personalized recommendations (optional). */
   affinityContext?: LogAffinityContext | null;
   createdAt: string;

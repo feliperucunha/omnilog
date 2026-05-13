@@ -764,7 +764,7 @@ export function ItemReviewForm({
                 className="w-full"
                 disabled={saving}
               >
-                {saving ? t("common.saving") : myLog ? t("itemReviewForm.updateReview") : t("itemReviewForm.saveReview")}
+                {saving ? t("common.saving") : myLog ? t("common.update") : t("common.save")}
               </Button>
             </motion.div>
           </div>

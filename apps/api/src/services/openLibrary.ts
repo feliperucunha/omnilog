@@ -3,6 +3,27 @@ import { sortSearchResults } from "../lib/sortSearchResults.js";
 
 const BASE = "https://openlibrary.org";
 
+async function fetchOpenLibraryWorkPagesCount(workId: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${BASE}/works/${workId}/editions.json?limit=20`, {
+      headers: { "User-Agent": "Geeklogs/1.0 (https://github.com/geeklogs)" },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      entries?: Array<{ number_of_pages?: number }>;
+    };
+    const counts = (data.entries ?? [])
+      .map((e) => e.number_of_pages)
+      .filter((n): n is number => typeof n === "number" && Number.isFinite(n) && n > 0);
+    if (counts.length === 0) return null;
+    counts.sort((a, b) => a - b);
+    const mid = Math.floor(counts.length / 2);
+    return counts.length % 2 === 0 ? Math.round((counts[mid - 1]! + counts[mid]!) / 2) : counts[mid]!;
+  } catch {
+    return null;
+  }
+}
+
 export async function getBookById(workId: string): Promise<ItemDetail | null> {
   const res = await fetch(`${BASE}/works/${workId}.json`, {
     headers: { "User-Agent": "Geeklogs/1.0 (https://github.com/geeklogs)" },
@@ -52,6 +73,7 @@ export async function getBookById(workId: string): Promise<ItemDetail | null> {
     : [];
   const genres = subjects.length > 0 ? subjects : null;
   const title = decodeHtmlEntities(data.title ?? "Unknown");
+  const pagesCount = await fetchOpenLibraryWorkPagesCount(workId);
   return {
     id: workId,
     title,
@@ -62,6 +84,7 @@ export async function getBookById(workId: string): Promise<ItemDetail | null> {
     authors: authors?.length ? authors : null,
     subjects: subjects.length > 0 ? subjects : null,
     genres,
+    pagesCount,
   };
 }
 

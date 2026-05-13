@@ -512,6 +512,13 @@
     "loadMore": "Carregar mais",
     "exportCategory": "Baixar esta lista em CSV",
     "exportCategorySuccess": "Lista baixada",
+    "tvOngoing": "Em exibição",
+    "tvEnded": "Encerrada",
+    "tvSeasonEpisode": "T{{season}} EP{{episode}}",
+    "tvEpisodeOnly": "EP{{episode}}",
+    "bookPagesBadge": "{{count}} páginas",
+    "boardgamePlayersBadgeRange": "{{min}}–{{max}} jogadores",
+    "boardgamePlayersBadgeSingle": "{{count}} jogadores",
     "badgePopupYou": "Você",
     "badgePopupYouHas": "Você tem {{amount}} {{kind}} em {{category}}",
     "badgePopupUserHas": "{{user}} tem {{amount}} {{kind}} em {{category}}",
@@ -520,6 +527,16 @@
     "badgePopupLog": "registro",
     "badgePopupLogs": "registros",
     "addMatch": "Registrar partida"
+  },
+  "exportLogsModal": {
+    "title": "Baixar lista",
+    "description": "Escolha a categoria, os filtros e a ordem. O CSV vai sair igual ao que você vê na sua lista.",
+    "categoryLabel": "Categoria",
+    "categoryAll": "Todas as categorias",
+    "statusLabel": "Status",
+    "sortLabel": "Ordem",
+    "download": "Baixar",
+    "downloading": "Preparando…"
   },
   "boardGameMatches": {
     "tabReview": "Resenha",
@@ -614,9 +631,7 @@
     "sold": "Vendido",
     "matchesPlayed": "Partidas jogadas",
     "rating": "Avaliação",
-    "reviewPlaceholder": "Seus pensamentos...",
-    "saveReview": "Salvar resenha",
-    "updateReview": "Atualizar"
+    "reviewPlaceholder": "Seus pensamentos..."
   },
   "status": {
     "watched": "Assistido",
@@ -675,8 +690,7 @@
   },
   "customEntry": {
     "dialogTitle": "Adicionar entrada manual",
-    "addCustomBatchEntry": "Entrada manual / em lote",
-    "tabCustom": "Manual",
+    "importButton": "Importar",
     "tabBatch": "Lote",
     "tabBggImport": "BGG",
     "tabLudopediaImport": "Ludopedia",

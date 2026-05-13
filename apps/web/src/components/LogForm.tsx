@@ -1,12 +1,13 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,6 +118,8 @@ export function LogForm(props: LogFormProps) {
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const isMobile = useIsMobile();
+  const cancellingRef = useRef(false);
+  const drawerRequestCloseRef = useRef<(() => void) | null>(null);
 
   type ProgressOptions = {
     seasons?: number[];
@@ -596,19 +599,39 @@ export function LogForm(props: LogFormProps) {
   };
 
   const handleDrawerBeforeDismiss = useCallback(async (): Promise<boolean> => {
+    if (cancellingRef.current) return true;
     if (!isDirty) return true;
     void performSave({ quiet: true, skipCancelIfUnchanged: true });
     return true;
   }, [isDirty, performSave]);
 
+  const handleDrawerCancel = useCallback(() => {
+    cancellingRef.current = true;
+    const requestClose = drawerRequestCloseRef.current;
+    if (requestClose) {
+      requestClose();
+      return;
+    }
+    onCancel();
+  }, [onCancel]);
+
   const handleDialogRequestClose = useCallback(() => {
     if (confirmDeleteOpen) return;
+    if (cancellingRef.current) {
+      onCancel();
+      return;
+    }
     if (!isDirty) {
       onCancel();
       return;
     }
     void performSave({ optimisticClose: true });
   }, [confirmDeleteOpen, isDirty, performSave, onCancel]);
+
+  const handleDialogCancel = useCallback(() => {
+    cancellingRef.current = true;
+    onCancel();
+  }, [onCancel]);
 
   const boardGameTabBar =
     showBoardGameTabs && log ? (
@@ -668,7 +691,7 @@ export function LogForm(props: LogFormProps) {
           }}
         />
       ) : (
-      <form onSubmit={handleSubmit}>
+      <form id="log-form" onSubmit={handleSubmit}>
             <div className="flex flex-col gap-4">
               {isEdit && (
                 <>
@@ -912,17 +935,70 @@ export function LogForm(props: LogFormProps) {
           <DrawerContent
             onClose={onCancel}
             onBeforeDismiss={handleDrawerBeforeDismiss}
+            onReady={(requestClose) => {
+              drawerRequestCloseRef.current = requestClose;
+            }}
             closeOnInteractOutside={!confirmDeleteOpen}
             mobileHeight="95%"
             className="flex max-h-[85dvh] w-full max-w-lg flex-col p-4 sm:p-6"
           >
             <div className="mt-6">{formContent}</div>
+            {!(showBoardGameTabs && boardMainTab === "matches") && (
+              <DrawerFooter>
+                <div className="flex w-full gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleDrawerCancel}
+                    disabled={loading || deleting}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    type="submit"
+                    form="log-form"
+                    className="flex-1"
+                    disabled={loading || deleting}
+                  >
+                    {loading ? t("common.saving") : t("common.save")}
+                  </Button>
+                </div>
+              </DrawerFooter>
+            )}
           </DrawerContent>
         </Drawer>
       ) : (
         <Dialog open modal={false}>
-          <DialogContent onClose={handleDialogRequestClose} closeOnInteractOutside={!confirmDeleteOpen}>
-            {formContent}
+          <DialogContent
+            onClose={handleDialogRequestClose}
+            closeOnInteractOutside={!confirmDeleteOpen}
+            className="flex flex-col gap-0 sm:max-h-[90vh]"
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">{formContent}</div>
+            {!(showBoardGameTabs && boardMainTab === "matches") && (
+              <DialogFooter className="mt-4">
+                <div className="flex w-full gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleDialogCancel}
+                    disabled={loading || deleting}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    type="submit"
+                    form="log-form"
+                    className="flex-1"
+                    disabled={loading || deleting}
+                  >
+                    {loading ? t("common.saving") : t("common.save")}
+                  </Button>
+                </div>
+              </DialogFooter>
+            )}
           </DialogContent>
         </Dialog>
       )}

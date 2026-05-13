@@ -20,6 +20,7 @@ export function decodeLogForDisplay(log: Log): Log {
     review: log.review != null ? d(log.review) : null,
     genres: decodeStrList(log.genres) ?? log.genres,
     mechanics: decodeStrList(log.mechanics) ?? log.mechanics,
+    networks: decodeStrList(log.networks) ?? log.networks,
   };
 }
 

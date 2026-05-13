@@ -1,8 +1,6 @@
 import { useState, useRef, useCallback, type ReactNode } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
-import { Button } from "@/components/ui/button";
-import { CustomEntryForm, type CustomEntryFormHandle } from "@/components/CustomEntryForm";
 import { BatchEntryTab } from "@/components/BatchEntryTab";
 import { BoardGameCollectionImportPanel } from "@/components/BoardGameCollectionImportPanel";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -11,9 +9,7 @@ import type { MediaType } from "@geeklogs/shared";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { cn } from "@/lib/utils";
 
-const CUSTOM_ENTRY_FORM_ID = "custom-entry-drawer-form";
-
-type Tab = "custom" | "batch" | "bggImport" | "ludopediaImport";
+type Tab = "batch" | "bggImport" | "ludopediaImport";
 
 interface CustomBatchEntryModalProps {
   mediaType: MediaType;
@@ -38,45 +34,37 @@ function CustomBatchEntryModalTabs({
   setTab: (t: Tab) => void;
   t: (key: string) => string;
 }) {
-  const isBg = mediaType === "boardgames";
+  if (mediaType !== "boardgames") return null;
   return (
     <div
       className="mb-3 flex shrink-0 flex-col gap-1.5 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1.5 sm:mb-4"
     >
-      <div className="grid grid-cols-2 gap-1">
-        <button type="button" onClick={() => setTab("custom")} className={tabClass(tab === "custom")}>
-          {t("customEntry.tabCustom")}
-        </button>
+      <div className="grid grid-cols-3 gap-1">
         <button type="button" onClick={() => setTab("batch")} className={tabClass(tab === "batch")}>
           {t("customEntry.tabBatch")}
         </button>
+        <button type="button" onClick={() => setTab("bggImport")} className={tabClass(tab === "bggImport")}>
+          {t("customEntry.tabBggImport")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("ludopediaImport")}
+          className={tabClass(tab === "ludopediaImport")}
+        >
+          {t("customEntry.tabLudopediaImport")}
+        </button>
       </div>
-      {isBg ? (
-        <div className="grid grid-cols-2 gap-1">
-          <button type="button" onClick={() => setTab("bggImport")} className={tabClass(tab === "bggImport")}>
-            {t("customEntry.tabBggImport")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("ludopediaImport")}
-            className={tabClass(tab === "ludopediaImport")}
-          >
-            {t("customEntry.tabLudopediaImport")}
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }
 
 export function CustomBatchEntryModal({ mediaType, onSaved, onCancel }: CustomBatchEntryModalProps) {
   const { t } = useLocale();
-  const [tab, setTab] = useState<Tab>("custom");
+  const [tab, setTab] = useState<Tab>("batch");
   const [batchFooter, setBatchFooter] = useState<ReactNode>(null);
   const [importRunning, setImportRunning] = useState(false);
   const isMobile = useIsMobile();
   const drawerRequestCloseRef = useRef<(() => void) | null>(null);
-  const customFormRefDesktop = useRef<CustomEntryFormHandle | null>(null);
 
   const closeOrCancel = useCallback(() => {
     if (importRunning) return;
@@ -90,26 +78,15 @@ export function CustomBatchEntryModal({ mediaType, onSaved, onCancel }: CustomBa
 
   const handleWebDialogClose = useCallback(() => {
     if (importRunning) return;
-    if (tab === "bggImport" || tab === "ludopediaImport" || tab === "batch") {
-      onCancel();
-      return;
-    }
-    if (tab === "custom") {
-      const h = customFormRefDesktop.current;
-      if (!h || h.canDismissWithoutSave()) {
-        onCancel();
-        return;
-      }
-      void h.trySubmit({ optimisticClose: true });
-    }
-  }, [importRunning, tab, onCancel]);
+    onCancel();
+  }, [importRunning, onCancel]);
 
   const importPanel = (source: "bgg" | "ludopedia") => (
     <BoardGameCollectionImportPanel
       source={source}
       showDuplicateModeToggle
       onPhaseChange={(ph) => setImportRunning(ph === "running")}
-      onBack={() => setTab("custom")}
+      onBack={() => setTab("batch")}
       onTerminal={(o) => {
         if (o.success) onSaved();
       }}
@@ -135,16 +112,7 @@ export function CustomBatchEntryModal({ mediaType, onSaved, onCancel }: CustomBa
         >
           <div className="mt-6">
             <CustomBatchEntryModalTabs mediaType={mediaType} tab={tab} setTab={setTab} t={t} />
-            {tab === "custom" ? (
-              <CustomEntryForm
-                embedded
-                buttonsInFooter
-                formId={CUSTOM_ENTRY_FORM_ID}
-                mediaType={mediaType}
-                onSaved={onSaved}
-                onCancel={handleDrawerClose}
-              />
-            ) : tab === "batch" ? (
+            {tab === "batch" ? (
               <BatchEntryTab
                 initialMediaType={mediaType}
                 onDone={onSaved}
@@ -159,18 +127,7 @@ export function CustomBatchEntryModal({ mediaType, onSaved, onCancel }: CustomBa
             )}
           </div>
           <DrawerFooter>
-            {tab === "custom" ? (
-              <div className="flex w-full gap-4">
-                <Button type="button" variant="outline" className="flex-1" onClick={handleDrawerClose} disabled={importRunning}>
-                  {t("common.cancel")}
-                </Button>
-                <Button type="submit" form={CUSTOM_ENTRY_FORM_ID} className="flex-1" disabled={importRunning}>
-                  {t("common.save")}
-                </Button>
-              </div>
-            ) : tab === "batch" ? (
-              batchFooter
-            ) : null}
+            {tab === "batch" ? batchFooter : null}
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
@@ -181,16 +138,7 @@ export function CustomBatchEntryModal({ mediaType, onSaved, onCancel }: CustomBa
     <>
       <CustomBatchEntryModalTabs mediaType={mediaType} tab={tab} setTab={setTab} t={t} />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === "custom" ? (
-          <CustomEntryForm
-            ref={customFormRefDesktop}
-            embedded
-            suppressActionButtons
-            mediaType={mediaType}
-            onSaved={onSaved}
-            onCancel={onCancel}
-          />
-        ) : tab === "batch" ? (
+        {tab === "batch" ? (
           <BatchEntryTab initialMediaType={mediaType} onDone={onSaved} onCancel={onCancel} />
         ) : tab === "bggImport" ? (
           importPanel("bgg")

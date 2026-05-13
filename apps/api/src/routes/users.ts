@@ -4,6 +4,7 @@ import type { MediaType } from "@geeklogs/shared";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { serializeLog } from "../lib/serializeLog.js";
+import { attachItemEnrichment } from "../lib/itemDetailEnrichment.js";
 import { getMilestoneProgress } from "../services/milestone.service.js";
 import {
   localDayBoundsFromDateString,
@@ -361,7 +362,8 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
     const hasMore = logs.length > takeSize;
     const data = (hasMore ? logs.slice(0, takeSize) : logs).map(serializeLog);
     const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null;
-    res.json({ data, nextCursor });
+    const enriched = await attachItemEnrichment(prisma, data);
+    res.json({ data: enriched, nextCursor });
     return;
   }
 
@@ -369,5 +371,6 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
     where,
     orderBy,
   });
-  res.json(logs.map(serializeLog));
+  const enriched = await attachItemEnrichment(prisma, logs.map(serializeLog));
+  res.json(enriched);
 });

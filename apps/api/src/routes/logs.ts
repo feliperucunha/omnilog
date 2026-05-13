@@ -218,7 +218,13 @@ function mergeLogWhere(base: Prisma.LogWhereInput, extra: Prisma.LogWhereInput):
 
 import { persistUserDefaultPurchaseCurrency } from "../lib/userPurchasePreference.js";
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
-import { computeGenreFacets, fetchLogsWithGenreFilter, LOG_GENRE_FILTER_MAX_LENGTH } from "../lib/logGenreList.js";
+import { attachItemEnrichment, attachItemEnrichmentSingle } from "../lib/itemDetailEnrichment.js";
+import {
+  computeGenreFacets,
+  fetchLogsWithGenreFilter,
+  LOG_GENRE_FILTER_MAX_LENGTH,
+  logHasGenreExact,
+} from "../lib/logGenreList.js";
 import { stringifyLogAffinityContext, logAffinityContextSchema } from "../lib/logAffinityContext.js";
 import { hoursFromCompletedLogForStats, rollupHoursFromCompletedLogs } from "../lib/completedLogHours.js";
 import { tierHasProFeatures, tierHasUnlimitedLogs } from "../lib/userTier.js";
@@ -499,7 +505,12 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
         cursorId,
         usePagination: true,
       });
-      res.json(result);
+      if (Array.isArray(result)) {
+        res.json(await attachItemEnrichment(prisma, result));
+      } else {
+        const enriched = await attachItemEnrichment(prisma, result.data);
+        res.json({ data: enriched, nextCursor: result.nextCursor });
+      }
       return;
     }
     const data = await fetchLogsWithGenreFilter(prisma, {
@@ -510,7 +521,12 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       cursorId: undefined,
       usePagination: false,
     });
-    res.json(data);
+    if (Array.isArray(data)) {
+      res.json(await attachItemEnrichment(prisma, data));
+    } else {
+      const enriched = await attachItemEnrichment(prisma, data.data);
+      res.json({ data: enriched, nextCursor: data.nextCursor });
+    }
     return;
   }
 
@@ -525,7 +541,8 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     const hasMore = logs.length > takeSize;
     const data = (hasMore ? logs.slice(0, takeSize) : logs).map(serializeLog);
     const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null;
-    res.json({ data, nextCursor });
+    const enriched = await attachItemEnrichment(prisma, data);
+    res.json({ data: enriched, nextCursor });
     return;
   }
 
@@ -533,7 +550,8 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     where,
     orderBy,
   });
-  res.json(logs.map(serializeLog));
+  const enriched = await attachItemEnrichment(prisma, logs.map(serializeLog));
+  res.json(enriched);
 });
 
 /** GET /logs/feed - Up to 5 recent logs from followed users, ordered by startedAt desc (for Social section). Optional ?userId= to filter by one friend. */
@@ -562,8 +580,8 @@ logsRouter.get("/feed", async (req: AuthenticatedRequest, res) => {
   });
   const logIds = rows.map((r) => r.id);
   const reactionMap = await getReactionsForLogs(logIds, userId);
-  const data = rows.map((row) => {
-    const { user, ...log } = row;
+  const serializedLogs = rows.map((row) => {
+    const { user: _user, ...log } = row;
     const serialized = serializeLog(log) as ReturnType<typeof serializeLog> & {
       likesCount?: number;
       dislikesCount?: number;
@@ -575,14 +593,16 @@ logsRouter.get("/feed", async (req: AuthenticatedRequest, res) => {
       serialized.dislikesCount = stats.dislikesCount;
       serialized.userReaction = stats.userReaction ?? null;
     }
-    return {
-      log: serialized,
-      user: {
-        id: user.id,
-        username: user.username ?? null,
-      },
-    };
+    return serialized;
   });
+  const enrichedLogs = await attachItemEnrichment(prisma, serializedLogs);
+  const data = rows.map((row, idx) => ({
+    log: enrichedLogs[idx]!,
+    user: {
+      id: row.user.id,
+      username: row.user.username ?? null,
+    },
+  }));
   res.json({ data });
 });
 
@@ -981,7 +1001,8 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
     },
     orderBy: [{ completedAt: "desc" }, { startedAt: "desc" }, { updatedAt: "desc" }],
   });
-  res.json({ data: logs.map(serializeLog) });
+  const enriched = await attachItemEnrichment(prisma, logs.map(serializeLog));
+  res.json({ data: enriched });
 });
 
 /** GET /logs/calendar?year=YYYY&month=M - Activity counts per day. Pro: any month. Free: only the current calendar month in the user's timezone (same as statistics). */
@@ -1127,7 +1148,11 @@ function getExportValue(
   }
 }
 
-/** GET /logs/export - Pro only; returns user logs as CSV. Optional ?mediaType= for single category (then only relevant columns). */
+/**
+ * GET /logs/export - Pro only; returns user logs as CSV.
+ * Optional filters: ?mediaType, ?status, ?own=true, ?wantToBuy=true, ?genre, ?sort.
+ * Filters mirror GET /logs (so the user gets exactly the list they're seeing).
+ */
 logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const user = await prisma.user.findUnique({
@@ -1145,13 +1170,70 @@ logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
       ? (mediaTypeParam as (typeof MEDIA_TYPES)[number])
       : null;
 
-  const where = { userId } as { userId: string; mediaType?: string };
+  const sortParam = typeof req.query.sort === "string" ? req.query.sort : "";
+  const validSorts = ["dateAsc", "dateDesc", "gradeAsc", "gradeDesc"] as const;
+  const boardgameSorts = ["matchesPlayedAsc", "matchesPlayedDesc"] as const;
+  const gameSorts = ["timeToBeatAsc", "timeToBeatDesc"] as const;
+  let sort: string = validSorts.includes(sortParam as (typeof validSorts)[number])
+    ? sortParam
+    : "dateDesc";
+  if (
+    mediaTypeFilter === "boardgames" &&
+    boardgameSorts.includes(sortParam as (typeof boardgameSorts)[number])
+  ) {
+    sort = sortParam;
+  } else if (
+    mediaTypeFilter === "games" &&
+    gameSorts.includes(sortParam as (typeof gameSorts)[number])
+  ) {
+    sort = sortParam;
+  }
+
+  const where: Prisma.LogWhereInput = { userId };
   if (mediaTypeFilter) where.mediaType = mediaTypeFilter;
 
-  const logs = await prisma.log.findMany({
-    where,
-    orderBy: { updatedAt: "desc" },
-  });
+  const statusParam = typeof req.query.status === "string" ? req.query.status : "";
+  if (statusParam) {
+    if (mediaTypeFilter) {
+      const allowed = LOG_STATUS_OPTIONS[mediaTypeFilter];
+      if (allowed.includes(statusParam)) where.status = statusParam;
+    } else {
+      where.status = statusParam;
+    }
+  }
+
+  if (mediaTypeFilter && isSpendTrackedMediaType(mediaTypeFilter)) {
+    if (req.query.own === "true") where.own = true;
+    if (req.query.wantToBuy === "true") where.wantToBuy = true;
+  }
+
+  const genreFilter = sanitizeText(
+    typeof req.query.genre === "string" ? req.query.genre : "",
+    LOG_GENRE_FILTER_MAX_LENGTH
+  );
+
+  const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =
+    sort === "matchesPlayedDesc"
+      ? [{ matchesPlayed: "desc" }, { updatedAt: "desc" }]
+      : sort === "matchesPlayedAsc"
+        ? [{ matchesPlayed: "asc" }, { updatedAt: "desc" }]
+        : sort === "timeToBeatDesc"
+          ? [{ hoursToBeat: "desc" }, { updatedAt: "desc" }]
+          : sort === "timeToBeatAsc"
+            ? [{ hoursToBeat: "asc" }, { updatedAt: "desc" }]
+            : sort === "gradeDesc"
+              ? [{ grade: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }]
+              : sort === "gradeAsc"
+                ? [{ grade: { sort: "asc", nulls: "last" } }, { updatedAt: "asc" }]
+                : sort === "dateAsc"
+                  ? { updatedAt: "asc" }
+                  : { updatedAt: "desc" };
+
+  const allLogs = await prisma.log.findMany({ where, orderBy });
+  const logs = genreFilter
+    ? allLogs.filter((row) => logHasGenreExact({ genres: row.genres }, genreFilter))
+    : allLogs;
+
   const columns = mediaTypeFilter ? EXPORT_COLUMNS_BY_MEDIA[mediaTypeFilter] : EXPORT_COLUMNS_ALL;
   const header = (columns as readonly string[]).join(",") + "\n";
   const escape = (v: string | number | null | undefined): string => {
@@ -1420,7 +1502,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           console.error("Gamification (review stats removed on upsert):", err);
         }
       }
-      const body = serializeLog(log) as Record<string, unknown>;
+      const enrichedLog = await attachItemEnrichmentSingle(prisma, serializeLog(log));
+      const body = enrichedLog as Record<string, unknown>;
       if (newBadges.length > 0) body.newBadges = newBadges;
       res.status(201).json(body);
       return;
@@ -1507,7 +1590,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       } catch (err) {
         console.error("Gamification:", err);
       }
-      const body = serializeLog(log) as Record<string, unknown>;
+      const enrichedLog = await attachItemEnrichmentSingle(prisma, serializeLog(log));
+      const body = enrichedLog as Record<string, unknown>;
       if (newBadges.length > 0) body.newBadges = newBadges;
       res.status(201).json(body);
     }
@@ -1865,7 +1949,8 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
       console.error("Gamification (review stats removed on PATCH):", err);
     }
   }
-  const body = serializeLog(updated) as Record<string, unknown>;
+  const enrichedUpdated = await attachItemEnrichmentSingle(prisma, serializeLog(updated));
+  const body = enrichedUpdated as Record<string, unknown>;
   if (newBadges.length > 0) body.newBadges = newBadges;
   res.json(body);
 });

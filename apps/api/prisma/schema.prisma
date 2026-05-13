@@ -298,3 +298,21 @@ model GooglePlayPubSubMessage {
   createdAt  DateTime @default(now())
 }
 
+/// Lazily populated cache of upstream item-detail fields used to enrich `Log` rows on read
+/// (e.g. dashboard badges). Composite key (mediaType, externalId) covers TMDB tv/movies,
+/// Jikan anime/manga, and RAWG games without bloating the Log table or blocking writes
+/// on an upstream API call. tv-only fields (`networks`, `status`) stay null for other types.
+model ItemDetailCache {
+  mediaType  String
+  externalId String
+  score      Float?                 // Normalized 0-10 rating from the upstream API
+  networks   String?                // tv only: JSON-encoded string[] of network names
+  status     String?                // tv only: raw TMDB status (e.g. "Ended", "Returning Series")
+  pagesCount Int?                   // books only: representative page count (median across editions)
+  playersMin Int?                   // boardgames only: min players from BGG / Ludopedia
+  playersMax Int?                   // boardgames only: max players from BGG / Ludopedia
+  fetchedAt  DateTime @default(now()) @updatedAt
+
+  @@id([mediaType, externalId])
+}
+
