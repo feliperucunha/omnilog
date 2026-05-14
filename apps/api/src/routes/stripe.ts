@@ -66,6 +66,144 @@ function stripeCustomerIdString(
   return customer?.id ?? null;
 }
 
+/**
+ * Periodic reconciliation against Stripe for every user with a
+ * `stripeSubscriptionId` (regardless of current tier). Safety net for setups
+ * where the Stripe webhook is not configured (or where deliveries are missed):
+ *
+ *   - Refreshes `subscriptionEndsAt` / `subscriptionInterval` /
+ *     `subscriptionCancelAtPeriodEnd` from live Stripe state.
+ *   - Downgrades terminal subscriptions (`canceled` / `unpaid` /
+ *     `incomplete_expired`) to `tier: free` (admins keep their tier).
+ *   - Re-upgrades a non-pro user back to `pro` when their Stripe subscription
+ *     is active/trialing/past_due again — covers the "user paid during dunning
+ *     after the expiry cron downgraded them" recovery path. Fires the
+ *     subscription confirmation email exactly once (atomic tier-claim).
+ *   - Detects portal-initiated cancellations (`cancel_at_period_end` flipped
+ *     false → true) and fires the cancellation email exactly once (atomic
+ *     `subscriptionCancelAtPeriodEnd` claim — same gate as
+ *     `/stripe/cancel-subscription` and the `customer.subscription.updated`
+ *     webhook, so no duplicates if both paths run).
+ *
+ * Safe to call repeatedly. Returns counts for logging/observability.
+ */
+export async function syncStripeSubscriptions(): Promise<{
+  refreshed: number;
+  downgraded: number;
+  reupgraded: number;
+  cancellationsDetected: number;
+}> {
+  let refreshed = 0;
+  let downgraded = 0;
+  let reupgraded = 0;
+  let cancellationsDetected = 0;
+  const stripe = getStripe();
+  if (!stripe) return { refreshed, downgraded, reupgraded, cancellationsDetected };
+
+  const users = await prisma.user.findMany({
+    where: { stripeSubscriptionId: { not: null } },
+    select: {
+      id: true,
+      email: true,
+      username: true,
+      tier: true,
+      stripeSubscriptionId: true,
+      subscriptionCancelAtPeriodEnd: true,
+    },
+  });
+
+  for (const user of users) {
+    const subscriptionId = user.stripeSubscriptionId;
+    if (!subscriptionId) continue;
+    try {
+      const subscription = (await stripe.subscriptions.retrieve(
+        subscriptionId
+      )) as unknown as StripeSubscriptionShape & {
+        current_period_end?: number;
+        status?: string;
+        cancel_at_period_end?: boolean;
+      };
+
+      const periodEnd = subscriptionPeriodEndDate(subscription);
+      const intervalLabel = subscriptionIntervalLabel(subscription);
+      const cancelFlag = !!subscription.cancel_at_period_end;
+      const status = subscription.status;
+      const terminallyInactive =
+        status === "canceled" || status === "unpaid" || status === "incomplete_expired";
+
+      if (terminallyInactive) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            stripeSubscriptionId: null,
+            subscriptionEndsAt: periodEnd ?? new Date(),
+            subscriptionCancelAtPeriodEnd: false,
+            subscriptionInterval: null,
+            ...(user.tier !== "admin" ? { tier: "free" as const } : {}),
+          },
+        });
+        if (user.tier === "pro") downgraded++;
+        continue;
+      }
+
+      let tierClaimed = false;
+      if (user.tier !== "pro" && user.tier !== "admin") {
+        const claim = await prisma.user.updateMany({
+          where: { id: user.id, tier: { notIn: ["pro", "admin"] } },
+          data: { tier: "pro" },
+        });
+        tierClaimed = claim.count > 0;
+      }
+
+      let cancellationClaimed = false;
+      if (!user.subscriptionCancelAtPeriodEnd && cancelFlag) {
+        const claim = await prisma.user.updateMany({
+          where: { id: user.id, subscriptionCancelAtPeriodEnd: false },
+          data: {
+            subscriptionCancelAtPeriodEnd: true,
+            subscriptionEndsAt: periodEnd ?? undefined,
+          },
+        });
+        cancellationClaimed = claim.count > 0;
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          subscriptionEndsAt: periodEnd ?? undefined,
+          subscriptionCancelAtPeriodEnd: cancelFlag,
+          ...(intervalLabel ? { subscriptionInterval: intervalLabel } : {}),
+        },
+      });
+      refreshed++;
+
+      if (tierClaimed) {
+        reupgraded++;
+      }
+
+      if (cancellationClaimed && user.email) {
+        cancellationsDetected++;
+        void sendSubscriptionCancellationEmail(user.email, {
+          displayName: user.username,
+          accessEndsAt: periodEnd,
+        }).catch((mailErr) => {
+          console.error(
+            "[syncStripeSubscriptions] cancellation email failed:",
+            mailErr
+          );
+        });
+      }
+    } catch (err) {
+      console.error(
+        `[syncStripeSubscriptions] Failed to sync ${subscriptionId} for user ${user.id}:`,
+        err
+      );
+    }
+  }
+
+  return { refreshed, downgraded, reupgraded, cancellationsDetected };
+}
+
 export const stripeRouter = Router();
 
 /** POST /stripe/create-checkout-session - Create Stripe Checkout Session for subscription. */
@@ -116,6 +254,52 @@ stripeRouter.post(
         error: "You already have Pro access on this account.",
       });
       return;
+    }
+
+    if (user.stripeSubscriptionId) {
+      try {
+        const existingSub = (await stripe.subscriptions.retrieve(
+          user.stripeSubscriptionId
+        )) as unknown as { status?: string };
+        const liveStatus = existingSub.status;
+        const stillActive =
+          liveStatus === "active" ||
+          liveStatus === "trialing" ||
+          liveStatus === "past_due" ||
+          liveStatus === "incomplete";
+        if (stillActive) {
+          res.status(409).json({
+            error:
+              "You already have a Stripe subscription on file. Use Manage subscription to update or cancel it.",
+          });
+          return;
+        }
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            stripeSubscriptionId: null,
+            subscriptionEndsAt: null,
+            subscriptionCancelAtPeriodEnd: false,
+            subscriptionInterval: null,
+          },
+        });
+      } catch (err) {
+        const code =
+          err instanceof Stripe.errors.StripeError ? err.code ?? err.type : undefined;
+        if (code === "resource_missing") {
+          await prisma.user.update({
+            where: { id: userId },
+            data: {
+              stripeSubscriptionId: null,
+              subscriptionEndsAt: null,
+              subscriptionCancelAtPeriodEnd: false,
+              subscriptionInterval: null,
+            },
+          });
+        } else {
+          console.error("[create-checkout-session] Could not verify existing Stripe sub:", err);
+        }
+      }
     }
 
     if (user.googlePlayPurchaseToken && isGooglePlayBillingConfigured()) {
@@ -235,12 +419,24 @@ stripeRouter.post(
 
       const existing = await prisma.user.findUnique({
         where: { id: req.user.userId },
-        select: { tier: true },
+        select: { tier: true, email: true, username: true },
       });
+      if (!existing) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+
+      const tierClaim =
+        existing.tier === "admin"
+          ? { count: 0 }
+          : await prisma.user.updateMany({
+              where: { id: req.user.userId, tier: { notIn: ["pro", "admin"] } },
+              data: { tier: "pro" },
+            });
+
       await prisma.user.update({
         where: { id: req.user.userId },
         data: {
-          ...(existing?.tier !== "admin" ? { tier: "pro" as const } : {}),
           stripeSubscriptionId: subscriptionId,
           stripeCustomerId: customerId ?? undefined,
           subscriptionEndsAt: periodEnd ?? undefined,
@@ -252,6 +448,19 @@ stripeRouter.post(
       });
 
       res.json({ ok: true });
+
+      if (tierClaim.count > 0 && existing.email) {
+        void sendSubscriptionConfirmationEmail(existing.email, {
+          displayName: existing.username,
+          interval: intervalLabel,
+          nextRenewalAt: periodEnd,
+        }).catch((mailErr) => {
+          console.error(
+            "[stripe/confirm-checkout-session] subscription confirmation email failed:",
+            mailErr
+          );
+        });
+      }
     } catch (err) {
       console.error("Stripe confirm-checkout-session error:", err);
       res.status(502).json({ error: "Could not confirm checkout session" });
@@ -523,10 +732,17 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
           where: { id: userId },
           select: { tier: true, email: true, username: true },
         });
+        if (!existing) break;
+        const tierClaim =
+          existing.tier === "admin"
+            ? { count: 0 }
+            : await prisma.user.updateMany({
+                where: { id: userId, tier: { notIn: ["pro", "admin"] } },
+                data: { tier: "pro" },
+              });
         await prisma.user.update({
           where: { id: userId },
           data: {
-            ...(existing?.tier !== "admin" ? { tier: "pro" as const } : {}),
             stripeSubscriptionId: subscriptionId,
             stripeCustomerId: customerId ?? undefined,
             subscriptionEndsAt: periodEnd ?? undefined,
@@ -536,7 +752,7 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
             googlePlayProductId: null,
           },
         });
-        if (existing && existing.tier !== "pro" && existing.email) {
+        if (tierClaim.count > 0 && existing.email) {
           void sendSubscriptionConfirmationEmail(existing.email, {
             displayName: existing.username,
             interval: intervalLabel,
@@ -587,20 +803,47 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
           StripeSubscriptionShape & { current_period_end?: number };
         const periodEnd = subscriptionPeriodEndDate(subscription);
         const intervalLabel = subscriptionIntervalLabel(subscription);
+        const cancelFlag = !!subscription.cancel_at_period_end;
         const user = await prisma.user.findFirst({
           where: { stripeSubscriptionId: subscription.id },
-          select: { id: true, tier: true },
+          select: {
+            id: true,
+            tier: true,
+            email: true,
+            username: true,
+            subscriptionCancelAtPeriodEnd: true,
+          },
         });
         if (user) {
           const terminallyInactive =
             subscription.status === "canceled" ||
             subscription.status === "unpaid" ||
             subscription.status === "incomplete_expired";
+
+          if (!terminallyInactive && user.tier !== "pro" && user.tier !== "admin") {
+            await prisma.user.updateMany({
+              where: { id: user.id, tier: { notIn: ["pro", "admin"] } },
+              data: { tier: "pro" },
+            });
+          }
+
+          let cancellationClaimed = false;
+          if (!terminallyInactive && !user.subscriptionCancelAtPeriodEnd && cancelFlag) {
+            const claim = await prisma.user.updateMany({
+              where: { id: user.id, subscriptionCancelAtPeriodEnd: false },
+              data: {
+                subscriptionCancelAtPeriodEnd: true,
+                subscriptionEndsAt: periodEnd ?? undefined,
+              },
+            });
+            cancellationClaimed = claim.count > 0;
+          }
+
           await prisma.user.update({
             where: { id: user.id },
             data: {
               subscriptionEndsAt: periodEnd ?? undefined,
-              subscriptionCancelAtPeriodEnd: !!subscription.cancel_at_period_end,
+              subscriptionCancelAtPeriodEnd: cancelFlag,
               ...(intervalLabel ? { subscriptionInterval: intervalLabel } : {}),
               ...(terminallyInactive
                 ? {
@@ -612,6 +855,18 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
                 : {}),
             },
           });
+
+          if (cancellationClaimed && user.email) {
+            void sendSubscriptionCancellationEmail(user.email, {
+              displayName: user.username,
+              accessEndsAt: periodEnd,
+            }).catch((mailErr) => {
+              console.error(
+                "[stripe webhook] cancellation email failed:",
+                mailErr
+              );
+            });
+          }
         }
         break;
       }

@@ -219,7 +219,12 @@ export function Tiers() {
         body: JSON.stringify({}),
       });
       if (data?.url) {
-        window.location.href = data.url;
+        if (isCapacitorNative()) {
+          await openExternalUrl(data.url);
+          toast.info(t("tiers.manageOpensInBrowser"));
+        } else {
+          window.location.href = data.url;
+        }
         return;
       }
       throw new Error("No portal URL returned");
@@ -266,7 +271,12 @@ export function Tiers() {
           body: JSON.stringify({}),
         });
         if (data?.url) {
-          window.location.href = data.url;
+          if (isCapacitorNative()) {
+            await openExternalUrl(data.url);
+            toast.info(t("tiers.manageOpensInBrowser"));
+          } else {
+            window.location.href = data.url;
+          }
           return;
         }
       } catch {

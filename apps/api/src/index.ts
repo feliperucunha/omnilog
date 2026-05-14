@@ -11,7 +11,7 @@ import { logsRouter } from "./routes/logs.js";
 import { meRouter } from "./routes/me.js";
 import { searchRouter } from "./routes/search.js";
 import { settingsRouter } from "./routes/settings.js";
-import { stripeRouter, handleStripeWebhook } from "./routes/stripe.js";
+import { stripeRouter, handleStripeWebhook, syncStripeSubscriptions } from "./routes/stripe.js";
 import { googlePlayBillingRouter } from "./routes/googlePlayBilling.js";
 import { handleGooglePlayPubSubPush } from "./routes/googlePlayPubsub.js";
 import { cronRouter, runSubscriptionExpiry } from "./routes/cron.js";
@@ -175,21 +175,41 @@ app.listen(PORT, () => {
       console.error("Milestone seed failed." + hint, e);
     });
 
-  // Run subscription expiry in-process: on startup and every 24h (no external cron needed)
-  void syncGooglePlaySubscriptions().then((n) => {
-    if (n > 0) console.log(`Google Play subscription sync: ${n} user(s) cleared or updated`);
-  });
-  void runSubscriptionExpiry().then((n) => {
-    if (n > 0) console.log(`Subscription expiry: ${n} user(s) downgraded to free`);
-  });
-  setInterval(() => {
-    void syncGooglePlaySubscriptions().then((n) => {
-      if (n > 0) console.log(`Google Play subscription sync: ${n} user(s) cleared or updated`);
-    });
-    void runSubscriptionExpiry().then((n) => {
-      if (n > 0) console.log(`Subscription expiry: ${n} user(s) downgraded to free`);
-    });
-  }, TWENTY_FOUR_HOURS_MS);
+  // Run subscription reconciliation in-process: on startup and every 24h.
+  // Order matters: refresh live state from Stripe (and Google Play) FIRST so
+  // subscriptionEndsAt is up to date, THEN run the expiry sweep. Otherwise a
+  // paying customer whose webhook was missed could be downgraded by the cron
+  // before sync had a chance to extend their end date. syncStripeSubscriptions
+  // is the safety net for setups where the Stripe webhook isn't configured.
+  const runBillingSync = async () => {
+    try {
+      const playCleared = await syncGooglePlaySubscriptions();
+      if (playCleared > 0) {
+        console.log(`Google Play subscription sync: ${playCleared} user(s) cleared or updated`);
+      }
+    } catch (err) {
+      console.error("[billing-sync] Google Play sync failed:", err);
+    }
+    try {
+      const { refreshed, downgraded, reupgraded, cancellationsDetected } =
+        await syncStripeSubscriptions();
+      if (refreshed > 0 || downgraded > 0 || reupgraded > 0 || cancellationsDetected > 0) {
+        console.log(
+          `Stripe subscription sync: ${refreshed} refreshed, ${downgraded} downgraded, ${reupgraded} re-upgraded, ${cancellationsDetected} cancellation(s) detected`
+        );
+      }
+    } catch (err) {
+      console.error("[billing-sync] Stripe sync failed:", err);
+    }
+    try {
+      const expired = await runSubscriptionExpiry();
+      if (expired > 0) console.log(`Subscription expiry: ${expired} user(s) downgraded to free`);
+    } catch (err) {
+      console.error("[billing-sync] Expiry failed:", err);
+    }
+  };
+  void runBillingSync();
+  setInterval(() => void runBillingSync(), TWENTY_FOUR_HOURS_MS);
 
   // Monthly recap emails: in-process on startup and every 24h (no external cron). See runMonthlyDigestIfDue.
   void runMonthlyDigestIfDue().then((r) => {

@@ -822,6 +822,7 @@
     "paymentMethodStripe": "Assinaturas Pro na web são cobradas com segurança pelo Stripe.",
     "paymentCompleteInBrowser": "Depois de pagar no site, volte ao app e puxe para atualizar (ou reabra) para ver o Pro.",
     "billingOnGeeklogsWeb": "Abrimos o site do Geeklogs. Entre com o mesmo e-mail e senha do app para continuar.",
+    "manageOpensInBrowser": "Abrindo o portal de cobrança no seu navegador. Volte ao app quando terminar — seu plano é atualizado automaticamente.",
     "admin": "Admin",
     "beta": "Beta",
     "free": "Grátis",

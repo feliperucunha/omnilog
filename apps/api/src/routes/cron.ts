@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { syncGooglePlaySubscriptions } from "../lib/googlePlayBilling.js";
+import { syncStripeSubscriptions } from "./stripe.js";
 
 const CRON_SECRET = process.env.CRON_SECRET?.trim();
 
@@ -42,6 +43,7 @@ cronRouter.get("/subscriptions", async (req: Request, res: Response): Promise<vo
   }
 
   const googlePlayCleared = await syncGooglePlaySubscriptions();
+  const stripeSync = await syncStripeSubscriptions();
   const expired = await runSubscriptionExpiry();
-  res.json({ ok: true, expired, googlePlayCleared });
+  res.json({ ok: true, expired, googlePlayCleared, stripeSync });
 });
