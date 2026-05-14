@@ -7,7 +7,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { isRegisterNewUsersAsBetaEnabled } from "../lib/featureFlags.js";
 import { sanitizeEmail, sanitizeText } from "../lib/sanitize.js";
-import { sendPasswordResetEmail } from "../lib/email.js";
+import { sendPasswordResetEmail, sendWelcomeEmail } from "../lib/email.js";
 import { setAuthCookie, clearAuthCookie } from "../lib/authCookie.js";
 import type { AuthResponse } from "@geeklogs/shared";
 
@@ -111,6 +111,10 @@ authRouter.post("/register", async (req, res) => {
   };
   setAuthCookie(res, token);
   res.status(201).json(response);
+
+  void sendWelcomeEmail(user.email, user.username).catch((err) => {
+    console.error("[auth/register] welcome email failed:", err);
+  });
 });
 
 authRouter.post("/login", async (req, res) => {

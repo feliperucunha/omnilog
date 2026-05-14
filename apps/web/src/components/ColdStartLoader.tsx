@@ -5,6 +5,7 @@ import { setOnFirstApiResponse, setOnFirstApiError } from "@/lib/api";
 import { LoadingErrorCode } from "@/lib/loadingErrorCodes";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { removeItem } from "@/lib/storage";
 
 /** Progress bar reaches ~100% over this duration (aligned with max wait so we don’t show “timed out” UI before retries finish). */
 const COLD_START_PROGRESS_DURATION_MS = 180_000;
@@ -77,6 +78,17 @@ export function ColdStartLoader() {
     window.location.reload();
   };
 
+  const handleSignIn = (): void => {
+    void removeItem("geeklogs_token");
+    void removeItem("geeklogs_user");
+    window.dispatchEvent(new CustomEvent("auth:logout"));
+    window.location.href = "/login";
+  };
+
+  const isAuthError =
+    errorCode === LoadingErrorCode.UNAUTHORIZED ||
+    errorCode === LoadingErrorCode.FORBIDDEN;
+
   /** Hide only when both first API response received and auth has finished initializing (merged with former SessionCheckOverlay). */
   const ready = state === "success" && !initializing;
 
@@ -95,9 +107,20 @@ export function ColdStartLoader() {
           <p className="text-sm leading-relaxed text-[var(--color-light)]">
             {errorCode != null ? t(`coldStart.code_${errorCode}` as "coldStart.code_TIMEOUT") : t("coldStart.error")}
           </p>
-          <Button onClick={handleTryAgain} variant="default" size="sm">
-            {t("common.tryAgain")}
-          </Button>
+          {isAuthError ? (
+            <div className="flex flex-col items-center gap-2">
+              <Button onClick={handleSignIn} variant="default" size="sm">
+                {t("login.signIn")}
+              </Button>
+              <Button onClick={handleTryAgain} variant="outline" size="sm">
+                {t("common.tryAgain")}
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={handleTryAgain} variant="default" size="sm">
+              {t("common.tryAgain")}
+            </Button>
+          )}
         </div>
       </div>
     );

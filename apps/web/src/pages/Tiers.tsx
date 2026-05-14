@@ -28,7 +28,7 @@ const PRO_PRICES = {
 } as const;
 
 export function Tiers() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { token } = useAuth();
   const { me, refetch, loading } = useMe();
   const { setPageTitle } = usePageTitle() ?? {};
@@ -46,14 +46,27 @@ export function Tiers() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
   const checkoutInFlightRef = useRef(false);
   const portalInFlightRef = useRef(false);
   const cancelInFlightRef = useRef(false);
+  const resumeInFlightRef = useRef(false);
   const processedCheckoutReturnRef = useRef<string | null>(null);
+  const intervalInitializedRef = useRef(false);
+
+  useEffect(() => {
+    if (intervalInitializedRef.current || !me) return;
+    intervalInitializedRef.current = true;
+    if (searchParams.get("interval")) return;
+    if (me.subscriptionInterval === "monthly" || me.subscriptionInterval === "yearly") {
+      setInterval(me.subscriptionInterval);
+    }
+  }, [me, searchParams]);
 
   useEffect(() => {
     const approved = searchParams.get("approved");
     const canceled = searchParams.get("canceled");
+    const sessionId = searchParams.get("session_id");
     if (approved !== "1" && canceled !== "1") {
       processedCheckoutReturnRef.current = null;
       return;
@@ -64,6 +77,16 @@ export function Tiers() {
 
     void (async () => {
       if (approved === "1") {
+        if (sessionId) {
+          try {
+            await apiFetch<{ ok: boolean }>("/stripe/confirm-checkout-session", {
+              method: "POST",
+              body: JSON.stringify({ sessionId }),
+            });
+          } catch (err) {
+            console.error("[checkout confirm]", err);
+          }
+        }
         await refetch();
         toast.success(t("tiers.upgradeSuccess"));
         setSearchParams({}, { replace: true });
@@ -96,6 +119,18 @@ export function Tiers() {
   const isPayingPro = tier === "pro";
   const isBeta = tier === "beta";
   const isAdmin = tier === "admin";
+  const isCancelledPro =
+    isPayingPro && !isAdmin && !!me?.subscriptionCancelAtPeriodEnd;
+  const subscriptionEndDateLabel = (() => {
+    if (!me?.subscriptionEndsAt) return null;
+    const d = new Date(me.subscriptionEndsAt);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString(locale, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  })();
   const hasUnlimitedLogs = tierHasUnlimitedLogs(tier);
   const isBrazil = me?.country === "BR";
   const proPriceMonthlyLabel = isBrazil ? t("tiers.proPriceBrMonthly") : t("tiers.proPriceMonthly");
@@ -244,6 +279,33 @@ export function Tiers() {
     }
   };
 
+  const handleResumeSubscription = async () => {
+    if (me?.billingProvider === "google_play") {
+      try {
+        await openGeeklogsWebForBilling("/tiers");
+      } catch (err) {
+        showErrorToast(t, "E026", { originalError: err });
+      }
+      return;
+    }
+    if (resumeInFlightRef.current) return;
+    resumeInFlightRef.current = true;
+    setResumeLoading(true);
+    try {
+      await apiFetch<{ ok: boolean }>("/stripe/resume-subscription", {
+        method: "POST",
+        body: JSON.stringify({ interval }),
+      });
+      toast.success(t("tiers.resumeSuccess"));
+      await refetch();
+    } catch (err) {
+      showErrorToast(t, "E026", { originalError: err });
+    } finally {
+      setResumeLoading(false);
+      resumeInFlightRef.current = false;
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -292,6 +354,11 @@ export function Tiers() {
               ? t("tiers.usageUnlimited", { count: String(logCount) })
               : t("tiers.usage", { count: String(logCount), limit: String(FREE_LOG_LIMIT) })}
           </p>
+          {token && isPayingPro && !isAdmin && isCancelledPro && subscriptionEndDateLabel && (
+            <p className="mt-1 text-sm text-[var(--color-light)]">
+              {t("tiers.subscriptionEndsOn", { date: subscriptionEndDateLabel })}
+            </p>
+          )}
           {token && isPayingPro && !isAdmin && daysRemaining != null && (
             <p className="mt-1 text-sm text-[var(--color-light)]">
               {daysRemaining === 1
@@ -305,20 +372,22 @@ export function Tiers() {
                 type="button"
                 variant="outline"
                 className="border-[var(--color-mid)] text-[var(--color-light)] hover:bg-[var(--color-mid)]/30"
-                disabled={portalLoading || cancelLoading}
+                disabled={portalLoading || cancelLoading || resumeLoading}
                 onClick={handleManageSubscription}
               >
                 {portalLoading ? t("tiers.redirecting") : t("tiers.manageSubscription")}
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="border-red-500/50 text-red-400 hover:bg-red-500/20"
-                disabled={portalLoading || cancelLoading}
-                onClick={handleCancelSubscription}
-              >
-                {cancelLoading ? t("tiers.canceling") : t("tiers.cancelSubscription")}
-              </Button>
+              {!isCancelledPro && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-red-500/50 text-red-400 hover:bg-red-500/20"
+                  disabled={portalLoading || cancelLoading}
+                  onClick={handleCancelSubscription}
+                >
+                  {cancelLoading ? t("tiers.canceling") : t("tiers.cancelSubscription")}
+                </Button>
+              )}
             </div>
           )}
         </Card>
@@ -367,7 +436,7 @@ export function Tiers() {
           <h2 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
             <OverflowMarquee>{t("tiers.pro")}</OverflowMarquee>
           </h2>
-          {token && !isPayingPro && !isAdmin && (
+          {token && (isCancelledPro || (!isPayingPro && !isAdmin)) && (
             <div className="mt-2 flex flex-col gap-2">
               <p className="text-xs text-[var(--color-light)]">{t("tiers.billingInterval")}</p>
               <ToggleGroup
@@ -416,7 +485,7 @@ export function Tiers() {
               </div>
             </div>
           )}
-          {token && isPayingPro && (
+          {token && isPayingPro && !isCancelledPro && (
             <p className="mt-2 text-lg font-bold text-[var(--color-lightest)]">
               {proPriceMonthlyLabel}
             </p>
@@ -466,6 +535,23 @@ export function Tiers() {
                 </>
               ) : (
                 t("tiers.upgradeToPro")
+              )}
+            </Button>
+          )}
+          {token && isCancelledPro && (
+            <Button
+              type="button"
+              className="btn-gradient mt-4 w-full"
+              disabled={resumeLoading}
+              onClick={handleResumeSubscription}
+            >
+              {resumeLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+                  {t("tiers.resuming")}
+                </>
+              ) : (
+                t("tiers.resumeSubscription")
               )}
             </Button>
           )}

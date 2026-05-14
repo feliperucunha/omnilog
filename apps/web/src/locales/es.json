@@ -838,6 +838,10 @@
     "cancelSubscription": "Cancelar suscripción",
     "canceling": "Cancelando…",
     "cancelSubscriptionSuccess": "Suscripción cancelada. Conservas el acceso hasta el final del período de facturación.",
+    "subscriptionEndsOn": "La suscripción termina el {{date}}",
+    "resumeSubscription": "Reanudar Pro",
+    "resuming": "Reanudando…",
+    "resumeSuccess": "Suscripción reanudada.",
     "daysLeft": "{{count}} días restantes",
     "daysLeftOne": "1 día restante",
     "exportLogs": "Exportar logs",
@@ -912,6 +916,7 @@
       "E023": "No se pudo cancelar la suscripción",
       "E024": "No se pudo enviar el comentario. Inténtalo más tarde.",
       "E025": "No se pudo iniciar el pago. Inténtalo más tarde.",
+      "E026": "No se pudo reanudar la suscripción. Inténtalo más tarde.",
       "E099": "Algo ha fallado. Vuelve a intentarlo."
     },
     "docs": {
@@ -940,6 +945,7 @@
       "E023": "Fallo al cancelar la suscripción (ej. proveedor de pago).",
       "E024": "Fallo al enviar el comentario (ej. red o servidor).",
       "E025": "Fallo al iniciar el pago (ej. proveedor o red).",
+      "E026": "Fallo al reanudar la suscripción (ej. proveedor o red).",
       "E099": "Ha ocurrido un error inesperado. Vuelve a intentarlo o contacta si persiste."
     }
   }

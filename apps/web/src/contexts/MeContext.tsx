@@ -20,6 +20,10 @@ export interface MeResponse {
   boardGameProvider: "bgg" | "ludopedia";
   tier: "free" | "beta" | "pro" | "admin";
   subscriptionEndsAt: string | null;
+  /** True when the user is still Pro but Stripe is set to cancel at period end. */
+  subscriptionCancelAtPeriodEnd?: boolean;
+  /** Current Stripe subscription cadence. Used to default the interval toggle on /tiers. */
+  subscriptionInterval?: "monthly" | "yearly" | null;
   daysRemaining: number | null; // Pro subscription days left (null if not pro or no end date)
   /** Where the current Pro subscription is billed (if applicable). */
   billingProvider?: "stripe" | "google_play" | null;

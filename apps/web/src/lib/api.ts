@@ -61,12 +61,21 @@ const COOKIE_SESSION = "cookie";
 
 export const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
 
+export function isNativePlatform(): boolean {
+  const w = typeof window !== "undefined"
+    ? (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } })
+    : null;
+  return Boolean(w?.Capacitor?.isNativePlatform?.());
+}
+
 export function getAuthHeaders(): HeadersInit {
   const token = getItemSync("geeklogs_token");
   const headers: HeadersInit = {
     "Content-Type": "application/json",
-    "X-App-Version": APP_VERSION,
   };
+  if (isNativePlatform()) {
+    headers["X-App-Version"] = APP_VERSION;
+  }
   if (token && token !== COOKIE_SESSION) headers["Authorization"] = `Bearer ${token}`;
   return headers;
 }
@@ -282,7 +291,7 @@ async function performSingleFetchAttempt<T>(
       } catch {
         /* ignore */
       }
-      if (code === APP_VERSION_MISMATCH_CODE) {
+      if (code === APP_VERSION_MISMATCH_CODE && isNativePlatform()) {
         window.dispatchEvent(new CustomEvent("app:version-mismatch"));
         throw new ApiError(parseErrorResponse(text, MSG.versionOutdated), 401, LoadingErrorCodeEnum.VERSION_MISMATCH);
       }
@@ -382,7 +391,11 @@ async function performSinglePublicFetchAttempt<T>(path: string, options?: Reques
       ...options,
       credentials: "omit",
       signal: controller.signal,
-      headers: { "Content-Type": "application/json", "X-App-Version": APP_VERSION, ...options?.headers },
+      headers: {
+        "Content-Type": "application/json",
+        ...(isNativePlatform() ? { "X-App-Version": APP_VERSION } : {}),
+        ...options?.headers,
+      },
     });
     clearTimeout(timeoutId);
     const text = await res.text();

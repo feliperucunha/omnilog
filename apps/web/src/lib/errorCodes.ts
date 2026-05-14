@@ -28,6 +28,7 @@ export const ERROR_CODES = {
   E023: "E023",
   E024: "E024",
   E025: "E025",
+  E026: "E026",
   E099: "E099",
 } as const;
 
@@ -60,6 +61,7 @@ const CODE_TO_MESSAGE_KEY: Record<ErrorCode, string> = {
   [ERROR_CODES.E023]: "errorCodes.toast.E023",
   [ERROR_CODES.E024]: "errorCodes.toast.E024",
   [ERROR_CODES.E025]: "errorCodes.toast.E025",
+  [ERROR_CODES.E026]: "errorCodes.toast.E026",
   [ERROR_CODES.E099]: "errorCodes.toast.E099",
 };
 
@@ -90,6 +92,7 @@ const CODE_TO_DOC_KEY: Record<ErrorCode, string> = {
   [ERROR_CODES.E023]: "errorCodes.docs.E023",
   [ERROR_CODES.E024]: "errorCodes.docs.E024",
   [ERROR_CODES.E025]: "errorCodes.docs.E025",
+  [ERROR_CODES.E026]: "errorCodes.docs.E026",
   [ERROR_CODES.E099]: "errorCodes.docs.E099",
 };
 

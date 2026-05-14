@@ -19,6 +19,8 @@ export async function runSubscriptionExpiry(): Promise<number> {
     data: {
       tier: "free",
       subscriptionEndsAt: null,
+      subscriptionCancelAtPeriodEnd: false,
+      subscriptionInterval: null,
       googlePlayPurchaseToken: null,
       googlePlayProductId: null,
     },

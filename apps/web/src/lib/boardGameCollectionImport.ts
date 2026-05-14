@@ -3,6 +3,7 @@ import {
   getApiBase,
   getAuthHeaders,
   APP_VERSION_MISMATCH_CODE,
+  isNativePlatform,
 } from "./api";
 import { removeItem } from "./storage";
 import type { BoardGameProvider } from "@geeklogs/shared";
@@ -64,7 +65,7 @@ export async function startBoardGameCollectionImport(body: {
     } catch {
       /* ignore */
     }
-    if (code === APP_VERSION_MISMATCH_CODE) {
+    if (code === APP_VERSION_MISMATCH_CODE && isNativePlatform()) {
       window.dispatchEvent(new CustomEvent("app:version-mismatch"));
       throw new CollectionImportStartError("App version outdated. Please update and try again.", 401);
     }

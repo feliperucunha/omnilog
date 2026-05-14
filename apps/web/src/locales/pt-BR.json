@@ -858,6 +858,10 @@
     "cancelSubscription": "Cancelar assinatura",
     "canceling": "Cancelando…",
     "cancelSubscriptionSuccess": "Assinatura cancelada. Você mantém acesso até o fim do período de cobrança.",
+    "subscriptionEndsOn": "A assinatura termina em {{date}}",
+    "resumeSubscription": "Reativar Pro",
+    "resuming": "Reativando…",
+    "resumeSuccess": "Assinatura reativada.",
     "daysLeft": "{{count}} dias restantes",
     "daysLeftOne": "1 dia restante",
     "exportLogs": "Exportar registros",
@@ -932,6 +936,7 @@
       "E023": "Não foi possível cancelar a assinatura",
       "E024": "Não foi possível enviar o feedback. Tente mais tarde.",
       "E025": "Não foi possível iniciar o checkout. Tente mais tarde.",
+      "E026": "Não foi possível reativar a assinatura. Tente mais tarde.",
       "E099": "Algo deu errado. Tente novamente."
     },
     "docs": {
@@ -960,6 +965,7 @@
       "E023": "Falha ao cancelar a assinatura (ex.: provedor de pagamento).",
       "E024": "Falha ao enviar o feedback (ex.: rede ou servidor).",
       "E025": "Falha ao iniciar o checkout (ex.: provedor de pagamento ou rede).",
+      "E026": "Falha ao reativar a assinatura (ex.: provedor de pagamento ou rede).",
       "E099": "Ocorreu um erro inesperado. Tente novamente ou entre em contato se persistir."
     }
   }

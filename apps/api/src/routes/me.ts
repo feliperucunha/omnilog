@@ -83,6 +83,8 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       onboarded: true,
       tier: true,
       subscriptionEndsAt: true,
+      subscriptionCancelAtPeriodEnd: true,
+      subscriptionInterval: true,
       stripeSubscriptionId: true,
       googlePlayPurchaseToken: true,
       googlePlayProductId: true,
@@ -186,6 +188,14 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     boardGameProvider,
     tier,
     subscriptionEndsAt,
+    subscriptionCancelAtPeriodEnd:
+      user.tier === "pro" ? !!user.subscriptionCancelAtPeriodEnd : false,
+    subscriptionInterval:
+      user.tier === "pro"
+        ? user.subscriptionInterval === "monthly" || user.subscriptionInterval === "yearly"
+          ? user.subscriptionInterval
+          : null
+        : null,
     daysRemaining,
     billingProvider,
     googlePlayProductId: googlePlayProductIdForClient,

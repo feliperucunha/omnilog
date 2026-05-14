@@ -64,7 +64,7 @@ app.post("/api/billing/google-play/pubsub", (req, res) =>
   void handleGooglePlayPubSubPush(req, res)
 );
 
-/** Require X-App-Version to match API version for all /api routes except /api/health and /api/wake-ping-config. Returns 401 when out of sync. */
+/** Require X-App-Version (sent only by native Capacitor clients) to match APP_VERSION. Web clients omit the header and are not gated. */
 app.use("/api", async (req, res, next) => {
   if (
     req.path === "/health" ||
@@ -76,10 +76,13 @@ app.use("/api", async (req, res, next) => {
   ) {
     return next();
   }
+  const clientVersion = req.headers["x-app-version"];
+  if (clientVersion == null) {
+    return next();
+  }
   if (await shouldSkipAppVersionMiddleware()) {
     return next();
   }
-  const clientVersion = req.headers["x-app-version"];
   if (clientVersion !== APP_VERSION) {
     return res.status(401).json({
       code: APP_VERSION_MISMATCH_CODE,

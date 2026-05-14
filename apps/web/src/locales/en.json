@@ -858,6 +858,10 @@
     "cancelSubscription": "Cancel subscription",
     "canceling": "Canceling…",
     "cancelSubscriptionSuccess": "Subscription canceled. You keep access until the end of the billing period.",
+    "subscriptionEndsOn": "Subscription ends on {{date}}",
+    "resumeSubscription": "Resume Pro",
+    "resuming": "Resuming…",
+    "resumeSuccess": "Subscription resumed.",
     "daysLeft": "{{count}} days left",
     "daysLeftOne": "1 day left",
     "exportLogs": "Export logs",
@@ -932,6 +936,7 @@
       "E023": "Could not cancel subscription",
       "E024": "Could not send feedback. Try again later.",
       "E025": "Could not start checkout. Try again later.",
+      "E026": "Could not resume subscription. Try again later.",
       "E099": "Something went wrong. Try again."
     },
     "docs": {
@@ -960,6 +965,7 @@
       "E023": "Canceling the subscription failed (e.g. payment provider).",
       "E024": "Sending feedback failed (e.g. network or server).",
       "E025": "Starting checkout failed (e.g. payment provider or network).",
+      "E026": "Resuming the subscription failed (e.g. payment provider or network).",
       "E099": "An unexpected error occurred. Try again or contact support if it persists."
     }
   }
