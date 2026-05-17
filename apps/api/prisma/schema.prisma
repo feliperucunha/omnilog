@@ -63,6 +63,7 @@ model User {
   preferredLocale      String?  // "en" | "pt-BR" | "es"
   recapEmailsEnabled   Boolean  @default(true) // monthly activity digest email
   visibleMediaTypes    String?  // JSON array of media type strings; null = all
+  profileVisibility    String?  // JSON ProfileVisibility; null = all public defaults
   boardGameProvider   String?  // "bgg" | "ludopedia"; null = bgg
   tier                Tier     @default(free)
   stripeSubscriptionId  String?  @unique // Stripe subscription ID for Pro
@@ -208,10 +209,12 @@ model Log {
   completedAt  DateTime? // when set to completed
   contentHours Float?   // duration of content in hours (for stats)
   hoursToBeat  Float?  // games only: how long it took the user to beat (hours)
+  gamePlatform String? // games only: console / platform the user is playing on
   season       Int?     // tv, anime
   episode      Int?     // tv, anime
   chapter      Int?     // anime, manga, comics
   volume       Int?     // anime, manga, comics
+  pagesRead    Int?     // books, manga, comics: current page progress
   boardGameSource String?  // "bgg" | "ludopedia" when mediaType = boardgames; which API this externalId came from
   own            Boolean? // games, board games, books, manga, comics: user owns a copy
   wantToBuy      Boolean? // same categories: user wants to buy a copy
@@ -233,6 +236,7 @@ model Log {
   updatedAt    DateTime @updatedAt
   reactions        LogReaction[]
   boardGameMatches BoardGameMatch[]
+  scopedReviews    ScopedReview[]
 
   @@unique([userId, mediaType, externalId])
   @@index([userId])
@@ -253,6 +257,23 @@ model LogReaction {
   @@unique([userId, logId])
   @@index([logId])
   @@index([userId])
+}
+
+/// TV/anime: optional per-show, per-season, or per-episode rating and review (series progress stays on Log).
+model ScopedReview {
+  id         String   @id @default(cuid())
+  logId      String
+  log        Log      @relation(fields: [logId], references: [id], onDelete: Cascade)
+  scope      String
+  seasonNum  Int      @default(0)
+  episodeNum Int      @default(0)
+  grade      Int?
+  review     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([logId, scope, seasonNum, episodeNum])
+  @@index([logId])
 }
 
 /// Board games only: one play session with players, scores, optional session notes (not the main log review).

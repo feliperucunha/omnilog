@@ -37,6 +37,7 @@ import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
+import { formatLogScopeLabel, getLogCardDisplay } from "@/lib/logDisplay";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
@@ -671,6 +672,8 @@ export function Dashboard() {
             >
               <div className="flex min-w-0 flex-col gap-2">
                 {feed.map(({ log, user: feedUser }) => {
+                  const display = getLogCardDisplay(log);
+                  const scopeLabel = formatLogScopeLabel(t, display);
                   const isDropped = log.status === "dropped";
                   const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
                   const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);
@@ -751,11 +754,16 @@ export function Dashboard() {
                           </OverflowMarquee>
                         </MotionLink>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-light)] shrink-0">
-                          {log.grade != null ? (
-                            <StarRating value={gradeToStars(log.grade)} readOnly size="sm" showGradeText={false} />
+                          {display.grade != null ? (
+                            <StarRating value={gradeToStars(display.grade)} readOnly size="sm" showGradeText={false} />
                           ) : (
                             <span>—</span>
                           )}
+                          {scopeLabel ? (
+                            <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
+                              {scopeLabel}
+                            </span>
+                          ) : null}
                           {log.mediaType === "books" && typeof log.pagesCount === "number" && log.pagesCount > 0 && (
                             <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
                               {t("mediaLogs.bookPagesBadge", { count: String(log.pagesCount) })}
@@ -811,10 +819,10 @@ export function Dashboard() {
                           <User className="size-3.5 shrink-0" aria-hidden />
                           {feedUser.username ?? t("social.userWithoutUsername")} · {t(`nav.${log.mediaType}`)}
                         </Link>
-                        {log.review ? (
+                        {display.review ? (
                           <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden min-w-0">
                             {(() => {
-                              const review = log.review;
+                              const review = display.review!;
                               return (
                                 <>
                                   {isExpanded ? (

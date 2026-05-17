@@ -186,6 +186,27 @@
     "visibleMediaTypesIntro": "Escolha quais tipos de mídia aparecem na barra lateral e na página de busca. Desmarque para ocultar.",
     "visibleMediaTypesOrderHint": "Arraste as linhas para definir a ordem: a primeira categoria marcada aparece primeiro na página inicial e na busca.",
     "dragToReorder": "Arraste para reordenar",
+    "profileVisibilityTitle": "Visibilidade do perfil público",
+    "profileVisibilityIntro": "Escolha o que os visitantes veem no seu perfil compartilhado. Valores de compra e venda nunca são exibidos publicamente.",
+    "profileVisibilitySaved": "Configurações de visibilidade salvas.",
+    "profileVisibilityViewProfile": "Ver seu perfil público",
+    "profileVisibilityHiddenHint": "O link do seu perfil aparecerá como não encontrado enquanto isto estiver desativado.",
+    "profileVisibilitySectionProfile": "Cabeçalho do perfil",
+    "profileVisibilitySectionLogs": "Cards de logs",
+    "profileVisibilityShowPublicProfile": "Perfil público ativado",
+    "profileVisibilityShowLogCount": "Total de logs",
+    "profileVisibilityShowPinnedBadges": "Badges fixadas",
+    "profileVisibilityShowMilestoneBadges": "Badges de marcos",
+    "profileVisibilityShowStatus": "Status (assistindo, concluído, etc.)",
+    "profileVisibilityShowRatings": "Notas em estrelas",
+    "profileVisibilityShowReviews": "Resenhas escritas",
+    "profileVisibilityShowGenres": "Gêneros e mecânicas",
+    "profileVisibilityShowApiScores": "Notas TMDB / MAL / RAWG",
+    "profileVisibilityShowProgress": "Temporada, episódio, capítulo, volume",
+    "profileVisibilityShowCompletionTime": "Datas de início e conclusão",
+    "profileVisibilityShowCollectionTags": "Tenho, quero comprar, partidas jogadas",
+    "profileVisibilityShowTvMetadata": "Emissoras e status da série",
+    "profileVisibilityShowEnrichmentDetails": "Número de páginas, jogadores",
     "publicProfileCustomization": "Personalização do perfil público",
     "publicProfileProOnlyIntro": "Escolha quais categorias aparecem no seu perfil compartilhado e no app. Assine o Pro para personalizar.",
     "publicProfileUpgrade": "Ver planos",
@@ -358,6 +379,8 @@
     "couldntLoadCounts": "Não foi possível carregar as contagens por categoria"
   },
   "statistics": {
+    "categoryFilter": "Filtrar estatísticas por categoria",
+    "filterAll": "Tudo",
     "freeMonthNotice": "Você está vendo apenas este mês civil. Assine o Pro para histórico completo, todos os períodos, retrospectivas mais longas e exportação em CSV.",
     "proOnlyTitle": "Recurso exclusivo do Pro",
     "proOnlyMessage": "Assine o Pro para histórico completo nas estatísticas, períodos de retrospectiva além da última semana e exportação em CSV nas categorias e em Configurações.",
@@ -472,7 +495,8 @@
     "recommendationsExpand": "Mostrar recomendações",
     "recommendationsCollapse": "Ocultar recomendações",
     "recommendationsNav": "Carrossel de recomendações",
-    "recommendationsDotLabel": "Ir para a página {{index}}"
+    "recommendationsDotLabel": "Ir para a página {{index}}",
+    "recommendationsEmpty": "Nenhuma recomendação no momento. Registre alguns títulos ou busque jogos que você curte."
   },
   "searchSort": {
     "relevance": "Relevância",
@@ -541,6 +565,7 @@
   "boardGameMatches": {
     "tabReview": "Resenha",
     "tabMatches": "Partidas",
+    "needLogFirst": "Salve sua resenha primeiro para registrar partidas deste jogo.",
     "matchCountReadOnly": "Total de partidas: {{count}} (atualizado ao salvar uma partida)",
     "previousSessions": "Histórico de partidas",
     "playHistorySubtitle": "Cada sessão que você registrar aparece aqui com pontuações e vencedores.",
@@ -574,6 +599,17 @@
     "scoreTrendLowerTitle": "Menos pontos que na última sessão",
     "scoreTrendHigherAria": "Pontuação maior que na sessão anterior deste jogo",
     "scoreTrendLowerAria": "Pontuação menor que na sessão anterior deste jogo"
+  },
+  "tvReviews": {
+    "tabShow": "Série",
+    "tabSeason": "Temporada",
+    "tabEpisode": "Episódio",
+    "needLogFirst": "Salve sua resenha da série antes de avaliar temporadas ou episódios.",
+    "scopeShow": "Série",
+    "scopeSeason": "Temporada {{n}}",
+    "scopeEpisode": "T{{season}} · E{{episode}}",
+    "showAllReviews": "Ver mais {{count}} resenhas",
+    "hideAllReviews": "Ver menos"
   },
   "itemPage": {
     "back": "Voltar",
@@ -632,6 +668,16 @@
     "matchesPlayed": "Partidas jogadas",
     "rating": "Avaliação",
     "reviewPlaceholder": "Seus pensamentos..."
+  },
+  "readingProgress": {
+    "startedAt": "Início",
+    "finishedAt": "Conclusão",
+    "pagesRead": "Páginas lidas",
+    "ofPages": "de {{count}}"
+  },
+  "gameLog": {
+    "platform": "Plataforma / console",
+    "platformPlaceholder": "ex.: PlayStation 5, PC, Switch"
   },
   "status": {
     "watched": "Assistido",

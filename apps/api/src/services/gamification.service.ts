@@ -53,7 +53,7 @@ function getStatsColumn(medium: BadgeMedium): ReviewCountKey {
 
 /**
  * A log counts toward review milestones/badges if the user left a star rating and/or written review.
- * (In-progress logs have grade cleared server-side, so grade implies completed-like state from the client.)
+ * Grade and/or non-empty review text both count toward review milestones.
  */
 export function countsAsReviewForGamification(
   grade: number | null | undefined,

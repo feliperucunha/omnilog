@@ -1,21 +1,25 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { Fragment, useEffect, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { ArrowLeft, ChevronDown, Plus } from "lucide-react";
 import {
   COMPLETED_STATUSES,
   IN_PROGRESS_STATUSES,
+  compareScopeGenerality,
+  groupItemReviewsByUser,
+  pickPrimaryScopedReview,
   type ItemDetail,
   type ItemPageData,
   type ItemReview,
   type LogAffinityContext,
   type MediaType,
+  type ReviewScope,
 } from "@geeklogs/shared";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { apiFetchCached } from "@/lib/api";
+import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache } from "@/lib/api";
 import { decodeItemPageDataForDisplay, decodeItemReviewForDisplay } from "@/lib/decodeDisplayFields";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLogComplete } from "@/contexts/LogCompleteContext";
@@ -407,6 +411,47 @@ const REVIEWS_PAGE_SIZE = 10;
 const REVIEW_SORT_OPTIONS = ["recent", "oldest", "likes", "dislikes"] as const;
 type ReviewSortKey = (typeof REVIEW_SORT_OPTIONS)[number];
 
+function sortReviewsByKey(list: ItemReview[], sort: ReviewSortKey): ItemReview[] {
+  const copy = [...list];
+  if (sort === "oldest") {
+    copy.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  } else if (sort === "likes") {
+    copy.sort((a, b) => (b.likesCount ?? 0) - (a.likesCount ?? 0));
+  } else if (sort === "dislikes") {
+    copy.sort((a, b) => (b.dislikesCount ?? 0) - (a.dislikesCount ?? 0));
+  } else {
+    copy.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+  return copy;
+}
+
+function sortUserScopedReviews(list: ItemReview[]): ItemReview[] {
+  return [...list].sort((a, b) => {
+    const scopeA = (a.reviewScope ?? "show") as ReviewScope;
+    const scopeB = (b.reviewScope ?? "show") as ReviewScope;
+    const scopeCmp = compareScopeGenerality(scopeB, scopeA);
+    if (scopeCmp !== 0) return scopeCmp;
+    const ds = (b.season ?? 0) - (a.season ?? 0);
+    if (ds !== 0) return ds;
+    return (b.episode ?? 0) - (a.episode ?? 0);
+  });
+}
+
+function reviewScopeLabel(
+  t: (key: string, vars?: Record<string, string>) => string,
+  r: ItemReview
+): string {
+  const scope = r.reviewScope ?? "show";
+  if (scope === "season") return t("tvReviews.scopeSeason", { n: String(r.season ?? "?") });
+  if (scope === "episode") {
+    return t("tvReviews.scopeEpisode", {
+      season: String(r.season ?? "?"),
+      episode: String(r.episode ?? "?"),
+    });
+  }
+  return t("tvReviews.scopeShow");
+}
+
 interface ReviewsResponse {
   reviews: ItemReview[];
   meanGrade: number | null;
@@ -426,6 +471,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
   const [error, setError] = useState<string | null>(null);
   const [reviewsPage, setReviewsPage] = useState(1);
   const [reviewsSort, setReviewsSort] = useState<ReviewSortKey>("recent");
+  const [expandedReviewUsers, setExpandedReviewUsers] = useState<Set<string>>(() => new Set());
   const { token } = useAuth();
   const { setPageTitle } = usePageTitle() ?? {};
 
@@ -495,6 +541,64 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
     if (!data?.item) return;
     fetchReviews(reviewsPage, reviewsSort);
   }, [data?.item, reviewsPage, reviewsSort, fetchReviews]);
+
+  const refreshReviewsAfterSave = useCallback(() => {
+    invalidateLogsAndItemsCache();
+    setReviewsPage(1);
+    setExpandedReviewUsers(new Set());
+    setReviewsLoading(true);
+    const params = new URLSearchParams({
+      page: "1",
+      limit: String(REVIEWS_PAGE_SIZE),
+      sort: reviewsSort,
+    });
+    void apiFetch<ReviewsResponse>(`/items/${mediaType}/${id}/reviews?${params.toString()}`)
+      .then((res) => {
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                reviews: res.reviews.map(decodeItemReviewForDisplay),
+                meanGrade: res.meanGrade,
+                reviewsTotal: res.reviewsTotal,
+                reviewsPage: res.reviewsPage,
+                reviewsLimit: res.reviewsLimit,
+              }
+            : prev
+        );
+      })
+      .catch(() => {})
+      .finally(() => setReviewsLoading(false));
+  }, [mediaType, id, reviewsSort]);
+
+  useEffect(() => {
+    setExpandedReviewUsers(new Set());
+  }, [reviewsPage, reviewsSort, id, mediaType]);
+
+  const scopedReviewsDisplay = mediaType === "tv" || mediaType === "anime";
+  const pageReviews = data?.reviews ?? [];
+
+  const reviewDisplayGroups = useMemo(() => {
+    if (!scopedReviewsDisplay) {
+      return pageReviews.map((r) => ({
+        userId: r.userId ?? r.id,
+        reviews: [r] as ItemReview[],
+      }));
+    }
+    const grouped = groupItemReviewsByUser(pageReviews);
+    const groups: { userId: string; reviews: ItemReview[] }[] = [];
+    for (const [userId, list] of grouped) {
+      groups.push({ userId, reviews: list });
+    }
+    const primaries = groups
+      .map((g) => pickPrimaryScopedReview(g.reviews))
+      .filter((p): p is ItemReview => p != null);
+    const sortedPrimaries = sortReviewsByKey(primaries, reviewsSort);
+    return sortedPrimaries.map((primary) => {
+      const match = groups.find((g) => g.reviews.some((r) => r.id === primary.id));
+      return match ?? { userId: primary.userId ?? primary.id, reviews: [primary] };
+    });
+  }, [pageReviews, scopedReviewsDisplay, reviewsSort]);
 
   const affinityContextDraft = useMemo((): LogAffinityContext | undefined => {
     const it = data?.item;
@@ -702,6 +806,8 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             image={getItemDisplayImageUrl(item.image, item.thumbnail)}
             runtimeMinutes={item.runtimeMinutes ?? null}
             episodesCount={item.episodesCount ?? null}
+            pagesCount={item.pagesCount ?? null}
+            platforms={item.platforms ?? null}
             genres={
               mediaType === "boardgames"
                 ? (item.categories ?? item.genres ?? undefined)
@@ -709,10 +815,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             }
             mechanics={mediaType === "boardgames" ? (item.mechanics ?? undefined) : undefined}
             affinityContextDraft={affinityContextDraft}
-            onSaved={() => {
-              setReviewsPage(1);
-              onBack();
-            }}
+            onSaved={refreshReviewsAfterSave}
             onSavedComplete={(state) => showLogComplete(state)}
           />
         )}
@@ -786,7 +889,14 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                 animate="animate"
               >
                 <div className="flex flex-col gap-4">
-                  {reviews.map((r: ItemReview) => {
+                  {reviewDisplayGroups.map((group) => {
+                    const primary = pickPrimaryScopedReview(group.reviews) ?? group.reviews[0]!;
+                    const expanded = expandedReviewUsers.has(group.userId);
+                    const visible = expanded ? sortUserScopedReviews(group.reviews) : [primary];
+                    const extraCount = group.reviews.length - 1;
+                    return (
+                      <Fragment key={group.userId}>
+                        {visible.map((r, cardIndex) => {
                     const isDropped = r.status === "dropped";
                     const isInProgress = r.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(r.status);
                     const isCompleted = r.status != null && (COMPLETED_STATUSES as readonly string[]).includes(r.status);
@@ -859,7 +969,13 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                                   {getStatusLabel(t, r.status ?? r.listType ?? null, mediaType)}
                                 </span>
                               )}
-                              {(r.season != null || r.episode != null) && (
+                              {scopedReviewsDisplay && (r.reviewScope ?? "show") !== "show" && (
+                                <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+                                  {reviewScopeLabel(t, r)}
+                                </span>
+                              )}
+                              {(!scopedReviewsDisplay || (r.reviewScope ?? "show") === "show") &&
+                                (r.season != null || r.episode != null) && (
                                 <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
                                   S{r.season ?? "?"} · E{r.episode ?? "?"}
                                 </span>
@@ -879,21 +995,21 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                             </p>
                           )}
 
-                          {/* Reactions */}
-                          <div className="flex items-center pt-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
                             <ReactionButtons
-                              logId={r.id}
+                              logId={r.reactionLogId ?? r.id}
                               likesCount={r.likesCount ?? 0}
                               dislikesCount={r.dislikesCount ?? 0}
                               userReaction={r.userReaction ?? null}
                               disabled={!token}
                               onReactionChange={(payload) => {
+                                const reactionLogId = r.reactionLogId ?? r.id;
                                 setData((prev) =>
                                   prev
                                     ? {
                                         ...prev,
                                         reviews: prev.reviews.map((rev) =>
-                                          rev.id === r.id
+                                          rev.id === r.id || rev.reactionLogId === reactionLogId
                                             ? {
                                                 ...rev,
                                                 likesCount: payload.likesCount,
@@ -907,11 +1023,34 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                                 );
                               }}
                             />
+                            {cardIndex === 0 && extraCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedReviewUsers((prev) => {
+                                    const next = new Set(prev);
+                                    if (expanded) next.delete(group.userId);
+                                    else next.add(group.userId);
+                                    return next;
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 rounded-md border border-[var(--color-mid)]/40 px-2 py-1 text-xs text-[var(--color-light)] transition-colors hover:border-[var(--color-mid)] hover:text-[var(--color-lightest)]"
+                                aria-expanded={expanded}
+                              >
+                                {!expanded && <Plus className="h-3.5 w-3.5" aria-hidden />}
+                                {expanded
+                                  ? t("tvReviews.hideAllReviews")
+                                  : t("tvReviews.showAllReviews", { count: String(extraCount) })}
+                              </button>
+                            )}
                           </div>
                         </div>
                       </Card>
                     </motion.div>
                   );
+                        })}
+                      </Fragment>
+                    );
                   })}
                 </div>
               </motion.div>

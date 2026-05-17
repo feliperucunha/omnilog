@@ -11,10 +11,9 @@ import { Input } from "@/components/ui/input";
 import { NumberCombobox } from "@/components/ui/number-combobox";
 import { Select } from "@/components/ui/select";
 import type { MediaType } from "@geeklogs/shared";
-import { IN_PROGRESS_STATUSES, MEDIA_TYPES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
+import { MEDIA_TYPES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
-import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { modalContentVariants, tapScale, tapTransition } from "@/lib/animations";
@@ -118,8 +117,7 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
       return false;
     }
     const image = imageUrl.trim() ? imageUrl.trim() : null;
-    const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-    const grade = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
+    const grade = stars == null ? null : starsToGrade(stars);
     const wasFirstLog = (me?.logCount ?? 0) === 0;
     if (!optimisticClose) setLoading(true);
     try {
@@ -127,7 +125,7 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
         onCancel();
       }
       const externalId = `custom-${crypto.randomUUID()}`;
-      const created = await apiFetch<{ newBadges?: NewBadge[] }>("/logs", {
+      await apiFetch("/logs", {
         method: "POST",
         body: JSON.stringify({
           mediaType,
@@ -145,7 +143,6 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
           ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
         }),
       });
-      if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
       invalidateLogsAndItemsCache();
       if (wasFirstLog) trackProductEvent("first_log_created");
       toast.success(t("toast.logSaved"));

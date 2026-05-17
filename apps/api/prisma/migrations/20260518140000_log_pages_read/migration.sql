@@ -1,0 +1,1 @@
+ALTER TABLE "Log" ADD COLUMN "pagesRead" INTEGER;

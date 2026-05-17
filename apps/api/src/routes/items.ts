@@ -17,6 +17,7 @@ import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
 import { tierHasProFeatures } from "../lib/userTier.js";
 import { getAllReviewerMilestonesForMediumBatch } from "../services/milestone.service.js";
+import { loadItemReviewsPaginated } from "../lib/itemReviews.js";
 
 export const itemsRouter = Router();
 itemsRouter.use(optionalAuthMiddleware);
@@ -181,93 +182,15 @@ itemsRouter.get("/:mediaType/:externalId/reviews", async (req: AuthenticatedRequ
     Math.max(1, parseInt(String(req.query.limit ?? req.query.reviewsLimit ?? DEFAULT_REVIEWS_LIMIT), 10) || DEFAULT_REVIEWS_LIMIT)
   );
   const sort = parseReviewSort(req.query.sort);
-  const where = { mediaType, externalId };
-  const whereWithGrade = { ...where, grade: { not: null } };
   const currentUserId = req.user?.userId ?? null;
   const skip = (reviewsPage - 1) * reviewsLimit;
 
-  const [reviewsTotal, gradeAgg, logs] = await Promise.all([
-    prisma.log.count({ where: whereWithGrade }),
-    prisma.log.aggregate({
-      where: whereWithGrade,
-      _avg: { grade: true },
-      _count: { grade: true },
-    }),
-    (async () => {
-      if (sort === "likes" || sort === "dislikes") {
-        const orderedIds = await getReviewLogIdsByReaction(
-          mediaType,
-          externalId,
-          sort === "likes" ? "like" : "dislike",
-          skip,
-          reviewsLimit
-        );
-        if (orderedIds.length === 0) return [];
-        const byId = new Map(
-          (
-            await prisma.log.findMany({
-              where: { id: { in: orderedIds } },
-              include: { user: { select: { email: true, username: true, tier: true } } },
-            })
-          ).map((l) => [l.id, l])
-        );
-        return orderedIds.map((id) => byId.get(id)).filter(Boolean) as Awaited<
-          ReturnType<typeof prisma.log.findMany<{ include: { user: { select: { email: true; username: true; tier: true } } } }>>
-        >;
-      }
-      return prisma.log.findMany({
-        where: whereWithGrade,
-        include: { user: { select: { email: true, username: true, tier: true } } },
-        orderBy: { createdAt: sort === "oldest" ? "asc" : "desc" },
-        skip,
-        take: reviewsLimit,
-      });
-    })(),
-  ]);
-
-  const meanGrade =
-    gradeAgg._count.grade > 0 && gradeAgg._avg.grade != null
-      ? gradeAgg._avg.grade
-      : null;
-
-  const logIds = logs.map((l) => l.id);
-  const [reactionMap, reviewerBadgesMap] = await Promise.all([
-    getReactionsForLogs(logIds, currentUserId),
-    getAllReviewerMilestonesForMediumBatch(logs.map((l) => l.userId), mediaType),
-  ]);
-
-  const reviews = logs.map((l) => {
-    const stats = reactionMap.get(l.id);
-    const { badges, count: reviewerReviewsInCategory } = reviewerBadgesMap.get(l.userId) ?? { badges: [] as { label: string; icon: string; level: number }[], count: 0 };
-    const last = badges.length > 0 ? badges[badges.length - 1]! : null;
-    return {
-      id: l.id,
-      userEmail: l.user.email,
-      reviewerUsername: l.user.username ?? null,
-      isPro: tierHasProFeatures(l.user.tier),
-      isAdmin: l.user.tier === "admin",
-      reviewerBadges: last ? [last] : [],
-      reviewerLevel: last?.level ?? undefined,
-      reviewerLevelLabel: last?.label,
-      reviewerLevelIcon: last?.icon,
-      reviewerReviewsInCategory,
-      grade: l.grade,
-      review: l.review != null ? decodeHtmlEntities(l.review) : null,
-      listType: l.listType,
-      status: l.status,
-      season: l.season,
-      episode: l.episode,
-      chapter: l.chapter,
-      volume: l.volume,
-      startedAt: l.startedAt?.toISOString() ?? null,
-      completedAt: l.completedAt?.toISOString() ?? null,
-      contentHours: l.contentHours,
-      createdAt: l.createdAt.toISOString(),
-      likesCount: stats?.likesCount ?? 0,
-      dislikesCount: stats?.dislikesCount ?? 0,
-      userReaction: stats?.userReaction ?? null,
-    };
-  });
+  const { reviews, reviewsTotal, meanGrade } = await loadItemReviewsPaginated(
+    prisma,
+    mediaType,
+    externalId,
+    { sort, skip, take: reviewsLimit, currentUserId }
+  );
 
   res.json({
     reviews,
@@ -378,94 +301,16 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     return;
   }
 
-  const where = { mediaType, externalId };
-  const whereWithGrade = { ...where, grade: { not: null } };
-
   const reviewsSkip = (reviewsPage - 1) * reviewsLimit;
-  const [reviewsTotal, gradeAgg, logs] = await Promise.all([
-    prisma.log.count({ where: whereWithGrade }),
-    prisma.log.aggregate({
-      where: whereWithGrade,
-      _avg: { grade: true },
-      _count: { grade: true },
-    }),
+  const { reviews, reviewsTotal, meanGrade } =
     reviewsLimit === 0
-      ? Promise.resolve([])
-      : (async () => {
-          if (reviewsSort === "likes" || reviewsSort === "dislikes") {
-            const orderedIds = await getReviewLogIdsByReaction(
-              mediaType,
-              externalId,
-              reviewsSort === "likes" ? "like" : "dislike",
-              reviewsSkip,
-              reviewsLimit
-            );
-            if (orderedIds.length === 0) return [];
-            const byId = new Map(
-              (
-                await prisma.log.findMany({
-                  where: { id: { in: orderedIds } },
-                  include: { user: { select: { email: true, username: true, tier: true } } },
-                })
-              ).map((l) => [l.id, l])
-            );
-            return orderedIds.map((id) => byId.get(id)).filter(Boolean) as Awaited<
-              ReturnType<typeof prisma.log.findMany<{ include: { user: { select: { email: true; username: true; tier: true } } } }>>
-            >;
-          }
-          return prisma.log.findMany({
-            where: whereWithGrade,
-            include: { user: { select: { email: true, username: true, tier: true } } },
-            orderBy: { createdAt: reviewsSort === "oldest" ? "asc" : "desc" },
-            skip: reviewsSkip,
-            take: reviewsLimit,
-          });
-        })(),
-  ]);
-
-  const meanGrade =
-    gradeAgg._count.grade > 0 && gradeAgg._avg.grade != null
-      ? gradeAgg._avg.grade
-      : null;
-
-  const logIds = logs.map((l) => l.id);
-  const [reactionMap, reviewerBadgesMap] = await Promise.all([
-    getReactionsForLogs(logIds, currentUserId),
-    getAllReviewerMilestonesForMediumBatch(logs.map((l) => l.userId), mediaType),
-  ]);
-
-  const reviews = logs.map((l) => {
-    const stats = reactionMap.get(l.id);
-    const { badges, count: reviewerReviewsInCategory } = reviewerBadgesMap.get(l.userId) ?? { badges: [] as { label: string; icon: string; level: number }[], count: 0 };
-    const last = badges.length > 0 ? badges[badges.length - 1]! : null;
-    return {
-      id: l.id,
-      userEmail: l.user.email,
-      reviewerUsername: l.user.username ?? null,
-      isPro: tierHasProFeatures(l.user.tier),
-      isAdmin: l.user.tier === "admin",
-      reviewerBadges: last ? [last] : [],
-      reviewerLevel: last?.level ?? undefined,
-      reviewerLevelLabel: last?.label,
-      reviewerLevelIcon: last?.icon,
-      reviewerReviewsInCategory,
-      grade: l.grade,
-      review: l.review != null ? decodeHtmlEntities(l.review) : null,
-      listType: l.listType,
-      status: l.status,
-      season: l.season,
-      episode: l.episode,
-      chapter: l.chapter,
-      volume: l.volume,
-      startedAt: l.startedAt?.toISOString() ?? null,
-      completedAt: l.completedAt?.toISOString() ?? null,
-      contentHours: l.contentHours,
-      createdAt: l.createdAt.toISOString(),
-      likesCount: stats?.likesCount ?? 0,
-      dislikesCount: stats?.dislikesCount ?? 0,
-      userReaction: stats?.userReaction ?? null,
-    };
-  });
+      ? { reviews: [], reviewsTotal: 0, meanGrade: null }
+      : await loadItemReviewsPaginated(prisma, mediaType, externalId, {
+          sort: reviewsSort,
+          skip: reviewsSkip,
+          take: reviewsLimit,
+          currentUserId,
+        });
 
   const logWithImage = await prisma.log.findFirst({
     where: { mediaType, externalId, image: { not: null } },

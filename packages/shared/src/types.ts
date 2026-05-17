@@ -1,4 +1,5 @@
 import type { LogAffinityContext } from "./affinityContext.js";
+import type { ScopedReview } from "./scopedReview.js";
 
 export const MEDIA_TYPES = [
   "movies",
@@ -249,9 +250,15 @@ export interface ItemDetail {
 /** Current user's reaction to a log/review */
 export type ReactionType = "like" | "dislike";
 
+export type ReviewScope = "show" | "season" | "episode";
+
 /** A review shown on the item page (from any user) */
 export interface ItemReview {
   id: string;
+  userId?: string;
+  /** Log id for reactions (parent series log when id is a scoped review). */
+  reactionLogId?: string;
+  reviewScope?: ReviewScope;
   /** Display name: username when set, otherwise email (for backward compat). Prefer showing reviewerUsername. */
   userEmail: string;
   /** Reviewer's username when set; use this for display instead of email when present. */
@@ -317,11 +324,15 @@ export interface Log {
   episode: number | null;
   chapter: number | null;
   volume: number | null;
+  /** Books, manga, comics: pages read so far. */
+  pagesRead: number | null;
   startedAt: string | null;
   completedAt: string | null;
   contentHours: number | null;
   /** Games only: how long it took the user to beat (hours). */
   hoursToBeat: number | null;
+  /** Games only: console or platform (e.g. PlayStation 5, PC). */
+  gamePlatform: string | null;
   /** Board games and video games: user owns a copy. */
   own: boolean | null;
   /** Board games and video games: user wants to buy a copy. */
@@ -366,6 +377,8 @@ export interface Log {
   dislikesCount?: number;
   /** Current user's reaction, if any. */
   userReaction?: ReactionType | null;
+  /** TV/anime only: season and episode granular ratings (included on list endpoints). */
+  scopedReviews?: ScopedReview[];
 }
 
 export interface CreateLogInput {

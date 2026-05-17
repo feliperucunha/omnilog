@@ -14,6 +14,10 @@ import {
 } from "../lib/purchaseFields.js";
 import { sanitizeText, SEARCH_QUERY_MAX_LENGTH } from "../lib/sanitize.js";
 import { computeGenreFacets, fetchLogsWithGenreFilter, LOG_GENRE_FILTER_MAX_LENGTH } from "../lib/logGenreList.js";
+import {
+  applyProfileVisibilityToPublicLog,
+  getProfileVisibilityFromUser,
+} from "../lib/profileVisibility.js";
 
 /** Public (no auth) read-only profile and logs for sharing. */
 
@@ -29,13 +33,48 @@ async function getUserByIdentifier(identifier: string) {
   if (looksLikeCuid(identifier)) {
     return prisma.user.findUnique({
       where: { id: identifier },
-      select: { id: true, username: true, visibleMediaTypes: true, selectedBadgeIds: true },
+      select: {
+        id: true,
+        username: true,
+        visibleMediaTypes: true,
+        selectedBadgeIds: true,
+        profileVisibility: true,
+      },
     });
   }
   return prisma.user.findUnique({
     where: { username: identifier },
-    select: { id: true, username: true, visibleMediaTypes: true, selectedBadgeIds: true },
+    select: {
+      id: true,
+      username: true,
+      visibleMediaTypes: true,
+      selectedBadgeIds: true,
+      profileVisibility: true,
+    },
   });
+}
+
+function parseVisibleMediaTypes(user: { visibleMediaTypes: string | null }): MediaType[] {
+  let visibleMediaTypes: MediaType[] = [...MEDIA_TYPES];
+  if (user.visibleMediaTypes) {
+    try {
+      const parsed = JSON.parse(user.visibleMediaTypes) as string[];
+      const valid = parsed.filter((t): t is MediaType =>
+        MEDIA_TYPES.includes(t as MediaType)
+      );
+      if (valid.length > 0) visibleMediaTypes = valid;
+    } catch {
+      // keep default
+    }
+  }
+  return visibleMediaTypes;
+}
+
+function redactPublicLogs<T extends Record<string, unknown>>(
+  logs: T[],
+  visibility: ReturnType<typeof getProfileVisibilityFromUser>
+): T[] {
+  return logs.map((log) => applyProfileVisibilityToPublicLog(log, visibility) as T);
 }
 
 /** GET /users/:identifier - Public profile by username or id. No email or secrets. */
@@ -46,6 +85,12 @@ usersRouter.get("/:identifier", async (req: Request<{ identifier: string }>, res
     res.status(404).json({ error: "User not found" });
     return;
   }
+  const visibility = getProfileVisibilityFromUser(user);
+  if (!visibility.showPublicProfile) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const visibleMediaTypes = parseVisibleMediaTypes(user);
   const [logCount, selectedBadges] = await Promise.all([
     prisma.log.count({ where: { userId: user.id } }),
     (async () => {
@@ -58,7 +103,7 @@ usersRouter.get("/:identifier", async (req: Request<{ identifier: string }>, res
           // ignore
         }
       }
-      if (badgeIds.length === 0) return [];
+      if (badgeIds.length === 0 || !visibility.showPinnedBadges) return [];
       const badges = await prisma.badge.findMany({
         where: { id: { in: badgeIds } },
         select: { id: true, name: true, icon: true, medium: true },
@@ -67,23 +112,11 @@ usersRouter.get("/:identifier", async (req: Request<{ identifier: string }>, res
       return badges.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
     })(),
   ]);
-  let visibleMediaTypes: string[] = [...MEDIA_TYPES];
-  if (user.visibleMediaTypes) {
-    try {
-      const parsed = JSON.parse(user.visibleMediaTypes) as string[];
-      const valid = parsed.filter((t): t is (typeof MEDIA_TYPES)[number] =>
-        MEDIA_TYPES.includes(t as (typeof MEDIA_TYPES)[number])
-      );
-      if (valid.length > 0) visibleMediaTypes = valid;
-    } catch {
-      // keep default
-    }
-  }
   res.json({
     id: user.id,
     username: user.username ?? null,
     visibleMediaTypes,
-    logCount,
+    logCount: visibility.showLogCount ? logCount : 0,
     selectedBadges: selectedBadges.map((b) => ({
       id: b.id,
       name: b.name,
@@ -101,18 +134,32 @@ usersRouter.get("/:identifier/milestones/progress", async (req: Request<{ identi
     res.status(404).json({ error: "User not found" });
     return;
   }
+  const visibility = getProfileVisibilityFromUser(user);
+  if (!visibility.showPublicProfile || !visibility.showMilestoneBadges) {
+    res.json({ perMedium: [], global: { reviews: { current: 0, next: null, progressPct: 0, earned: [] }, logs: { current: 0, next: null, progressPct: 0, earned: [] } } });
+    return;
+  }
   const data = await getMilestoneProgress(user.id);
   res.json(data);
 });
 
+async function requirePublicUser(identifier: string) {
+  const user = await getUserByIdentifier(identifier);
+  if (!user) return null;
+  const visibility = getProfileVisibilityFromUser(user);
+  if (!visibility.showPublicProfile) return null;
+  return { user, visibility, visibleMediaTypes: parseVisibleMediaTypes(user) };
+}
+
 /** GET /users/:identifier/logs/stats?group=category|month|year - Public stats. No auth. */
 usersRouter.get("/:identifier/logs/stats", async (req: Request<{ identifier: string }>, res: Response) => {
   const { identifier } = req.params;
-  const user = await getUserByIdentifier(identifier);
-  if (!user) {
+  const ctx = await requirePublicUser(identifier);
+  if (!ctx) {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  const { user } = ctx;
   const groupParam = req.query.group as string;
   const group = groupParam === "year" ? "year" : groupParam === "category" ? "category" : "month";
   const logs = await prisma.log.findMany({
@@ -161,18 +208,19 @@ const PAGINATION_LIMIT_MAX = 100;
 /** GET /users/:identifier/logs/counts - Public per-category counts. Returns { data: { [mediaType]: number } }. */
 usersRouter.get("/:identifier/logs/counts", async (req: Request<{ identifier: string }>, res: Response) => {
   const { identifier } = req.params;
-  const user = await getUserByIdentifier(identifier);
-  if (!user) {
+  const ctx = await requirePublicUser(identifier);
+  if (!ctx) {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  const { user, visibleMediaTypes } = ctx;
   const counts = await prisma.log.groupBy({
     by: ["mediaType"],
     where: { userId: user.id },
     _count: { id: true },
   });
   const data = Object.fromEntries(
-    MEDIA_TYPES.map((t) => [t, counts.find((c) => c.mediaType === t)?._count.id ?? 0])
+    visibleMediaTypes.map((t) => [t, counts.find((c) => c.mediaType === t)?._count.id ?? 0])
   ) as Record<MediaType, number>;
   res.json({ data });
 });
@@ -180,14 +228,19 @@ usersRouter.get("/:identifier/logs/counts", async (req: Request<{ identifier: st
 /** GET /users/:identifier/logs/status-counts?mediaType=X - Public per-status counts for one category. Returns { data: { total, byStatus } }. */
 usersRouter.get("/:identifier/logs/status-counts", async (req: Request<{ identifier: string }>, res: Response) => {
   const { identifier } = req.params;
-  const user = await getUserByIdentifier(identifier);
-  if (!user) {
+  const ctx = await requirePublicUser(identifier);
+  if (!ctx) {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  const { user, visibility, visibleMediaTypes } = ctx;
   const mediaType = req.query.mediaType as MediaType | undefined;
   if (!mediaType || !MEDIA_TYPES.includes(mediaType)) {
     res.status(400).json({ error: "mediaType required and must be a valid media type" });
+    return;
+  }
+  if (!visibleMediaTypes.includes(mediaType)) {
+    res.json({ data: { total: 0, byStatus: {}, byGenre: {} } });
     return;
   }
   const [rows, genreRows] = await Promise.all([
@@ -214,7 +267,10 @@ usersRouter.get("/:identifier/logs/status-counts", async (req: Request<{ identif
     total += row._count.id;
   }
   const byGenre = computeGenreFacets(genreRows);
-  if ((SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mediaType)) {
+  if (
+    visibility.showCollectionTags &&
+    (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mediaType)
+  ) {
     const [owned, wantToBuy] = await Promise.all([
       prisma.log.count({ where: { userId: user.id, mediaType, own: true } }),
       prisma.log.count({ where: { userId: user.id, mediaType, wantToBuy: true } }),
@@ -228,11 +284,12 @@ usersRouter.get("/:identifier/logs/status-counts", async (req: Request<{ identif
 /** GET /users/:identifier/logs - Public list of logs (same shape as GET /logs). Supports ?limit=&cursor= for pagination. No auth. */
 usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>, res: Response) => {
   const { identifier } = req.params;
-  const user = await getUserByIdentifier(identifier);
-  if (!user) {
+  const ctx = await requirePublicUser(identifier);
+  if (!ctx) {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  const { user, visibility, visibleMediaTypes } = ctx;
   const mediaType = req.query.mediaType as MediaType | undefined;
   const status = req.query.status as string | undefined;
   const sortParam = req.query.sort as string;
@@ -250,8 +307,21 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
   const takeSize = usePagination ? Math.min(limitParam, PAGINATION_LIMIT_MAX) : undefined;
   const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
 
-  let where: Prisma.LogWhereInput = { userId: user.id };
-  if (mediaType && MEDIA_TYPES.includes(mediaType)) where.mediaType = mediaType;
+  let where: Prisma.LogWhereInput = {
+    userId: user.id,
+    mediaType: { in: [...visibleMediaTypes] },
+  };
+  if (mediaType && MEDIA_TYPES.includes(mediaType)) {
+    if (!visibleMediaTypes.includes(mediaType)) {
+      if (usePagination && takeSize != null) {
+        res.json({ data: [], nextCursor: null });
+        return;
+      }
+      res.json([]);
+      return;
+    }
+    where = { userId: user.id, mediaType };
+  }
   if (status != null && status !== "") {
     if (mediaType && MEDIA_TYPES.includes(mediaType)) {
       const allowed = LOG_STATUS_OPTIONS[mediaType];
@@ -336,8 +406,14 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
         cursorId,
         usePagination: true,
       });
-      res.json(result);
-      return;
+      if (!Array.isArray(result)) {
+        const enriched = redactPublicLogs(
+          await attachItemEnrichment(prisma, result.data),
+          visibility
+        );
+        res.json({ data: enriched, nextCursor: result.nextCursor });
+        return;
+      }
     }
     const data = await fetchLogsWithGenreFilter(prisma, {
       where,
@@ -347,7 +423,9 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
       cursorId: undefined,
       usePagination: false,
     });
-    res.json(data);
+    const list = Array.isArray(data) ? data : data.data;
+    const enriched = redactPublicLogs(await attachItemEnrichment(prisma, list), visibility);
+    res.json(enriched);
     return;
   }
 
@@ -362,7 +440,7 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
     const hasMore = logs.length > takeSize;
     const data = (hasMore ? logs.slice(0, takeSize) : logs).map(serializeLog);
     const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null;
-    const enriched = await attachItemEnrichment(prisma, data);
+    const enriched = redactPublicLogs(await attachItemEnrichment(prisma, data), visibility);
     res.json({ data: enriched, nextCursor });
     return;
   }
@@ -371,6 +449,9 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
     where,
     orderBy,
   });
-  const enriched = await attachItemEnrichment(prisma, logs.map(serializeLog));
+  const enriched = redactPublicLogs(
+    await attachItemEnrichment(prisma, logs.map(serializeLog)),
+    visibility
+  );
   res.json(enriched);
 });

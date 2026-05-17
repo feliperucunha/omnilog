@@ -14,7 +14,6 @@ import {
   SPEND_TRACKED_MEDIA_TYPES,
 } from "@geeklogs/shared";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
-import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { skipApiKeyMissingUi } from "@/lib/featureFlags";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
@@ -504,7 +503,6 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
     setBatchProgress({ current: 0, total: parseResult.rows.length });
     setFailedReasons([]);
     const reasons: Array<{ name: string; reason: string }> = [];
-    const newBadgesFromBatch: Array<{ id: string; name: string; icon: string }> = [];
     let added = 0;
     for (let i = 0; i < parseResult.rows.length; i++) {
       setBatchProgress({ current: i + 1, total: parseResult.rows.length });
@@ -529,11 +527,10 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
           }
           const status = resolveRowStatus(row, mediaType, defaultStatus);
           const bgp = boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
-          const res = await apiFetch<{ newBadges?: NewBadge[] }>("/logs", {
+          await apiFetch("/logs", {
             method: "POST",
             body: JSON.stringify(buildBatchLogBody(row, mediaType, hit, status, bgp)),
           });
-          if (res.newBadges?.length) newBadgesFromBatch.push(...res.newBadges);
           added++;
         } else {
           reasons.push({
@@ -559,10 +556,6 @@ export function BatchEntryTab({ initialMediaType, onDone, onCancel, renderFooter
     setBatchProgress(null);
     setFailedReasons(reasons);
     invalidateLogsAndItemsCache();
-    const uniqueNewBadges = newBadgesFromBatch.filter(
-      (b, idx, arr) => arr.findIndex((x) => x.id === b.id) === idx
-    );
-    if (uniqueNewBadges.length > 0) showAchievementToasts(uniqueNewBadges, t("dashboard.badgesAchievementUnlocked"));
     if (added > 0) {
       toast.success(t("batchEntry.addedCount", { count: String(added) }));
       onDone();

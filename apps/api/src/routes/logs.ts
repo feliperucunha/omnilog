@@ -27,6 +27,18 @@ export const logsRouter = Router();
 logsRouter.use(authMiddleware);
 
 const optionalInt = z.number().int().min(0).nullable().optional();
+const GAME_PLATFORM_MAX_LENGTH = 80;
+
+const optionalManualDate = z
+  .string()
+  .max(40)
+  .nullable()
+  .optional();
+
+function parseManualLogDate(value: string): Date | null {
+  const d = new Date(value.trim());
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 const optionalFloat = z.number().min(0).nullable().optional();
 
@@ -47,6 +59,10 @@ const createLogSchema = z.object({
   episode: optionalInt,
   chapter: optionalInt,
   volume: optionalInt,
+  pagesRead: optionalInt,
+  gamePlatform: z.string().max(GAME_PLATFORM_MAX_LENGTH).nullable().optional(),
+  startedAt: optionalManualDate,
+  completedAt: optionalManualDate,
   contentHours: optionalFloat,
   hoursToBeat: optionalFloat,
   genres: genresSchema,
@@ -147,6 +163,10 @@ const updateLogSchema = z.object({
   episode: optionalInt,
   chapter: optionalInt,
   volume: optionalInt,
+  pagesRead: optionalInt,
+  gamePlatform: z.string().max(GAME_PLATFORM_MAX_LENGTH).nullable().optional(),
+  startedAt: optionalManualDate,
+  completedAt: optionalManualDate,
   contentHours: optionalFloat,
   hoursToBeat: optionalFloat,
   genres: genresSchema,
@@ -216,9 +236,21 @@ function mergeLogWhere(base: Prisma.LogWhereInput, extra: Prisma.LogWhereInput):
   return { AND: [base, extra] };
 }
 
+function parseStatsMediaTypeFilter(query: Record<string, unknown>): MediaType | undefined {
+  const raw = typeof query.mediaType === "string" ? query.mediaType.trim() : "";
+  if (!raw) return undefined;
+  if (MEDIA_TYPES.includes(raw as MediaType)) return raw as MediaType;
+  return undefined;
+}
+
+function applyStatsMediaFilter(where: Prisma.LogWhereInput, mediaType?: MediaType): Prisma.LogWhereInput {
+  return mediaType ? mergeLogWhere(where, { mediaType }) : where;
+}
+
 import { persistUserDefaultPurchaseCurrency } from "../lib/userPurchasePreference.js";
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
 import { attachItemEnrichment, attachItemEnrichmentSingle } from "../lib/itemDetailEnrichment.js";
+import { enrichLogsForClient } from "../lib/attachScopedReviews.js";
 import {
   computeGenreFacets,
   fetchLogsWithGenreFilter,
@@ -506,9 +538,9 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
         usePagination: true,
       });
       if (Array.isArray(result)) {
-        res.json(await attachItemEnrichment(prisma, result));
+        res.json(await enrichLogsForClient(prisma, result));
       } else {
-        const enriched = await attachItemEnrichment(prisma, result.data);
+        const enriched = await enrichLogsForClient(prisma, result.data);
         res.json({ data: enriched, nextCursor: result.nextCursor });
       }
       return;
@@ -522,9 +554,9 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       usePagination: false,
     });
     if (Array.isArray(data)) {
-      res.json(await attachItemEnrichment(prisma, data));
+      res.json(await enrichLogsForClient(prisma, data));
     } else {
-      const enriched = await attachItemEnrichment(prisma, data.data);
+      const enriched = await enrichLogsForClient(prisma, data.data);
       res.json({ data: enriched, nextCursor: data.nextCursor });
     }
     return;
@@ -541,7 +573,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     const hasMore = logs.length > takeSize;
     const data = (hasMore ? logs.slice(0, takeSize) : logs).map(serializeLog);
     const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null;
-    const enriched = await attachItemEnrichment(prisma, data);
+    const enriched = await enrichLogsForClient(prisma, data);
     res.json({ data: enriched, nextCursor });
     return;
   }
@@ -550,7 +582,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     where,
     orderBy,
   });
-  const enriched = await attachItemEnrichment(prisma, logs.map(serializeLog));
+  const enriched = await enrichLogsForClient(prisma, logs.map(serializeLog));
   res.json(enriched);
 });
 
@@ -595,7 +627,7 @@ logsRouter.get("/feed", async (req: AuthenticatedRequest, res) => {
     }
     return serialized;
   });
-  const enrichedLogs = await attachItemEnrichment(prisma, serializedLogs);
+  const enrichedLogs = await enrichLogsForClient(prisma, serializedLogs);
   const data = rows.map((row, idx) => ({
     log: enrichedLogs[idx]!,
     user: {
@@ -644,9 +676,10 @@ logsRouter.delete("/:id/reaction", async (req: AuthenticatedRequest, res) => {
   res.status(204).end();
 });
 
-/** GET /logs/stats?group=summary|category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear - summary = account totals; category/month/year rows include { hours, count }; genre uses unique log counts per genre name */
+/** GET /logs/stats?group=summary|category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear&mediaType=optional - summary = account totals; category/month/year rows include { hours, count }; genre uses unique log counts per genre name */
 logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
+  const statsMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { tier: true },
@@ -699,7 +732,9 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     const dateWhere = logSpendStatsDateWhere(range);
     const purchaseSpendingAnd: Prisma.LogWhereInput[] = [
       { userId },
-      { mediaType: { in: [...SPEND_TRACKED_MEDIA_TYPES] } },
+      statsMediaType
+        ? { mediaType: statsMediaType }
+        : { mediaType: { in: [...SPEND_TRACKED_MEDIA_TYPES] } },
       spendPresentWhere,
     ];
     if (Object.keys(dateWhere).length > 0) purchaseSpendingAnd.push(dateWhere);
@@ -768,25 +803,40 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 
   if (group === "summary") {
-    const totalWhere = freeMonthWhere ? mergeLogWhere({ userId }, freeMonthWhere) : { userId };
-    const completedCountWhere: Prisma.LogWhereInput = freeMonthRange
-      ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-      : { userId, completedAt: { not: null } };
-    const reviewedWhere = freeMonthWhere
-      ? mergeLogWhere({ userId, grade: { not: null } }, freeMonthWhere)
-      : { userId, grade: { not: null } };
-    const completedForHoursWhere: Prisma.LogWhereInput = freeMonthRange
-      ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-      : { userId, completedAt: { not: null } };
+    const totalWhere = applyStatsMediaFilter(
+      freeMonthWhere ? mergeLogWhere({ userId }, freeMonthWhere) : { userId },
+      statsMediaType
+    );
+    const completedCountWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
+      freeMonthRange
+        ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+        : { userId, completedAt: { not: null } },
+      statsMediaType
+    );
+    const reviewedWhere = applyStatsMediaFilter(
+      freeMonthWhere
+        ? mergeLogWhere({ userId, grade: { not: null } }, freeMonthWhere)
+        : { userId, grade: { not: null } },
+      statsMediaType
+    );
+    const completedForHoursWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
+      freeMonthRange
+        ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+        : { userId, completedAt: { not: null } },
+      statsMediaType
+    );
 
-    const spendLifetimeWhere: Prisma.LogWhereInput = {
-      userId,
-      mediaType: { in: [...SPEND_TRACKED_MEDIA_TYPES] },
-      OR: [
-        { AND: [{ purchaseAmountMinor: { not: null } }, { purchaseCurrency: { not: null } }] },
-        { AND: [{ saleAmountMinor: { not: null } }, { saleCurrency: { not: null } }] },
-      ],
-    };
+    const spendLifetimeWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
+      {
+        userId,
+        mediaType: { in: [...SPEND_TRACKED_MEDIA_TYPES] },
+        OR: [
+          { AND: [{ purchaseAmountMinor: { not: null } }, { purchaseCurrency: { not: null } }] },
+          { AND: [{ saleAmountMinor: { not: null } }, { saleCurrency: { not: null } }] },
+        ],
+      },
+      statsMediaType
+    );
 
     const [totalLogs, completedLogCount, reviewedLogs, completedLogs, spendLifetimeRows] =
       await Promise.all([
@@ -852,7 +902,10 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 
   if (group === "genre") {
-    const genreBase: Prisma.LogWhereInput = { userId, genres: { not: null } };
+    const genreBase: Prisma.LogWhereInput = applyStatsMediaFilter(
+      { userId, genres: { not: null } },
+      statsMediaType
+    );
     const logs = await prisma.log.findMany({
       where: freeMonthWhere ? mergeLogWhere(genreBase, freeMonthWhere) : genreBase,
       select: { id: true, genres: true },
@@ -879,9 +932,12 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 
   if (group === "completedByMonth" || group === "completedByYear") {
-    const completedTimeWhere: Prisma.LogWhereInput = freeMonthRange
-      ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-      : { userId, completedAt: { not: null } };
+    const completedTimeWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
+      freeMonthRange
+        ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+        : { userId, completedAt: { not: null } },
+      statsMediaType
+    );
     const logs = await prisma.log.findMany({
       where: completedTimeWhere,
       select: { completedAt: true },
@@ -903,9 +959,12 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 
   if (group === "categoryByMonth" || group === "categoryByYear") {
-    const catTimeWhere: Prisma.LogWhereInput = freeMonthRange
-      ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-      : { userId, completedAt: { not: null } };
+    const catTimeWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
+      freeMonthRange
+        ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+        : { userId, completedAt: { not: null } },
+      statsMediaType
+    );
     const logs = await prisma.log.findMany({
       where: catTimeWhere,
       select: { completedAt: true, mediaType: true },
@@ -918,6 +977,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
           ? `${d.getUTCFullYear()}`
           : `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
       const mt = log.mediaType as string;
+      if (statsMediaType && mt !== statsMediaType) continue;
       if (!byPeriodCategory[period]) byPeriodCategory[period] = {};
       byPeriodCategory[period][mt] = (byPeriodCategory[period][mt] ?? 0) + 1;
     }
@@ -932,9 +992,12 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const hoursRollupWhere: Prisma.LogWhereInput = freeMonthRange
-    ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-    : { userId, completedAt: { not: null } };
+  const hoursRollupWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
+    freeMonthRange
+      ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+      : { userId, completedAt: { not: null } },
+    statsMediaType
+  );
   const logs = await prisma.log.findMany({
     where: hoursRollupWhere,
     select: { completedAt: true, contentHours: true, startedAt: true, mediaType: true, hoursToBeat: true, matchesPlayed: true },
@@ -991,17 +1054,21 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
     }
   }
   const { gte: start, lte: end } = bounds;
+  const byDateMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
   const logs = await prisma.log.findMany({
-    where: {
-      userId,
-      OR: [
-        { completedAt: { gte: start, lte: end } },
-        { startedAt: { gte: start, lte: end } },
-      ],
-    },
+    where: applyStatsMediaFilter(
+      {
+        userId,
+        OR: [
+          { completedAt: { gte: start, lte: end } },
+          { startedAt: { gte: start, lte: end } },
+        ],
+      },
+      byDateMediaType
+    ),
     orderBy: [{ completedAt: "desc" }, { startedAt: "desc" }, { updatedAt: "desc" }],
   });
-  const enriched = await attachItemEnrichment(prisma, logs.map(serializeLog));
+  const enriched = await enrichLogsForClient(prisma, logs.map(serializeLog));
   res.json({ data: enriched });
 });
 
@@ -1032,14 +1099,18 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
   }
   const start = new Date(Date.UTC(year, month - 1, 1));
   const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+  const calendarMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
   const logs = await prisma.log.findMany({
-    where: {
-      userId,
-      OR: [
-        { startedAt: { gte: start, lte: end } },
-        { completedAt: { gte: start, lte: end } },
-      ],
-    },
+    where: applyStatsMediaFilter(
+      {
+        userId,
+        OR: [
+          { startedAt: { gte: start, lte: end } },
+          { completedAt: { gte: start, lte: end } },
+        ],
+      },
+      calendarMediaType
+    ),
     select: { startedAt: true, completedAt: true },
   });
   const dates: Record<string, number> = {};
@@ -1071,17 +1142,17 @@ const EXPORT_COLUMNS_BY_MEDIA: Record<MediaType, readonly string[]> = {
   movies: ["externalId", "title", "grade", "status", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   tv: ["externalId", "title", "grade", "status", "season", "episode", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   anime: ["externalId", "title", "grade", "status", "season", "episode", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
-  books: ["externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
+  books: ["externalId", "title", "grade", "status", "chapter", "volume", "pagesRead", "contentHours", "startedAt", "completedAt", "review", "createdAt", "updatedAt"],
   manga: [
-    "externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "purchaseAmountMinor",
+    "externalId", "title", "grade", "status", "chapter", "volume", "pagesRead", "contentHours", "purchaseAmountMinor",
     "purchaseCurrency", "saleAmountMinor", "saleCurrency", "sold", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
   ],
   comics: [
-    "externalId", "title", "grade", "status", "chapter", "volume", "contentHours", "purchaseAmountMinor",
+    "externalId", "title", "grade", "status", "chapter", "volume", "pagesRead", "contentHours", "purchaseAmountMinor",
     "purchaseCurrency", "saleAmountMinor", "saleCurrency", "sold", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
   ],
   games: [
-    "externalId", "title", "grade", "status", "contentHours", "hoursToBeat", "own", "wantToBuy", "sold",
+    "externalId", "title", "grade", "status", "contentHours", "hoursToBeat", "gamePlatform", "own", "wantToBuy", "sold",
     "purchaseAmountMinor", "purchaseCurrency", "saleAmountMinor", "saleCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
   ],
   boardgames: [
@@ -1101,6 +1172,8 @@ function getExportValue(
     episode: number | null;
     chapter: number | null;
     volume: number | null;
+    pagesRead: number | null;
+    gamePlatform: string | null;
     startedAt: Date | null;
     completedAt: Date | null;
     contentHours: number | null;
@@ -1129,6 +1202,8 @@ function getExportValue(
     case "episode": return log.episode;
     case "chapter": return log.chapter;
     case "volume": return log.volume;
+    case "pagesRead": return log.pagesRead;
+    case "gamePlatform": return log.gamePlatform;
     case "startedAt": return log.startedAt?.toISOString() ?? null;
     case "completedAt": return log.completedAt?.toISOString() ?? null;
     case "contentHours": return log.contentHours;
@@ -1273,6 +1348,10 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     episode,
     chapter,
     volume,
+    pagesRead: bodyPagesRead,
+    gamePlatform: bodyGamePlatform,
+    startedAt: bodyStartedAt,
+    completedAt: bodyCompletedAt,
     contentHours,
     hoursToBeat,
     genres: genresInput,
@@ -1323,10 +1402,28 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
   }
   const sanitizedImage = image != null ? sanitizeUrl(image) : null;
   const sanitizedReview = sanitizeReview(review ?? null);
+  const sanitizedGamePlatform =
+    bodyGamePlatform !== undefined && bodyGamePlatform != null
+      ? sanitizeText(bodyGamePlatform, GAME_PLATFORM_MAX_LENGTH)
+      : undefined;
   const now = new Date();
-  const createStartedAt = isInProgress(status) ? now : null;
-  const createCompletedAt = isCompleted(status) ? now : null;
-  const grade = isInProgress(status) ? null : (gradeInput ?? null);
+  const createStartedAt =
+    bodyStartedAt !== undefined
+      ? bodyStartedAt == null
+        ? null
+        : parseManualLogDate(bodyStartedAt)
+      : isInProgress(status)
+        ? now
+        : null;
+  const createCompletedAt =
+    bodyCompletedAt !== undefined
+      ? bodyCompletedAt == null
+        ? null
+        : parseManualLogDate(bodyCompletedAt)
+      : isCompleted(status)
+        ? now
+        : null;
+  const grade = gradeInput ?? null;
   try {
     const existing = await prisma.log.findUnique({
       where: { userId_mediaType_externalId: { userId, mediaType, externalId: sanitizedExternalId } },
@@ -1426,6 +1523,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         episode: number | null;
         chapter: number | null;
         volume: number | null;
+        pagesRead?: number | null;
+        gamePlatform?: string | null;
         genres?: string | null;
         mechanics?: string | null;
         affinityContext?: string | null;
@@ -1467,8 +1566,24 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       if (bodyMatchesPlayed !== undefined && mediaType === "boardgames") {
         updateData.matchesPlayed = bodyMatchesPlayed ?? null;
       }
-      if (isInProgress(status) && existing.startedAt == null) updateData.startedAt = now;
-      if (isCompleted(status)) updateData.completedAt = now;
+      if (bodyPagesRead !== undefined) {
+        updateData.pagesRead = bodyPagesRead;
+      }
+      if (bodyGamePlatform !== undefined) {
+        updateData.gamePlatform = sanitizedGamePlatform ?? null;
+      }
+      if (bodyStartedAt !== undefined) {
+        updateData.startedAt =
+          bodyStartedAt == null ? null : parseManualLogDate(bodyStartedAt);
+      } else if (isInProgress(status) && existing.startedAt == null) {
+        updateData.startedAt = now;
+      }
+      if (bodyCompletedAt !== undefined) {
+        updateData.completedAt =
+          bodyCompletedAt == null ? null : parseManualLogDate(bodyCompletedAt);
+      } else if (isCompleted(status)) {
+        updateData.completedAt = now;
+      }
       const prevSpendSnap = spendMonetarySnapshotFromLog(existing);
       const nextSpendSnap = spendMonetarySnapshotFromLog({
         purchaseAmountMinor: updateData.purchaseAmountMinor ?? null,
@@ -1543,6 +1658,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           episode: episode ?? null,
           chapter: chapter ?? null,
           volume: volume ?? null,
+          pagesRead: bodyPagesRead ?? null,
+          gamePlatform: sanitizedGamePlatform ?? null,
           genres: genresJson,
           mechanics: mechanicsJson,
           affinityContext: affinityStored !== undefined ? affinityStored : null,
@@ -1598,6 +1715,107 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
   } catch (e) {
     res.status(500).json({ error: "Failed to save log" });
   }
+});
+
+const scopedReviewBodySchema = z.object({
+  scope: z.enum(["show", "season", "episode"]),
+  season: optionalInt,
+  episode: optionalInt,
+  grade: optionalInt,
+  review: z.string().max(10_000).optional().nullable(),
+});
+
+function isTvOrAnime(mediaType: string): boolean {
+  return mediaType === "tv" || mediaType === "anime";
+}
+
+/** GET /logs/:id/scoped-reviews — TV/anime granular reviews for this log. */
+logsRouter.get("/:id/scoped-reviews", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const logId = req.params.id;
+  const log = await prisma.log.findFirst({
+    where: { id: logId, userId },
+    select: { id: true, mediaType: true },
+  });
+  if (!log) {
+    res.status(404).json({ error: "Log not found" });
+    return;
+  }
+  if (!isTvOrAnime(log.mediaType)) {
+    res.status(400).json({ error: "Scoped reviews are only for TV and anime" });
+    return;
+  }
+  const rows = await prisma.scopedReview.findMany({
+    where: { logId },
+    orderBy: [{ seasonNum: "asc" }, { episodeNum: "asc" }],
+  });
+  const { serializeScopedReview } = await import("../lib/scopedReview.js");
+  res.json({ data: rows.map(serializeScopedReview) });
+});
+
+/** PUT /logs/:id/scoped-reviews — upsert a season or episode review (show-level stays on the log). */
+logsRouter.put("/:id/scoped-reviews", async (req: AuthenticatedRequest, res) => {
+  const parsed = scopedReviewBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid scoped review body" });
+    return;
+  }
+  if (parsed.data.scope === "show") {
+    res.status(400).json({ error: "Use the main log form for the series review" });
+    return;
+  }
+  const userId = req.user!.userId;
+  const logId = req.params.id;
+  const log = await prisma.log.findFirst({
+    where: { id: logId, userId },
+    select: { id: true, mediaType: true },
+  });
+  if (!log) {
+    res.status(404).json({ error: "Log not found" });
+    return;
+  }
+  if (!isTvOrAnime(log.mediaType)) {
+    res.status(400).json({ error: "Scoped reviews are only for TV and anime" });
+    return;
+  }
+  const { parseScopedScopeInput, serializeScopedReview } = await import("../lib/scopedReview.js");
+  const scopeParsed = parseScopedScopeInput(
+    parsed.data.scope,
+    parsed.data.season,
+    parsed.data.episode
+  );
+  if (!scopeParsed.ok) {
+    res.status(400).json({ error: scopeParsed.error });
+    return;
+  }
+  const grade = parsed.data.grade ?? null;
+  const review = sanitizeReview(parsed.data.review ?? null);
+  const hasContent = grade != null || (review != null && review.trim() !== "");
+  const { seasonNum, episodeNum, scope } = scopeParsed;
+
+  if (!hasContent) {
+    await prisma.scopedReview.deleteMany({
+      where: { logId, scope, seasonNum, episodeNum },
+    });
+    res.json({ data: null });
+    return;
+  }
+
+  const row = await prisma.scopedReview.upsert({
+    where: {
+      logId_scope_seasonNum_episodeNum: { logId, scope, seasonNum, episodeNum },
+    },
+    create: {
+      logId,
+      scope,
+      seasonNum,
+      episodeNum,
+      grade,
+      review,
+    },
+    update: { grade, review },
+  });
+  res.json({ data: serializeScopedReview(row) });
 });
 
 /** List play sessions for a board-game log. */
@@ -1805,6 +2023,8 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     episode?: number | null;
     chapter?: number | null;
     volume?: number | null;
+    pagesRead?: number | null;
+    gamePlatform?: string | null;
     genres?: string | null;
     mechanics?: string | null;
     affinityContext?: string | null;
@@ -1825,8 +2045,20 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
   if (parsed.data.status !== undefined) {
     data.status = parsed.data.status;
     const now = new Date();
-    if (isInProgress(parsed.data.status) && log.startedAt == null) data.startedAt = now;
-    if (isCompleted(parsed.data.status)) data.completedAt = now;
+    if (parsed.data.startedAt === undefined && isInProgress(parsed.data.status) && log.startedAt == null) {
+      data.startedAt = now;
+    }
+    if (parsed.data.completedAt === undefined && isCompleted(parsed.data.status)) {
+      data.completedAt = now;
+    }
+  }
+  if (parsed.data.startedAt !== undefined) {
+    data.startedAt =
+      parsed.data.startedAt == null ? null : parseManualLogDate(parsed.data.startedAt);
+  }
+  if (parsed.data.completedAt !== undefined) {
+    data.completedAt =
+      parsed.data.completedAt == null ? null : parseManualLogDate(parsed.data.completedAt);
   }
   if (parsed.data.contentHours !== undefined) data.contentHours = parsed.data.contentHours;
   if (parsed.data.hoursToBeat !== undefined) data.hoursToBeat = parsed.data.hoursToBeat;
@@ -1834,6 +2066,13 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
   if (parsed.data.episode !== undefined) data.episode = parsed.data.episode;
   if (parsed.data.chapter !== undefined) data.chapter = parsed.data.chapter;
   if (parsed.data.volume !== undefined) data.volume = parsed.data.volume;
+  if (parsed.data.pagesRead !== undefined) data.pagesRead = parsed.data.pagesRead;
+  if (parsed.data.gamePlatform !== undefined) {
+    data.gamePlatform =
+      parsed.data.gamePlatform == null
+        ? null
+        : sanitizeText(parsed.data.gamePlatform, GAME_PLATFORM_MAX_LENGTH);
+  }
   if (parsed.data.genres !== undefined) {
     data.genres = parsed.data.genres && parsed.data.genres.length > 0 ? JSON.stringify(parsed.data.genres.slice(0, 20)) : null;
   }
@@ -1903,7 +2142,6 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
       data.saleCurrency = sn.saleCurrency;
     }
   }
-  if (isInProgress(parsed.data.status)) data.grade = null;
   const mergedPurchaseMinor =
     data.purchaseAmountMinor !== undefined ? data.purchaseAmountMinor : log.purchaseAmountMinor;
   const mergedPurchaseCurrency =

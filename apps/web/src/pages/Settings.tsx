@@ -22,7 +22,13 @@ import { useMe } from "@/contexts/MeContext";
 import { getShowCompleteModal, SHOW_COMPLETE_MODAL_STORAGE_KEY } from "@/contexts/LogCompleteContext";
 import * as storage from "@/lib/storage";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
-import { MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
+import {
+  DEFAULT_PROFILE_VISIBILITY,
+  MEDIA_TYPES,
+  type BoardGameProvider,
+  type MediaType,
+  type ProfileVisibility,
+} from "@geeklogs/shared";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 import { tierHasProFeatures } from "@/lib/userTier";
@@ -83,6 +89,10 @@ export function Settings() {
   const [adminFlagSavingKey, setAdminFlagSavingKey] = useState<string | null>(null);
   const [digestSending, setDigestSending] = useState(false);
   const [recapSaving, setRecapSaving] = useState(false);
+  const [profileVisibility, setProfileVisibility] = useState<ProfileVisibility>(
+    () => ({ ...DEFAULT_PROFILE_VISIBILITY })
+  );
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportSelectedCategories, setExportSelectedCategories] = useState<Set<MediaType>>(() => new Set(MEDIA_TYPES));
@@ -188,6 +198,36 @@ export function Settings() {
       setOrderedMediaTypes([...visible, ...rest]);
     }
   }, [me?.visibleMediaTypes]);
+
+  useEffect(() => {
+    if (me?.profileVisibility) {
+      setProfileVisibility(me.profileVisibility);
+    }
+  }, [me?.profileVisibility]);
+
+  const handleProfileVisibilityChange = async (
+    key: keyof ProfileVisibility,
+    value: boolean
+  ) => {
+    if (!token) return;
+    const prev = profileVisibility;
+    const next = { ...prev, [key]: value };
+    setProfileVisibility(next);
+    setVisibilitySaving(true);
+    try {
+      await apiFetch<ProfileVisibility>("/settings/profile-visibility", {
+        method: "PUT",
+        body: JSON.stringify(next),
+      });
+      await refetchMe();
+      toast.success(t("settings.profileVisibilitySaved"));
+    } catch (err) {
+      setProfileVisibility(prev);
+      showErrorToast(t, "E008", { originalError: err });
+    } finally {
+      setVisibilitySaving(false);
+    }
+  };
 
   const handleSave = async (provider: ApiKeyProvider) => {
     const value =
@@ -553,6 +593,112 @@ export function Settings() {
               </div>
             </div>
           </div>
+        </Card>
+
+        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+          <motion.div
+            className="flex flex-col gap-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <h3 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("settings.profileVisibilityTitle")}</OverflowMarquee>
+            </h3>
+            <p className="text-sm text-[var(--color-light)]">
+              {t("settings.profileVisibilityIntro")}
+            </p>
+            {me?.user.username ? (
+              <p className="text-sm text-[var(--color-light)]">
+                <Link
+                  to={`/${me.user.username}`}
+                  className="text-[var(--color-primary)] underline-offset-2 hover:underline"
+                >
+                  {t("settings.profileVisibilityViewProfile")}
+                </Link>
+              </p>
+            ) : null}
+            <motion.div
+              className="divide-y divide-[var(--color-surface-border)]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <p className="pb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
+                {t("settings.profileVisibilitySectionProfile")}
+              </p>
+              {(
+                [
+                  ["showPublicProfile", "settings.profileVisibilityShowPublicProfile"],
+                  ["showLogCount", "settings.profileVisibilityShowLogCount"],
+                  ["showPinnedBadges", "settings.profileVisibilityShowPinnedBadges"],
+                  ["showMilestoneBadges", "settings.profileVisibilityShowMilestoneBadges"],
+                ] as const
+              ).map(([key, labelKey]) => (
+                <motion.div
+                  key={key}
+                  className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                >
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium text-[var(--color-lightest)]">
+                      {t(labelKey)}
+                    </span>
+                  </div>
+                  <div className="shrink-0 pt-0.5">
+                    <Switch
+                      checked={profileVisibility[key]}
+                      disabled={visibilitySaving || !me}
+                      onCheckedChange={(v) => void handleProfileVisibilityChange(key, v)}
+                      aria-label={t(labelKey)}
+                    />
+                  </div>
+                </motion.div>
+              ))}
+              <p className="pb-2 pt-4 text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
+                {t("settings.profileVisibilitySectionLogs")}
+              </p>
+              {(
+                [
+                  ["showStatus", "settings.profileVisibilityShowStatus"],
+                  ["showRatings", "settings.profileVisibilityShowRatings"],
+                  ["showReviews", "settings.profileVisibilityShowReviews"],
+                  ["showGenres", "settings.profileVisibilityShowGenres"],
+                  ["showApiScores", "settings.profileVisibilityShowApiScores"],
+                  ["showProgress", "settings.profileVisibilityShowProgress"],
+                  ["showCompletionTime", "settings.profileVisibilityShowCompletionTime"],
+                  ["showCollectionTags", "settings.profileVisibilityShowCollectionTags"],
+                  ["showTvMetadata", "settings.profileVisibilityShowTvMetadata"],
+                  ["showEnrichmentDetails", "settings.profileVisibilityShowEnrichmentDetails"],
+                ] as const
+              ).map(([key, labelKey]) => (
+                <motion.div
+                  key={key}
+                  className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 last:pb-0"
+                >
+                  <motion.div className="min-w-0">
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        profileVisibility.showPublicProfile
+                          ? "text-[var(--color-lightest)]"
+                          : "text-[var(--color-light)]"
+                      )}
+                    >
+                      {t(labelKey)}
+                    </span>
+                  </motion.div>
+                  <motion.div className="shrink-0 pt-0.5">
+                    <Switch
+                      checked={profileVisibility[key]}
+                      disabled={
+                        visibilitySaving || !me || !profileVisibility.showPublicProfile
+                      }
+                      onCheckedChange={(v) => void handleProfileVisibilityChange(key, v)}
+                      aria-label={t(labelKey)}
+                    />
+                  </motion.div>
+                </motion.div>
+              ))}
+            </motion.div>
+          </motion.div>
         </Card>
 
         <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">

@@ -15,14 +15,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { NumberCombobox } from "@/components/ui/number-combobox";
-import type { MediaType, Log } from "@geeklogs/shared";
+import type { MediaType, Log, ReviewScope, ScopedReview } from "@geeklogs/shared";
 import { BoardGameMatchesSection } from "@/components/BoardGameMatchesSection";
+import {
+  TvGranularReviewSection,
+  emptyTvReviewDraft,
+  saveScopedReviewTab,
+  type TvReviewTabDraft,
+} from "@/components/TvGranularReviewSection";
+import { GameLogFields } from "@/components/GameLogFields";
+import { ReadingProgressFields } from "@/components/ReadingProgressFields";
+import { dateInputToIso, isoToDateInput } from "@/lib/readingDates";
 import { cn } from "@/lib/utils";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
+import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { trackProductEvent } from "@/lib/productAnalytics";
-import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { triggerImpact } from "@/lib/capacitorHaptics";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
@@ -49,6 +57,8 @@ const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
 /** TV only; anime uses episode without season. */
 const HAS_SEASON_FIELD: MediaType[] = ["tv"];
 const HAS_CHAPTER_VOLUME: MediaType[] = ["comics", "manga"];
+const HAS_READING_PROGRESS: MediaType[] = ["books", "manga", "comics"];
+const HAS_GAME_LOG_FIELDS: MediaType[] = ["games"];
 
 interface LogFormCreateProps {
   mode: "create";
@@ -69,6 +79,8 @@ interface LogFormEditProps {
   initialBoardGameTab?: "review" | "matches";
   /** Board games: after a match is saved/deleted, parent should refresh `log` (e.g. matchesPlayed). */
   onLogRefreshed?: (log: Log) => void;
+  /** Games: platform names from item detail (console picker suggestions). */
+  platforms?: string[] | null;
   onSaved: (completion?: LogCompleteState, savedLog?: Log) => void;
   onCancel: () => void;
   /** Called when user confirms delete; modal will close after. */
@@ -79,7 +91,7 @@ type LogFormProps = LogFormCreateProps | LogFormEditProps;
 
 const toNum = (v: number | ""): number | null => (v === "" ? null : v);
 
-function logFromApiResponse(res: Log & { newBadges?: NewBadge[] }): Log {
+function logFromApiResponse(res: Log & { newBadges?: unknown[] }): Log {
   const { newBadges: _nb, ...rest } = res;
   void _nb;
   return rest;
@@ -93,9 +105,8 @@ export function LogForm(props: LogFormProps) {
   const log = isEdit ? props.log : null;
   const mediaType = isEdit ? (log!.mediaType as MediaType) : (props as LogFormCreateProps).mediaType;
 
-  const isInProgressInitial = isEdit && log!.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log!.status);
   const [stars, setStars] = useState<number | null>(
-    isEdit ? (isInProgressInitial ? null : (log!.grade != null ? gradeToStars(log!.grade) : null)) : null
+    isEdit ? (log!.grade != null ? gradeToStars(log!.grade) : null) : null
   );
   const [review, setReview] = useState(isEdit ? (log!.review ?? "") : "");
   const [status, setStatus] = useState<string | null>(
@@ -105,6 +116,10 @@ export function LogForm(props: LogFormProps) {
   const [episode, setEpisode] = useState<number | "">(isEdit ? (log!.episode ?? "") : "");
   const [chapter, setChapter] = useState<number | "">(isEdit ? (log!.chapter ?? "") : "");
   const [volume, setVolume] = useState<number | "">(isEdit ? (log!.volume ?? "") : "");
+  const [pagesRead, setPagesRead] = useState<number | "">(isEdit ? (log!.pagesRead ?? "") : "");
+  const [gamePlatform, setGamePlatform] = useState(isEdit ? (log!.gamePlatform ?? "") : "");
+  const [startedAtInput, setStartedAtInput] = useState(isEdit ? isoToDateInput(log!.startedAt) : "");
+  const [completedAtInput, setCompletedAtInput] = useState(isEdit ? isoToDateInput(log!.completedAt) : "");
   const [hoursToBeat, setHoursToBeat] = useState<number | "">(isEdit ? (log!.hoursToBeat ?? "") : "");
   const [own, setOwn] = useState(isEdit ? (log!.own ?? false) : false);
   const [wantToBuy, setWantToBuy] = useState(isEdit ? (log!.wantToBuy ?? false) : false);
@@ -131,11 +146,20 @@ export function LogForm(props: LogFormProps) {
   const [progressOptions, setProgressOptions] = useState<ProgressOptions | null>(null);
   const [progressOptionsLoading, setProgressOptionsLoading] = useState(false);
   const [boardMainTab, setBoardMainTab] = useState<"review" | "matches">("review");
+  const tvGranular = mediaType === "tv" || mediaType === "anime";
+  const [tvReviewTab, setTvReviewTab] = useState<ReviewScope>("show");
+  const [scopedReviews, setScopedReviews] = useState<ScopedReview[]>([]);
+  const [seasonDraft, setSeasonDraft] = useState<TvReviewTabDraft>(() => emptyTvReviewDraft());
+  const [episodeDraft, setEpisodeDraft] = useState<TvReviewTabDraft>(() => emptyTvReviewDraft());
 
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showSeasonField = HAS_SEASON_FIELD.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
+  const showReadingProgress = HAS_READING_PROGRESS.includes(mediaType);
+  const showGameLogFields = HAS_GAME_LOG_FIELDS.includes(mediaType);
+  const platformOptions =
+    isEdit && "platforms" in props ? (props.platforms ?? null) : null;
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
   const showHoursToBeat = mediaType === "games";
@@ -145,6 +169,7 @@ export function LogForm(props: LogFormProps) {
     showPurchaseAmount && spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
   const showSaleAmountField = showPurchaseAmount && (!showCollectionOwnership || sold);
   const showBoardGameTabs = isEdit && showBoardGameFields;
+  const showTvTabs = isEdit && tvGranular;
   const initialBoardGameTab = isEdit && "initialBoardGameTab" in props ? props.initialBoardGameTab : undefined;
   const onLogRefreshed = isEdit && "onLogRefreshed" in props ? props.onLogRefreshed : undefined;
 
@@ -201,14 +226,17 @@ export function LogForm(props: LogFormProps) {
 
   useEffect(() => {
     if (isEdit && log) {
-      const inProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
-      setStars(inProgress ? null : (log.grade != null ? gradeToStars(log.grade) : null));
+      setStars(log.grade != null ? gradeToStars(log.grade) : null);
       setReview(log.review ?? "");
       setStatus(log.status ?? log.listType ?? null);
       setSeason(log.season ?? "");
       setEpisode(log.episode ?? "");
       setChapter(log.chapter ?? "");
       setVolume(log.volume ?? "");
+      setPagesRead(log.pagesRead ?? "");
+      setGamePlatform(log.gamePlatform ?? "");
+      setStartedAtInput(isoToDateInput(log.startedAt));
+      setCompletedAtInput(isoToDateInput(log.completedAt));
       setHoursToBeat(log.hoursToBeat ?? "");
       setOwn(log.own ?? false);
       setWantToBuy(log.wantToBuy ?? false);
@@ -237,13 +265,32 @@ export function LogForm(props: LogFormProps) {
     setBoardMainTab(initialBoardGameTab ?? "review");
   }, [showBoardGameTabs, log?.id, initialBoardGameTab]);
 
+  useEffect(() => {
+    if (!showTvTabs || !log?.id) {
+      setScopedReviews([]);
+      return;
+    }
+    apiFetch<{ data: ScopedReview[] }>(`/logs/${log.id}/scoped-reviews`)
+      .then((res) => setScopedReviews(res.data ?? []))
+      .catch(() => setScopedReviews([]));
+  }, [showTvTabs, log?.id]);
+
+  useEffect(() => {
+    if (!showTvTabs) {
+      setTvReviewTab("show");
+      return;
+    }
+    setTvReviewTab("show");
+    setSeasonDraft(emptyTvReviewDraft());
+    setEpisodeDraft(emptyTvReviewDraft());
+  }, [showTvTabs, log?.id]);
+
   const title = isEdit ? log!.title : props.title;
   const image = isEdit ? (log!.image ?? null) : (props as LogFormCreateProps).image;
 
   const isDirty = useMemo(() => {
     if (isEdit && log) {
-      const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-      const grade = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
+      const grade = stars == null ? null : starsToGrade(stars);
       const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
       const episodesCount = "episodesCount" in props ? props.episodesCount : undefined;
       const episodeForPayload =
@@ -259,6 +306,14 @@ export function LogForm(props: LogFormProps) {
         episodeForPayload === (log.episode ?? null) &&
         toNum(chapter) === (log.chapter ?? null) &&
         toNum(volume) === (log.volume ?? null) &&
+        (!showReadingProgress ||
+          (toNum(pagesRead) === (log.pagesRead ?? null) &&
+            (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (log.startedAt ?? null) &&
+            (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) === (log.completedAt ?? null))) &&
+        (!showGameLogFields ||
+          ((gamePlatform.trim() || null) === (log.gamePlatform ?? null) &&
+            (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (log.startedAt ?? null) &&
+            (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) === (log.completedAt ?? null))) &&
         (!showHoursToBeat || toNum(hoursToBeat) === (log.hoursToBeat ?? null)) &&
         (!showCollectionOwnership ||
           (own === (log.own ?? false) &&
@@ -301,6 +356,8 @@ export function LogForm(props: LogFormProps) {
       episode !== "" ||
       chapter !== "" ||
       volume !== "" ||
+      (showReadingProgress && (pagesRead !== "" || startedAtInput !== "" || completedAtInput !== "")) ||
+      (showGameLogFields && (gamePlatform.trim() !== "" || startedAtInput !== "" || completedAtInput !== "")) ||
       (showHoursToBeat && hoursToBeat !== "") ||
       (showCollectionOwnership && (own || wantToBuy || sold)) ||
       (showBoardGameFields &&
@@ -318,6 +375,9 @@ export function LogForm(props: LogFormProps) {
     episode,
     chapter,
     volume,
+    pagesRead,
+    startedAtInput,
+    completedAtInput,
     hoursToBeat,
     own,
     wantToBuy,
@@ -325,6 +385,9 @@ export function LogForm(props: LogFormProps) {
     matchesPlayed,
     props,
     showSeasonEpisode,
+    showReadingProgress,
+    showGameLogFields,
+    gamePlatform,
     showHoursToBeat,
     showCollectionOwnership,
     showBoardGameFields,
@@ -347,8 +410,7 @@ export function LogForm(props: LogFormProps) {
     const quiet = options?.quiet === true;
     const skipCancelIfUnchanged = options?.skipCancelIfUnchanged === true;
     const wasFirstLog = !isEdit && (me?.logCount ?? 0) === 0;
-    const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-    const grade = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
+    const grade = stars == null ? null : starsToGrade(stars);
     if (!optimisticClose && !quiet) setLoading(true);
     try {
       if (isEdit && log) {
@@ -367,6 +429,16 @@ export function LogForm(props: LogFormProps) {
           chapter: toNum(chapter),
           volume: toNum(volume),
         };
+        if (showReadingProgress) {
+          payload.pagesRead = toNum(pagesRead);
+          payload.startedAt = startedAtInput.trim() ? dateInputToIso(startedAtInput) : null;
+          payload.completedAt = completedAtInput.trim() ? dateInputToIso(completedAtInput) : null;
+        }
+        if (showGameLogFields) {
+          payload.gamePlatform = gamePlatform.trim() || null;
+          payload.startedAt = startedAtInput.trim() ? dateInputToIso(startedAtInput) : null;
+          payload.completedAt = completedAtInput.trim() ? dateInputToIso(completedAtInput) : null;
+        }
         if (showHoursToBeat) payload.hoursToBeat = toNum(hoursToBeat);
         if (showCollectionOwnership) {
           payload.own = own;
@@ -404,6 +476,16 @@ export function LogForm(props: LogFormProps) {
           episodeForPayload === (props.log.episode ?? null) &&
           toNum(chapter) === (props.log.chapter ?? null) &&
           toNum(volume) === (props.log.volume ?? null) &&
+          (!showReadingProgress ||
+            (toNum(pagesRead) === (props.log.pagesRead ?? null) &&
+              (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (props.log.startedAt ?? null) &&
+              (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) ===
+                (props.log.completedAt ?? null))) &&
+          (!showGameLogFields ||
+            ((gamePlatform.trim() || null) === (props.log.gamePlatform ?? null) &&
+              (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (props.log.startedAt ?? null) &&
+              (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) ===
+                (props.log.completedAt ?? null))) &&
           (!showHoursToBeat || toNum(hoursToBeat) === (props.log.hoursToBeat ?? null)) &&
           (!showCollectionOwnership ||
             (own === (props.log.own ?? false) &&
@@ -445,11 +527,10 @@ export function LogForm(props: LogFormProps) {
         if (optimisticClose) {
           onCancel();
         }
-        const updated = await apiFetch<Log & { newBadges?: NewBadge[] }>(
+        const updated = await apiFetch<Log & { newBadges?: unknown[] }>(
           `/logs/${props.log.id}`,
           { method: "PATCH", body: JSON.stringify(payload) }
         );
-        if (updated.newBadges?.length) showAchievementToasts(updated.newBadges, t("dashboard.badgesAchievementUnlocked"));
         toast.success(t("toast.logUpdated"));
         triggerImpact("medium");
         invalidateLogsAndItemsCache();
@@ -487,7 +568,7 @@ export function LogForm(props: LogFormProps) {
       if (optimisticClose) {
         onCancel();
       }
-      const created = await apiFetch<Log & { newBadges?: NewBadge[] }>(
+      const created = await apiFetch<Log & { newBadges?: unknown[] }>(
         "/logs",
         {
           method: "POST",
@@ -499,6 +580,16 @@ export function LogForm(props: LogFormProps) {
             grade,
             review,
             status: status ?? null,
+            ...(showReadingProgress && {
+              pagesRead: toNum(pagesRead),
+              startedAt: startedAtInput.trim() ? dateInputToIso(startedAtInput) : null,
+              completedAt: completedAtInput.trim() ? dateInputToIso(completedAtInput) : null,
+            }),
+            ...(showGameLogFields && {
+              gamePlatform: gamePlatform.trim() || null,
+              startedAt: startedAtInput.trim() ? dateInputToIso(startedAtInput) : null,
+              completedAt: completedAtInput.trim() ? dateInputToIso(completedAtInput) : null,
+            }),
             ...(showHoursToBeat && { hoursToBeat: toNum(hoursToBeat) }),
             ...(showCollectionOwnership && { own, wantToBuy, sold }),
             ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
@@ -525,7 +616,6 @@ export function LogForm(props: LogFormProps) {
           }),
         }
       );
-      if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
       toast.success(t("toast.logSaved"));
       triggerImpact("medium");
       invalidateLogsAndItemsCache();
@@ -572,6 +662,9 @@ export function LogForm(props: LogFormProps) {
     episode,
     chapter,
     volume,
+    pagesRead,
+    startedAtInput,
+    completedAtInput,
     hoursToBeat,
     own,
     wantToBuy,
@@ -580,6 +673,9 @@ export function LogForm(props: LogFormProps) {
     image,
     props,
     showSeasonEpisode,
+    showReadingProgress,
+    showGameLogFields,
+    gamePlatform,
     showHoursToBeat,
     showCollectionOwnership,
     showBoardGameFields,
@@ -595,8 +691,31 @@ export function LogForm(props: LogFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (showTvTabs && (tvReviewTab === "season" || tvReviewTab === "episode") && log) {
+      setLoading(true);
+      try {
+        const draft = tvReviewTab === "season" ? seasonDraft : episodeDraft;
+        await saveScopedReviewTab(log.id, tvReviewTab, draft);
+        const res = await apiFetch<{ data: ScopedReview[] }>(`/logs/${log.id}/scoped-reviews`);
+        setScopedReviews(res.data ?? []);
+        toast.success(t("toast.reviewSaved"));
+        invalidateLogsAndItemsCache();
+      } catch (err) {
+        showErrorToast(t, "E012", { originalError: err });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     await performSave();
   };
+
+  const saveButtonLabel =
+    loading || deleting
+      ? t("common.saving")
+      : showBoardGameTabs && boardMainTab === "matches"
+        ? t("boardGameMatches.saveMatch")
+        : t("common.save");
 
   const handleDrawerBeforeDismiss = useCallback(async (): Promise<boolean> => {
     if (cancellingRef.current) return true;
@@ -632,6 +751,26 @@ export function LogForm(props: LogFormProps) {
     cancellingRef.current = true;
     onCancel();
   }, [onCancel]);
+
+  const tvTabBar = showTvTabs ? (
+    <motion.div className="mb-3 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
+      {(["show", "season", "episode"] as const).map((tab) => (
+        <button
+          key={tab}
+          type="button"
+          onClick={() => setTvReviewTab(tab)}
+          className={cn(
+            "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            tvReviewTab === tab
+              ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+              : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+          )}
+        >
+          {t(`tvReviews.tab${tab === "show" ? "Show" : tab === "season" ? "Season" : "Episode"}`)}
+        </button>
+      ))}
+    </motion.div>
+  ) : null;
 
   const boardGameTabBar =
     showBoardGameTabs && log ? (
@@ -682,6 +821,7 @@ export function LogForm(props: LogFormProps) {
           {title}
         </div>
       </div>
+      {tvTabBar}
       {boardGameTabBar}
       {showBoardGameTabs && boardMainTab === "matches" && log ? (
         <BoardGameMatchesSection
@@ -689,6 +829,19 @@ export function LogForm(props: LogFormProps) {
           onLogUpdated={(lg) => {
             onLogRefreshed?.(lg);
           }}
+        />
+      ) : showTvTabs && tvReviewTab !== "show" && log ? (
+        <TvGranularReviewSection
+          mediaType={mediaType}
+          progressOptions={progressOptions}
+          progressOptionsLoading={progressOptionsLoading}
+          showSeasonField={showSeasonField}
+          scopedReviews={scopedReviews}
+          activeTab={tvReviewTab}
+          seasonDraft={seasonDraft}
+          onSeasonDraftChange={setSeasonDraft}
+          episodeDraft={episodeDraft}
+          onEpisodeDraftChange={setEpisodeDraft}
         />
       ) : (
       <form id="log-form" onSubmit={handleSubmit}>
@@ -769,6 +922,18 @@ export function LogForm(props: LogFormProps) {
                       </div>
                     </div>
                   )}
+                  {showReadingProgress && (
+                    <ReadingProgressFields
+                      pagesRead={pagesRead}
+                      onPagesReadChange={setPagesRead}
+                      pagesCount={isEdit ? log?.pagesCount ?? null : null}
+                      startedAt={startedAtInput}
+                      onStartedAtChange={setStartedAtInput}
+                      completedAt={completedAtInput}
+                      onCompletedAtChange={setCompletedAtInput}
+                      disabled={loading}
+                    />
+                  )}
                   {showChapterVolume && (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -798,6 +963,18 @@ export function LogForm(props: LogFormProps) {
                     </div>
                   )}
                 </>
+              )}
+              {showGameLogFields && (
+                <GameLogFields
+                  gamePlatform={gamePlatform}
+                  onGamePlatformChange={setGamePlatform}
+                  platformOptions={platformOptions}
+                  startedAt={startedAtInput}
+                  onStartedAtChange={setStartedAtInput}
+                  completedAt={completedAtInput}
+                  onCompletedAtChange={setCompletedAtInput}
+                  disabled={loading}
+                />
               )}
               {showHoursToBeat && (
                 <div className="space-y-2">
@@ -956,12 +1133,12 @@ export function LogForm(props: LogFormProps) {
                     {t("common.cancel")}
                   </Button>
                   <Button
-                    type="submit"
-                    form="log-form"
+                    type="button"
                     className="flex-1"
                     disabled={loading || deleting}
+                    onClick={() => void handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
                   >
-                    {loading ? t("common.saving") : t("common.save")}
+                    {saveButtonLabel}
                   </Button>
                 </div>
               </DrawerFooter>
@@ -989,12 +1166,12 @@ export function LogForm(props: LogFormProps) {
                     {t("common.cancel")}
                   </Button>
                   <Button
-                    type="submit"
-                    form="log-form"
+                    type="button"
                     className="flex-1"
                     disabled={loading || deleting}
+                    onClick={() => void handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
                   >
-                    {loading ? t("common.saving") : t("common.save")}
+                    {saveButtonLabel}
                   </Button>
                 </div>
               </DialogFooter>

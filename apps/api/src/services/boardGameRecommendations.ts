@@ -29,6 +29,10 @@ export type BoardGameRecommendationsOutcome =
       tutorial: string;
     };
 
+function normalizeQueryKey(q: string): string {
+  return q.trim().toLowerCase();
+}
+
 /**
  * At most `maxSearchCalls` provider searches (each BGG/Ludopedia search uses its normal flow).
  * Merges, dedupes, excludes logged ids; earlier query batches rank earlier in the list.
@@ -60,11 +64,8 @@ export async function fetchBoardGameRecommendationsMerged(args: {
   const { scores, queryLabel } = buildTagAffinityMaps(logs);
   const hadPositiveAffinity = [...scores.values()].some((v) => v > 0.06);
 
-  let queries = pickAffinitySearchQueries(scores, queryLabel, 6);
-  if (queries.length === 0) {
-    queries = [...FALLBACK_QUERIES];
-  }
-  queries = queries.slice(0, Math.max(1, maxSearchCalls));
+  let affinityQueries = pickAffinitySearchQueries(scores, queryLabel, 6);
+  affinityQueries = affinityQueries.slice(0, Math.max(1, maxSearchCalls));
 
   const search: SearchFn =
     provider === "bgg"
@@ -72,11 +73,17 @@ export async function fetchBoardGameRecommendationsMerged(args: {
       : (q) => searchBoardGamesLudopedia(q, apiToken, ludopediaMeta, sort);
 
   const byId = new Map<string, { row: SearchResult; rank: number }>();
+  const tried = new Set<string>();
   let queryIndex = 0;
 
-  for (const q of queries) {
-    if (byId.size >= maxResults) break;
+  const runQuery = async (q: string): Promise<BoardGameRecommendationsOutcome | null> => {
+    const key = normalizeQueryKey(q);
+    if (!key || tried.has(key)) return null;
+    tried.add(key);
+    if (byId.size >= maxResults) return null;
+
     const batch = await search(q);
+    if (!batch) return null;
     if ("requiresApiKey" in batch && batch.results.length === 0) {
       return {
         results: [],
@@ -97,6 +104,21 @@ export async function fetchBoardGameRecommendationsMerged(args: {
       if (byId.size >= maxResults) break;
     }
     queryIndex += 1;
+    return null;
+  };
+
+  for (const q of affinityQueries) {
+    const early = await runQuery(q);
+    if (early) return early;
+    if (byId.size >= maxResults) break;
+  }
+
+  if (byId.size === 0) {
+    for (const q of FALLBACK_QUERIES) {
+      const early = await runQuery(q);
+      if (early) return early;
+      if (byId.size >= maxResults) break;
+    }
   }
 
   const results = [...byId.values()]
@@ -106,6 +128,6 @@ export async function fetchBoardGameRecommendationsMerged(args: {
 
   return {
     results,
-    personalization: hadPositiveAffinity ? "from_logs" : "popular",
+    personalization: hadPositiveAffinity && affinityQueries.length > 0 ? "from_logs" : "popular",
   };
 }

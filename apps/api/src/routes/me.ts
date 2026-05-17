@@ -9,6 +9,7 @@ import { getMilestoneProgress } from "../services/milestone.service.js";
 import { getNextBoardGameCollectionImportTime } from "../services/boardGameCollectionImport.service.js";
 import { isBetaBannerEnabled, isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
 import { APP_SETTING_KEYS, getAppSettingValue } from "../lib/appSettings.js";
+import { getProfileVisibilityFromUser } from "../lib/profileVisibility.js";
 
 export const meRouter = Router();
 
@@ -92,6 +93,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       preferredLocale: true,
       recapEmailsEnabled: true,
       visibleMediaTypes: true,
+      profileVisibility: true,
       boardGameProvider: true,
       country: true,
       defaultPurchaseCurrency: true,
@@ -185,6 +187,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     locale,
     recapEmailsEnabled: user.recapEmailsEnabled ?? true,
     visibleMediaTypes,
+    profileVisibility: getProfileVisibilityFromUser(user),
     boardGameProvider,
     tier,
     subscriptionEndsAt,

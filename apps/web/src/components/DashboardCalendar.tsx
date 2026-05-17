@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
-import { IN_PROGRESS_STATUSES, type Log } from "@geeklogs/shared";
+import { IN_PROGRESS_STATUSES, type Log, type MediaType } from "@geeklogs/shared";
 import { paperShadow } from "@/lib/paperShadow";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
@@ -63,11 +63,14 @@ export type DashboardCalendarAccess = "full" | "monthOnly";
 export function DashboardCalendar({
   access,
   fillColumnHeight,
+  mediaType,
 }: {
   /** full = any month (Pro). monthOnly = current calendar month in user TZ (free statistics). */
   access: DashboardCalendarAccess;
   /** When set (e.g. Statistics desktop two-column row), the card stretches to match the sibling column height. */
   fillColumnHeight?: boolean;
+  /** When set, only count activity for this category. */
+  mediaType?: MediaType;
 }) {
   const { t, locale } = useLocale();
   const isMobile = useIsMobile();
@@ -95,8 +98,9 @@ export function DashboardCalendar({
     if (!canFetchCalendar) return;
     setLoading(true);
     try {
+      const mediaQ = mediaType ? `&mediaType=${encodeURIComponent(mediaType)}` : "";
       const res = await apiFetch<CalendarData>(
-        `/logs/calendar?year=${y}&month=${m}&timezoneOffsetMinutes=${tzOffsetMinutes}`
+        `/logs/calendar?year=${y}&month=${m}&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`
       );
       setData(res);
     } catch {
@@ -104,7 +108,7 @@ export function DashboardCalendar({
     } finally {
       setLoading(false);
     }
-  }, [canFetchCalendar, tzOffsetMinutes]);
+  }, [canFetchCalendar, tzOffsetMinutes, mediaType]);
 
   useEffect(() => {
     if (!canFetchCalendar) {
@@ -119,8 +123,9 @@ export function DashboardCalendar({
     setDayLogsLoading(true);
     setDayLogs([]);
     try {
+      const mediaQ = mediaType ? `&mediaType=${encodeURIComponent(mediaType)}` : "";
       const res = await apiFetch<{ data: Log[] }>(
-        `/logs/by-date?date=${dateKey}&timezoneOffsetMinutes=${tzOffsetMinutes}`
+        `/logs/by-date?date=${dateKey}&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`
       );
       setDayLogs((res.data ?? []).map(decodeLogForDisplay));
     } catch {
@@ -128,7 +133,7 @@ export function DashboardCalendar({
     } finally {
       setDayLogsLoading(false);
     }
-  }, [tzOffsetMinutes]);
+  }, [tzOffsetMinutes, mediaType]);
 
   useEffect(() => {
     if (selectedDate && canInteract) fetchDayLogs(selectedDate);

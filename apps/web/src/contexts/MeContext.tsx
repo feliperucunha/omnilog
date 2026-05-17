@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch, ApiError, invalidateApiCache } from "@/lib/api";
+import type { ProfileVisibility } from "@geeklogs/shared";
 
 export interface MeResponse {
   user: { id: string; username?: string; email: string; onboarded: boolean };
@@ -17,6 +18,7 @@ export interface MeResponse {
   /** Monthly activity recap email (default on). */
   recapEmailsEnabled?: boolean;
   visibleMediaTypes: string[];
+  profileVisibility?: ProfileVisibility;
   boardGameProvider: "bgg" | "ludopedia";
   tier: "free" | "beta" | "pro" | "admin";
   subscriptionEndsAt: string | null;

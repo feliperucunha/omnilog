@@ -65,6 +65,7 @@ import { formatStatsTimeAxisLabel } from "@/lib/formatStatsPeriod";
 import { cn } from "@/lib/utils";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
+import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 
 function formatMinorAsMoney(minor: number, currency: string): string {
   const d = currencyMinorDecimals(currency);
@@ -518,11 +519,26 @@ function OverviewStatCard({
   );
 }
 
+function CategoryOrderSkeletonStrip() {
+  return (
+    <div className="scrollbar-hide flex min-h-[3rem] min-w-0 overflow-x-auto scroll-smooth [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]" aria-busy>
+      <div className="flex min-w-max items-stretch gap-6 pl-3 pr-3">
+        {Array.from({ length: 8 }, (_, i) => (
+          <div key={i} className="flex shrink-0 flex-col items-center justify-start pt-3">
+            <div className="h-4 w-16 max-w-[5rem] animate-pulse rounded bg-[var(--color-mid)]/30" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Statistics() {
   const { t, locale } = useLocale();
   const { me } = useMe();
-  const { visibleTypes } = useVisibleMediaTypes();
-  const { setPageTitle, setRightSlot } = usePageTitle() ?? {};
+  const { visibleTypes, visibleTypesOrderReady } = useVisibleMediaTypes();
+  const { setPageTitle, setRightSlot, setBelowNavbar } = usePageTitle() ?? {};
+  const [categoryFilter, setCategoryFilter] = useState<"all" | MediaType>("all");
   const isPro = tierHasProFeatures(me?.tier);
   const [logs, setLogs] = useState<Log[]>([]);
   const [summary, setSummary] = useState<LogStatsSummary | null>(null);
@@ -636,11 +652,15 @@ export function Statistics() {
   const statBarMarqueeClass = "block min-w-0 text-xs text-[var(--color-light)]";
   const statBarValueClass = "shrink-0 text-right text-xs tabular-nums text-[var(--color-lightest)]";
 
+  const statsMediaQuery = useCallback(() => {
+    return categoryFilter === "all" ? "" : `&mediaType=${encodeURIComponent(categoryFilter)}`;
+  }, [categoryFilter]);
+
   const fetchStats = useCallback(async (group: StatsGroup) => {
     setStatsLoading(true);
     try {
       const res = await apiFetch<{ data: StatsEntry[] }>(
-        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}`
+        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`
       );
       setStats(res.data ?? []);
     } catch {
@@ -648,13 +668,13 @@ export function Statistics() {
     } finally {
       setStatsLoading(false);
     }
-  }, [tzOffsetMinutes]);
+  }, [tzOffsetMinutes, statsMediaQuery]);
 
   const fetchGenreStats = useCallback(async () => {
     setGenreStatsLoading(true);
     try {
       const res = await apiFetch<{ data: StatsEntry[] }>(
-        `/logs/stats?group=genre&timezoneOffsetMinutes=${tzOffsetMinutes}`
+        `/logs/stats?group=genre&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`
       );
       setGenreStats(res.data ?? []);
     } catch {
@@ -662,13 +682,13 @@ export function Statistics() {
     } finally {
       setGenreStatsLoading(false);
     }
-  }, [tzOffsetMinutes]);
+  }, [tzOffsetMinutes, statsMediaQuery]);
 
   const fetchStatusOverTimeStats = useCallback(async (group: "completedByMonth" | "completedByYear") => {
     setStatusOverTimeLoading(true);
     try {
       const res = await apiFetch<{ data: StatsEntry[] }>(
-        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}`
+        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`
       );
       setStatusOverTimeStats(res.data ?? []);
     } catch {
@@ -676,13 +696,13 @@ export function Statistics() {
     } finally {
       setStatusOverTimeLoading(false);
     }
-  }, [tzOffsetMinutes]);
+  }, [tzOffsetMinutes, statsMediaQuery]);
 
   const fetchCategoryOverTimeStats = useCallback(async (group: "categoryByMonth" | "categoryByYear") => {
     setCategoryOverTimeLoading(true);
     try {
       const res = await apiFetch<{ data: CategoryOverTimeEntry[] }>(
-        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}`
+        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`
       );
       setCategoryOverTimeStats(res.data ?? []);
     } catch {
@@ -690,7 +710,7 @@ export function Statistics() {
     } finally {
       setCategoryOverTimeLoading(false);
     }
-  }, [tzOffsetMinutes]);
+  }, [tzOffsetMinutes, statsMediaQuery]);
 
   const fetchPurchaseSpending = useCallback(async () => {
     setPurchaseSpendingLoading(true);
@@ -700,7 +720,7 @@ export function Statistics() {
         saleData?: Record<string, Record<string, number>>;
         counts?: Record<string, number>;
         saleCounts?: Record<string, number>;
-      }>(`/logs/stats?group=purchaseSpending&period=${purchasePeriod}&timezoneOffsetMinutes=${tzOffsetMinutes}`);
+      }>(`/logs/stats?group=purchaseSpending&period=${purchasePeriod}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`);
       setPurchaseSpending(res.data ?? null);
       setSaleProceedsByCategory(res.saleData ?? null);
       setPurchaseItemCounts(res.counts ?? null);
@@ -713,7 +733,7 @@ export function Statistics() {
     } finally {
       setPurchaseSpendingLoading(false);
     }
-  }, [purchasePeriod, tzOffsetMinutes]);
+  }, [purchasePeriod, tzOffsetMinutes, statsMediaQuery]);
 
   useEffect(() => {
     void fetchStats(statsGroup);
@@ -795,9 +815,10 @@ export function Statistics() {
 
   const fetchLogs = useCallback(() => {
     setLoading(true);
+    const mediaQ = statsMediaQuery();
     const logsQuery = isPro
-      ? "/logs?limit=5&sort=dateDesc"
-      : `/logs?limit=5&sort=dateDesc&forStatistics=1&timezoneOffsetMinutes=${tzOffsetMinutes}`;
+      ? `/logs?limit=5&sort=dateDesc${mediaQ}`
+      : `/logs?limit=5&sort=dateDesc&forStatistics=1&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`;
     Promise.all([
       apiFetchCached<Log[] | { data: Log[]; nextCursor: string | null }>(logsQuery, {
         ttlMs: 2 * 60 * 1000,
@@ -806,7 +827,7 @@ export function Statistics() {
         setLogs((raw ?? []).map(decodeLogForDisplay));
       }),
       apiFetch<{ data: LogStatsSummary }>(
-        `/logs/stats?group=summary&timezoneOffsetMinutes=${tzOffsetMinutes}`
+        `/logs/stats?group=summary&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`
       )
         .then((res) => setSummary(res.data ?? null))
         .catch(() => setSummary(null)),
@@ -816,7 +837,7 @@ export function Statistics() {
         setSummary(null);
       })
       .finally(() => setLoading(false));
-  }, [isPro, tzOffsetMinutes]);
+  }, [isPro, tzOffsetMinutes, statsMediaQuery]);
 
   const recapCategoryOptions = useMemo(
     () => [
@@ -919,25 +940,80 @@ export function Statistics() {
     return () => {
       setPageTitle?.(null);
       setRightSlot?.(null);
+      setBelowNavbar?.(null);
     };
-  }, [t, setPageTitle, setRightSlot, handleOpenRecapPicker]);
+  }, [t, setPageTitle, setRightSlot, setBelowNavbar, handleOpenRecapPicker]);
+
+  useEffect(() => {
+    if (visibleTypes.length === 0) {
+      setBelowNavbar?.(null);
+      return;
+    }
+    if (!visibleTypesOrderReady) {
+      setBelowNavbar?.(
+        <div className="sticky top-14 z-20 w-full shrink-0 self-start border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
+          <CategoryOrderSkeletonStrip />
+        </div>
+      );
+      return () => setBelowNavbar?.(null);
+    }
+    setBelowNavbar?.(
+      <div className="sticky top-14 z-20 w-full shrink-0 self-start border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
+        <StickyCategoryStrip
+          items={[
+            { value: "all", label: t("statistics.filterAll") },
+            ...visibleTypes.map((type) => ({
+              value: type,
+              label: t(`nav.${type}`),
+            })),
+          ]}
+          selectedValue={categoryFilter}
+          onSelect={(v) => setCategoryFilter(v === "all" ? "all" : (v as MediaType))}
+          showCount={false}
+          mobileOnly={false}
+          bare
+          stickyTop=""
+          aria-label={t("statistics.categoryFilter")}
+        />
+      </div>
+    );
+    return () => setBelowNavbar?.(null);
+  }, [visibleTypes, visibleTypesOrderReady, categoryFilter, t, setBelowNavbar]);
+
+  useEffect(() => {
+    if (categoryFilter !== "all" && spendDetailMediaType && spendDetailMediaType !== categoryFilter) {
+      setSpendDetailMediaType(null);
+    }
+  }, [categoryFilter, spendDetailMediaType]);
 
   useEffect(() => {
     void fetchLogs();
   }, [fetchLogs]);
 
-  const recent = logs.slice(0, 5); // Show only the 5 most recent logs
-  const displayedStats =
-    statsGroup === "category"
-      ? visibleTypes.map((period) => {
-          const row = stats.find((s) => s.period === period);
-          return {
-            period,
+  const recent = logs.slice(0, 5);
+  const displayedStats = useMemo(() => {
+    if (statsGroup === "category") {
+      if (categoryFilter !== "all") {
+        const row = stats.find((s) => s.period === categoryFilter);
+        return [
+          {
+            period: categoryFilter,
             hours: row?.hours ?? 0,
             count: row?.count ?? 0,
-          };
-        })
-      : stats;
+          },
+        ];
+      }
+      return visibleTypes.map((period) => {
+        const row = stats.find((s) => s.period === period);
+        return {
+          period,
+          hours: row?.hours ?? 0,
+          count: row?.count ?? 0,
+        };
+      });
+    }
+    return stats;
+  }, [statsGroup, stats, visibleTypes, categoryFilter]);
   const maxHours = displayedStats.length > 0 ? Math.max(...displayedStats.map((s) => s.hours), 1) : 1;
   const maxGenreCount =
     genreStats.length > 0 ? Math.max(...genreStats.map((s) => s.hours), 1) : 1;
@@ -988,18 +1064,23 @@ export function Statistics() {
   }, [purchaseSpending, saleProceedsByCategory, purchaseSpendingLoading]);
 
   /** Categories with purchase/sale data in the period (counts and/or non-zero totals). */
-  const spendMediaTypesWithActivity = useMemo(
-    () =>
-      SPEND_TRACKED_MEDIA_TYPES.filter((mt) => {
-        const pCount = purchaseItemCounts?.[mt] ?? 0;
-        const sCount = saleItemCounts?.[mt] ?? 0;
-        if (pCount > 0 || sCount > 0) return true;
-        const spend = Object.values(purchaseSpending?.[mt] ?? {}).some((v) => v > 0);
-        const sale = Object.values(saleProceedsByCategory?.[mt] ?? {}).some((v) => v > 0);
-        return spend || sale;
-      }),
-    [purchaseItemCounts, saleItemCounts, purchaseSpending, saleProceedsByCategory]
-  );
+  const showFinanceSection =
+    categoryFilter === "all" ||
+    (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(categoryFilter);
+
+  const spendMediaTypesWithActivity = useMemo(() => {
+    const active = SPEND_TRACKED_MEDIA_TYPES.filter((mt) => {
+      const pCount = purchaseItemCounts?.[mt] ?? 0;
+      const sCount = saleItemCounts?.[mt] ?? 0;
+      if (pCount > 0 || sCount > 0) return true;
+      const spend = Object.values(purchaseSpending?.[mt] ?? {}).some((v) => v > 0);
+      const sale = Object.values(saleProceedsByCategory?.[mt] ?? {}).some((v) => v > 0);
+      return spend || sale;
+    });
+    if (categoryFilter === "all") return active;
+    if (!showFinanceSection) return [];
+    return active.filter((mt) => mt === categoryFilter);
+  }, [purchaseItemCounts, saleItemCounts, purchaseSpending, saleProceedsByCategory, categoryFilter, showFinanceSection]);
 
   const getRecapSpotlightTarget = useCallback(
     () => document.getElementById("onboarding-statistics-recap"),
@@ -1263,7 +1344,7 @@ export function Statistics() {
         </div>
       )}
 
-      {!loading && (
+      {!loading && showFinanceSection && (
         <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
           <button
             type="button"
@@ -1509,7 +1590,11 @@ export function Statistics() {
           aria-label={t("dashboard.calendarTitle")}
           className="flex min-h-0 min-w-0 flex-1 flex-col md:min-h-0"
         >
-          <DashboardCalendar access={isPro ? "full" : "monthOnly"} fillColumnHeight />
+          <DashboardCalendar
+            access={isPro ? "full" : "monthOnly"}
+            fillColumnHeight
+            mediaType={categoryFilter === "all" ? undefined : categoryFilter}
+          />
         </section>
           )}
         </div>
@@ -1950,7 +2035,7 @@ export function Statistics() {
                               {log.genres && log.genres.length > 0 && (
                                 <GenreBadges genres={log.genres} maxCount={1} />
                               )}
-                              {!isInProgress && log.grade != null && (
+                              {log.grade != null && (
                                 <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
                               )}
                               <OverflowMarquee className="text-xs leading-snug text-[var(--color-light)]">

@@ -9,7 +9,6 @@ import type { MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, apiFetchFile, downloadFile, LOGS_INVALIDATED_EVENT } from "@/lib/api";
-import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
 import { ExportLogsModal, type ExportLogsOptions } from "@/components/ExportLogsModal";
@@ -20,6 +19,7 @@ import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
+import { formatLogScopeLabel, getLogCardDisplay } from "@/lib/logDisplay";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { MediaLogsSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
@@ -499,15 +499,12 @@ export function MediaLogs({
     const next = value + 1;
     setIncrementingId(log.id);
     try {
-      const updated = await apiFetch<Log & { newBadges?: NewBadge[] }>(
+      const updated = await apiFetch<Log>(
         `/logs/${log.id}`,
         { method: "PATCH", body: JSON.stringify({ [field]: next }) }
       );
-      if (updated.newBadges?.length) showAchievementToasts(updated.newBadges, t("dashboard.badgesAchievementUnlocked"));
       invalidateLogsAndItemsCache();
-      const { newBadges: _nb, ...logRest } = updated;
-      void _nb;
-      setLogs((prev) => prev.map((l) => (l.id === log.id ? decodeLogForDisplay(logRest as Log) : l)));
+      setLogs((prev) => prev.map((l) => (l.id === log.id ? decodeLogForDisplay(updated) : l)));
       toast.success(t("toast.logUpdated"));
     } catch (err) {
       showErrorToast(t, "E008", { originalError: err });
@@ -1165,6 +1162,8 @@ export function MediaLogs({
                         ? "bg-emerald-600 text-white"
                         : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
               const isReviewExpanded = embedded && expandedReviewLogId === log.id;
+              const display = getLogCardDisplay(log);
+              const scopeLabel = formatLogScopeLabel(t, display);
               return (
               <motion.div key={log.id} variants={staggerItem} className="min-h-0 sm:h-full">
                 <div className="h-full">
@@ -1225,11 +1224,16 @@ export function MediaLogs({
                         <OverflowMarquee className="text-sm font-semibold sm:text-base">{log.title}</OverflowMarquee>
                       </MotionLink>
                       <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                        {log.grade != null ? (
-                          <StarRating value={gradeToStars(log.grade)} readOnly size="sm" />
+                        {display.grade != null ? (
+                          <StarRating value={gradeToStars(display.grade)} readOnly size="sm" />
                         ) : (
                           <span className="text-[var(--color-light)]">—</span>
                         )}
+                        {scopeLabel ? (
+                          <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
+                            {scopeLabel}
+                          </span>
+                        ) : null}
                         <GenreBadges genres={log.genres} maxCount={1} />
                         {log.mediaType === "tv" && log.networks?.[0] && (
                           <span className="rounded-full bg-[var(--color-mid)]/30 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
@@ -1329,9 +1333,9 @@ export function MediaLogs({
                         );
                       })()}
                       <div className={`flex flex-col items-start gap-1 min-h-0 ${embedded && !isReviewExpanded ? "flex-1 overflow-hidden" : ""}`}>
-                        {log.review ? (
+                        {display.review ? (
                           (() => {
-                            const review = log.review;
+                            const review = display.review!;
                             const isExpanded = expandedReviewLogId === log.id;
                             const truncated = review.length > REVIEW_PREVIEW_LENGTH;
                             const preview = truncated && !isExpanded

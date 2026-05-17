@@ -1,4 +1,15 @@
 export type { LogAffinityContext } from "./affinityContext.js";
+export type { ScopedReview } from "./scopedReview.js";
+export {
+  reviewScopeFromParts,
+  seasonEpisodeFromScoped,
+  scopedKeysForScope,
+  pickPrimaryScopedReview,
+  groupItemReviewsByUser,
+  compareScopeGenerality,
+} from "./scopedReview.js";
+export { getLogDisplayRating } from "./logDisplay.js";
+export type { LogDisplayRating } from "./logDisplay.js";
 export type {
   MediaType,
   BoardGameProvider,
@@ -9,6 +20,7 @@ export type {
   SearchSortOption,
   ItemDetail,
   ItemReview,
+  ReviewScope,
   ItemPageData,
   Log,
   CreateLogInput,
@@ -36,3 +48,9 @@ export {
   SEARCH_SORT_OPTIONS,
   SEARCH_RESULTS_PAGE_SIZE,
 } from "./types.js";
+export type { ProfileVisibility } from "./profileVisibility.js";
+export {
+  DEFAULT_PROFILE_VISIBILITY,
+  mergeProfileVisibility,
+  parseProfileVisibilityJson,
+} from "./profileVisibility.js";

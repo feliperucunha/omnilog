@@ -29,6 +29,7 @@ import { searchComics } from "../services/comicvine.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 import { collectFromSeeds, topUpFromPopular } from "../lib/searchRecommendationsMerge.js";
 import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
+import { preferEnvApiToken } from "../lib/preferEnvApiToken.js";
 import { fetchBoardGameRecommendationsMerged } from "../services/boardGameRecommendations.js";
 import { fetchBookRecommendationsMerged } from "../services/bookRecommendations.js";
 import { fetchMangaRecommendationsMerged } from "../services/mangaRecommendations.js";
@@ -402,7 +403,10 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
                 take: 120,
               })
             : [];
-        const token = boardProvider === "bgg" ? userBgg : userLudo;
+        const token =
+          boardProvider === "bgg"
+            ? preferEnvApiToken(process.env.BGG_API_TOKEN, userBgg)
+            : preferEnvApiToken(process.env.LUDOPEDIA_API_TOKEN, userLudo);
         const sortParam = parsed.data.sort;
         const allowedSorts = SEARCH_SORT_OPTIONS.boardgames.map((o) => o.value);
         const sort = sortParam && allowedSorts.includes(sortParam) ? sortParam : undefined;

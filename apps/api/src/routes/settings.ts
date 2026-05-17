@@ -1,6 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
-import { BOARD_GAME_PROVIDERS, MEDIA_TYPES } from "@geeklogs/shared";
+import {
+  BOARD_GAME_PROVIDERS,
+  MEDIA_TYPES,
+  mergeProfileVisibility,
+  type ProfileVisibility,
+} from "@geeklogs/shared";
+import { getProfileVisibilityFromUser } from "../lib/profileVisibility.js";
 import { prisma } from "../lib/prisma.js";
 import { sanitizeApiKey } from "../lib/sanitize.js";
 import { authMiddleware } from "../middleware/auth.js";
@@ -279,6 +285,49 @@ settingsRouter.put("/profile-badges", async (req: AuthenticatedRequest, res) => 
   }
   await setSelectedBadges(req.user.userId, parsed.data.badgeIds);
   res.json({ ok: true, badgeIds: parsed.data.badgeIds });
+});
+
+const profileVisibilitySchema = z.object({
+  showPublicProfile: z.boolean(),
+  showLogCount: z.boolean(),
+  showPinnedBadges: z.boolean(),
+  showMilestoneBadges: z.boolean(),
+  showStatus: z.boolean(),
+  showRatings: z.boolean(),
+  showReviews: z.boolean(),
+  showGenres: z.boolean(),
+  showApiScores: z.boolean(),
+  showProgress: z.boolean(),
+  showCompletionTime: z.boolean(),
+  showCollectionTags: z.boolean(),
+  showTvMetadata: z.boolean(),
+  showEnrichmentDetails: z.boolean(),
+});
+
+/** GET /settings/profile-visibility — what visitors see on the public profile. */
+settingsRouter.get("/profile-visibility", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { profileVisibility: true },
+  });
+  res.json(getProfileVisibilityFromUser(user ?? { profileVisibility: null }));
+});
+
+/** PUT /settings/profile-visibility */
+settingsRouter.put("/profile-visibility", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const parsed = profileVisibilitySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid profile visibility settings" });
+    return;
+  }
+  const merged = mergeProfileVisibility(parsed.data as ProfileVisibility);
+  await prisma.user.update({
+    where: { id: req.user.userId },
+    data: { profileVisibility: JSON.stringify(merged) },
+  });
+  res.json(merged);
 });
 
 /** Complete onboarding: set theme, visible media types, and onboarded = true. */

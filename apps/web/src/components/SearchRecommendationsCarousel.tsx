@@ -8,13 +8,16 @@ import {
   type ReactNode,
 } from "react";
 import { motion } from "framer-motion";
-import type { BoardGameProvider, MediaType, SearchResult } from "@geeklogs/shared";
+import type { BoardGameProvider, Log, MediaType, SearchResult } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { GenreBadges } from "@/components/GenreBadges";
+import { StarRating } from "@/components/StarRating";
+import { gradeToStars } from "@/lib/gradeStars";
+import { getLogCardDisplay } from "@/lib/logDisplay";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { tapScale, tapTransition } from "@/lib/animations";
 import type { TFunction } from "@/contexts/LocaleContext";
@@ -86,7 +89,7 @@ export interface SearchRecommendationsCarouselProps {
   /** Used for BGG landscape box art in portrait frames. */
   boardGameProvider?: BoardGameProvider;
   token: string | null;
-  logsByExternalId: Map<string, string>;
+  logsByExternalId: Map<string, Log>;
   onItemOpen: (id: string) => void;
 }
 
@@ -105,7 +108,9 @@ export function SearchRecommendationsCarousel({
     reactKey: string,
     widthClass: string
   ) => {
-    const status = token ? logsByExternalId.get(item.id) : undefined;
+    const userLog = token ? logsByExternalId.get(item.id) : undefined;
+    const status = userLog?.status ?? userLog?.listType;
+    const display = userLog ? getLogCardDisplay(userLog) : null;
     const isDropped = status === "dropped";
     const isInProgress =
       status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
@@ -160,6 +165,9 @@ export function SearchRecommendationsCarousel({
               <OverflowMarquee className="text-xs font-semibold leading-snug text-[var(--color-lightest)]">
                 {item.title}
               </OverflowMarquee>
+              {display?.grade != null ? (
+                <StarRating value={gradeToStars(display.grade)} readOnly size="sm" />
+              ) : null}
               {item.genres && item.genres.length > 0 && (
                 <GenreBadges genres={item.genres} maxCount={1} />
               )}

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { BoardGameMatch, BoardGameMatchPlayer, Log } from "@geeklogs/shared";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -320,13 +328,22 @@ function MatchPlayerNameField({
   );
 }
 
-export function BoardGameMatchesSection({
-  logId,
-  onLogUpdated,
-}: {
-  logId: string;
-  onLogUpdated: (log: Log) => void;
-}) {
+export type BoardGameMatchesSectionHandle = {
+  saveNewMatch: () => Promise<boolean>;
+};
+
+export const BoardGameMatchesSection = forwardRef<
+  BoardGameMatchesSectionHandle,
+  {
+    /** When null, only the new-match form is shown until `onEnsureLog` creates a log. */
+    logId: string | null;
+    onLogUpdated: (log: Log) => void;
+    /** Creates a board-game log when saving the first match without an existing review. */
+    onEnsureLog?: () => Promise<string>;
+    /** When true, hide the section save button (parent provides one). */
+    embedded?: boolean;
+  }
+>(function BoardGameMatchesSection({ logId, onLogUpdated, onEnsureLog, embedded = false }, ref) {
   const { t, locale } = useLocale();
   const { me } = useMe();
   const [matches, setMatches] = useState<BoardGameMatch[]>([]);
@@ -343,6 +360,11 @@ export function BoardGameMatchesSection({
   const matchesChronologicalAsc = useMemo(() => sortBoardGameMatchesChronologicalAsc(matches), [matches]);
 
   const loadMatches = useCallback(() => {
+    if (!logId) {
+      setMatches([]);
+      setLoadingList(false);
+      return;
+    }
     setLoadingList(true);
     apiFetch<{ data: BoardGameMatch[] }>(`/logs/${logId}/board-game-matches`)
       .then((res) => setMatches(res.data ?? []))
@@ -363,11 +385,11 @@ export function BoardGameMatchesSection({
     setNotes("");
   };
 
-  const handleSaveNew = async () => {
+  const handleSaveNew = useCallback(async (): Promise<boolean> => {
     const iso = dateInputToIso(playedDate);
     if (!iso) {
       toast.error(t("boardGameMatches.invalidDate"));
-      return;
+      return false;
     }
     const trimmed = players.map((p) => ({
       name: p.name.trim(),
@@ -378,17 +400,25 @@ export function BoardGameMatchesSection({
     const withNames = trimmed.filter((p) => p.name.length > 0);
     if (withNames.length === 0) {
       toast.error(t("boardGameMatches.needPlayerName"));
-      return;
+      return false;
     }
     for (const p of withNames) {
       if (p.score != null && !Number.isFinite(p.score)) {
         toast.error(t("boardGameMatches.invalidScore"));
-        return;
+        return false;
       }
     }
     setSaving(true);
     try {
-      const res = await apiFetch<{ match: BoardGameMatch; log: Log }>(`/logs/${logId}/board-game-matches`, {
+      let targetLogId = logId;
+      if (!targetLogId) {
+        if (!onEnsureLog) {
+          toast.error(t("boardGameMatches.needLogFirst"));
+          return false;
+        }
+        targetLogId = await onEnsureLog();
+      }
+      const res = await apiFetch<{ match: BoardGameMatch; log: Log }>(`/logs/${targetLogId}/board-game-matches`, {
         method: "POST",
         body: JSON.stringify({
           playedAt: iso,
@@ -406,14 +436,19 @@ export function BoardGameMatchesSection({
       setMatches((prev) => [res.match, ...prev]);
       resetForm();
       toast.success(t("boardGameMatches.saved"));
+      return true;
     } catch (err) {
       showErrorToast(t, "E013", { originalError: err });
+      return false;
     } finally {
       setSaving(false);
     }
-  };
+  }, [logId, notes, onEnsureLog, onLogUpdated, playedDate, players, t]);
+
+  useImperativeHandle(ref, () => ({ saveNewMatch: handleSaveNew }), [handleSaveNew]);
 
   const handleDelete = async (matchId: string) => {
+    if (!logId) return;
     if (!window.confirm(t("boardGameMatches.deleteConfirm"))) return;
     setDeletingId(matchId);
     try {
@@ -439,8 +474,9 @@ export function BoardGameMatchesSection({
 
   return (
     <div className="flex flex-col gap-8">
+      {logId ? (
       <section className="flex flex-col gap-4">
-        <div className="flex items-center gap-2.5">
+        <motion.div className="flex items-center gap-2.5">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--btn-gradient-start)]/25 to-[var(--btn-gradient-end)]/20 text-[var(--color-lightest)] ring-1 ring-[var(--color-mid)]/30">
             <History className="h-5 w-5" aria-hidden />
           </span>
@@ -448,7 +484,7 @@ export function BoardGameMatchesSection({
             <h3 className="text-base font-semibold text-[var(--color-lightest)]">{t("boardGameMatches.previousSessions")}</h3>
             <p className="text-xs text-[var(--color-light)]">{t("boardGameMatches.playHistorySubtitle")}</p>
           </div>
-        </div>
+        </motion.div>
         {loadingList ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-8 w-8 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
@@ -486,6 +522,7 @@ export function BoardGameMatchesSection({
           </ul>
         )}
       </section>
+      ) : null}
 
       <section className="relative overflow-hidden rounded-2xl border border-[var(--color-mid)]/25 bg-gradient-to-b from-[var(--color-category-bg)]/80 to-[var(--color-dark)] p-5 shadow-[var(--shadow-category)] ring-1 ring-[var(--color-mid)]/10 sm:p-6">
         <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-[var(--btn-gradient-start)]/10 blur-2xl" aria-hidden />
@@ -616,20 +653,22 @@ export function BoardGameMatchesSection({
             />
           </div>
 
-          <Button
-            type="button"
-            className="w-full rounded-xl py-6 text-base font-semibold sm:w-auto sm:px-10 sm:py-5"
-            disabled={saving}
-            onClick={() => void handleSaveNew()}
-          >
-            {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden /> : <Dice5 className="mr-2 h-5 w-5 opacity-90" aria-hidden />}
-            {saving ? t("common.saving") : t("boardGameMatches.saveMatch")}
-          </Button>
+          {!embedded && (
+            <Button
+              type="button"
+              className="w-full rounded-xl py-6 text-base font-semibold sm:w-auto sm:px-10 sm:py-5"
+              disabled={saving}
+              onClick={() => void handleSaveNew()}
+            >
+              {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden /> : <Dice5 className="mr-2 h-5 w-5 opacity-90" aria-hidden />}
+              {saving ? t("common.saving") : t("boardGameMatches.saveMatch")}
+            </Button>
+          )}
         </div>
       </section>
     </div>
   );
-}
+});
 
 function MatchHistoryCard({
   match,

@@ -186,6 +186,27 @@
     "visibleMediaTypesIntro": "Choose which media types appear in the sidebar and on the search page. Uncheck to hide a type.",
     "visibleMediaTypesOrderHint": "Drag rows to set the order: the first checked category appears first on the home and search pages.",
     "dragToReorder": "Drag to reorder",
+    "profileVisibilityTitle": "Public profile visibility",
+    "profileVisibilityIntro": "Choose what visitors see on your shared profile. Purchase and sale amounts are never shown publicly.",
+    "profileVisibilitySaved": "Visibility settings saved.",
+    "profileVisibilityViewProfile": "View your public profile",
+    "profileVisibilityHiddenHint": "Your profile link will show as not found while this is off.",
+    "profileVisibilitySectionProfile": "Profile header",
+    "profileVisibilitySectionLogs": "Log cards",
+    "profileVisibilityShowPublicProfile": "Public profile enabled",
+    "profileVisibilityShowLogCount": "Total log count",
+    "profileVisibilityShowPinnedBadges": "Pinned badges",
+    "profileVisibilityShowMilestoneBadges": "Milestone badges",
+    "profileVisibilityShowStatus": "Status (watching, completed, etc.)",
+    "profileVisibilityShowRatings": "Star ratings",
+    "profileVisibilityShowReviews": "Written reviews",
+    "profileVisibilityShowGenres": "Genres and mechanics",
+    "profileVisibilityShowApiScores": "TMDB / MAL / RAWG scores",
+    "profileVisibilityShowProgress": "Season, episode, chapter, volume",
+    "profileVisibilityShowCompletionTime": "Started and completed dates",
+    "profileVisibilityShowCollectionTags": "Own, want to buy, matches played",
+    "profileVisibilityShowTvMetadata": "TV networks and show status",
+    "profileVisibilityShowEnrichmentDetails": "Page count, player counts",
     "publicProfileCustomization": "Public profile customization",
     "publicProfileProOnlyIntro": "Choose which categories appear on your shared profile and in the app. Upgrade to Pro to customize.",
     "publicProfileUpgrade": "View plans",
@@ -358,6 +379,8 @@
     "calendarNoActivity": "No activity on this day."
   },
   "statistics": {
+    "categoryFilter": "Filter statistics by category",
+    "filterAll": "All",
     "freeMonthNotice": "You're viewing this calendar month only. Upgrade to Pro for full history, all periods, longer recaps, and CSV export.",
     "proOnlyTitle": "This is a Pro feature",
     "proOnlyMessage": "Upgrade to Pro for full statistics history, recap timeframes beyond last week, and CSV export from category views and Settings.",
@@ -472,7 +495,8 @@
     "recommendationsExpand": "Show recommendations",
     "recommendationsCollapse": "Hide recommendations",
     "recommendationsNav": "Recommended titles carousel",
-    "recommendationsDotLabel": "Go to page {{index}}"
+    "recommendationsDotLabel": "Go to page {{index}}",
+    "recommendationsEmpty": "No recommendations right now. Try logging a few titles or searching for games you like."
   },
   "searchSort": {
     "relevance": "Relevance",
@@ -541,6 +565,7 @@
   "boardGameMatches": {
     "tabReview": "Review",
     "tabMatches": "Matches",
+    "needLogFirst": "Save your review first to log matches for this game.",
     "matchCountReadOnly": "Total matches played: {{count}} (updated when you save a match)",
     "previousSessions": "Play history",
     "playHistorySubtitle": "Every session you log shows up here with scores and winners.",
@@ -574,6 +599,17 @@
     "scoreTrendLowerTitle": "Fewer points than last session",
     "scoreTrendHigherAria": "Scored higher than in the previous session for this game",
     "scoreTrendLowerAria": "Scored lower than in the previous session for this game"
+  },
+  "tvReviews": {
+    "tabShow": "Series",
+    "tabSeason": "Season",
+    "tabEpisode": "Episode",
+    "needLogFirst": "Save your series review first to rate individual seasons or episodes.",
+    "scopeShow": "Series",
+    "scopeSeason": "Season {{n}}",
+    "scopeEpisode": "S{{season}} · E{{episode}}",
+    "showAllReviews": "Show {{count}} more reviews",
+    "hideAllReviews": "Show fewer"
   },
   "itemPage": {
     "back": "Back",
@@ -632,6 +668,16 @@
     "matchesPlayed": "Matches played",
     "rating": "Rating",
     "reviewPlaceholder": "Your thoughts..."
+  },
+  "readingProgress": {
+    "startedAt": "Started",
+    "finishedAt": "Finished",
+    "pagesRead": "Pages read",
+    "ofPages": "of {{count}}"
+  },
+  "gameLog": {
+    "platform": "Platform / console",
+    "platformPlaceholder": "e.g. PlayStation 5, PC, Switch"
   },
   "status": {
     "watched": "Watched",

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
@@ -8,12 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { NumberCombobox } from "@/components/ui/number-combobox";
-import type { LogAffinityContext, MediaType, Log } from "@geeklogs/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
+import type { LogAffinityContext, MediaType, Log, ReviewScope, ScopedReview } from "@geeklogs/shared";
+import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
-import { showAchievementToasts, type NewBadge } from "@/lib/achievementToast";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { tapScale, tapTransition } from "@/lib/animations";
@@ -31,12 +30,26 @@ import {
 } from "@/lib/mediaTypeFeatures";
 import { MoneyAmountInput } from "@/components/MoneyAmountInput";
 import { DEFAULT_PURCHASE_CURRENCY, normalizeCurrencyCode } from "@/lib/currencies";
-import { BoardGameMatchesSection } from "@/components/BoardGameMatchesSection";
+import {
+  BoardGameMatchesSection,
+  type BoardGameMatchesSectionHandle,
+} from "@/components/BoardGameMatchesSection";
+import {
+  TvGranularReviewSection,
+  emptyTvReviewDraft,
+  saveScopedReviewTab,
+  type TvReviewTabDraft,
+} from "@/components/TvGranularReviewSection";
+import { GameLogFields } from "@/components/GameLogFields";
+import { ReadingProgressFields } from "@/components/ReadingProgressFields";
+import { dateInputToIso, isoToDateInput } from "@/lib/readingDates";
 import { cn } from "@/lib/utils";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
 const HAS_SEASON_FIELD: MediaType[] = ["tv"];
 const HAS_CHAPTER_VOLUME: MediaType[] = ["comics", "manga"];
+const HAS_READING_PROGRESS: MediaType[] = ["books", "manga", "comics"];
+const HAS_GAME_LOG_FIELDS: MediaType[] = ["games"];
 
 export interface LogCompleteState {
   image: string | null;
@@ -66,6 +79,10 @@ interface ItemReviewFormProps {
   runtimeMinutes?: number | null;
   /** TV/Anime: total episodes (used to set episode when user selects completed status) */
   episodesCount?: number | null;
+  /** Books: total page count from item detail (for progress hint). */
+  pagesCount?: number | null;
+  /** Games: platform names from item detail (for console picker). */
+  platforms?: string[] | null;
   /** Genre/category names from item (stored with log for stats and recommendations). */
   genres?: string[] | null;
   /** Board games: mechanic names from item detail. */
@@ -83,6 +100,8 @@ export function ItemReviewForm({
   image,
   runtimeMinutes,
   episodesCount,
+  pagesCount,
+  platforms,
   genres,
   mechanics,
   affinityContextDraft,
@@ -102,6 +121,10 @@ export function ItemReviewForm({
   const [episode, setEpisode] = useState<number | "">("");
   const [chapter, setChapter] = useState<number | "">("");
   const [volume, setVolume] = useState<number | "">("");
+  const [pagesRead, setPagesRead] = useState<number | "">("");
+  const [gamePlatform, setGamePlatform] = useState("");
+  const [startedAtInput, setStartedAtInput] = useState("");
+  const [completedAtInput, setCompletedAtInput] = useState("");
   const [hoursToBeat, setHoursToBeat] = useState<number | "">("");
   const [own, setOwn] = useState(false);
   const [wantToBuy, setWantToBuy] = useState(false);
@@ -114,6 +137,12 @@ export function ItemReviewForm({
   const [saving, setSaving] = useState(false);
   const [boardMainTab, setBoardMainTab] = useState<"review" | "matches">("review");
   const [searchParams] = useSearchParams();
+  const boardMatchesRef = useRef<BoardGameMatchesSectionHandle>(null);
+  const tvGranular = mediaType === "tv" || mediaType === "anime";
+  const [tvReviewTab, setTvReviewTab] = useState<ReviewScope>("show");
+  const [scopedReviews, setScopedReviews] = useState<ScopedReview[]>([]);
+  const [seasonDraft, setSeasonDraft] = useState<TvReviewTabDraft>(() => emptyTvReviewDraft());
+  const [episodeDraft, setEpisodeDraft] = useState<TvReviewTabDraft>(() => emptyTvReviewDraft());
 
   /** When the log has no saved currency for a field, use account default (not only when state is still USD). */
   useEffect(() => {
@@ -151,6 +180,8 @@ export function ItemReviewForm({
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showSeasonField = HAS_SEASON_FIELD.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
+  const showReadingProgress = HAS_READING_PROGRESS.includes(mediaType);
+  const showGameLogFields = HAS_GAME_LOG_FIELDS.includes(mediaType);
   const showHoursToBeat = mediaType === "games";
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
   const showPurchaseAmount = mediaTypeHasPurchaseAmount(mediaType);
@@ -174,22 +205,22 @@ export function ItemReviewForm({
 
   useEffect(() => {
     setLoadingLog(true);
-    apiFetchCached<Log[]>(
-      `/logs?mediaType=${mediaType}&externalId=${encodeURIComponent(externalId)}`,
-      { ttlMs: 2 * 60 * 1000 }
-    )
+    apiFetch<Log[]>(`/logs?mediaType=${mediaType}&externalId=${encodeURIComponent(externalId)}`)
       .then((logs) => {
         const log = logs[0] != null ? decodeLogForDisplay(logs[0]) : null;
         setMyLog(log);
         if (log) {
-          const isInProgressLog = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
-          setStars(isInProgressLog ? null : (log.grade != null ? gradeToStars(log.grade) : null));
+          setStars(log.grade != null ? gradeToStars(log.grade) : null);
           setReview(log.review ?? "");
           setStatus(log.status ?? log.listType ?? null);
           setSeason(log.season ?? "");
           setEpisode(log.episode ?? "");
           setChapter(log.chapter ?? "");
           setVolume(log.volume ?? "");
+          setPagesRead(log.pagesRead ?? "");
+          setGamePlatform(log.gamePlatform ?? "");
+          setStartedAtInput(isoToDateInput(log.startedAt));
+          setCompletedAtInput(isoToDateInput(log.completedAt));
           setHoursToBeat(log.hoursToBeat != null ? log.hoursToBeat : "");
           setOwn(log.own ?? false);
           setWantToBuy(log.wantToBuy ?? false);
@@ -218,6 +249,10 @@ export function ItemReviewForm({
           setEpisode("");
           setChapter("");
           setVolume("");
+          setPagesRead("");
+          setGamePlatform("");
+          setStartedAtInput("");
+          setCompletedAtInput("");
           setHoursToBeat("");
           setOwn(false);
           setWantToBuy(false);
@@ -244,7 +279,21 @@ export function ItemReviewForm({
   }, [mediaType, externalId]);
 
   useEffect(() => {
-    if (!showBoardGameFields || !myLog) {
+    if (!myLog?.id || !tvGranular) {
+      setScopedReviews([]);
+      return;
+    }
+    apiFetch<{ data: ScopedReview[] }>(`/logs/${myLog.id}/scoped-reviews`)
+      .then((res) => setScopedReviews(res.data ?? []))
+      .catch(() => setScopedReviews([]));
+  }, [myLog?.id, tvGranular]);
+
+  useEffect(() => {
+    if (!showBoardGameFields) {
+      setBoardMainTab("review");
+      return;
+    }
+    if (!myLog) {
       setBoardMainTab("review");
       return;
     }
@@ -267,10 +316,91 @@ export function ItemReviewForm({
 
   const affinityJsonStable = (v: LogAffinityContext | null | undefined) => JSON.stringify(v ?? null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-    const gradeNum = isInProgress ? null : (stars == null ? null : starsToGrade(stars));
+  const ensureTvLog = useCallback(async (): Promise<string> => {
+    if (myLog?.id) return myLog.id;
+    const gradeNum = stars == null ? null : starsToGrade(stars);
+    const createBody: Record<string, unknown> = {
+      mediaType,
+      externalId,
+      title,
+      image: image ?? null,
+      grade: gradeNum,
+      review: review.trim() || null,
+      status: status || LOG_STATUS_OPTIONS[mediaType][0],
+      season: toNum(season),
+      episode: toNum(episode),
+    };
+    const created = await apiFetch<Log>("/logs", {
+      method: "POST",
+      body: JSON.stringify(createBody),
+    });
+    setMyLog(created);
+    invalidateLogsAndItemsCache();
+    return created.id;
+  }, [
+    myLog?.id,
+    mediaType,
+    externalId,
+    title,
+    image,
+    stars,
+    review,
+    status,
+    season,
+    episode,
+  ]);
+
+  const ensureBoardGameLog = useCallback(async (): Promise<string> => {
+    if (myLog?.id) return myLog.id;
+    const genreList = (genres ?? []).slice(0, 20);
+    const mechanicList = (mechanics ?? []).slice(0, 20);
+    const createBody: Record<string, unknown> = {
+      mediaType,
+      externalId,
+      title,
+      image: image ?? null,
+      grade: null,
+      review: null,
+      status: "played",
+      matchesPlayed: 0,
+    };
+    if (genreList.length > 0) createBody.genres = genreList;
+    if (mechanicList.length > 0) createBody.mechanics = mechanicList;
+    if (
+      affinityContextDraft != null &&
+      Object.keys(affinityContextDraft).length > 0
+    ) {
+      createBody.affinityContext = affinityContextDraft;
+    }
+    const provider = meRef.current?.boardGameProvider;
+    if (provider === "bgg" || provider === "ludopedia") {
+      createBody.boardGameSource = provider;
+    }
+    const created = await apiFetch<Log>("/logs", {
+      method: "POST",
+      body: JSON.stringify(createBody),
+    });
+    setMyLog(created);
+    setStatus("played");
+    setMatchesPlayed(created.matchesPlayed ?? 0);
+    invalidateLogsAndItemsCache();
+    onSaved();
+    return created.id;
+  }, [
+    myLog?.id,
+    genres,
+    mechanics,
+    affinityContextDraft,
+    mediaType,
+    externalId,
+    title,
+    image,
+    onSaved,
+  ]);
+
+  const handleSubmit = async (e?: FormEvent) => {
+    e?.preventDefault();
+    const gradeNum = stars == null ? null : starsToGrade(stars);
     setSaving(true);
     try {
       const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
@@ -294,6 +424,16 @@ export function ItemReviewForm({
         volume: toNum(volume),
         contentHours,
       };
+      if (showReadingProgress) {
+        payload.pagesRead = toNum(pagesRead);
+        payload.startedAt = startedAtInput.trim() ? dateInputToIso(startedAtInput) : null;
+        payload.completedAt = completedAtInput.trim() ? dateInputToIso(completedAtInput) : null;
+      }
+      if (showGameLogFields) {
+        payload.gamePlatform = gamePlatform.trim() || null;
+        payload.startedAt = startedAtInput.trim() ? dateInputToIso(startedAtInput) : null;
+        payload.completedAt = completedAtInput.trim() ? dateInputToIso(completedAtInput) : null;
+      }
       if (showHoursToBeat) payload.hoursToBeat = toNum(hoursToBeat);
       if (showCollectionOwnership) {
         payload.own = own;
@@ -347,6 +487,16 @@ export function ItemReviewForm({
           episodeForPayload === (myLog.episode ?? null) &&
           toNum(chapter) === (myLog.chapter ?? null) &&
           toNum(volume) === (myLog.volume ?? null) &&
+          (!showReadingProgress ||
+            (toNum(pagesRead) === (myLog.pagesRead ?? null) &&
+              (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (myLog.startedAt ?? null) &&
+              (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) ===
+                (myLog.completedAt ?? null))) &&
+          (!showGameLogFields ||
+            ((gamePlatform.trim() || null) === (myLog.gamePlatform ?? null) &&
+              (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (myLog.startedAt ?? null) &&
+              (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) ===
+                (myLog.completedAt ?? null))) &&
           (!showHoursToBeat || toNum(hoursToBeat) === (myLog.hoursToBeat ?? null)) &&
           sameStringList(genreList, myLog.genres ?? []) &&
           mechanicsMatch &&
@@ -384,12 +534,11 @@ export function ItemReviewForm({
           setSaving(false);
           return;
         }
-        const updated = await apiFetch<Log & { newBadges?: Array<{ id: string; name: string; icon: string }> }>(
+        const updated = await apiFetch<Log>(
           `/logs/${myLog.id}`,
           { method: "PATCH", body: JSON.stringify(payload) }
         );
         setMyLog(updated);
-        if (updated.newBadges?.length) showAchievementToasts(updated.newBadges, t("dashboard.badgesAchievementUnlocked"));
         toast.success(t("toast.reviewUpdated"));
         invalidateLogsAndItemsCache();
         if (
@@ -426,12 +575,11 @@ export function ItemReviewForm({
         };
         if (mediaType === "boardgames" && (me?.boardGameProvider === "bgg" || me?.boardGameProvider === "ludopedia"))
           createBody.boardGameSource = me.boardGameProvider;
-        const created = await apiFetch<Log & { newBadges?: NewBadge[] }>(
+        const created = await apiFetch<Log>(
           "/logs",
           { method: "POST", body: JSON.stringify(createBody) }
         );
         setMyLog(created);
-        if (created.newBadges?.length) showAchievementToasts(created.newBadges, t("dashboard.badgesAchievementUnlocked"));
         toast.success(t("toast.reviewSaved"));
         invalidateLogsAndItemsCache();
         if (
@@ -465,6 +613,47 @@ export function ItemReviewForm({
       setSaving(false);
     }
   };
+
+  const handlePrimarySave = async (e?: FormEvent) => {
+    e?.preventDefault();
+    if (tvGranular && (tvReviewTab === "season" || tvReviewTab === "episode")) {
+      setSaving(true);
+      try {
+        const logId = await ensureTvLog();
+        const draft = tvReviewTab === "season" ? seasonDraft : episodeDraft;
+        await saveScopedReviewTab(logId, tvReviewTab, draft);
+        const res = await apiFetch<{ data: ScopedReview[] }>(`/logs/${logId}/scoped-reviews`);
+        setScopedReviews(res.data ?? []);
+        toast.success(t("toast.reviewSaved"));
+        invalidateLogsAndItemsCache();
+        onSaved();
+      } catch (err) {
+        showErrorToast(t, "E012", { originalError: err });
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+    if (showBoardGameFields && boardMainTab === "matches") {
+      setSaving(true);
+      try {
+        const ok = await boardMatchesRef.current?.saveNewMatch();
+        if (ok) onSaved();
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+    await handleSubmit(e);
+  };
+
+  const saveButtonLabel = saving
+    ? t("common.saving")
+    : showBoardGameFields && boardMainTab === "matches"
+      ? t("boardGameMatches.saveMatch")
+      : myLog
+        ? t("common.update")
+        : t("common.save");
 
   if (loadingLog) {
     return (
@@ -511,8 +700,27 @@ export function ItemReviewForm({
             )}
           </div>
         )}
-        {showBoardGameFields && myLog && (
-          <div className="mb-3 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
+        {tvGranular && (
+          <motion.div className="mb-3 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
+            {(["show", "season", "episode"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setTvReviewTab(tab)}
+                className={cn(
+                  "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  tvReviewTab === tab
+                    ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+                    : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+                )}
+              >
+                {t(`tvReviews.tab${tab === "show" ? "Show" : tab === "season" ? "Season" : "Episode"}`)}
+              </button>
+            ))}
+          </motion.div>
+        )}
+        {showBoardGameFields && (
+          <motion.div className="mb-3 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
             <button
               type="button"
               onClick={() => setBoardMainTab("review")}
@@ -537,13 +745,36 @@ export function ItemReviewForm({
             >
               {t("boardGameMatches.tabMatches")}
             </button>
-          </div>
+          </motion.div>
         )}
-        {showBoardGameFields && myLog && boardMainTab === "matches" ? (
-          <BoardGameMatchesSection logId={myLog.id} onLogUpdated={setMyLog} />
+        {showBoardGameFields && boardMainTab === "matches" ? (
+          <BoardGameMatchesSection
+            ref={boardMatchesRef}
+            embedded
+            logId={myLog?.id ?? null}
+            onEnsureLog={ensureBoardGameLog}
+            onLogUpdated={(log) => {
+              setMyLog(log);
+              setStatus(log.status ?? log.listType ?? status);
+              if (log.matchesPlayed != null) setMatchesPlayed(log.matchesPlayed);
+            }}
+          />
+        ) : tvGranular && tvReviewTab !== "show" ? (
+          <TvGranularReviewSection
+            mediaType={mediaType}
+            progressOptions={progressOptions}
+            progressOptionsLoading={progressOptionsLoading}
+            showSeasonField={showSeasonField}
+            scopedReviews={scopedReviews}
+            activeTab={tvReviewTab}
+            seasonDraft={seasonDraft}
+            onSeasonDraftChange={setSeasonDraft}
+            episodeDraft={episodeDraft}
+            onEpisodeDraftChange={setEpisodeDraft}
+          />
         ) : (
-        <form onSubmit={handleSubmit}>
-          <div className="flex flex-col gap-4">
+        <form onSubmit={(e) => void handlePrimarySave(e)}>
+          <motion.div className="flex flex-col gap-4">
             <div>
               <Label className="mb-2 block text-sm font-medium text-[var(--color-lightest)]">
                 {t("itemReviewForm.status")}
@@ -618,6 +849,19 @@ export function ItemReviewForm({
               </div>
             )}
 
+            {showReadingProgress && (
+              <ReadingProgressFields
+                pagesRead={pagesRead}
+                onPagesReadChange={setPagesRead}
+                pagesCount={pagesCount ?? myLog?.pagesCount ?? null}
+                startedAt={startedAtInput}
+                onStartedAtChange={setStartedAtInput}
+                completedAt={completedAtInput}
+                onCompletedAtChange={setCompletedAtInput}
+                disabled={saving}
+              />
+            )}
+
             {showChapterVolume && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -643,6 +887,19 @@ export function ItemReviewForm({
                   />
                 </div>
               </div>
+            )}
+
+            {showGameLogFields && (
+              <GameLogFields
+                gamePlatform={gamePlatform}
+                onGamePlatformChange={setGamePlatform}
+                platformOptions={platforms}
+                startedAt={startedAtInput}
+                onStartedAtChange={setStartedAtInput}
+                completedAt={completedAtInput}
+                onCompletedAtChange={setCompletedAtInput}
+                disabled={saving}
+              />
             )}
 
             {showHoursToBeat && (
@@ -758,18 +1015,19 @@ export function ItemReviewForm({
                 className="min-h-[80px]"
               />
             </div>
-            <motion.div whileTap={tapScale} transition={tapTransition}>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={saving}
-              >
-                {saving ? t("common.saving") : myLog ? t("common.update") : t("common.save")}
-              </Button>
-            </motion.div>
-          </div>
+          </motion.div>
         </form>
         )}
+        <motion.div whileTap={tapScale} transition={tapTransition} className="mt-4">
+          <Button
+            type="button"
+            className="w-full"
+            disabled={saving}
+            onClick={(e) => void handlePrimarySave(e)}
+          >
+            {saveButtonLabel}
+          </Button>
+        </motion.div>
       </Card>
     </motion.div>
   );
