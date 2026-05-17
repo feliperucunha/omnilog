@@ -26,7 +26,7 @@ import { runMonthlyDigestIfDue } from "./lib/monthlyDigest.js";
 import { isWakeApiPingEnabled, shouldSkipAppVersionMiddleware } from "./lib/featureFlags.js";
 import { runSeedBadges } from "./scripts/seedBadges.js";
 import { runSeedMilestones } from "./scripts/seedMilestones.js";
-import { APP_VERSION } from "@geeklogs/shared";
+import { APP_VERSION, isAppVersionOlder } from "@geeklogs/shared";
 
 const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
 
@@ -83,10 +83,15 @@ app.use("/api", async (req, res, next) => {
   if (await shouldSkipAppVersionMiddleware()) {
     return next();
   }
-  if (clientVersion !== APP_VERSION) {
+  const clientVersionStr = Array.isArray(clientVersion) ? clientVersion[0] : clientVersion;
+  if (
+    typeof clientVersionStr === "string" &&
+    isAppVersionOlder(clientVersionStr, APP_VERSION)
+  ) {
     return res.status(401).json({
       code: APP_VERSION_MISMATCH_CODE,
       error: "App version outdated. Please update the app from the store.",
+      requiredVersion: APP_VERSION,
     });
   }
   next();

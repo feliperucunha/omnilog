@@ -26,6 +26,23 @@ text = text.replace(re, `APP_VERSION = "${next}"`);
 fs.writeFileSync(versionFile, text);
 console.log(`bump-app-version: APP_VERSION -> ${next}`);
 
+const gradleFile = path.join(
+  repoRoot,
+  "apps/android/android/app/build.gradle"
+);
+if (fs.existsSync(gradleFile)) {
+  let gradle = fs.readFileSync(gradleFile, "utf8");
+  const codeRe = /versionCode\s+(\d+)/;
+  const codeMatch = gradle.match(codeRe);
+  if (codeMatch) {
+    const nextCode = parseInt(codeMatch[1], 10) + 1;
+    gradle = gradle.replace(codeRe, `versionCode ${nextCode}`);
+    gradle = gradle.replace(/versionName\s+"[^"]*"/, `versionName "${next}"`);
+    fs.writeFileSync(gradleFile, gradle);
+    console.log(`bump-app-version: android versionCode -> ${nextCode}, versionName -> ${next}`);
+  }
+}
+
 const build = spawnSync(
   "pnpm",
   ["--filter", "@geeklogs/shared", "build"],

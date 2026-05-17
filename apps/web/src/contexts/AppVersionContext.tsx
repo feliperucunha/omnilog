@@ -6,28 +6,46 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { APP_VERSION } from "@geeklogs/shared";
+import { Capacitor } from "@capacitor/core";
+import { APP_VERSION, isAppVersionOlder } from "@geeklogs/shared";
 import { getApiBase } from "@/lib/api";
-
-function isNativePlatform(): boolean {
-  const w = typeof window !== "undefined" ? (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }) : null;
-  return Boolean(w?.Capacitor?.isNativePlatform?.());
-}
 
 interface AppVersionContextValue {
   showVersionModal: boolean;
   setShowVersionModal: (show: boolean) => void;
-  isMobile: boolean;
+  isNative: boolean;
+  requiredVersion: string | null;
 }
 
 const AppVersionContext = createContext<AppVersionContextValue | null>(null);
 
 export function AppVersionProvider({ children }: { children: ReactNode }) {
   const [showVersionModal, setShowVersionModal] = useState(false);
-  const isMobile = isNativePlatform();
+  const [requiredVersion, setRequiredVersion] = useState<string | null>(null);
+  const isNative = Capacitor.isNativePlatform();
+
+  const applyHealthPayload = useCallback(
+    (data: { version?: string; ignoreClientVersionCheck?: boolean }) => {
+      if (data.ignoreClientVersionCheck === true) {
+        setShowVersionModal(false);
+        setRequiredVersion(null);
+        return;
+      }
+      const serverVersion = data.version?.trim();
+      if (!serverVersion) return;
+      if (isAppVersionOlder(APP_VERSION, serverVersion)) {
+        setRequiredVersion(serverVersion);
+        setShowVersionModal(true);
+      } else {
+        setShowVersionModal(false);
+        setRequiredVersion(null);
+      }
+    },
+    []
+  );
 
   const checkVersion = useCallback(async () => {
-    if (!isMobile) return;
+    if (!isNative) return;
     try {
       const res = await fetch(`${getApiBase()}/health`, { credentials: "omit" });
       if (!res.ok) return;
@@ -35,28 +53,58 @@ export function AppVersionProvider({ children }: { children: ReactNode }) {
         version?: string;
         ignoreClientVersionCheck?: boolean;
       };
-      if (data.ignoreClientVersionCheck === true) {
-        return;
-      }
-      if (data.version != null && data.version !== APP_VERSION) {
-        setShowVersionModal(true);
-      }
+      applyHealthPayload(data);
     } catch {
-      /* ignore; will show on first 401 if mismatch */
+      /* ignore; 401 APP_VERSION_MISMATCH will open the gate */
     }
-  }, [isMobile]);
+  }, [isNative, applyHealthPayload]);
 
   useEffect(() => {
-    if (!isMobile) return;
-    const handleMismatch = () => setShowVersionModal(true);
+    if (!isNative) return;
+
+    const handleMismatch = (event: Event) => {
+      const detail = (event as CustomEvent<{ requiredVersion?: string }>).detail;
+      if (detail?.requiredVersion) {
+        setRequiredVersion(detail.requiredVersion);
+      }
+      setShowVersionModal(true);
+      void checkVersion();
+    };
+
+    const handleCheckRequest = () => {
+      void checkVersion();
+    };
+
     window.addEventListener("app:version-mismatch", handleMismatch);
+    window.addEventListener("app:check-version", handleCheckRequest);
     void checkVersion();
-    return () => window.removeEventListener("app:version-mismatch", handleMismatch);
-  }, [isMobile, checkVersion]);
+
+    let resumeHandle: { remove: () => Promise<void> } | undefined;
+    let cancelled = false;
+
+    void (async () => {
+      const { App } = await import("@capacitor/app");
+      const h = await App.addListener("resume", () => {
+        void checkVersion();
+      });
+      if (cancelled) {
+        await h.remove();
+        return;
+      }
+      resumeHandle = h;
+    })();
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("app:version-mismatch", handleMismatch);
+      window.removeEventListener("app:check-version", handleCheckRequest);
+      void resumeHandle?.remove();
+    };
+  }, [isNative, checkVersion]);
 
   return (
     <AppVersionContext.Provider
-      value={{ showVersionModal, setShowVersionModal, isMobile }}
+      value={{ showVersionModal, setShowVersionModal, isNative, requiredVersion }}
     >
       {children}
     </AppVersionContext.Provider>

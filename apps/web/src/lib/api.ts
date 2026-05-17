@@ -227,6 +227,12 @@ function fireFirstApiErrorFromCaught(err: unknown): void {
     return;
   }
   if (err instanceof ApiError) {
+    if (
+      err.loadingErrorCode === LoadingErrorCodeEnum.VERSION_MISMATCH &&
+      isNativePlatform()
+    ) {
+      return;
+    }
     fireFirstApiErrorOnce(err.loadingErrorCode ?? statusToLoadingErrorCode(err.statusCode));
     return;
   }
@@ -292,7 +298,16 @@ async function performSingleFetchAttempt<T>(
         /* ignore */
       }
       if (code === APP_VERSION_MISMATCH_CODE && isNativePlatform()) {
-        window.dispatchEvent(new CustomEvent("app:version-mismatch"));
+        let requiredVersion: string | undefined;
+        try {
+          const body = JSON.parse(text) as { requiredVersion?: string };
+          requiredVersion = body.requiredVersion;
+        } catch {
+          /* ignore */
+        }
+        window.dispatchEvent(
+          new CustomEvent("app:version-mismatch", { detail: { requiredVersion } })
+        );
         throw new ApiError(parseErrorResponse(text, MSG.versionOutdated), 401, LoadingErrorCodeEnum.VERSION_MISMATCH);
       }
       const message = parseErrorResponse(text, MSG.sessionEnded);

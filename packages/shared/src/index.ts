@@ -34,6 +34,7 @@ export type {
   CreateBoardGameMatchInput,
 } from "./types.js";
 export { APP_VERSION } from "./version.js";
+export { isAppVersionOlder, parseAppVersion } from "./versionCompare.js";
 export { decodeHtmlEntities } from "./htmlEntities.js";
 export {
   MEDIA_TYPES,

@@ -916,8 +916,10 @@
     "logLimitReached": "Você atingiu o limite de 500 registros do plano Grátis. Assine o Pro para registros ilimitados."
   },
   "appVersion": {
-    "title": "Atualização disponível",
-    "message": "Há uma nova versão do Geeklogs. Instale a build mais recente na Play Store ou App Store para continuar usando o app."
+    "title": "Atualização obrigatória",
+    "message": "Há uma nova versão do Geeklogs na Play Store. Atualize agora para continuar usando o app.",
+    "updateButton": "Atualizar na Google Play",
+    "versionHint": "Sua versão: {{current}} · Necessária: {{required}}"
   },
   "coldStart": {
     "error": "O Geeklogs não conseguiu terminar de carregar. Confira se você está online e toque em Tentar novamente. Se faz tempo que você não abre o app, a primeira vez pode demorar um pouco mais.",

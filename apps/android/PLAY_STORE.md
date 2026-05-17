@@ -7,7 +7,7 @@ This app is configured to meet current Play Store technical requirements (target
 - **Target API level:** 35 (Android 15) — required for new apps and updates as of Aug 2025 ([Play requirements](https://developer.android.com/google/play/requirements/target-sdk)).
 - **Android App Bundle (AAB):** Use the AAB for uploads; Play will generate optimized APKs. Bundle splits are enabled (ABI, density, language).
 - **Release build:** `debuggable false`, `usesCleartextTraffic="false"`. Only `INTERNET` permission is declared.
-- **Versioning:** Bump `versionCode` (integer) for each upload and set `versionName` (e.g. `"1.0"`) in `android/app/build.gradle` before releasing.
+- **Versioning:** Run `node scripts/bump-app-version.mjs` from the repo root before each Play release (updates `APP_VERSION` in `@geeklogs/shared`, rebuilds shared, and bumps `versionCode` / `versionName` in `android/app/build.gradle`). Deploy the API with the same commit so older app builds see the forced-update screen and receive `401 APP_VERSION_MISMATCH` until users update from [Google Play](https://play.google.com/store/apps/details?id=com.geeklogs.app). Ensure admin **Ignore native app version gate** is **off** in production.
 - **Launcher & splash icon:** Generated from `apps/web/public/logo-dark.png` (black background). After changing the web logo, run from repo root: `python3 apps/android/scripts/generate-launcher-icons.py` (requires Pillow).
 
 ## 2. App signing

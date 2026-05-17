@@ -66,7 +66,7 @@ export async function startBoardGameCollectionImport(body: {
       /* ignore */
     }
     if (code === APP_VERSION_MISMATCH_CODE && isNativePlatform()) {
-      window.dispatchEvent(new CustomEvent("app:version-mismatch"));
+      window.dispatchEvent(new CustomEvent("app:version-mismatch", { detail: {} }));
       throw new CollectionImportStartError("App version outdated. Please update and try again.", 401);
     }
     void removeItem("geeklogs_token").then(() => removeItem("geeklogs_user"));
