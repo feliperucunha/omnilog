@@ -926,6 +926,15 @@
     "title": "Update required",
     "message": "A new version of Geeklogs is available on the Play Store. Update now to keep using the app.",
     "updateButton": "Update on Google Play",
+    "playStoreBadge": "Google Play",
+    "updateOn": "Update on",
+    "googlePlay": "Google Play",
+    "openingStore": "Opening…",
+    "currentShort": "Installed",
+    "requiredShort": "Required",
+    "openStoreFailed": "Couldn’t open the Play Store. Try again or search for Geeklogs in the Play Store app.",
+    "currentLabel": "Installed · {{version}}",
+    "requiredLabel": "Required · {{version}}",
     "versionHint": "Your version: {{current}} · Required: {{required}}"
   },
   "coldStart": {

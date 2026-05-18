@@ -14,6 +14,7 @@ export interface PlayBillingPlugin {
     offerToken: string;
     obfuscatedAccountId?: string;
   }): Promise<{ purchaseToken: string; products: string[] }>;
+  openPlayStoreListing(options?: { packageId?: string }): Promise<void>;
 }
 
 /** Android-only Capacitor plugin; no-op registration on web (calls will fail at runtime if invoked). */
