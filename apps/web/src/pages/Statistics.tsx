@@ -16,7 +16,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { apiFetch, apiFetchCached, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, getCachedEntry, HEAVY_PAGE_TTL_MS, apiFetchSWR } from "@/lib/api";
+import {
+  loadWithSWR,
+  registerLogsPageCacheContext,
+  warmStatisticsCaches,
+} from "@/lib/logsPageCache";
 import {
   StatisticsSummarySkeleton,
   StatisticsBarsSkeleton,
@@ -664,106 +669,104 @@ export function Statistics() {
     return categoryFilter === "all" ? "" : `&mediaType=${encodeURIComponent(categoryFilter)}`;
   }, [categoryFilter]);
 
-  const fetchStats = useCallback(async (group: StatsGroup) => {
-    setStatsLoading(true);
-    try {
-      const res = await apiFetch<{ data: StatsEntry[] }>(
-        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`
-      );
-      setStats(res.data ?? []);
-    } catch {
-      setStats([]);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, [tzOffsetMinutes, statsMediaQuery]);
+  const fetchStats = useCallback(async () => {
+    const path = `/logs/stats?group=${statsGroup}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
+    await loadWithSWR<{ data: StatsEntry[] }>(
+      path,
+      (res) => setStats(res.data ?? []),
+      { setLoading: setStatsLoading, onError: () => setStats([]) }
+    );
+  }, [statsGroup, tzOffsetMinutes, statsMediaQuery]);
 
   const fetchGamePlatformStats = useCallback(async () => {
     if (categoryFilter !== "games") {
       setGamePlatformStats([]);
+      setGamePlatformStatsLoading(false);
       return;
     }
-    setGamePlatformStatsLoading(true);
-    try {
-      const res = await apiFetch<{ data: StatsEntry[] }>(
-        `/logs/stats?group=gamePlatforms&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`
-      );
-      setGamePlatformStats(res.data ?? []);
-    } catch {
-      setGamePlatformStats([]);
-    } finally {
-      setGamePlatformStatsLoading(false);
-    }
+    const path = `/logs/stats?group=gamePlatforms&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
+    await loadWithSWR<{ data: StatsEntry[] }>(
+      path,
+      (res) => setGamePlatformStats(res.data ?? []),
+      { setLoading: setGamePlatformStatsLoading, onError: () => setGamePlatformStats([]) }
+    );
   }, [categoryFilter, tzOffsetMinutes, statsMediaQuery]);
 
   const fetchGenreStats = useCallback(async () => {
-    setGenreStatsLoading(true);
-    try {
-      const res = await apiFetch<{ data: StatsEntry[] }>(
-        `/logs/stats?group=genre&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`
-      );
-      setGenreStats(res.data ?? []);
-    } catch {
-      setGenreStats([]);
-    } finally {
-      setGenreStatsLoading(false);
-    }
+    const path = `/logs/stats?group=genre&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
+    await loadWithSWR<{ data: StatsEntry[] }>(
+      path,
+      (res) => setGenreStats(res.data ?? []),
+      { setLoading: setGenreStatsLoading, onError: () => setGenreStats([]) }
+    );
   }, [tzOffsetMinutes, statsMediaQuery]);
 
-  const fetchStatusOverTimeStats = useCallback(async (group: "completedByMonth" | "completedByYear") => {
-    setStatusOverTimeLoading(true);
-    try {
-      const res = await apiFetch<{ data: StatsEntry[] }>(
-        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`
+  const fetchStatusOverTimeStats = useCallback(
+    async (group: "completedByMonth" | "completedByYear") => {
+      const path = `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
+      await loadWithSWR<{ data: StatsEntry[] }>(
+        path,
+        (res) => setStatusOverTimeStats(res.data ?? []),
+        { setLoading: setStatusOverTimeLoading, onError: () => setStatusOverTimeStats([]) }
       );
-      setStatusOverTimeStats(res.data ?? []);
-    } catch {
-      setStatusOverTimeStats([]);
-    } finally {
-      setStatusOverTimeLoading(false);
-    }
-  }, [tzOffsetMinutes, statsMediaQuery]);
+    },
+    [tzOffsetMinutes, statsMediaQuery]
+  );
 
-  const fetchCategoryOverTimeStats = useCallback(async (group: "categoryByMonth" | "categoryByYear") => {
-    setCategoryOverTimeLoading(true);
-    try {
-      const res = await apiFetch<{ data: CategoryOverTimeEntry[] }>(
-        `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`
+  const fetchCategoryOverTimeStats = useCallback(
+    async (group: "categoryByMonth" | "categoryByYear") => {
+      const path = `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
+      await loadWithSWR<{ data: CategoryOverTimeEntry[] }>(
+        path,
+        (res) => setCategoryOverTimeStats(res.data ?? []),
+        { setLoading: setCategoryOverTimeLoading, onError: () => setCategoryOverTimeStats([]) }
       );
-      setCategoryOverTimeStats(res.data ?? []);
-    } catch {
-      setCategoryOverTimeStats([]);
-    } finally {
-      setCategoryOverTimeLoading(false);
-    }
-  }, [tzOffsetMinutes, statsMediaQuery]);
+    },
+    [tzOffsetMinutes, statsMediaQuery]
+  );
+
+  type PurchaseSpendingResponse = {
+    data: Record<string, Record<string, number>>;
+    saleData?: Record<string, Record<string, number>>;
+    counts?: Record<string, number>;
+    saleCounts?: Record<string, number>;
+  };
 
   const fetchPurchaseSpending = useCallback(async () => {
-    setPurchaseSpendingLoading(true);
-    try {
-      const res = await apiFetch<{
-        data: Record<string, Record<string, number>>;
-        saleData?: Record<string, Record<string, number>>;
-        counts?: Record<string, number>;
-        saleCounts?: Record<string, number>;
-      }>(`/logs/stats?group=purchaseSpending&period=${purchasePeriod}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`);
-      setPurchaseSpending(res.data ?? null);
-      setSaleProceedsByCategory(res.saleData ?? null);
-      setPurchaseItemCounts(res.counts ?? null);
-      setSaleItemCounts(res.saleCounts ?? null);
-    } catch {
-      setPurchaseSpending(null);
-      setSaleProceedsByCategory(null);
-      setPurchaseItemCounts(null);
-      setSaleItemCounts(null);
-    } finally {
-      setPurchaseSpendingLoading(false);
-    }
+    const path = `/logs/stats?group=purchaseSpending&period=${purchasePeriod}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
+    await loadWithSWR<PurchaseSpendingResponse>(
+      path,
+      (res) => {
+        setPurchaseSpending(res.data ?? null);
+        setSaleProceedsByCategory(res.saleData ?? null);
+        setPurchaseItemCounts(res.counts ?? null);
+        setSaleItemCounts(res.saleCounts ?? null);
+      },
+      {
+        setLoading: setPurchaseSpendingLoading,
+        onError: () => {
+          setPurchaseSpending(null);
+          setSaleProceedsByCategory(null);
+          setPurchaseItemCounts(null);
+          setSaleItemCounts(null);
+        },
+      }
+    );
   }, [purchasePeriod, tzOffsetMinutes, statsMediaQuery]);
 
   useEffect(() => {
-    void fetchStats(statsGroup);
-  }, [statsGroup, fetchStats]);
+    void fetchStats();
+  }, [fetchStats]);
+
+  useEffect(() => {
+    if (!visibleTypesOrderReady || visibleTypes.length === 0) return;
+    registerLogsPageCacheContext({
+      mediaTypes: visibleTypes,
+      tzOffsetMinutes,
+      isPro,
+    });
+    warmStatisticsCaches(visibleTypes, tzOffsetMinutes, isPro);
+  }, [visibleTypes, visibleTypesOrderReady, tzOffsetMinutes, isPro]);
 
   useEffect(() => {
     void fetchGenreStats();
@@ -844,27 +847,49 @@ export function Statistics() {
   }, [spendDetailMediaType, purchasePeriod, tzOffsetMinutes, t]);
 
   const fetchLogs = useCallback(() => {
-    setLoading(true);
     const mediaQ = statsMediaQuery();
     const logsQuery = isPro
       ? `/logs?limit=5&sort=dateDesc${mediaQ}`
       : `/logs?limit=5&sort=dateDesc&forStatistics=1&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`;
-    Promise.all([
-      apiFetchCached<Log[] | { data: Log[]; nextCursor: string | null }>(logsQuery, {
-        ttlMs: 2 * 60 * 1000,
-      }).then((res) => {
-        const raw = Array.isArray(res) ? res : res.data;
+    const summaryPath = `/logs/stats?group=summary&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`;
+
+    const logsCached = getCachedEntry<Log[] | { data: Log[]; nextCursor: string | null }>("GET", logsQuery);
+    const summaryCached = getCachedEntry<{ data: LogStatsSummary }>("GET", summaryPath);
+    if (!logsCached && !summaryCached) setLoading(true);
+    else setLoading(false);
+
+    if (logsCached) {
+      const raw = Array.isArray(logsCached.data) ? logsCached.data : logsCached.data.data;
+      setLogs((raw ?? []).map(decodeLogForDisplay));
+    }
+    if (summaryCached) setSummary(summaryCached.data.data ?? null);
+
+    void apiFetchSWR<Log[] | { data: Log[]; nextCursor: string | null }>(logsQuery, {
+      ttlMs: HEAVY_PAGE_TTL_MS,
+      onUpdate: (res) => {
+        const raw = Array.isArray(res) ? res : (res as { data: Log[] }).data;
         setLogs((raw ?? []).map(decodeLogForDisplay));
-      }),
-      apiFetch<{ data: LogStatsSummary }>(
-        `/logs/stats?group=summary&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`
-      )
-        .then((res) => setSummary(res.data ?? null))
-        .catch(() => setSummary(null)),
-    ])
+      },
+    })
+      .then(({ data, fromCache }) => {
+        if (!fromCache) {
+          const raw = Array.isArray(data) ? data : data.data;
+          setLogs((raw ?? []).map(decodeLogForDisplay));
+        }
+      })
       .catch(() => {
-        setLogs([]);
-        setSummary(null);
+        if (!logsCached) setLogs([]);
+      });
+
+    void apiFetchSWR<{ data: LogStatsSummary }>(summaryPath, {
+      ttlMs: HEAVY_PAGE_TTL_MS,
+      onUpdate: (res) => setSummary((res as { data: LogStatsSummary }).data ?? null),
+    })
+      .then(({ data, fromCache }) => {
+        if (!fromCache) setSummary(data.data ?? null);
+      })
+      .catch(() => {
+        if (!summaryCached) setSummary(null);
       })
       .finally(() => setLoading(false));
   }, [isPro, tzOffsetMinutes, statsMediaQuery]);

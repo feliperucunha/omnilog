@@ -8,7 +8,18 @@ import { Card } from "@/components/ui/card";
 import type { MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { apiFetch, apiFetchCached, apiFetchPublic, invalidateLogsAndItemsCache, apiFetchFile, downloadFile, LOGS_INVALIDATED_EVENT } from "@/lib/api";
+import {
+  apiFetch,
+  apiFetchCached,
+  apiFetchSWR,
+  apiFetchPublic,
+  getCachedEntry,
+  HEAVY_PAGE_TTL_MS,
+  invalidateLogsAndItemsCache,
+  apiFetchFile,
+  downloadFile,
+  LOGS_INVALIDATED_EVENT,
+} from "@/lib/api";
 import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
 import { ExportLogsModal, type ExportLogsOptions } from "@/components/ExportLogsModal";
@@ -275,12 +286,19 @@ export function MediaLogs({
     return { field: "volume", value: log.volume ?? 0, labelKey: "itemReviewForm.volume" };
   };
 
+  const applyLogsResponse = useCallback((response: LogsResponse, reset: boolean) => {
+    const list = Array.isArray(response) ? response : response.data;
+    const decoded = list.map(decodeLogForDisplay);
+    const cursor = Array.isArray(response) ? null : response.nextCursor;
+    setLogs((prev) => (reset ? decoded : [...prev, ...decoded]));
+    setNextCursor(cursor);
+  }, []);
+
   const fetchLogs = useCallback(
     (reset = true) => {
       if (!reset && (loadingMore || !nextCursor)) return;
       if (reset) {
         setError(null);
-        setLoading(true);
         setNextCursor(null);
       } else {
         setLoadingMore(true);
@@ -300,28 +318,66 @@ export function MediaLogs({
       const path = publicUserId
         ? `/users/${publicUserId}/logs?${params.toString()}`
         : `/logs?${params.toString()}`;
-      const fetcher = publicUserId
-        ? () => apiFetchPublic<LogsResponse>(path)
-        : () =>
-            reset && !nextCursor
-              ? apiFetchCached<LogsResponse>(path, { ttlMs: 2 * 60 * 1000 })
-              : apiFetch<LogsResponse>(path);
-      fetcher()
-        .then((response) => {
-          const list = Array.isArray(response) ? response : response.data;
-          const decoded = list.map(decodeLogForDisplay);
-          const cursor = Array.isArray(response) ? null : response.nextCursor;
-          setLogs((prev) => (reset ? decoded : [...prev, ...decoded]));
-          setNextCursor(cursor);
+
+      const finish = () => {
+        setLoading(false);
+        setLoadingMore(false);
+      };
+
+      if (publicUserId) {
+        if (reset) setLoading(true);
+        void apiFetchPublic<LogsResponse>(path)
+          .then((response) => {
+            applyLogsResponse(response, reset);
+            setError(null);
+          })
+          .catch((err) => {
+            if (reset) setLogs([]);
+            setError(err instanceof Error ? err.message : t("mediaLogs.couldntLoadLogs"));
+          })
+          .finally(finish);
+        return;
+      }
+
+      if (!reset) {
+        void apiFetch<LogsResponse>(path)
+          .then((response) => {
+            applyLogsResponse(response, false);
+            setError(null);
+          })
+          .catch((err) => {
+            setError(err instanceof Error ? err.message : t("mediaLogs.couldntLoadLogs"));
+          })
+          .finally(finish);
+        return;
+      }
+
+      const cached = getCachedEntry<LogsResponse>("GET", path);
+      if (cached) {
+        applyLogsResponse(cached.data, true);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+
+      void apiFetchSWR<LogsResponse>(path, {
+        ttlMs: HEAVY_PAGE_TTL_MS,
+        onUpdate: (data) => {
+          applyLogsResponse(data as LogsResponse, true);
+          setError(null);
+        },
+      })
+        .then(({ data, fromCache }) => {
+          if (!fromCache) {
+            applyLogsResponse(data, true);
+          }
+          setError(null);
         })
         .catch((err) => {
-          if (reset) setLogs([]);
+          if (!cached) setLogs([]);
           setError(err instanceof Error ? err.message : t("mediaLogs.couldntLoadLogs"));
         })
-        .finally(() => {
-          setLoading(false);
-          setLoadingMore(false);
-        });
+        .finally(finish);
     },
     [
       mediaType,
@@ -335,37 +391,45 @@ export function MediaLogs({
       showCollectionOwnershipFilters,
       categorySearchQuery,
       genreFilter,
+      applyLogsResponse,
     ]
   );
+
+  type StatusCountsPayload = {
+    data: {
+      total: number;
+      byStatus: Record<string, number>;
+      owned?: number;
+      wantToBuy?: number;
+      byGenre?: Array<{ name: string; count: number }>;
+    };
+  };
 
   const fetchStatusCounts = useCallback(() => {
     const path = publicUserId
       ? `/users/${publicUserId}/logs/status-counts?mediaType=${encodeURIComponent(mediaType)}`
       : `/logs/status-counts?mediaType=${encodeURIComponent(mediaType)}`;
-    const fetcher = publicUserId
-      ? () =>
-          apiFetchPublic<{
-            data: {
-              total: number;
-              byStatus: Record<string, number>;
-              owned?: number;
-              wantToBuy?: number;
-              byGenre?: Array<{ name: string; count: number }>;
-            };
-          }>(path)
-      : () =>
-          apiFetchCached<{
-            data: {
-              total: number;
-              byStatus: Record<string, number>;
-              owned?: number;
-              wantToBuy?: number;
-              byGenre?: Array<{ name: string; count: number }>;
-            };
-          }>(path, { ttlMs: 2 * 60 * 1000 });
-    fetcher()
-      .then((res) => setStatusCounts(res.data ?? null))
-      .catch(() => setStatusCounts(null));
+
+    if (publicUserId) {
+      void apiFetchPublic<StatusCountsPayload>(path)
+        .then((res) => setStatusCounts(res.data ?? null))
+        .catch(() => setStatusCounts(null));
+      return;
+    }
+
+    const cached = getCachedEntry<StatusCountsPayload>("GET", path);
+    if (cached) setStatusCounts(cached.data.data ?? null);
+
+    void apiFetchSWR<StatusCountsPayload>(path, {
+      ttlMs: HEAVY_PAGE_TTL_MS,
+      onUpdate: (res) => setStatusCounts((res as StatusCountsPayload).data ?? null),
+    })
+      .then(({ data, fromCache }) => {
+        if (!fromCache) setStatusCounts(data.data ?? null);
+      })
+      .catch(() => {
+        if (!cached) setStatusCounts(null);
+      });
   }, [mediaType, publicUserId]);
 
   useEffect(() => {
@@ -384,13 +448,7 @@ export function MediaLogs({
   }, [mediaType]);
 
   useEffect(() => {
-    const defaultsMatch =
-      sortBy === "dateDesc" &&
-      statusFilter === "" &&
-      collectionFilter === "" &&
-      genreFilter === "" &&
-      categorySearchQuery.trim() === "";
-    const useInitial = embedded && initialLogsProp !== undefined && defaultsMatch;
+    const useInitial = embedded && initialLogsProp !== undefined;
     if (useInitial) {
       setLogs((initialLogsProp ?? []).map(decodeLogForDisplay));
       setNextCursor(initialNextCursorProp ?? null);
@@ -400,7 +458,6 @@ export function MediaLogs({
       setLogs([]);
       setNextCursor(null);
       setError(null);
-      setLoading(true);
       fetchLogsRef.current(true);
     }
   }, [
@@ -422,7 +479,6 @@ export function MediaLogs({
   }, [embedded, mediaType, statusFilter, collectionFilter, sortBy, categorySearchQuery, genreFilter]);
 
   useEffect(() => {
-    setStatusCounts(null);
     fetchStatusCounts();
   }, [fetchStatusCounts]);
 
@@ -430,6 +486,17 @@ export function MediaLogs({
   const categorySearchInputRef = useRef<HTMLInputElement>(null);
   const fetchLogsRef = useRef(fetchLogs);
   fetchLogsRef.current = fetchLogs;
+
+  useEffect(() => {
+    if (publicUserId) return;
+    const onInvalidated = () => {
+      fetchStatusCounts();
+      fetchLogsRef.current(true);
+    };
+    window.addEventListener(LOGS_INVALIDATED_EVENT, onInvalidated);
+    return () => window.removeEventListener(LOGS_INVALIDATED_EVENT, onInvalidated);
+  }, [publicUserId, fetchStatusCounts]);
+
   useEffect(() => {
     if (!infiniteScrollEnabled) return;
     const el = loadMoreRef.current;

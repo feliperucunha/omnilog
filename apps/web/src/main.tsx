@@ -18,6 +18,7 @@ import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import { AppVersionProvider } from "@/contexts/AppVersionContext";
 import App from "./App";
 import { CapacitorAndroidIntegration } from "@/components/CapacitorAndroidIntegration";
+import { LogsPageCacheInit } from "@/components/LogsPageCacheInit";
 import { initSentry } from "@/lib/sentry";
 import "./fonts.css";
 import "./index.css";
@@ -36,6 +37,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <VisibleMediaTypesProvider>
                     <LogCompleteProvider>
                       <CapacitorAndroidIntegration />
+                      <LogsPageCacheInit />
                       <ThemeSync />
                       <LocaleSync />
                       <ColdStartLoader />

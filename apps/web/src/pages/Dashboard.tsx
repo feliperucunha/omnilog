@@ -6,7 +6,25 @@ import { Button } from "@/components/ui/button";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
-import { apiFetch, apiFetchCached, invalidateApiCache, LOGS_INVALIDATED_EVENT } from "@/lib/api";
+import {
+  apiFetchSWR,
+  getCachedEntry,
+  HEAVY_PAGE_TTL_MS,
+  invalidateApiCache,
+  LOGS_INVALIDATED_EVENT,
+} from "@/lib/api";
+import {
+  buildFeedPath,
+  buildLogsListPathFromSearchParams,
+  FOLLOWS_PATH,
+  loadWithSWR,
+  MILESTONES_PATH,
+  prefetchDashboardCategoryView,
+  registerFollowedUserIds,
+  registerLogsPageCacheContext,
+  warmDashboardAndStatisticsCaches,
+  warmFriendFeedCaches,
+} from "@/lib/logsPageCache";
 import { APP_PTR_REFRESH_EVENT } from "@/lib/appPtrRefresh";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -50,6 +68,7 @@ import { paperShadow } from "@/lib/paperShadow";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
+import { tierHasProFeatures } from "@/lib/userTier";
 
 interface FeedEntry {
   log: Log;
@@ -224,16 +243,46 @@ export function Dashboard() {
     [setSearchParams]
   );
 
+  const isPro = tierHasProFeatures(me?.tier);
+  const tzOffsetMinutes = useMemo(() => -new Date().getTimezoneOffset(), []);
+
+  const cachedCategoryLogs = useMemo(() => {
+    const path = buildLogsListPathFromSearchParams(
+      selectedCategory,
+      new URLSearchParams(searchParamsKey)
+    );
+    const entry = getCachedEntry<Log[] | { data: Log[]; nextCursor: string | null }>("GET", path);
+    if (!entry) return null;
+    const raw = Array.isArray(entry.data) ? entry.data : entry.data.data;
+    const cursor = Array.isArray(entry.data) ? null : (entry.data.nextCursor ?? null);
+    return {
+      logs: (raw ?? []).map(decodeLogForDisplay),
+      cursor,
+    };
+  }, [selectedCategory, searchParamsKey]);
+
   const fetchCounts = useCallback(() => {
     setCountsError(null);
-    setCountsLoading(true);
-    apiFetchCached<{ data: Record<MediaType, number> }>("/logs/counts", { ttlMs: 2 * 60 * 1000 })
-      .then((res) => {
-        setCounts(res.data ?? null);
+    const path = "/logs/counts";
+    const cached = getCachedEntry<{ data: Record<MediaType, number> }>("GET", path);
+    if (!cached) setCountsLoading(true);
+
+    void apiFetchSWR<{ data: Record<MediaType, number> }>(path, {
+      ttlMs: HEAVY_PAGE_TTL_MS,
+      onUpdate: (res) => {
+        const payload = res as { data: Record<MediaType, number> };
+        setCounts(payload.data ?? null);
         setCountsError(null);
+      },
+    })
+      .then(({ data, fromCache }) => {
+        if (!fromCache) {
+          setCounts(data.data ?? null);
+          setCountsError(null);
+        }
       })
       .catch((err) => {
-        setCounts(null);
+        if (!cached) setCounts(null);
         setCountsError(err instanceof Error ? err.message : t("dashboard.couldntLoadLogs"));
       })
       .finally(() => setCountsLoading(false));
@@ -242,6 +291,99 @@ export function Dashboard() {
   useEffect(() => {
     fetchCounts();
   }, [fetchCounts]);
+
+  const applyFeedResponse = useCallback((res: { data: FeedEntry[] }) => {
+    setFeed((res.data ?? []).map((e) => ({ ...e, log: decodeLogForDisplay(e.log) })));
+  }, []);
+
+  const fetchFollows = useCallback(() => {
+    if (!token) {
+      setFollowedUsers([]);
+      registerFollowedUserIds([]);
+      return;
+    }
+    void loadWithSWR<{ data: Array<{ id: string; username: string | null }> }>(
+      FOLLOWS_PATH,
+      (res) => {
+        const list = res.data ?? [];
+        setFollowedUsers(list);
+        const ids = list.map((u) => u.id);
+        registerFollowedUserIds(ids);
+        warmFriendFeedCaches(ids);
+      },
+      { onError: () => {
+        setFollowedUsers([]);
+        registerFollowedUserIds([]);
+      } }
+    );
+  }, [token]);
+
+  const fetchFeed = useCallback(() => {
+    if (!token) {
+      setFeed([]);
+      return;
+    }
+    const path =
+      feedFriendFilter === "all" ? buildFeedPath() : buildFeedPath(feedFriendFilter);
+    const cached = getCachedEntry<{ data: FeedEntry[] }>("GET", path);
+    if (!cached) setFeedLoading(true);
+    else {
+      applyFeedResponse(cached.data);
+      setFeedLoading(false);
+    }
+
+    void apiFetchSWR<{ data: FeedEntry[] }>(path, {
+      ttlMs: HEAVY_PAGE_TTL_MS,
+      onUpdate: (res) => applyFeedResponse(res as { data: FeedEntry[] }),
+    })
+      .then(({ data, fromCache }) => {
+        if (!fromCache) applyFeedResponse(data);
+      })
+      .catch(() => {
+        if (!cached) setFeed([]);
+      })
+      .finally(() => setFeedLoading(false));
+  }, [token, feedFriendFilter, applyFeedResponse]);
+
+  const fetchMilestones = useCallback(() => {
+    if (!token) {
+      setMilestoneProgress(null);
+      return;
+    }
+    void loadWithSWR<MilestoneProgressResponse>(MILESTONES_PATH, setMilestoneProgress, {
+      onError: () => setMilestoneProgress(null),
+    });
+  }, [token]);
+
+  useEffect(() => {
+    if (!visibleTypesOrderReady || visibleTypes.length === 0) return;
+    registerLogsPageCacheContext({
+      mediaTypes: visibleTypes,
+      tzOffsetMinutes,
+      isPro,
+    });
+    warmDashboardAndStatisticsCaches(visibleTypes, tzOffsetMinutes, isPro);
+    prefetchDashboardCategoryView(selectedCategory, new URLSearchParams(searchParamsKey));
+  }, [
+    visibleTypes,
+    visibleTypesOrderReady,
+    tzOffsetMinutes,
+    isPro,
+    selectedCategory,
+    searchParamsKey,
+  ]);
+
+  useEffect(() => {
+    fetchFollows();
+  }, [fetchFollows]);
+
+  useEffect(() => {
+    fetchFeed();
+  }, [fetchFeed]);
+
+  useEffect(() => {
+    fetchMilestones();
+  }, [fetchMilestones]);
 
   useEffect(() => {
     if (!me?.user?.id) return;
@@ -291,75 +433,28 @@ export function Dashboard() {
   );
 
   useEffect(() => {
-    if (!token) {
-      setFollowedUsers([]);
-      return;
-    }
-    apiFetch<{ data: Array<{ id: string; username: string | null }> }>("/follows")
-      .then((res) => setFollowedUsers(res.data ?? []))
-      .catch(() => setFollowedUsers([]));
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) {
-      setFeed([]);
-      return;
-    }
-    setFeedLoading(true);
-    const url = feedFriendFilter === "all" ? "/logs/feed" : `/logs/feed?userId=${encodeURIComponent(feedFriendFilter)}`;
-    apiFetch<{ data: FeedEntry[] }>(url)
-      .then((res) =>
-        setFeed((res.data ?? []).map((e) => ({ ...e, log: decodeLogForDisplay(e.log) })))
-      )
-      .catch(() => setFeed([]))
-      .finally(() => setFeedLoading(false));
-  }, [token, feedFriendFilter]);
-
-  useEffect(() => {
-    if (!token) {
-      setMilestoneProgress(null);
-      return;
-    }
-    apiFetch<MilestoneProgressResponse>("/me/milestones/progress")
-      .then(setMilestoneProgress)
-      .catch(() => setMilestoneProgress(null));
-  }, [token]);
-
-  useEffect(() => {
     const onPtr = () => {
       fetchCounts();
       if (!token) return;
-      apiFetch<MilestoneProgressResponse>("/me/milestones/progress")
-        .then(setMilestoneProgress)
-        .catch(() => setMilestoneProgress(null));
-      setFeedLoading(true);
-      const feedUrl =
-        feedFriendFilter === "all"
-          ? "/logs/feed"
-          : `/logs/feed?userId=${encodeURIComponent(feedFriendFilter)}`;
-      apiFetch<{ data: FeedEntry[] }>(feedUrl)
-        .then((res) =>
-          setFeed((res.data ?? []).map((e) => ({ ...e, log: decodeLogForDisplay(e.log) })))
-        )
-        .catch(() => setFeed([]))
-        .finally(() => setFeedLoading(false));
+      fetchMilestones();
+      fetchFeed();
+      fetchFollows();
       invalidateApiCache("/logs");
       window.dispatchEvent(new CustomEvent(LOGS_INVALIDATED_EVENT));
     };
     window.addEventListener(APP_PTR_REFRESH_EVENT, onPtr);
     return () => window.removeEventListener(APP_PTR_REFRESH_EVENT, onPtr);
-  }, [token, fetchCounts, feedFriendFilter]);
+  }, [token, fetchCounts, fetchFeed, fetchFollows, fetchMilestones]);
 
   useEffect(() => {
-    const refetchMilestones = () => {
-      if (!token) return;
-      apiFetch<MilestoneProgressResponse>("/me/milestones/progress")
-        .then(setMilestoneProgress)
-        .catch(() => setMilestoneProgress(null));
+    const onLogsInvalidated = () => {
+      fetchCounts();
+      fetchMilestones();
+      fetchFeed();
     };
-    window.addEventListener(LOGS_INVALIDATED_EVENT, refetchMilestones);
-    return () => window.removeEventListener(LOGS_INVALIDATED_EVENT, refetchMilestones);
-  }, [token]);
+    window.addEventListener(LOGS_INVALIDATED_EVENT, onLogsInvalidated);
+    return () => window.removeEventListener(LOGS_INVALIDATED_EVENT, onLogsInvalidated);
+  }, [fetchCounts, fetchMilestones, fetchFeed]);
 
   /** When opening a friend from the feed, keep the same list filters as on the home category list (search, sort, status, collection). */
   const feedUserProfilePath = useCallback(
@@ -582,6 +677,8 @@ export function Dashboard() {
             milestoneProgress={
               milestoneProgress?.perMedium.find((p) => p.mediaType === selectedCategory) ?? null
             }
+            initialLogs={cachedCategoryLogs?.logs}
+            initialNextCursor={cachedCategoryLogs?.cursor ?? undefined}
             initialFilters={logsInitialFilters}
             initialFiltersSyncKey={searchParamsKey}
             onFiltersChange={handleEmbeddedMediaLogsFiltersChange}

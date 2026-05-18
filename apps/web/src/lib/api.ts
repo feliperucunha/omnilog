@@ -52,7 +52,13 @@ function statusToLoadingErrorCode(status: number): LoadingErrorCode {
   return LoadingErrorCodeEnum.CLIENT_ERROR;
 }
 
-import { getCached, setCached, invalidateByPrefix } from "./cache.js";
+import {
+  DEFAULT_TTL_MS,
+  getCached,
+  getCachedEntry,
+  setCached,
+  invalidateByPrefix,
+} from "./cache.js";
 
 import { getItemSync, removeItem } from "./storage.js";
 
@@ -251,15 +257,23 @@ export function invalidateApiCache(prefix: string): void {
 /** Custom event dispatched when logs/items cache is invalidated so Dashboard/MediaLogs can refetch milestone progress. */
 export const LOGS_INVALIDATED_EVENT = "geeklogs-logs-invalidated";
 
+/** Background re-warm of dashboard/statistics caches after mutations. */
+export const LOGS_CACHE_WARM_EVENT = "geeklogs-logs-cache-warm";
+
 /** Invalidate logs and items caches (use after any log mutation). */
 export function invalidateLogsAndItemsCache(): void {
+  swrInflight.clear();
   invalidateByPrefix("/logs");
   invalidateByPrefix("/items");
   invalidateByPrefix("/me");
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(LOGS_INVALIDATED_EVENT));
+    window.dispatchEvent(new CustomEvent(LOGS_CACHE_WARM_EVENT));
   }
 }
+
+export { DEFAULT_TTL_MS, HEAVY_PAGE_TTL_MS } from "./cache.js";
+export { getCachedEntry } from "./cache.js";
 
 export interface ApiFetchOptions extends RequestInit {
   timeout?: number;
@@ -562,9 +576,96 @@ export async function apiFetchCached<T>(
   }
   const cached = getCached<T>(method, path);
   if (cached !== undefined) return cached;
-  const ttlMs = options?.ttlMs ?? 2 * 60 * 1000;
+  const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
   const { ttlMs: _ttl, ...fetchOpts } = options ?? {};
   const data = await fetchInternal<T>(path, fetchOpts);
   setCached(method, path, data, ttlMs);
   return data;
+}
+
+const swrInflight = new Map<string, Promise<unknown>>();
+
+function cacheDataChanged(a: unknown, b: unknown): boolean {
+  try {
+    return JSON.stringify(a) !== JSON.stringify(b);
+  } catch {
+    return true;
+  }
+}
+
+async function revalidateGet<T>(
+  path: string,
+  fetchOpts: ApiFetchOptions | undefined,
+  ttlMs: number
+): Promise<T> {
+  const key = `GET ${path}`;
+  const existing = swrInflight.get(key);
+  if (existing) return existing as Promise<T>;
+
+  const promise = fetchInternal<T>(path, fetchOpts)
+    .then((data) => {
+      setCached("GET", path, data, ttlMs);
+      return data;
+    })
+    .finally(() => {
+      swrInflight.delete(key);
+    });
+
+  swrInflight.set(key, promise);
+  return promise;
+}
+
+export type ApiFetchSWROptions = ApiFetchOptions & {
+  ttlMs?: number;
+  /** Called when a background revalidation returns (only if JSON changed). */
+  onUpdate?: (data: unknown) => void;
+  onRefreshing?: (refreshing: boolean) => void;
+};
+
+/**
+ * Stale-while-revalidate GET: returns cached data immediately when present, revalidates in background.
+ * Without cache, awaits the network (callers should show loading).
+ */
+export async function apiFetchSWR<T>(
+  path: string,
+  options?: ApiFetchSWROptions
+): Promise<{ data: T; fromCache: boolean }> {
+  const method = options?.method ?? "GET";
+  if (method !== "GET") {
+    const data = await fetchInternal<T>(path, options);
+    return { data, fromCache: false };
+  }
+
+  const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
+  const { ttlMs: _ttl, onUpdate, onRefreshing, ...fetchOpts } = options ?? {};
+  const entry = getCachedEntry<T>("GET", path);
+
+  if (!entry) {
+    onRefreshing?.(true);
+    try {
+      const data = await revalidateGet<T>(path, fetchOpts, ttlMs);
+      return { data, fromCache: false };
+    } finally {
+      onRefreshing?.(false);
+    }
+  }
+
+  const runBackground = async () => {
+    onRefreshing?.(true);
+    try {
+      const previous = entry.data;
+      const fresh = await revalidateGet<T>(path, fetchOpts, ttlMs);
+      if (onUpdate && cacheDataChanged(previous, fresh)) {
+        onUpdate(fresh);
+      }
+    } catch {
+      /* keep stale UI on background failure */
+    } finally {
+      onRefreshing?.(false);
+    }
+  };
+
+  void runBackground();
+
+  return { data: entry.data, fromCache: true };
 }

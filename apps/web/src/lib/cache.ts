@@ -1,39 +1,48 @@
 /**
- * In-memory client cache for GET requests. Reduces repeat loads and improves perceived performance.
- * Mutations should call invalidateApiCache() so the next read is fresh.
+ * In-memory client cache for GET requests. Supports stale-while-revalidate reads.
  */
 
-const cache = new Map<
-  string,
-  { data: unknown; expiresAt: number }
->();
+const cache = new Map<string, { data: unknown; expiresAt: number; storedAt: number }>();
 
-const DEFAULT_TTL_MS = 2 * 60 * 1000; // 2 minutes
+export const DEFAULT_TTL_MS = 2 * 60 * 1000;
+export const HEAVY_PAGE_TTL_MS = 30 * 60 * 1000;
 
 function cacheKey(method: string, path: string): string {
   return `${method} ${path}`;
 }
 
 export function getCached<T>(method: string, path: string): T | undefined {
+  const entry = getCachedEntry<T>(method, path);
+  if (!entry || entry.isStale) return undefined;
+  return entry.data;
+}
+
+export function getCachedEntry<T>(
+  method: string,
+  path: string
+): { data: T; isStale: boolean; storedAt: number } | undefined {
   const key = cacheKey(method, path);
   const entry = cache.get(key);
   if (!entry) return undefined;
-  if (Date.now() > entry.expiresAt) {
-    cache.delete(key);
-    return undefined;
-  }
-  return entry.data as T;
+  const isStale = Date.now() > entry.expiresAt;
+  return { data: entry.data as T, isStale, storedAt: entry.storedAt };
 }
 
-export function setCached<T>(method: string, path: string, data: T, ttlMs: number = DEFAULT_TTL_MS): void {
+export function setCached<T>(
+  method: string,
+  path: string,
+  data: T,
+  ttlMs: number = DEFAULT_TTL_MS
+): void {
   const key = cacheKey(method, path);
+  const now = Date.now();
   cache.set(key, {
     data,
-    expiresAt: Date.now() + ttlMs,
+    expiresAt: now + ttlMs,
+    storedAt: now,
   });
 }
 
-/** Invalidate all entries whose key includes the given prefix (e.g. "/logs" or "/items") */
 export function invalidateByPrefix(prefix: string): void {
   for (const key of cache.keys()) {
     if (key.includes(prefix)) cache.delete(key);
