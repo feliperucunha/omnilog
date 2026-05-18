@@ -171,12 +171,23 @@ export function Dashboard() {
     if (categoryParam && MEDIA_TYPES.includes(categoryParam as MediaType)) return toMediaType(categoryParam);
     return defaultCategory;
   });
-  const [counts, setCounts] = useState<Record<MediaType, number> | null>(null);
+  const [counts, setCounts] = useState<Record<MediaType, number> | null>(() => {
+    const cached = getCachedEntry<{ data: Record<MediaType, number> }>("GET", "/logs/counts");
+    return cached?.data?.data ?? null;
+  });
   /** Background fetch for category strip counts only — never blocks the main dashboard shell. */
-  const [countsLoading, setCountsLoading] = useState(true);
+  const [countsLoading, setCountsLoading] = useState(
+    () => !getCachedEntry<{ data: Record<MediaType, number> }>("GET", "/logs/counts")
+  );
   const [countsError, setCountsError] = useState<string | null>(null);
-  const [feed, setFeed] = useState<FeedEntry[]>([]);
-  const [feedLoading, setFeedLoading] = useState(false);
+  const [feed, setFeed] = useState<FeedEntry[]>(() => {
+    const cached = getCachedEntry<{ data: FeedEntry[] }>("GET", buildFeedPath());
+    if (!cached?.data?.data) return [];
+    return cached.data.data.map((e) => ({ ...e, log: decodeLogForDisplay(e.log) }));
+  });
+  const [feedLoading, setFeedLoading] = useState(
+    () => !getCachedEntry<{ data: FeedEntry[] }>("GET", buildFeedPath())
+  );
   const [feedFriendFilter, setFeedFriendFilter] = useState<string>("all");
   const [followedUsers, setFollowedUsers] = useState<Array<{ id: string; username: string | null }>>([]);
   const [showBetaModal, setShowBetaModal] = useState(false);
@@ -265,7 +276,12 @@ export function Dashboard() {
     setCountsError(null);
     const path = "/logs/counts";
     const cached = getCachedEntry<{ data: Record<MediaType, number> }>("GET", path);
-    if (!cached) setCountsLoading(true);
+    if (cached) {
+      setCounts(cached.data.data ?? null);
+      setCountsLoading(false);
+    } else {
+      setCountsLoading(true);
+    }
 
     void apiFetchSWR<{ data: Record<MediaType, number> }>(path, {
       ttlMs: HEAVY_PAGE_TTL_MS,
@@ -275,11 +291,9 @@ export function Dashboard() {
         setCountsError(null);
       },
     })
-      .then(({ data, fromCache }) => {
-        if (!fromCache) {
-          setCounts(data.data ?? null);
-          setCountsError(null);
-        }
+      .then(({ data }) => {
+        setCounts(data.data ?? null);
+        setCountsError(null);
       })
       .catch((err) => {
         if (!cached) setCounts(null);
@@ -336,8 +350,8 @@ export function Dashboard() {
       ttlMs: HEAVY_PAGE_TTL_MS,
       onUpdate: (res) => applyFeedResponse(res as { data: FeedEntry[] }),
     })
-      .then(({ data, fromCache }) => {
-        if (!fromCache) applyFeedResponse(data);
+      .then(({ data }) => {
+        applyFeedResponse(data);
       })
       .catch(() => {
         if (!cached) setFeed([]);

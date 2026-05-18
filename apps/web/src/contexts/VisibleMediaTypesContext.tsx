@@ -8,6 +8,11 @@ import {
 import { MEDIA_TYPES, type MediaType } from "@geeklogs/shared";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
+import { tierHasProFeatures } from "@/lib/userTier";
+import {
+  registerLogsPageCacheContext,
+  warmDashboardAndStatisticsCaches,
+} from "@/lib/logsPageCache";
 
 const STORAGE_KEY = (userId: string) => `geeklogs.visibleMediaTypes.v1:${userId}`;
 
@@ -77,6 +82,14 @@ export function VisibleMediaTypesProvider({ children }: { children: ReactNode })
     if (filtered.length === 0) return;
     writeCachedVisibleTypes(me.user.id, filtered);
   }, [token, me?.user?.id, me?.visibleMediaTypes]);
+
+  useEffect(() => {
+    if (!visibleTypesOrderReady || visibleTypes.length === 0) return;
+    const tz = -new Date().getTimezoneOffset();
+    const isPro = tierHasProFeatures(me?.tier);
+    registerLogsPageCacheContext({ mediaTypes: visibleTypes, tzOffsetMinutes: tz, isPro });
+    warmDashboardAndStatisticsCaches(visibleTypes, tz, isPro);
+  }, [visibleTypes, visibleTypesOrderReady, me?.tier]);
 
   const value = useMemo(
     () => ({

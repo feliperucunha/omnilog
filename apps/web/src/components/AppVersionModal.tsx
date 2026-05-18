@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { GooglePlayIcon } from "@/components/GooglePlayIcon";
 import { GooglePlayUpdateButton } from "@/components/GooglePlayUpdateButton";
-import { Logo } from "@/components/Logo";
 import { useAppVersion } from "@/contexts/AppVersionContext";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -107,8 +106,14 @@ export function AppVersionModal() {
 
           <div className="relative mx-auto flex w-fit flex-col items-center">
             <div className="relative">
-              <div className="flex h-[5.25rem] w-[5.25rem] items-center justify-center rounded-[1.35rem] bg-[var(--color-darkest)] shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10">
-                <Logo className="h-[3.25rem] w-[3.25rem] object-contain" alt="" />
+              <div className="h-[5.25rem] w-[5.25rem] overflow-hidden rounded-[1.35rem] shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10">
+                <img
+                  src="/logo.png"
+                  alt=""
+                  className="h-full w-full object-cover"
+                  width={84}
+                  height={84}
+                />
               </div>
               <div
                 className="absolute -bottom-2 -right-2 flex h-9 w-9 items-center justify-center rounded-xl bg-[#0d0d0d] shadow-lg ring-2 ring-[var(--color-dark)]"

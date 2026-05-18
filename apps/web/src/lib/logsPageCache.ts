@@ -1,6 +1,7 @@
 import {
   MEDIA_TYPES,
   SPEND_TRACKED_MEDIA_TYPES,
+  type Log,
   type MediaType,
 } from "@geeklogs/shared";
 import {
@@ -82,6 +83,17 @@ export function buildLogsListPathFromSearchParams(
     wantToBuy: searchParams.get("wantToBuy") === "true",
     genre: searchParams.get("genre") ?? "",
   });
+}
+
+export function readCachedLogsListResponse(
+  path: string
+): { raw: Log[] | { data: Log[]; nextCursor: string | null }; list: Log[]; cursor: string | null } | null {
+  const entry = getCachedEntry<Log[] | { data: Log[]; nextCursor: string | null }>("GET", path);
+  if (!entry) return null;
+  const raw = entry.data;
+  const list = Array.isArray(raw) ? raw : (raw.data ?? []);
+  const cursor = Array.isArray(raw) ? null : (raw.nextCursor ?? null);
+  return { raw, list, cursor };
 }
 
 export function buildDefaultLogsListPath(mediaType: MediaType): string {

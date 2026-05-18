@@ -20,6 +20,7 @@ import {
   downloadFile,
   LOGS_INVALIDATED_EVENT,
 } from "@/lib/api";
+import { buildLogsListPath, readCachedLogsListResponse } from "@/lib/logsPageCache";
 import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
 import { ExportLogsModal, type ExportLogsOptions } from "@/components/ExportLogsModal";
@@ -175,12 +176,30 @@ export function MediaLogs({
     (mediaType === "boardgames" ? !hasBoardGameKey : me?.apiKeys && !me.apiKeys[provider]);
   const readOnly = !!publicUserId;
   const showCollectionOwnershipFilters = mediaTypeHasCollectionOwnership(mediaType);
-  const hasInitialData = embedded && initialLogsProp !== undefined;
-  const [logs, setLogs] = useState<Log[]>(() =>
-    hasInitialData && initialLogsProp ? initialLogsProp.map(decodeLogForDisplay) : []
-  );
-  const [nextCursor, setNextCursor] = useState<string | null>(() => (hasInitialData && initialNextCursorProp !== undefined) ? initialNextCursorProp : null);
-  const [loading, setLoading] = useState(!(hasInitialData && initialLogsProp !== undefined));
+
+  const embeddedCacheOnMount = (() => {
+    if (publicUserId || !embedded) return null;
+    if (initialLogsProp !== undefined) {
+      return { logs: initialLogsProp, cursor: initialNextCursorProp ?? null };
+    }
+    const collection = initialFilters?.collection ?? "";
+    const path = buildLogsListPath({
+      mediaType,
+      sort: (initialFilters?.sort as string) ?? DEFAULT_SORT,
+      status: initialFilters?.status ?? "",
+      q: initialFilters?.search ?? "",
+      own: showCollectionOwnershipFilters && collection === "owned",
+      wantToBuy: showCollectionOwnershipFilters && collection === "wantToBuy",
+      genre: initialFilters?.genre ?? "",
+    });
+    const hit = readCachedLogsListResponse(path);
+    if (!hit) return null;
+    return { logs: hit.list.map(decodeLogForDisplay), cursor: hit.cursor };
+  })();
+
+  const [logs, setLogs] = useState<Log[]>(() => embeddedCacheOnMount?.logs ?? []);
+  const [nextCursor, setNextCursor] = useState<string | null>(() => embeddedCacheOnMount?.cursor ?? null);
+  const [loading, setLoading] = useState(() => !publicUserId && !embeddedCacheOnMount);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingLog, setEditingLog] = useState<Log | null>(null);
@@ -214,6 +233,28 @@ export function MediaLogs({
   const [milestoneProgressFetched, setMilestoneProgressFetched] = useState<CategoryMilestoneProgress | null>(null);
   /** When embedded (home): start with Load more button; after first click, switch to infinite scroll. When not embedded, use infinite scroll from the start. */
   const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(() => !embedded);
+
+  const buildLogsPath = useCallback(() => {
+    const params: Parameters<typeof buildLogsListPath>[0] = {
+      mediaType,
+      sort: sortBy,
+    };
+    if (statusFilter) params.status = statusFilter;
+    if (showCollectionOwnershipFilters && collectionFilter === "owned") params.own = true;
+    if (showCollectionOwnershipFilters && collectionFilter === "wantToBuy") params.wantToBuy = true;
+    const q = categorySearchQuery.trim();
+    if (q) params.q = q;
+    if (genreFilter) params.genre = genreFilter;
+    return buildLogsListPath(params);
+  }, [
+    mediaType,
+    sortBy,
+    statusFilter,
+    collectionFilter,
+    categorySearchQuery,
+    genreFilter,
+    showCollectionOwnershipFilters,
+  ]);
 
   const milestoneProgress = milestoneProgressProp ?? (readOnly ? null : milestoneProgressFetched);
 
@@ -315,9 +356,7 @@ export function MediaLogs({
       if (q) params.set("q", q);
       if (genreFilter) params.set("genre", genreFilter);
       if (!reset && nextCursor) params.set("cursor", nextCursor);
-      const path = publicUserId
-        ? `/users/${publicUserId}/logs?${params.toString()}`
-        : `/logs?${params.toString()}`;
+      const path = publicUserId ? `/users/${publicUserId}/logs?${params.toString()}` : buildLogsPath();
 
       const finish = () => {
         setLoading(false);
@@ -367,10 +406,8 @@ export function MediaLogs({
           setError(null);
         },
       })
-        .then(({ data, fromCache }) => {
-          if (!fromCache) {
-            applyLogsResponse(data, true);
-          }
+        .then(({ data }) => {
+          applyLogsResponse(data, true);
           setError(null);
         })
         .catch((err) => {
@@ -392,6 +429,7 @@ export function MediaLogs({
       categorySearchQuery,
       genreFilter,
       applyLogsResponse,
+      buildLogsPath,
     ]
   );
 
@@ -448,18 +486,29 @@ export function MediaLogs({
   }, [mediaType]);
 
   useEffect(() => {
-    const useInitial = embedded && initialLogsProp !== undefined;
-    if (useInitial) {
-      setLogs((initialLogsProp ?? []).map(decodeLogForDisplay));
-      setNextCursor(initialNextCursorProp ?? null);
+    if (publicUserId) {
+      setLogs([]);
+      setNextCursor(null);
+      setError(null);
+      setLoading(true);
+      fetchLogsRef.current(true);
+      return;
+    }
+
+    const path = buildLogsPath();
+    const cached = readCachedLogsListResponse(path);
+    if (cached) {
+      setLogs(cached.list.map(decodeLogForDisplay));
+      setNextCursor(cached.cursor);
       setError(null);
       setLoading(false);
     } else {
       setLogs([]);
       setNextCursor(null);
       setError(null);
-      fetchLogsRef.current(true);
+      setLoading(true);
     }
+    fetchLogsRef.current(true);
   }, [
     mediaType,
     statusFilter,
@@ -467,10 +516,8 @@ export function MediaLogs({
     sortBy,
     categorySearchQuery,
     publicUserId,
-    embedded,
-    initialLogsProp,
-    initialNextCursorProp,
     genreFilter,
+    buildLogsPath,
   ]);
 
   /** When embedded, start with Load more again when category or filters change. */
