@@ -1,10 +1,9 @@
 import { useMemo } from "react";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { LogDateFields } from "@/components/LogDateFields";
 import { useLocale } from "@/contexts/LocaleContext";
-
-const GAME_PLATFORM_MAX = 80;
+import { buildGamePlatformSelectOptions } from "@/lib/gamePlatforms";
 
 export function GameLogFields({
   gamePlatform,
@@ -26,35 +25,25 @@ export function GameLogFields({
   disabled?: boolean;
 }) {
   const { t } = useLocale();
-  const listId = useMemo(() => `game-platform-${Math.random().toString(36).slice(2, 9)}`, []);
-  const options = useMemo(() => {
-    const fromItem = (platformOptions ?? []).filter(Boolean);
-    const current = gamePlatform.trim();
-    const merged = current && !fromItem.includes(current) ? [...fromItem, current] : fromItem;
-    return [...new Set(merged)].sort((a, b) => a.localeCompare(b));
-  }, [platformOptions, gamePlatform]);
+
+  const platformSelectOptions = useMemo(
+    () => buildGamePlatformSelectOptions(platformOptions, gamePlatform),
+    [platformOptions, gamePlatform]
+  );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="space-y-2">
         <Label className="text-sm text-[var(--color-lightest)]">{t("gameLog.platform")}</Label>
-        <Input
-          type="text"
-          list={options.length > 0 ? listId : undefined}
+        <Select
           value={gamePlatform}
-          onChange={(e) => onGamePlatformChange(e.target.value.slice(0, GAME_PLATFORM_MAX))}
-          disabled={disabled}
+          onValueChange={onGamePlatformChange}
+          options={platformSelectOptions}
           placeholder={t("gameLog.platformPlaceholder")}
-          className="w-full"
+          disabled={disabled}
+          contentScrollable
           aria-label={t("gameLog.platform")}
         />
-        {options.length > 0 && (
-          <datalist id={listId}>
-            {options.map((p) => (
-              <option key={p} value={p} />
-            ))}
-          </datalist>
-        )}
       </div>
       <LogDateFields
         startedAt={startedAt}

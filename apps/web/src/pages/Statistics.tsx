@@ -4,6 +4,7 @@ import { MotionLink } from "@/components/MotionLink";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { motion } from "framer-motion";
 import {
+  BookOpen,
   ChevronDown,
   ChevronRight,
   CircleCheck,
@@ -11,6 +12,7 @@ import {
   Layers,
   Scale,
   Star,
+  Trophy,
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -395,7 +397,7 @@ const STORAGE_KEY_CALENDAR = "geeklogs.statistics.calendarCollapsed";
 const STORAGE_KEY_CHARTS = "geeklogs.statistics.chartsCollapsed";
 
 type StatsGroup = "category" | "month" | "year";
-type GenreGraphMode = "genre" | "statusOverTime" | "byCategory";
+type GenreGraphMode = "genre" | "statusOverTime" | "byCategory" | "platforms";
 type StatusOverTimeGroup = "month" | "year";
 interface StatsEntry {
   period: string;
@@ -420,6 +422,10 @@ interface LogStatsSummary {
   completedLogsWithHours: number;
   /** All-time net per ISO 4217 currency (sale proceeds − purchases). */
   lifetimeNetByCurrency?: Record<string, number>;
+  /** books / manga / comics filter only */
+  totalPagesRead?: number;
+  /** boardgames filter only */
+  boardGamesWon?: number;
 }
 
 const EMPTY_SUMMARY: LogStatsSummary = {
@@ -547,6 +553,8 @@ export function Statistics() {
   const [stats, setStats] = useState<StatsEntry[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [genreStats, setGenreStats] = useState<StatsEntry[]>([]);
+  const [gamePlatformStats, setGamePlatformStats] = useState<StatsEntry[]>([]);
+  const [gamePlatformStatsLoading, setGamePlatformStatsLoading] = useState(false);
   const [genreStatsLoading, setGenreStatsLoading] = useState(true);
   const [genreGraphMode, setGenreGraphMode] = useState<GenreGraphMode>("byCategory");
   const [statusOverTimeGroup, setStatusOverTimeGroup] = useState<StatusOverTimeGroup>("month");
@@ -670,6 +678,24 @@ export function Statistics() {
     }
   }, [tzOffsetMinutes, statsMediaQuery]);
 
+  const fetchGamePlatformStats = useCallback(async () => {
+    if (categoryFilter !== "games") {
+      setGamePlatformStats([]);
+      return;
+    }
+    setGamePlatformStatsLoading(true);
+    try {
+      const res = await apiFetch<{ data: StatsEntry[] }>(
+        `/logs/stats?group=gamePlatforms&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`
+      );
+      setGamePlatformStats(res.data ?? []);
+    } catch {
+      setGamePlatformStats([]);
+    } finally {
+      setGamePlatformStatsLoading(false);
+    }
+  }, [categoryFilter, tzOffsetMinutes, statsMediaQuery]);
+
   const fetchGenreStats = useCallback(async () => {
     setGenreStatsLoading(true);
     try {
@@ -742,6 +768,10 @@ export function Statistics() {
   useEffect(() => {
     void fetchGenreStats();
   }, [fetchGenreStats]);
+
+  useEffect(() => {
+    void fetchGamePlatformStats();
+  }, [fetchGamePlatformStats]);
 
   useEffect(() => {
     if (genreGraphMode === "statusOverTime") {
@@ -1068,6 +1098,35 @@ export function Statistics() {
     categoryFilter === "all" ||
     (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(categoryFilter);
 
+  const isReadingCategory =
+    categoryFilter === "books" || categoryFilter === "manga" || categoryFilter === "comics";
+  const showPagesReadHighlight = isReadingCategory;
+  const showBoardGamesWonHighlight = categoryFilter === "boardgames";
+  const isGamesCategory = categoryFilter === "games";
+
+  const chartModeOptions = useMemo(() => {
+    const modes: { value: GenreGraphMode; label: string }[] = [
+      { value: "genre", label: t("dashboard.byGenre") },
+      { value: "statusOverTime", label: t("dashboard.byStatusOverTime") },
+      { value: "byCategory", label: t("dashboard.byCategory") },
+    ];
+    if (isGamesCategory) {
+      return [{ value: "platforms", label: t("statistics.gamePlatformsTitle") }, ...modes];
+    }
+    return modes;
+  }, [isGamesCategory, t]);
+
+  useEffect(() => {
+    if (isGamesCategory) {
+      setGenreGraphMode("platforms");
+    } else {
+      setGenreGraphMode((prev) => (prev === "platforms" ? "genre" : prev));
+    }
+  }, [isGamesCategory]);
+
+  const maxGamePlatformCount =
+    gamePlatformStats.length > 0 ? Math.max(...gamePlatformStats.map((s) => s.hours), 1) : 1;
+
   const spendMediaTypesWithActivity = useMemo(() => {
     const active = SPEND_TRACKED_MEDIA_TYPES.filter((mt) => {
       const pCount = purchaseItemCounts?.[mt] ?? 0;
@@ -1272,6 +1331,22 @@ export function Statistics() {
           aria-label={t("statistics.summaryTitle")}
           className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 md:gap-4"
         >
+          {showPagesReadHighlight && (
+            <OverviewStatCard
+              icon={BookOpen}
+              label={t("statistics.pagesReadTitle")}
+              value={(summaryData.totalPagesRead ?? 0).toLocaleString(locale)}
+              sub={t("statistics.pagesReadSub")}
+            />
+          )}
+          {showBoardGamesWonHighlight && (
+            <OverviewStatCard
+              icon={Trophy}
+              label={t("statistics.boardGamesWonTitle")}
+              value={(summaryData.boardGamesWon ?? 0).toLocaleString(locale)}
+              sub={t("statistics.boardGamesWonSub")}
+            />
+          )}
           <OverviewStatCard
             icon={Layers}
             label={t("statistics.summaryTotalLogs")}
@@ -1621,11 +1696,7 @@ export function Statistics() {
             <Select
               value={genreGraphMode}
               onValueChange={(v) => setGenreGraphMode(v as GenreGraphMode)}
-              options={[
-                { value: "genre", label: t("dashboard.byGenre") },
-                { value: "statusOverTime", label: t("dashboard.byStatusOverTime") },
-                { value: "byCategory", label: t("dashboard.byCategory") },
-              ]}
+              options={chartModeOptions}
               aria-label={t("dashboard.byGenre")}
               className="w-full min-w-0 sm:max-w-[220px]"
               triggerClassName="w-full min-w-0"
@@ -1658,6 +1729,51 @@ export function Statistics() {
             )}
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {genreGraphMode === "platforms" && (
+            <div className="min-h-[12.5rem] min-w-0 flex-1">
+              {gamePlatformStatsLoading ? (
+                <StatisticsBarsSkeleton rows={6} />
+              ) : gamePlatformStats.length === 0 ? (
+                <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
+                  {t("statistics.gamePlatformsEmpty")}
+                </p>
+              ) : (
+                <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+                  {gamePlatformStats.map(({ period, hours, count }) => {
+                    const itemCount = count ?? hours;
+                    return (
+                      <div key={period} className={statBarGridClass}>
+                        <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
+                          <OverflowMarquee className={statBarMarqueeClass}>{period}</OverflowMarquee>
+                          {itemCount > 0 && (
+                            <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
+                              {t(
+                                itemCount === 1
+                                  ? "statistics.statItemsCount_one"
+                                  : "statistics.statItemsCount_other",
+                                { count: String(itemCount) }
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        <div className={statBarTrackClass}>
+                          <div
+                            className={statBarFillClass}
+                            style={{
+                              width: `${Math.max(5, (hours / maxGamePlatformCount) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                        <span className={statBarValueClass}>
+                          {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           {genreGraphMode === "genre" && (
             <div className="min-h-[12.5rem] min-w-0 flex-1">
               {genreStatsLoading ? (

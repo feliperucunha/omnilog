@@ -407,7 +407,14 @@
     "statItemsCount_one": "{{count}} elemento",
     "statItemsCount_other": "{{count}} elementos",
     "summaryHoursItems_one": "{{count}} elemento con tiempo registrado",
-    "summaryHoursItems_other": "{{count}} elementos con tiempo registrado"
+    "summaryHoursItems_other": "{{count}} elementos con tiempo registrado",
+    "pagesReadTitle": "Páginas leídas",
+    "pagesReadSub": "Total de páginas registradas en esta categoría",
+    "boardGamesWonTitle": "Partidas ganadas",
+    "boardGamesWonSub": "Partidas en las que apareciste como ganador",
+    "gamePlatformsTitle": "Por plataforma",
+    "gamePlatformsSub": "Cuántos juegos registraste en cada plataforma o consola",
+    "gamePlatformsEmpty": "Aún no hay plataforma en tus juegos. Elige una al registrar un juego."
   },
   "recap": {
     "button": "Retrospectiva",

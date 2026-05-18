@@ -427,7 +427,14 @@
     "statItemsCount_one": "{{count}} item",
     "statItemsCount_other": "{{count}} items",
     "summaryHoursItems_one": "{{count}} item with time logged",
-    "summaryHoursItems_other": "{{count}} items with time logged"
+    "summaryHoursItems_other": "{{count}} items with time logged",
+    "pagesReadTitle": "Pages read",
+    "pagesReadSub": "Total pages logged across your library in this category",
+    "boardGamesWonTitle": "Games won",
+    "boardGamesWonSub": "Matches where you were marked as the winner",
+    "gamePlatformsTitle": "By platform",
+    "gamePlatformsSub": "How many games you logged on each platform or console",
+    "gamePlatformsEmpty": "No platform set on your game logs yet. Pick a platform when logging a game."
   },
   "recap": {
     "button": "Recap",

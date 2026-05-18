@@ -259,6 +259,12 @@ import {
 } from "../lib/logGenreList.js";
 import { stringifyLogAffinityContext, logAffinityContextSchema } from "../lib/logAffinityContext.js";
 import { hoursFromCompletedLogForStats, rollupHoursFromCompletedLogs } from "../lib/completedLogHours.js";
+import {
+  countBoardGameWinsForStats,
+  gamePlatformStatsForUser,
+  isReadingMediaType,
+  sumPagesReadForStats,
+} from "../lib/statsCategoryMetrics.js";
 import { tierHasProFeatures, tierHasUnlimitedLogs } from "../lib/userTier.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
 import {
@@ -713,9 +719,11 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
                     ? "categoryByMonth"
                     : groupParam === "purchaseSpending"
                       ? "purchaseSpending"
-                      : groupParam === "month"
-                        ? "month"
-                        : "month";
+                      : groupParam === "gamePlatforms"
+                        ? "gamePlatforms"
+                        : groupParam === "month"
+                          ? "month"
+                          : "month";
 
   if (group === "purchaseSpending") {
     const periodRaw = typeof req.query.period === "string" ? req.query.period.trim() : "month";
@@ -887,17 +895,40 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     for (const cur of lifetimeCurrencies) {
       lifetimeNetByCurrency[cur] = (totalsSaleByCur[cur] ?? 0) - (totalsPurchaseByCur[cur] ?? 0);
     }
+    const summaryPayload: Record<string, unknown> = {
+      totalLogs,
+      completedLogs: completedLogCount,
+      reviewedLogs,
+      totalContentHours: totalHours,
+      completedLogsWithHours: logsWithPositiveHours,
+      lifetimeNetByCurrency,
+    };
+    const highlightWhere = freeMonthWhere ?? undefined;
+    if (statsMediaType && isReadingMediaType(statsMediaType)) {
+      summaryPayload.totalPagesRead = await sumPagesReadForStats(
+        userId,
+        statsMediaType,
+        highlightWhere
+      );
+    }
+    if (statsMediaType === "boardgames") {
+      summaryPayload.boardGamesWon = await countBoardGameWinsForStats(userId, highlightWhere);
+    }
     res.json({
       group: "summary",
-      data: {
-        totalLogs,
-        completedLogs: completedLogCount,
-        reviewedLogs,
-        totalContentHours: totalHours,
-        completedLogsWithHours: logsWithPositiveHours,
-        lifetimeNetByCurrency,
-      },
+      data: summaryPayload,
     });
+    return;
+  }
+
+  if (group === "gamePlatforms") {
+    if (statsMediaType !== "games") {
+      res.json({ group: "gamePlatforms", data: [] });
+      return;
+    }
+    const platformWhere = freeMonthWhere ?? undefined;
+    const entries = await gamePlatformStatsForUser(userId, platformWhere);
+    res.json({ group: "gamePlatforms", data: entries });
     return;
   }
 
