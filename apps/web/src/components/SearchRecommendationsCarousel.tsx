@@ -18,6 +18,7 @@ import { GenreBadges } from "@/components/GenreBadges";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { getLogCardDisplay } from "@/lib/logDisplay";
+import { RECOMMENDATION_CARD_BODY, RECOMMENDATION_CARD_WIDTH } from "@/lib/logCardLayout";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { tapScale, tapTransition } from "@/lib/animations";
 import type { TFunction } from "@/contexts/LocaleContext";
@@ -161,7 +162,7 @@ export function SearchRecommendationsCarousel({
                 </span>
               )}
             </div>
-            <div className="flex min-h-[3.5rem] flex-col gap-0.5 p-2.5">
+            <div className={RECOMMENDATION_CARD_BODY}>
               <OverflowMarquee className="text-xs font-semibold leading-snug text-[var(--color-lightest)]">
                 {item.title}
               </OverflowMarquee>
@@ -208,7 +209,7 @@ export function SearchRecommendationsCarousel({
           renderRecommendationCard(
             item,
             `rec-d-${suffix}-${item.id}`,
-            "w-[9.5rem] sm:w-[11rem]"
+            RECOMMENDATION_CARD_WIDTH
           )
         }
         t={t}

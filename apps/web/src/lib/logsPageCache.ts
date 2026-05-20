@@ -11,6 +11,7 @@ import {
   LOGS_CACHE_WARM_EVENT,
   LOGS_INVALIDATED_EVENT,
 } from "@/lib/api";
+import { updateCachedEntriesMatching } from "@/lib/cache.js";
 
 const LOGS_PAGE_SIZE = 24;
 const DEFAULT_SORT = "dateDesc";
@@ -94,6 +95,50 @@ export function readCachedLogsListResponse(
   const list = Array.isArray(raw) ? raw : (raw.data ?? []);
   const cursor = Array.isArray(raw) ? null : (raw.nextCursor ?? null);
   return { raw, list, cursor };
+}
+
+type LogsListCachePayload = Log[] | { data: Log[]; nextCursor?: string | null };
+
+function patchLogsListPayload(raw: LogsListCachePayload, log: Log): LogsListCachePayload | undefined {
+  const id = log.id;
+  if (Array.isArray(raw)) {
+    if (!raw.some((l) => l.id === id)) return undefined;
+    return raw.map((l) => (l.id === id ? log : l));
+  }
+  if (raw.data?.some((l) => l.id === id)) {
+    return { ...raw, data: raw.data.map((l) => (l.id === id ? log : l)) };
+  }
+  return undefined;
+}
+
+export function upsertLogInClientCaches(log: Log): void {
+  updateCachedEntriesMatching(
+    "GET /logs?",
+    (data) => patchLogsListPayload(data as LogsListCachePayload, log),
+    HEAVY_PAGE_TTL_MS
+  );
+}
+
+export function buildLogsListPathFromFilters(
+  mediaType: MediaType,
+  filters: {
+    sort?: string;
+    status?: string;
+    search?: string;
+    collection?: "" | "owned" | "wantToBuy";
+    genre?: string;
+  },
+  showCollectionOwnership: boolean
+): string {
+  return buildLogsListPath({
+    mediaType,
+    sort: filters.sort ?? DEFAULT_SORT,
+    status: filters.status ?? "",
+    q: filters.search ?? "",
+    own: showCollectionOwnership && filters.collection === "owned",
+    wantToBuy: showCollectionOwnership && filters.collection === "wantToBuy",
+    genre: filters.genre ?? "",
+  });
 }
 
 export function buildDefaultLogsListPath(mediaType: MediaType): string {
@@ -195,13 +240,15 @@ export async function loadWithSWR<T>(
   options?: {
     setLoading?: (loading: boolean) => void;
     onError?: () => void;
+    /** When false, do not show loading if cache is empty (keeps prior UI). */
+    showLoadingOnMiss?: boolean;
   }
 ): Promise<void> {
   const cached = getCachedEntry<T>("GET", path);
   if (cached) {
     apply(cached.data);
     options?.setLoading?.(false);
-  } else {
+  } else if (options?.showLoadingOnMiss !== false) {
     options?.setLoading?.(true);
   }
 

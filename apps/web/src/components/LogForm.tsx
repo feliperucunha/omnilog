@@ -29,7 +29,8 @@ import { dateInputToIso, isoToDateInput } from "@/lib/readingDates";
 import { cn } from "@/lib/utils";
 import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
+import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
+import { useProgressOptions } from "@/hooks/useProgressOptions";
 import { trackProductEvent } from "@/lib/productAnalytics";
 import { triggerImpact } from "@/lib/capacitorHaptics";
 import { showErrorToast } from "@/lib/errorToast";
@@ -40,7 +41,14 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useMe } from "@/contexts/MeContext";
 import { ItemImage } from "@/components/ItemImage";
 import { StarRating } from "@/components/StarRating";
-import { gradeToStars, starsToGrade } from "@/lib/gradeStars";
+import { gradeToStars } from "@/lib/gradeStars";
+import {
+  episodeFieldUnchanged,
+  episodePayloadValue,
+  gradeForPayload,
+  gradeStarsUnchanged,
+  logDateInputMatchesStored,
+} from "@/lib/logFormEquality";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { BoardGameOwnershipSwitch } from "@/components/BoardGameOwnershipSwitch";
 import { MoneyAmountInput } from "@/components/MoneyAmountInput";
@@ -136,17 +144,8 @@ export function LogForm(props: LogFormProps) {
   const cancellingRef = useRef(false);
   const drawerRequestCloseRef = useRef<(() => void) | null>(null);
 
-  type ProgressOptions = {
-    seasons?: number[];
-    episodesBySeason?: Record<string, number[]>;
-    episodes?: number[];
-    chapters?: number[];
-    volumes?: number[];
-  };
-  const [progressOptions, setProgressOptions] = useState<ProgressOptions | null>(null);
-  const [progressOptionsLoading, setProgressOptionsLoading] = useState(false);
   const [boardMainTab, setBoardMainTab] = useState<"review" | "matches">("review");
-  const tvGranular = mediaType === "tv" || mediaType === "anime";
+  const tvGranular = mediaType === "tv";
   const [tvReviewTab, setTvReviewTab] = useState<ReviewScope>("show");
   const [scopedReviews, setScopedReviews] = useState<ScopedReview[]>([]);
   const [seasonDraft, setSeasonDraft] = useState<TvReviewTabDraft>(() => emptyTvReviewDraft());
@@ -172,6 +171,12 @@ export function LogForm(props: LogFormProps) {
   const showTvTabs = isEdit && tvGranular;
   const initialBoardGameTab = isEdit && "initialBoardGameTab" in props ? props.initialBoardGameTab : undefined;
   const onLogRefreshed = isEdit && "onLogRefreshed" in props ? props.onLogRefreshed : undefined;
+  const progressExternalId = isEdit ? log?.externalId : (props as LogFormCreateProps).externalId;
+  const { progressOptions, progressOptionsLoading } = useProgressOptions(
+    mediaType,
+    progressExternalId,
+    showSeasonEpisode || showChapterVolume
+  );
 
   const [purchaseCurrency, setPurchaseCurrency] = useState(
     () =>
@@ -209,20 +214,6 @@ export function LogForm(props: LogFormProps) {
       setSaleCurrency(d);
     }
   }, [isEdit, log?.purchaseCurrency, log?.saleCurrency, log?.id, me?.defaultPurchaseCurrency]);
-
-  useEffect(() => {
-    if (!isEdit || !log) return;
-    const needOptions = showSeasonEpisode || showChapterVolume;
-    if (!needOptions) return;
-    const externalId = log.externalId;
-    setProgressOptionsLoading(true);
-    apiFetchCached<ProgressOptions>(`/items/${mediaType}/${encodeURIComponent(externalId)}/progress-options`, {
-      ttlMs: 5 * 60 * 1000,
-    })
-      .then(setProgressOptions)
-      .catch(() => setProgressOptions(null))
-      .finally(() => setProgressOptionsLoading(false));
-  }, [isEdit, log?.id, mediaType, log?.externalId, showSeasonEpisode, showChapterVolume]);
 
   useEffect(() => {
     if (isEdit && log) {
@@ -290,30 +281,23 @@ export function LogForm(props: LogFormProps) {
 
   const isDirty = useMemo(() => {
     if (isEdit && log) {
-      const grade = stars == null ? null : starsToGrade(stars);
-      const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
-      const episodesCount = "episodesCount" in props ? props.episodesCount : undefined;
-      const episodeForPayload =
-        isCompleted && showSeasonEpisode && episodesCount != null && episodesCount > 0
-          ? episodesCount
-          : toNum(episode);
       const currentStatus = log.status ?? log.listType ?? null;
       const noChange =
-        grade === (log.grade ?? null) &&
+        gradeStarsUnchanged(stars, log.grade) &&
         (review.trim() || null) === (log.review ?? null) &&
         (status ?? null) === currentStatus &&
         toNum(season) === (log.season ?? null) &&
-        episodeForPayload === (log.episode ?? null) &&
+        episodeFieldUnchanged(episode, log.episode) &&
         toNum(chapter) === (log.chapter ?? null) &&
         toNum(volume) === (log.volume ?? null) &&
         (!showReadingProgress ||
           (toNum(pagesRead) === (log.pagesRead ?? null) &&
-            (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (log.startedAt ?? null) &&
-            (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) === (log.completedAt ?? null))) &&
+            logDateInputMatchesStored(log.startedAt, startedAtInput) &&
+            logDateInputMatchesStored(log.completedAt, completedAtInput))) &&
         (!showGameLogFields ||
           ((gamePlatform.trim() || null) === (log.gamePlatform ?? null) &&
-            (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (log.startedAt ?? null) &&
-            (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) === (log.completedAt ?? null))) &&
+            logDateInputMatchesStored(log.startedAt, startedAtInput) &&
+            logDateInputMatchesStored(log.completedAt, completedAtInput))) &&
         (!showHoursToBeat || toNum(hoursToBeat) === (log.hoursToBeat ?? null)) &&
         (!showCollectionOwnership ||
           (own === (log.own ?? false) &&
@@ -410,16 +394,17 @@ export function LogForm(props: LogFormProps) {
     const quiet = options?.quiet === true;
     const skipCancelIfUnchanged = options?.skipCancelIfUnchanged === true;
     const wasFirstLog = !isEdit && (me?.logCount ?? 0) === 0;
-    const grade = stars == null ? null : starsToGrade(stars);
+    const grade = gradeForPayload(stars);
     if (!optimisticClose && !quiet) setLoading(true);
     try {
       if (isEdit && log) {
-        const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
         const episodesCount = "episodesCount" in props ? props.episodesCount : undefined;
-        const episodeForPayload =
-          isCompleted && showSeasonEpisode && episodesCount != null && episodesCount > 0
-            ? episodesCount
-            : toNum(episode);
+        const episodeForPayload = episodePayloadValue(
+          episode,
+          status,
+          episodesCount,
+          showSeasonEpisode
+        );
         const payload: Record<string, unknown> = {
           grade,
           review: review.trim() || null,
@@ -469,23 +454,21 @@ export function LogForm(props: LogFormProps) {
         const currentStatus = props.log.status ?? props.log.listType ?? null;
         const statusChanged = (status ?? null) !== currentStatus;
         const noChange =
-          grade === (props.log.grade ?? null) &&
+          gradeStarsUnchanged(stars, props.log.grade) &&
           (review.trim() || null) === (props.log.review ?? null) &&
           (status ?? null) === currentStatus &&
           toNum(season) === (props.log.season ?? null) &&
-          episodeForPayload === (props.log.episode ?? null) &&
+          episodeFieldUnchanged(episode, props.log.episode) &&
           toNum(chapter) === (props.log.chapter ?? null) &&
           toNum(volume) === (props.log.volume ?? null) &&
           (!showReadingProgress ||
             (toNum(pagesRead) === (props.log.pagesRead ?? null) &&
-              (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (props.log.startedAt ?? null) &&
-              (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) ===
-                (props.log.completedAt ?? null))) &&
+              logDateInputMatchesStored(props.log.startedAt, startedAtInput) &&
+              logDateInputMatchesStored(props.log.completedAt, completedAtInput))) &&
           (!showGameLogFields ||
             ((gamePlatform.trim() || null) === (props.log.gamePlatform ?? null) &&
-              (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (props.log.startedAt ?? null) &&
-              (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) ===
-                (props.log.completedAt ?? null))) &&
+              logDateInputMatchesStored(props.log.startedAt, startedAtInput) &&
+              logDateInputMatchesStored(props.log.completedAt, completedAtInput))) &&
           (!showHoursToBeat || toNum(hoursToBeat) === (props.log.hoursToBeat ?? null)) &&
           (!showCollectionOwnership ||
             (own === (props.log.own ?? false) &&
@@ -696,10 +679,9 @@ export function LogForm(props: LogFormProps) {
       try {
         const draft = tvReviewTab === "season" ? seasonDraft : episodeDraft;
         await saveScopedReviewTab(log.id, tvReviewTab, draft);
-        const res = await apiFetch<{ data: ScopedReview[] }>(`/logs/${log.id}/scoped-reviews`);
-        setScopedReviews(res.data ?? []);
         toast.success(t("toast.reviewSaved"));
         invalidateLogsAndItemsCache();
+        props.onSaved(undefined, log);
       } catch (err) {
         showErrorToast(t, "E012", { originalError: err });
       } finally {
@@ -830,21 +812,33 @@ export function LogForm(props: LogFormProps) {
             onLogRefreshed?.(lg);
           }}
         />
-      ) : showTvTabs && tvReviewTab !== "show" && log ? (
-        <TvGranularReviewSection
-          mediaType={mediaType}
-          progressOptions={progressOptions}
-          progressOptionsLoading={progressOptionsLoading}
-          showSeasonField={showSeasonField}
-          scopedReviews={scopedReviews}
-          activeTab={tvReviewTab}
-          seasonDraft={seasonDraft}
-          onSeasonDraftChange={setSeasonDraft}
-          episodeDraft={episodeDraft}
-          onEpisodeDraftChange={setEpisodeDraft}
-        />
       ) : (
-      <form id="log-form" onSubmit={handleSubmit}>
+      <>
+        {showTvTabs && log && (
+          <div
+            className={tvReviewTab === "show" ? "hidden" : undefined}
+            aria-hidden={tvReviewTab === "show"}
+          >
+            <TvGranularReviewSection
+              mediaType={mediaType}
+              progressOptions={progressOptions}
+              progressOptionsLoading={progressOptionsLoading}
+              showSeasonField={showSeasonField}
+              scopedReviews={scopedReviews}
+              activeTab={tvReviewTab}
+              seasonDraft={seasonDraft}
+              onSeasonDraftChange={setSeasonDraft}
+              episodeDraft={episodeDraft}
+              onEpisodeDraftChange={setEpisodeDraft}
+            />
+          </div>
+        )}
+      <form
+        id="log-form"
+        onSubmit={handleSubmit}
+        className={showTvTabs && tvReviewTab !== "show" ? "hidden" : undefined}
+        aria-hidden={showTvTabs && tvReviewTab !== "show"}
+      >
             <div className="flex flex-col gap-4">
               {isEdit && (
                 <>
@@ -1097,6 +1091,7 @@ export function LogForm(props: LogFormProps) {
               )}
             </div>
           </form>
+      </>
       )}
     </motion.div>
   );

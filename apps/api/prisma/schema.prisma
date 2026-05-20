@@ -329,7 +329,7 @@ model ItemDetailCache {
   mediaType  String
   externalId String
   score      Float?                 // Normalized 0-10 rating from the upstream API
-  networks   String?                // tv only: JSON-encoded string[] of network names
+  networks   String?                // tv/movies/anime: JSON-encoded string[] (networks or streaming providers)
   status     String?                // tv only: raw TMDB status (e.g. "Ended", "Returning Series")
   pagesCount Int?                   // books only: representative page count (median across editions)
   playersMin Int?                   // boardgames only: min players from BGG / Ludopedia

@@ -11,7 +11,8 @@ import { NumberCombobox } from "@/components/ui/number-combobox";
 import type { LogAffinityContext, MediaType, Log, ReviewScope, ScopedReview } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
+import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
+import { useProgressOptions } from "@/hooks/useProgressOptions";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
@@ -19,7 +20,14 @@ import { tapScale, tapTransition } from "@/lib/animations";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMe } from "@/contexts/MeContext";
 import { StarRating } from "@/components/StarRating";
-import { gradeToStars, starsToGrade } from "@/lib/gradeStars";
+import { gradeToStars } from "@/lib/gradeStars";
+import {
+  episodeFieldUnchanged,
+  episodePayloadValue,
+  gradeForPayload,
+  gradeStarsUnchanged,
+  logDateInputMatchesStored,
+} from "@/lib/logFormEquality";
 import { BoardGameOwnershipSwitch } from "@/components/BoardGameOwnershipSwitch";
 import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/lib/boardGameOwnership";
 import {
@@ -138,7 +146,7 @@ export function ItemReviewForm({
   const [boardMainTab, setBoardMainTab] = useState<"review" | "matches">("review");
   const [searchParams] = useSearchParams();
   const boardMatchesRef = useRef<BoardGameMatchesSectionHandle>(null);
-  const tvGranular = mediaType === "tv" || mediaType === "anime";
+  const tvGranular = mediaType === "tv";
   const [tvReviewTab, setTvReviewTab] = useState<ReviewScope>("show");
   const [scopedReviews, setScopedReviews] = useState<ScopedReview[]>([]);
   const [seasonDraft, setSeasonDraft] = useState<TvReviewTabDraft>(() => emptyTvReviewDraft());
@@ -166,16 +174,6 @@ export function ItemReviewForm({
     }
   }, [loadingLog, myLog?.id, myLog?.purchaseCurrency, myLog?.saleCurrency, me?.defaultPurchaseCurrency]);
 
-  type ProgressOptions = {
-    seasons?: number[];
-    episodesBySeason?: Record<string, number[]>;
-    episodes?: number[];
-    chapters?: number[];
-    volumes?: number[];
-  };
-  const [progressOptions, setProgressOptions] = useState<ProgressOptions | null>(null);
-  const [progressOptionsLoading, setProgressOptionsLoading] = useState(false);
-
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
   const showSeasonField = HAS_SEASON_FIELD.includes(mediaType);
@@ -190,18 +188,11 @@ export function ItemReviewForm({
   const showPurchaseAmountField =
     showPurchaseAmount && spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
   const showSaleAmountField = showPurchaseAmount && (!showCollectionOwnership || sold);
-
-  useEffect(() => {
-    if (!showSeasonEpisode && !showChapterVolume) return;
-    setProgressOptionsLoading(true);
-    apiFetchCached<ProgressOptions>(
-      `/items/${mediaType}/${encodeURIComponent(externalId)}/progress-options`,
-      { ttlMs: 5 * 60 * 1000 }
-    )
-      .then(setProgressOptions)
-      .catch(() => setProgressOptions(null))
-      .finally(() => setProgressOptionsLoading(false));
-  }, [mediaType, externalId, showSeasonEpisode, showChapterVolume]);
+  const { progressOptions, progressOptionsLoading } = useProgressOptions(
+    mediaType,
+    externalId,
+    showSeasonEpisode || showChapterVolume
+  );
 
   useEffect(() => {
     setLoadingLog(true);
@@ -318,7 +309,7 @@ export function ItemReviewForm({
 
   const ensureTvLog = useCallback(async (): Promise<string> => {
     if (myLog?.id) return myLog.id;
-    const gradeNum = stars == null ? null : starsToGrade(stars);
+    const gradeNum = gradeForPayload(stars);
     const createBody: Record<string, unknown> = {
       mediaType,
       externalId,
@@ -400,7 +391,7 @@ export function ItemReviewForm({
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault();
-    const gradeNum = stars == null ? null : starsToGrade(stars);
+    const gradeNum = gradeForPayload(stars);
     setSaving(true);
     try {
       const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
@@ -408,10 +399,12 @@ export function ItemReviewForm({
         isCompleted && runtimeMinutes != null && runtimeMinutes > 0
           ? Math.round((runtimeMinutes / 60) * 10) / 10
           : null;
-      const episodeForPayload =
-        isCompleted && showSeasonEpisode && episodesCount != null && episodesCount > 0
-          ? episodesCount
-          : toNum(episode);
+      const episodeForPayload = episodePayloadValue(
+        episode,
+        status,
+        episodesCount,
+        showSeasonEpisode
+      );
       const genreList = (genres ?? myLog?.genres ?? []).slice(0, 20);
       const mechanicList = (mechanics ?? myLog?.mechanics ?? []).slice(0, 20);
       const payload: Record<string, unknown> = {
@@ -480,23 +473,22 @@ export function ItemReviewForm({
             ? true
             : affinityJsonStable(myLog.affinityContext) === affinityJsonStable(affinityContextDraft);
         const noChange =
-          gradeNum === (myLog.grade ?? null) &&
+          gradeStarsUnchanged(stars, myLog.grade) &&
           (review.trim() || null) === (myLog.review ?? null) &&
           (status ?? null) === currentStatus &&
           toNum(season) === (myLog.season ?? null) &&
-          episodeForPayload === (myLog.episode ?? null) &&
+          episodeFieldUnchanged(episode, myLog.episode) &&
           toNum(chapter) === (myLog.chapter ?? null) &&
           toNum(volume) === (myLog.volume ?? null) &&
+          contentHours === (myLog.contentHours ?? null) &&
           (!showReadingProgress ||
             (toNum(pagesRead) === (myLog.pagesRead ?? null) &&
-              (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (myLog.startedAt ?? null) &&
-              (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) ===
-                (myLog.completedAt ?? null))) &&
+              logDateInputMatchesStored(myLog.startedAt, startedAtInput) &&
+              logDateInputMatchesStored(myLog.completedAt, completedAtInput))) &&
           (!showGameLogFields ||
             ((gamePlatform.trim() || null) === (myLog.gamePlatform ?? null) &&
-              (startedAtInput.trim() ? dateInputToIso(startedAtInput) : null) === (myLog.startedAt ?? null) &&
-              (completedAtInput.trim() ? dateInputToIso(completedAtInput) : null) ===
-                (myLog.completedAt ?? null))) &&
+              logDateInputMatchesStored(myLog.startedAt, startedAtInput) &&
+              logDateInputMatchesStored(myLog.completedAt, completedAtInput))) &&
           (!showHoursToBeat || toNum(hoursToBeat) === (myLog.hoursToBeat ?? null)) &&
           sameStringList(genreList, myLog.genres ?? []) &&
           mechanicsMatch &&
@@ -759,21 +751,29 @@ export function ItemReviewForm({
               if (log.matchesPlayed != null) setMatchesPlayed(log.matchesPlayed);
             }}
           />
-        ) : tvGranular && tvReviewTab !== "show" ? (
-          <TvGranularReviewSection
-            mediaType={mediaType}
-            progressOptions={progressOptions}
-            progressOptionsLoading={progressOptionsLoading}
-            showSeasonField={showSeasonField}
-            scopedReviews={scopedReviews}
-            activeTab={tvReviewTab}
-            seasonDraft={seasonDraft}
-            onSeasonDraftChange={setSeasonDraft}
-            episodeDraft={episodeDraft}
-            onEpisodeDraftChange={setEpisodeDraft}
-          />
         ) : (
-        <form onSubmit={(e) => void handlePrimarySave(e)}>
+        <>
+          {tvGranular && (
+            <div className={tvReviewTab === "show" ? "hidden" : undefined} aria-hidden={tvReviewTab === "show"}>
+              <TvGranularReviewSection
+                mediaType={mediaType}
+                progressOptions={progressOptions}
+                progressOptionsLoading={progressOptionsLoading}
+                showSeasonField={showSeasonField}
+                scopedReviews={scopedReviews}
+                activeTab={tvReviewTab}
+                seasonDraft={seasonDraft}
+                onSeasonDraftChange={setSeasonDraft}
+                episodeDraft={episodeDraft}
+                onEpisodeDraftChange={setEpisodeDraft}
+              />
+            </div>
+          )}
+        <form
+          onSubmit={(e) => void handlePrimarySave(e)}
+          className={tvGranular && tvReviewTab !== "show" ? "hidden" : undefined}
+          aria-hidden={tvGranular && tvReviewTab !== "show"}
+        >
           <motion.div className="flex flex-col gap-4">
             <div>
               <Label className="mb-2 block text-sm font-medium text-[var(--color-lightest)]">
@@ -1017,6 +1017,7 @@ export function ItemReviewForm({
             </div>
           </motion.div>
         </form>
+        </>
         )}
         <motion.div whileTap={tapScale} transition={tapTransition} className="mt-4">
           <Button

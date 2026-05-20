@@ -49,6 +49,34 @@ export function invalidateByPrefix(prefix: string): void {
   }
 }
 
+/** Keep entries for instant UI; readers using getCachedEntry still see data while SWR revalidates. */
+export function markStaleByPrefix(prefix: string): void {
+  const now = Date.now();
+  for (const [key, entry] of cache.entries()) {
+    if (key.includes(prefix)) {
+      cache.set(key, { ...entry, expiresAt: now - 1 });
+    }
+  }
+}
+
 export function invalidateAll(): void {
   cache.clear();
+}
+
+export function updateCachedEntriesMatching(
+  keyIncludes: string,
+  updater: (data: unknown, cacheKey: string) => unknown | undefined,
+  ttlMs: number = DEFAULT_TTL_MS
+): void {
+  const now = Date.now();
+  for (const [key, entry] of cache.entries()) {
+    if (!key.includes(keyIncludes)) continue;
+    const next = updater(entry.data, key);
+    if (next === undefined) continue;
+    cache.set(key, {
+      data: next,
+      expiresAt: now + ttlMs,
+      storedAt: entry.storedAt,
+    });
+  }
 }

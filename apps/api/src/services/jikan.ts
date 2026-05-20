@@ -5,6 +5,7 @@ import {
   SEARCH_RESULTS_PAGE_SIZE,
 } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
+import { searchAnimeAnilist } from "./anilist.js";
 
 /** Map our sort value to Jikan order_by and sort (asc/desc). */
 function jikanOrderParams(sort: string | undefined): { order_by?: string; sort?: string } {
@@ -96,6 +97,7 @@ export async function getAnimeById(id: string): Promise<ItemDetail | null> {
       episodes?: number | null;
       genres?: Array<{ name?: string }>;
       studios?: Array<{ name?: string }>;
+      licensors?: Array<{ name?: string }>;
       themes?: Array<{ name?: string }>;
       duration?: string | null;
     };
@@ -110,6 +112,10 @@ export async function getAnimeById(id: string): Promise<ItemDetail | null> {
     .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
   const studios = d.studios
     ?.map((s) => s.name)
+    .filter(Boolean)
+    .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
+  const licensors = d.licensors
+    ?.map((l) => l.name)
     .filter(Boolean)
     .map((n) => decodeHtmlEntities(n as string)) as string[] | undefined;
   const themes = d.themes
@@ -129,12 +135,52 @@ export async function getAnimeById(id: string): Promise<ItemDetail | null> {
     episodesCount: (d.episodes ?? 0) > 0 ? d.episodes! : null,
     genres: genres?.length ? genres : null,
     studios: studios?.length ? studios : null,
+    networks: licensors?.length ? licensors : null,
     themes: themes?.length ? themes : null,
     duration: duration ?? null,
   };
 }
 
-export async function searchAnime(q: string, sort?: string): Promise<SearchResult[]> {
+function mergeAnimeSearchResults(
+  anilist: SearchResult[],
+  jikan: SearchResult[]
+): SearchResult[] {
+  const byId = new Map<string, SearchResult>();
+  for (const r of anilist) byId.set(r.id, r);
+  for (const r of jikan) {
+    const existing = byId.get(r.id);
+    if (existing) {
+      byId.set(r.id, {
+        ...existing,
+        title: r.title || existing.title,
+        image: r.image ?? existing.image,
+        year: r.year ?? existing.year,
+        score: r.score ?? existing.score,
+      });
+    } else {
+      byId.set(r.id, r);
+    }
+  }
+  const ordered: SearchResult[] = [];
+  const seen = new Set<string>();
+  for (const r of anilist) {
+    if (seen.has(r.id)) continue;
+    const merged = byId.get(r.id);
+    if (!merged) continue;
+    ordered.push(merged);
+    seen.add(r.id);
+  }
+  for (const r of jikan) {
+    if (seen.has(r.id)) continue;
+    const merged = byId.get(r.id);
+    if (!merged) continue;
+    ordered.push(merged);
+    seen.add(r.id);
+  }
+  return ordered;
+}
+
+async function searchAnimeJikan(q: string): Promise<SearchResult[]> {
   type Row = {
     mal_id: number;
     title?: string;
@@ -142,8 +188,8 @@ export async function searchAnime(q: string, sort?: string): Promise<SearchResul
     score?: number;
     images?: { jpg?: { image_url?: string } };
   };
-  const list = await fetchJikanSearchPages<Row>("anime", q, sort);
-  const results = list.map((item) => ({
+  const list = await fetchJikanSearchPages<Row>("anime", q, undefined);
+  return list.map((item) => ({
     id: String(item.mal_id),
     title: decodeHtmlEntities(item.title ?? "Unknown"),
     image: item.images?.jpg?.image_url ?? null,
@@ -151,7 +197,15 @@ export async function searchAnime(q: string, sort?: string): Promise<SearchResul
     subtitle: null,
     score: typeof item.score === "number" && item.score > 0 ? item.score : null,
   }));
-  return sortSearchResults(results, sort);
+}
+
+export async function searchAnime(q: string, sort?: string): Promise<SearchResult[]> {
+  const [anilistResults, jikanResults] = await Promise.all([
+    searchAnimeAnilist(q).catch(() => [] as SearchResult[]),
+    searchAnimeJikan(q),
+  ]);
+  const merged = mergeAnimeSearchResults(anilistResults, jikanResults);
+  return sortSearchResults(merged, sort).slice(0, SEARCH_RESULTS_PAGE_SIZE);
 }
 
 export async function getMangaById(id: string): Promise<ItemDetail | null> {

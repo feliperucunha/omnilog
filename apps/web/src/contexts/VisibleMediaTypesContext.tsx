@@ -84,12 +84,21 @@ export function VisibleMediaTypesProvider({ children }: { children: ReactNode })
   }, [token, me?.user?.id, me?.visibleMediaTypes]);
 
   useEffect(() => {
+    if (!token) return;
+    warmDashboardAndStatisticsCaches(
+      [...MEDIA_TYPES],
+      -new Date().getTimezoneOffset(),
+      tierHasProFeatures(me?.tier)
+    );
+  }, [token, me?.tier]);
+
+  useEffect(() => {
     if (!visibleTypesOrderReady || visibleTypes.length === 0) return;
     const tz = -new Date().getTimezoneOffset();
     const isPro = tierHasProFeatures(me?.tier);
     registerLogsPageCacheContext({ mediaTypes: visibleTypes, tzOffsetMinutes: tz, isPro });
     warmDashboardAndStatisticsCaches(visibleTypes, tz, isPro);
-  }, [visibleTypes, visibleTypesOrderReady, me?.tier]);
+  }, [visibleTypes, visibleTypesOrderReady, me?.tier, token]);
 
   const value = useMemo(
     () => ({

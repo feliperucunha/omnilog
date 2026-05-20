@@ -63,6 +63,13 @@ import { decodeSearchResultForDisplay } from "@/lib/decodeDisplayFields";
 import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
+import {
+  LOG_CARD_TITLE,
+  SEARCH_RESULT_CARD_BODY,
+  SEARCH_RESULT_CARD_IMAGE,
+  SEARCH_RESULT_CARD_GRID,
+  SEARCH_RESULT_CARD_SHELL,
+} from "@/lib/logCardLayout";
 
 const FREE_SEARCH_USAGE_STORAGE_KEY = "geeklogs_free_search_usage";
 
@@ -865,7 +872,7 @@ export function Search() {
 
       {hasSearched && !loading && searchFilter !== SEARCH_USERS_TYPE && results.length > 0 && (
         <motion.div variants={staggerContainer} initial="initial" animate="animate" className="min-w-0">
-          <div className="flex min-w-0 flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className={SEARCH_RESULT_CARD_GRID}>
             {results.map((item) => {
               const userLog = token ? logsByExternalId.get(item.id) : undefined;
               const status = userLog?.status ?? userLog?.listType;
@@ -912,13 +919,13 @@ export function Search() {
               const metaLine = metaParts.join(" · ") || "—";
               return (
               <motion.div key={item.id} variants={staggerItem} className="min-h-0 min-w-0 sm:h-full">
-                <motion.div whileTap={tapScale} transition={tapTransition} className="h-full">
+                <motion.div whileTap={tapScale} transition={tapTransition} className={SEARCH_RESULT_CARD_SHELL}>
                   <button
                     type="button"
                     onClick={() => openItemDetail(mediaType, item.id)}
                     className={`h-full w-full flex flex-row sm:flex-col text-left overflow-hidden rounded-lg border bg-[var(--color-dark)] text-inherit no-underline shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 max-md:min-h-[44px] ${listBorderClass} ${status == null ? "hover:border-black" : ""}`}
                   >
-                    <div className="w-20 h-28 flex-shrink-0 overflow-hidden relative rounded-l-lg sm:w-full sm:h-auto sm:aspect-[2/3] sm:rounded-l-none sm:rounded-t-lg">
+                    <div className={SEARCH_RESULT_CARD_IMAGE}>
                       <ItemImage
                         src={item.image}
                         className="h-full w-full"
@@ -934,11 +941,11 @@ export function Search() {
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-1 min-w-0 flex-col justify-center gap-0.5 p-3 overflow-hidden sm:justify-start sm:gap-0.5 sm:p-3 sm:pt-2.5 sm:flex-shrink-0">
+                    <div className={SEARCH_RESULT_CARD_BODY}>
                       <OverflowMarquee className="text-[10px] font-medium uppercase text-[var(--color-light)] sm:hidden">
                         {t(`nav.${mediaType}`)}
                       </OverflowMarquee>
-                      <OverflowMarquee className="text-sm font-semibold text-[var(--color-lightest)] sm:text-base sm:leading-tight">
+                      <OverflowMarquee className={`${LOG_CARD_TITLE} text-[var(--color-lightest)] sm:leading-tight`}>
                         {item.title}
                       </OverflowMarquee>
                       {display?.grade != null ? (

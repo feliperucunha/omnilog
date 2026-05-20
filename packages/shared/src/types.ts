@@ -217,7 +217,7 @@ export interface ItemDetail {
   productionCountries?: string[] | null;
   /** Movie: spoken language names */
   spokenLanguages?: string[] | null;
-  /** TV: network names */
+  /** TV: network names; movies/anime: streaming providers (TMDB watch providers / MAL licensors). */
   networks?: string[] | null;
   /** Games: developer names */
   developers?: string[] | null;
@@ -347,7 +347,7 @@ export interface Log {
   mechanics?: string[] | null;
   /** Upstream API rating on a 0-10 scale (TMDB / MAL / RAWG metacritic), lazily enriched server-side. */
   apiScore?: number | null;
-  /** TV only: network names lazily enriched by the API from TMDB (undefined for non-TV logs). */
+  /** TV/movies/anime: network or streaming provider names lazily enriched by the API. */
   networks?: string[] | null;
   /** TV only: raw TMDB status (e.g. "Ended", "Returning Series", "Canceled"); lazily enriched. */
   tvStatus?: string | null;

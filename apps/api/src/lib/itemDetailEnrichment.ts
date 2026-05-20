@@ -92,12 +92,16 @@ async function readCacheRows(
   return map;
 }
 
+const NETWORK_BADGE_MEDIA_TYPES = new Set(["tv", "movies", "anime"]);
+
 function rowToEnrichment(row: CacheRow): ItemEnrichment {
   const apiScore = typeof row.score === "number" && Number.isFinite(row.score) ? row.score : null;
   const tvOnly = row.mediaType === "tv";
   return {
     apiScore,
-    networks: tvOnly ? parseNetworksJson(row.networks) : null,
+    networks: NETWORK_BADGE_MEDIA_TYPES.has(row.mediaType)
+      ? parseNetworksJson(row.networks)
+      : null,
     tvStatus: tvOnly && row.status?.trim() ? row.status.trim() : null,
     pagesCount: row.mediaType === "books" && typeof row.pagesCount === "number" && row.pagesCount > 0 ? row.pagesCount : null,
     playersMin: row.mediaType === "boardgames" && typeof row.playersMin === "number" && row.playersMin > 0 ? row.playersMin : null,
@@ -145,7 +149,10 @@ async function fetchAndUpsertOne(
   const isBook = input.mediaType === "books";
   const isBoardgame = input.mediaType === "boardgames";
   const score = item != null && typeof item.score === "number" && Number.isFinite(item.score) ? item.score : null;
-  const networks = item != null && isTv && item.networks?.length ? item.networks : null;
+  const networks =
+    item != null && NETWORK_BADGE_MEDIA_TYPES.has(input.mediaType) && item.networks?.length
+      ? item.networks
+      : null;
   const status = item != null && isTv && item.status?.trim() ? item.status.trim() : null;
   const pagesCount = item != null && isBook && typeof item.pagesCount === "number" && item.pagesCount > 0 ? Math.round(item.pagesCount) : null;
   const playersMin = item != null && isBoardgame && typeof item.playersMin === "number" && item.playersMin > 0 ? item.playersMin : null;
@@ -258,6 +265,8 @@ export async function attachItemEnrichment<T extends SerializedLogLike>(
     if (log.mediaType === "tv") {
       out.networks = e.networks;
       out.tvStatus = e.tvStatus;
+    } else if (log.mediaType === "movies" || log.mediaType === "anime") {
+      out.networks = e.networks;
     } else if (log.mediaType === "books") {
       out.pagesCount = e.pagesCount;
     } else if (log.mediaType === "boardgames") {

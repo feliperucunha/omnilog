@@ -8,12 +8,7 @@ import { StarRating } from "@/components/StarRating";
 import { gradeToStars, starsToGrade } from "@/lib/gradeStars";
 import { apiFetch } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
-
-type ProgressOptions = {
-  seasons?: number[];
-  episodesBySeason?: Record<string, number[]>;
-  episodes?: number[];
-};
+import type { ProgressOptions } from "@/hooks/useProgressOptions";
 
 export type TvReviewTabDraft = {
   stars: number | null;
@@ -93,71 +88,67 @@ export function TvGranularReviewSection({
 
   return (
     <div className="flex flex-col gap-4">
-      {activeTab === "season" && (
-        <>
-          <div className="space-y-2">
-            <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.season")}</Label>
-            <NumberCombobox
-              value={seasonDraft.season}
-              onChange={(next) => onSeasonDraftChange({ ...seasonDraft, season: next })}
-              options={progressOptions?.seasons ?? []}
-              placeholder="—"
-              aria-label={t("itemReviewForm.season")}
-              optionsLoading={progressOptionsLoading}
-            />
-          </div>
-          <RatingReviewFields
-            stars={seasonDraft.stars}
-            review={seasonDraft.review}
-            onStars={(s) => onSeasonDraftChange({ ...seasonDraft, stars: s })}
-            onReview={(v) => onSeasonDraftChange({ ...seasonDraft, review: v })}
-            t={t}
+      <div className={activeTab === "season" ? "flex flex-col gap-4" : "hidden"} aria-hidden={activeTab !== "season"}>
+        <div className="space-y-2">
+          <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.season")}</Label>
+          <NumberCombobox
+            value={seasonDraft.season}
+            onChange={(next) => onSeasonDraftChange({ ...seasonDraft, season: next })}
+            options={progressOptions?.seasons ?? []}
+            placeholder="—"
+            aria-label={t("itemReviewForm.season")}
+            optionsLoading={progressOptionsLoading}
           />
-        </>
-      )}
+        </div>
+        <RatingReviewFields
+          stars={seasonDraft.stars}
+          review={seasonDraft.review}
+          onStars={(s) => onSeasonDraftChange({ ...seasonDraft, stars: s })}
+          onReview={(v) => onSeasonDraftChange({ ...seasonDraft, review: v })}
+          t={t}
+        />
+      </div>
 
-      {activeTab === "episode" && (
-        <>
-          <div className={showSeasonField ? "grid grid-cols-2 gap-4" : "grid grid-cols-1 gap-4"}>
-            {showSeasonField && (
-              <div className="space-y-2">
-                <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.season")}</Label>
-                <NumberCombobox
-                  value={episodeDraft.season}
-                  onChange={(next) => onEpisodeDraftChange({ ...episodeDraft, season: next })}
-                  options={progressOptions?.seasons ?? []}
-                  placeholder="—"
-                  aria-label={t("itemReviewForm.season")}
-                  optionsLoading={progressOptionsLoading}
-                />
-              </div>
-            )}
+      <div className={activeTab === "episode" ? "flex flex-col gap-4" : "hidden"} aria-hidden={activeTab !== "episode"}>
+        <div className={showSeasonField ? "grid grid-cols-2 gap-4" : "grid grid-cols-1 gap-4"}>
+          {showSeasonField && (
             <div className="space-y-2">
-              <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.episode")}</Label>
+              <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.season")}</Label>
               <NumberCombobox
-                value={episodeDraft.episode}
-                onChange={(next) => onEpisodeDraftChange({ ...episodeDraft, episode: next })}
-                options={
-                  mediaType === "tv" && episodeDraft.season !== ""
-                    ? (progressOptions?.episodesBySeason?.[String(episodeDraft.season)] ?? [])
-                    : (progressOptions?.episodes ?? [])
-                }
+                value={episodeDraft.season}
+                onChange={(next) => onEpisodeDraftChange({ ...episodeDraft, season: next })}
+                options={progressOptions?.seasons ?? []}
                 placeholder="—"
-                aria-label={t("itemReviewForm.episode")}
+                aria-label={t("itemReviewForm.season")}
                 optionsLoading={progressOptionsLoading}
-                contentScrollable
               />
             </div>
+          )}
+          <div className="space-y-2">
+            <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.episode")}</Label>
+            <NumberCombobox
+              value={episodeDraft.episode}
+              onChange={(next) => onEpisodeDraftChange({ ...episodeDraft, episode: next })}
+              options={
+                mediaType === "tv" && episodeDraft.season !== ""
+                  ? (progressOptions?.episodesBySeason?.[String(episodeDraft.season)] ?? [])
+                  : (progressOptions?.episodes ?? [])
+              }
+              placeholder="—"
+              aria-label={t("itemReviewForm.episode")}
+              optionsLoading={progressOptionsLoading}
+              contentScrollable
+            />
           </div>
-          <RatingReviewFields
-            stars={episodeDraft.stars}
-            review={episodeDraft.review}
-            onStars={(s) => onEpisodeDraftChange({ ...episodeDraft, stars: s })}
-            onReview={(v) => onEpisodeDraftChange({ ...episodeDraft, review: v })}
-            t={t}
-          />
-        </>
-      )}
+        </div>
+        <RatingReviewFields
+          stars={episodeDraft.stars}
+          review={episodeDraft.review}
+          onStars={(s) => onEpisodeDraftChange({ ...episodeDraft, stars: s })}
+          onReview={(v) => onEpisodeDraftChange({ ...episodeDraft, review: v })}
+          t={t}
+        />
+      </div>
     </div>
   );
 }

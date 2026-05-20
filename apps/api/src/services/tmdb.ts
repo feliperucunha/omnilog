@@ -9,6 +9,36 @@ import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 
 const BASE = "https://api.themoviedb.org/3";
 const IMAGE_BASE = "https://image.tmdb.org/t/p/w200";
+const WATCH_PROVIDER_REGION = (process.env.TMDB_WATCH_REGION ?? "US").toUpperCase();
+
+type WatchProviderRegion = {
+  flatrate?: Array<{ provider_name?: string }>;
+  free?: Array<{ provider_name?: string }>;
+  ads?: Array<{ provider_name?: string }>;
+};
+
+export function streamingNamesFromWatchProviders(data: {
+  results?: Record<string, WatchProviderRegion>;
+}): string[] | null {
+  const results = data.results;
+  if (!results || typeof results !== "object") return null;
+  const region =
+    results[WATCH_PROVIDER_REGION] ??
+    results.US ??
+    Object.values(results).find(
+      (r) => (r.flatrate?.length ?? 0) > 0 || (r.free?.length ?? 0) > 0
+    );
+  if (!region) return null;
+  const names: string[] = [];
+  for (const bucket of [region.flatrate, region.free, region.ads] as const) {
+    for (const p of bucket ?? []) {
+      const n = p.provider_name?.trim();
+      if (n) names.push(decodeHtmlEntities(n));
+    }
+  }
+  const unique = [...new Set(names)];
+  return unique.length ? unique.slice(0, 10) : null;
+}
 
 function getKey(apiKey?: string | null): string | null {
   return apiKey ?? process.env.TMDB_API_KEY ?? null;
@@ -17,9 +47,17 @@ function getKey(apiKey?: string | null): string | null {
 export async function getMovieById(id: string, apiKey?: string | null): Promise<ItemDetail | null> {
   const key = getKey(apiKey);
   if (!key) return null;
-  const res = await fetch(`${BASE}/movie/${id}?api_key=${key}`);
+  const [res, providersRes] = await Promise.all([
+    fetch(`${BASE}/movie/${id}?api_key=${key}`),
+    fetch(`${BASE}/movie/${id}/watch/providers?api_key=${key}`),
+  ]);
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res.ok) return null;
+  let networks: string[] | null = null;
+  if (providersRes.ok) {
+    const providerData = (await providersRes.json()) as { results?: Record<string, WatchProviderRegion> };
+    networks = streamingNamesFromWatchProviders(providerData);
+  }
   const data = (await res.json()) as {
     id?: number;
     title?: string;
@@ -64,6 +102,7 @@ export async function getMovieById(id: string, apiKey?: string | null): Promise<
     status: data.status?.trim() ? decodeHtmlEntities(data.status.trim()) : null,
     productionCountries: productionCountries?.length ? productionCountries : null,
     spokenLanguages: spokenLanguages?.length ? spokenLanguages : null,
+    networks: networks?.length ? networks : null,
   };
 }
 

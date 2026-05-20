@@ -20,7 +20,12 @@ import {
   downloadFile,
   LOGS_INVALIDATED_EVENT,
 } from "@/lib/api";
-import { buildLogsListPath, readCachedLogsListResponse } from "@/lib/logsPageCache";
+import {
+  buildLogsListPath,
+  buildLogsListPathFromFilters,
+  readCachedLogsListResponse,
+  upsertLogInClientCaches,
+} from "@/lib/logsPageCache";
 import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
 import { ExportLogsModal, type ExportLogsOptions } from "@/components/ExportLogsModal";
@@ -39,6 +44,20 @@ import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { itemDetailPath } from "@/lib/itemRoutes";
+import {
+  LOG_CARD_ACTION_COLUMN,
+  LOG_CARD_BODY_GAP,
+  LOG_CARD_BODY_PADDING,
+  LOG_CARD_EDIT_BUTTON,
+  LOG_CARD_HEIGHT_DEFAULT,
+  LOG_CARD_HEIGHT_EMBEDDED,
+  LOG_CARD_HEIGHT_EMBEDDED_COLLAPSED,
+  LOG_CARD_IMAGE_COLUMN,
+  LOG_CARD_INCREMENT_BUTTON,
+  LOG_CARD_REVIEW_MAX_WIDTH,
+  LOG_CARD_TITLE,
+  LOG_LIST_CARD_GRID,
+} from "@/lib/logCardLayout";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useLogComplete } from "@/contexts/LogCompleteContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -182,16 +201,17 @@ export function MediaLogs({
     if (initialLogsProp !== undefined) {
       return { logs: initialLogsProp, cursor: initialNextCursorProp ?? null };
     }
-    const collection = initialFilters?.collection ?? "";
-    const path = buildLogsListPath({
+    const path = buildLogsListPathFromFilters(
       mediaType,
-      sort: (initialFilters?.sort as string) ?? DEFAULT_SORT,
-      status: initialFilters?.status ?? "",
-      q: initialFilters?.search ?? "",
-      own: showCollectionOwnershipFilters && collection === "owned",
-      wantToBuy: showCollectionOwnershipFilters && collection === "wantToBuy",
-      genre: initialFilters?.genre ?? "",
-    });
+      {
+        sort: initialFilters?.sort,
+        status: initialFilters?.status,
+        search: initialFilters?.search,
+        collection: initialFilters?.collection,
+        genre: initialFilters?.genre,
+      },
+      showCollectionOwnershipFilters
+    );
     const hit = readCachedLogsListResponse(path);
     if (!hit) return null;
     return { logs: hit.list.map(decodeLogForDisplay), cursor: hit.cursor };
@@ -395,7 +415,7 @@ export function MediaLogs({
       if (cached) {
         applyLogsResponse(cached.data, true);
         setLoading(false);
-      } else {
+      } else if (logsRef.current.length === 0) {
         setLoading(true);
       }
 
@@ -531,13 +551,20 @@ export function MediaLogs({
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const categorySearchInputRef = useRef<HTMLInputElement>(null);
+  const logsRef = useRef(logs);
+  logsRef.current = logs;
   const fetchLogsRef = useRef(fetchLogs);
   fetchLogsRef.current = fetchLogs;
+  const skipLogsInvalidatedRefetchRef = useRef(false);
 
   useEffect(() => {
     if (publicUserId) return;
     const onInvalidated = () => {
       fetchStatusCounts();
+      if (skipLogsInvalidatedRefetchRef.current) {
+        skipLogsInvalidatedRefetchRef.current = false;
+        return;
+      }
       fetchLogsRef.current(true);
     };
     window.addEventListener(LOGS_INVALIDATED_EVENT, onInvalidated);
@@ -612,15 +639,21 @@ export function MediaLogs({
     const { field, value } = getProgress(log);
     const next = value + 1;
     setIncrementingId(log.id);
+    const optimistic = decodeLogForDisplay({ ...log, [field]: next });
+    setLogs((prev) => prev.map((l) => (l.id === log.id ? optimistic : l)));
     try {
       const updated = await apiFetch<Log>(
         `/logs/${log.id}`,
         { method: "PATCH", body: JSON.stringify({ [field]: next }) }
       );
+      const normalized = decodeLogForDisplay(updated);
+      setLogs((prev) => prev.map((l) => (l.id === log.id ? normalized : l)));
+      upsertLogInClientCaches(normalized);
+      skipLogsInvalidatedRefetchRef.current = true;
       invalidateLogsAndItemsCache();
-      setLogs((prev) => prev.map((l) => (l.id === log.id ? decodeLogForDisplay(updated) : l)));
       toast.success(t("toast.logUpdated"));
     } catch (err) {
+      setLogs((prev) => prev.map((l) => (l.id === log.id ? log : l)));
       showErrorToast(t, "E008", { originalError: err });
     } finally {
       setIncrementingId(null);
@@ -1250,7 +1283,7 @@ export function MediaLogs({
         </motion.div>
       ) : (
         <motion.div variants={staggerContainer} initial="initial" animate="animate" className="min-w-0 overflow-hidden">
-          <div className="flex min-w-0 flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+          <div className={LOG_LIST_CARD_GRID}>
             {logs.map((log) => {
               const isDropped = log.status === "dropped";
               const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
@@ -1282,7 +1315,7 @@ export function MediaLogs({
               <motion.div key={log.id} variants={staggerItem} className="min-h-0 sm:h-full">
                 <div className="h-full">
                   <Card
-                    className={`relative flex flex-row min-h-0 overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${embedded && !isReviewExpanded ? "h-[193px] min-h-[193px] max-h-[193px] sm:h-[193px] sm:min-h-[193px] sm:max-h-[193px]" : embedded ? "min-h-[160px]" : "min-h-[140px] sm:min-h-[160px]"} ${listBorderClass}`}
+                    className={`relative flex flex-row min-h-0 overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${embedded && !isReviewExpanded ? LOG_CARD_HEIGHT_EMBEDDED_COLLAPSED : embedded ? LOG_CARD_HEIGHT_EMBEDDED : LOG_CARD_HEIGHT_DEFAULT} ${listBorderClass}`}
                     style={cardShadow}
                   >
                     {!readOnly && deletingId === log.id && (
@@ -1295,7 +1328,7 @@ export function MediaLogs({
                       to={itemDetailPath(log.mediaType, log.externalId)}
                       whileTap={tapScale}
                       transition={tapTransition}
-                      className="relative w-28 shrink-0 self-stretch overflow-hidden sm:w-32 min-h-[7rem]"
+                      className={LOG_CARD_IMAGE_COLUMN}
                     >
                       <div className="absolute inset-0 min-h-0">
                         <ItemImage
@@ -1328,14 +1361,14 @@ export function MediaLogs({
                       )}
                     </MotionLink>
                     {/* Middle: title, grade, badge, episode, review */}
-                    <div className={`flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 sm:p-4 ${embedded && !isReviewExpanded ? "min-h-0" : ""}`}>
+                    <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${LOG_CARD_BODY_GAP} ${LOG_CARD_BODY_PADDING} ${embedded && !isReviewExpanded ? "min-h-0" : ""}`}>
                       <MotionLink
                         to={itemDetailPath(log.mediaType, log.externalId)}
                         whileTap={tapScale}
                         transition={tapTransition}
                         className="block min-w-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
                       >
-                        <OverflowMarquee className="text-sm font-semibold sm:text-base">{log.title}</OverflowMarquee>
+                        <OverflowMarquee className={LOG_CARD_TITLE}>{log.title}</OverflowMarquee>
                       </MotionLink>
                       <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                         {display.grade != null ? (
@@ -1349,7 +1382,8 @@ export function MediaLogs({
                           </span>
                         ) : null}
                         <GenreBadges genres={log.genres} maxCount={1} />
-                        {log.mediaType === "tv" && log.networks?.[0] && (
+                        {(log.mediaType === "tv" || log.mediaType === "movies" || log.mediaType === "anime") &&
+                          log.networks?.[0] && (
                           <span className="rounded-full bg-[var(--color-mid)]/30 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
                             {log.networks[0]}
                           </span>
@@ -1458,7 +1492,7 @@ export function MediaLogs({
                             const showClamp = embedded && truncated && !isExpanded;
                             return (
                               <>
-                                <div className={showClamp ? "line-clamp-2 w-full max-w-[240px]" : "w-full max-w-[240px]"}>
+                                <div className={showClamp ? `line-clamp-2 w-full ${LOG_CARD_REVIEW_MAX_WIDTH}` : `w-full ${LOG_CARD_REVIEW_MAX_WIDTH}`}>
                                   <p className="text-xs sm:text-sm text-[var(--color-light)] whitespace-pre-wrap break-words">
                                     {preview}
                                     {truncated && !isExpanded && " ... "}
@@ -1489,7 +1523,7 @@ export function MediaLogs({
                     </div>
                     {/* Right: +1 (primary) + edit — +1 only when progress type and not complete/read/watched */}
                     {!readOnly && (
-                      <div className="flex flex-shrink-0 flex-col justify-center gap-2 border-l border-[var(--color-surface-border)] p-2">
+                      <div className={LOG_CARD_ACTION_COLUMN}>
                         {showIncrementForLog(log) && (
                           <button
                             type="button"
@@ -1500,7 +1534,7 @@ export function MediaLogs({
                             }}
                             disabled={incrementingId === log.id || deletingId === log.id}
                             aria-label={t("mediaLogs.addOne")}
-                            className="flex h-10 min-w-10 items-center justify-center gap-1 rounded-xl border-0 bg-[var(--color-darkest)] px-2.5 shadow-[var(--shadow-sm)] transition-[transform,box-shadow] hover:scale-[1.04] hover:shadow-[var(--shadow-md)] active:scale-[0.98] disabled:scale-100 disabled:opacity-50 [@media(hover:hover)]:hover:bg-[var(--btn-gradient-start)] [@media(hover:hover)]:hover:shadow-[0_0_0_2px_var(--btn-gradient-start)]"
+                            className={LOG_CARD_INCREMENT_BUTTON}
                           >
                             {incrementingId === log.id ? (
                               <Loader2 className="h-4 w-4 animate-spin text-[var(--color-lightest)]" aria-hidden />
@@ -1523,7 +1557,7 @@ export function MediaLogs({
                             }}
                             disabled={deletingId === log.id}
                             aria-label={t("mediaLogs.addMatch")}
-                            className="flex h-10 min-w-10 items-center justify-center gap-1 rounded-xl border-0 bg-[var(--color-darkest)] px-2.5 shadow-[var(--shadow-sm)] transition-[transform,box-shadow] hover:scale-[1.04] hover:shadow-[var(--shadow-md)] active:scale-[0.98] disabled:scale-100 disabled:opacity-50 [@media(hover:hover)]:hover:bg-[var(--btn-gradient-start)] [@media(hover:hover)]:hover:shadow-[0_0_0_2px_var(--btn-gradient-start)]"
+                            className={LOG_CARD_INCREMENT_BUTTON}
                           >
                             <Plus className="h-4 w-4 shrink-0 text-[var(--color-lightest)]" aria-hidden />
                           </button>
@@ -1532,7 +1566,7 @@ export function MediaLogs({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 rounded-lg text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)] transition-colors"
+                          className={`${LOG_CARD_EDIT_BUTTON} text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)] transition-colors`}
                           onClick={() => {
                             setBoardGameEditTab("review");
                             setEditingLog(log);

@@ -575,7 +575,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
     setExpandedReviewUsers(new Set());
   }, [reviewsPage, reviewsSort, id, mediaType]);
 
-  const scopedReviewsDisplay = mediaType === "tv" || mediaType === "anime";
+  const scopedReviewsDisplay = mediaType === "tv";
   const pageReviews = data?.reviews ?? [];
 
   const reviewDisplayGroups = useMemo(() => {
@@ -974,8 +974,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                                   {reviewScopeLabel(t, r)}
                                 </span>
                               )}
-                              {(!scopedReviewsDisplay || (r.reviewScope ?? "show") === "show") &&
-                                (r.season != null || r.episode != null) && (
+                              {!scopedReviewsDisplay && (r.season != null || r.episode != null) && (
                                 <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
                                   S{r.season ?? "?"} · E{r.episode ?? "?"}
                                 </span>

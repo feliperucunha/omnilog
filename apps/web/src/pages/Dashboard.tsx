@@ -10,7 +10,7 @@ import {
   apiFetchSWR,
   getCachedEntry,
   HEAVY_PAGE_TTL_MS,
-  invalidateApiCache,
+  invalidateLogsAndItemsCache,
   LOGS_INVALIDATED_EVENT,
 } from "@/lib/api";
 import {
@@ -60,6 +60,14 @@ import { formatTimeToFinish } from "@/lib/formatDuration";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
 import { itemDetailPath } from "@/lib/itemRoutes";
+import {
+  LOG_CARD_BODY_GAP,
+  LOG_CARD_BODY_PADDING,
+  LOG_CARD_HEIGHT_FEED_COLLAPSED,
+  LOG_CARD_HEIGHT_FEED_EXPANDED,
+  LOG_CARD_IMAGE_COLUMN_ROUNDED_L,
+  LOG_CARD_TITLE,
+} from "@/lib/logCardLayout";
 import { MotionLink } from "@/components/MotionLink";
 import * as storage from "@/lib/storage";
 import { ReactionButtons } from "@/components/ReactionButtons";
@@ -340,10 +348,11 @@ export function Dashboard() {
     const path =
       feedFriendFilter === "all" ? buildFeedPath() : buildFeedPath(feedFriendFilter);
     const cached = getCachedEntry<{ data: FeedEntry[] }>("GET", path);
-    if (!cached) setFeedLoading(true);
-    else {
+    if (cached) {
       applyFeedResponse(cached.data);
       setFeedLoading(false);
+    } else {
+      setFeedLoading((prev) => (feed.length === 0 ? true : prev));
     }
 
     void apiFetchSWR<{ data: FeedEntry[] }>(path, {
@@ -453,8 +462,7 @@ export function Dashboard() {
       fetchMilestones();
       fetchFeed();
       fetchFollows();
-      invalidateApiCache("/logs");
-      window.dispatchEvent(new CustomEvent(LOGS_INVALIDATED_EVENT));
+      invalidateLogsAndItemsCache();
     };
     window.addEventListener(APP_PTR_REFRESH_EVENT, onPtr);
     return () => window.removeEventListener(APP_PTR_REFRESH_EVENT, onPtr);
@@ -686,6 +694,7 @@ export function Dashboard() {
             </ToggleGroup>
           </div>
           <MediaLogs
+            key={selectedCategory}
             mediaType={selectedCategory}
             embedded
             milestoneProgress={
@@ -747,7 +756,7 @@ export function Dashboard() {
           {!socialCollapsed && (
           <div id="dashboard-social-content" role="region" aria-labelledby="dashboard-social-heading">
             <div className="flex min-w-0 flex-col gap-4 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50 p-4">
-              {feedLoading ? (
+              {feedLoading && feed.length === 0 ? (
             <div className="flex flex-col gap-2">
               {[1, 2, 3].map((i) => (
                 <div
@@ -812,7 +821,7 @@ export function Dashboard() {
                   return (
                   <motion.li key={log.id} variants={staggerItem} className="list-none">
                     <div
-                      className={`flex min-w-0 flex-row overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${!isExpanded ? "min-h-[160px] h-[160px]" : "min-h-[140px]"} ${listBorderClass}`}
+                      className={`flex min-w-0 flex-row overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${!isExpanded ? LOG_CARD_HEIGHT_FEED_COLLAPSED : LOG_CARD_HEIGHT_FEED_EXPANDED} ${listBorderClass}`}
                       style={paperShadow}
                     >
                       {/* Left: image full height */}
@@ -820,7 +829,7 @@ export function Dashboard() {
                         to={itemDetailPath(log.mediaType, log.externalId)}
                         whileTap={tapScale}
                         transition={tapTransition}
-                        className="relative w-28 shrink-0 self-stretch overflow-hidden rounded-l-lg sm:w-32 min-h-[7rem]"
+                        className={LOG_CARD_IMAGE_COLUMN_ROUNDED_L}
                       >
                         <div className="absolute inset-0 min-h-0 rounded-l-lg">
                           <ItemImage
@@ -853,14 +862,14 @@ export function Dashboard() {
                         )}
                       </MotionLink>
                       {/* Middle: title, meta, user, review */}
-                      <div className={`flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 sm:p-4 ${!isExpanded ? "min-h-0" : ""}`}>
+                      <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${LOG_CARD_BODY_GAP} ${LOG_CARD_BODY_PADDING} ${!isExpanded ? "min-h-0" : ""}`}>
                         <MotionLink
                           to={itemDetailPath(log.mediaType, log.externalId)}
                           whileTap={tapScale}
                           transition={tapTransition}
                           className="block min-w-0 shrink-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
                         >
-                          <OverflowMarquee className="text-sm font-semibold sm:text-base">
+                          <OverflowMarquee className={LOG_CARD_TITLE}>
                             {log.title}
                           </OverflowMarquee>
                         </MotionLink>
@@ -875,6 +884,12 @@ export function Dashboard() {
                               {scopeLabel}
                             </span>
                           ) : null}
+                          {(log.mediaType === "tv" || log.mediaType === "movies" || log.mediaType === "anime") &&
+                            log.networks?.[0] && (
+                            <span className="rounded-full bg-[var(--color-mid)]/30 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
+                              {log.networks[0]}
+                            </span>
+                          )}
                           {log.mediaType === "books" && typeof log.pagesCount === "number" && log.pagesCount > 0 && (
                             <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
                               {t("mediaLogs.bookPagesBadge", { count: String(log.pagesCount) })}

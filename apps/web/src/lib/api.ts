@@ -58,6 +58,7 @@ import {
   getCachedEntry,
   setCached,
   invalidateByPrefix,
+  markStaleByPrefix,
 } from "./cache.js";
 
 import { getItemSync, removeItem } from "./storage.js";
@@ -263,9 +264,9 @@ export const LOGS_CACHE_WARM_EVENT = "geeklogs-logs-cache-warm";
 /** Invalidate logs and items caches (use after any log mutation). */
 export function invalidateLogsAndItemsCache(): void {
   swrInflight.clear();
-  invalidateByPrefix("/logs");
-  invalidateByPrefix("/items");
-  invalidateByPrefix("/me");
+  markStaleByPrefix("/logs");
+  markStaleByPrefix("/items");
+  markStaleByPrefix("/me");
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(LOGS_INVALIDATED_EVENT));
     window.dispatchEvent(new CustomEvent(LOGS_CACHE_WARM_EVENT));

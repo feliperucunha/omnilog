@@ -474,56 +474,6 @@ export const BoardGameMatchesSection = forwardRef<
 
   return (
     <div className="flex flex-col gap-8">
-      {logId ? (
-      <section className="flex flex-col gap-4">
-        <motion.div className="flex items-center gap-2.5">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--btn-gradient-start)]/25 to-[var(--btn-gradient-end)]/20 text-[var(--color-lightest)] ring-1 ring-[var(--color-mid)]/30">
-            <History className="h-5 w-5" aria-hidden />
-          </span>
-          <div>
-            <h3 className="text-base font-semibold text-[var(--color-lightest)]">{t("boardGameMatches.previousSessions")}</h3>
-            <p className="text-xs text-[var(--color-light)]">{t("boardGameMatches.playHistorySubtitle")}</p>
-          </div>
-        </motion.div>
-        {loadingList ? (
-          <div className="flex justify-center py-10">
-            <Loader2 className="h-8 w-8 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
-          </div>
-        ) : matches.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--color-mid)]/40 bg-[var(--color-mid)]/5 px-6 py-10 text-center"
-          >
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--color-dark)] text-[var(--color-light)] ring-1 ring-[var(--color-mid)]/30">
-              <Dice5 className="h-7 w-7" aria-hidden />
-            </span>
-            <p className="max-w-sm text-sm text-[var(--color-light)]">{t("boardGameMatches.noMatchesYet")}</p>
-          </motion.div>
-        ) : (
-          <ul className="m-0 flex list-none flex-col gap-3 p-0">
-            {matches.map((m, i) => (
-              <motion.li
-                key={m.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(i * 0.04, 0.24), type: "spring", stiffness: 380, damping: 28 }}
-              >
-                <MatchHistoryCard
-                  match={m}
-                  previousMatch={getChronologicalPreviousMatch(matchesChronologicalAsc, m)}
-                  formatPlayed={formatPlayed}
-                  deleting={deletingId === m.id}
-                  onDelete={() => handleDelete(m.id)}
-                  t={t}
-                />
-              </motion.li>
-            ))}
-          </ul>
-        )}
-      </section>
-      ) : null}
-
       <section className="relative overflow-hidden rounded-2xl border border-[var(--color-mid)]/25 bg-gradient-to-b from-[var(--color-category-bg)]/80 to-[var(--color-dark)] p-5 shadow-[var(--shadow-category)] ring-1 ring-[var(--color-mid)]/10 sm:p-6">
         <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-[var(--btn-gradient-start)]/10 blur-2xl" aria-hidden />
         <div className="pointer-events-none absolute -bottom-10 left-1/3 h-24 w-40 rounded-full bg-[var(--btn-gradient-end)]/10 blur-2xl" aria-hidden />
@@ -574,22 +524,20 @@ export const BoardGameMatchesSection = forwardRef<
               <motion.div
                 key={i}
                 layout
-                className="flex flex-col gap-3 rounded-2xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 ring-1 ring-white/5 sm:flex-row sm:items-center sm:gap-4 sm:p-4"
+                className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 ring-1 ring-white/5 sm:gap-3"
               >
-                <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-center sm:gap-1.5">
-                  <div className="relative shrink-0">
-                    <PlayerAvatar name={p.name} size="lg" winner={p.winner} />
-                    {p.appUserId && (
-                      <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-md bg-[var(--color-darkest)] p-0.5 ring-2 ring-[var(--color-dark)]">
-                        <Logo className="h-3.5 w-3.5 object-contain" alt="" />
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-light)] sm:hidden">
-                    {t("boardGameMatches.playerSlot", { n: String(i + 1) })}
-                  </span>
+                <div className="relative shrink-0">
+                  <PlayerAvatar name={p.name || "?"} size="md" winner={p.winner} />
+                  {p.appUserId && (
+                    <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-md bg-[var(--color-darkest)] p-0.5 ring-2 ring-[var(--color-dark)]">
+                      <Logo className="h-3.5 w-3.5 object-contain" alt="" />
+                    </span>
+                  )}
                 </div>
-                <div className="grid min-w-0 flex-1 grid-cols-1 gap-3">
+                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-light)] sm:text-xs">
+                  {t("boardGameMatches.playerSlot", { n: String(i + 1) })}
+                </span>
+                <div className="min-w-[8rem] flex-1 basis-[10rem]">
                   <MatchPlayerNameField
                     value={p.name}
                     appUserId={p.appUserId}
@@ -599,45 +547,43 @@ export const BoardGameMatchesSection = forwardRef<
                       setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, ...next } : row)))
                     }
                   />
-                  <Input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder={t("boardGameMatches.score")}
-                    value={p.score}
-                    onChange={(e) =>
-                      setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, score: e.target.value } : row)))
+                </div>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={t("boardGameMatches.score")}
+                  value={p.score}
+                  onChange={(e) =>
+                    setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, score: e.target.value } : row)))
+                  }
+                  className="h-10 w-[5.5rem] shrink-0 border-[var(--color-mid)]/35 bg-[var(--color-dark)]/80"
+                  aria-label={t("boardGameMatches.score")}
+                />
+                <div className="flex shrink-0 items-center gap-2 rounded-xl bg-[var(--color-mid)]/10 px-2.5 py-1.5">
+                  <Switch
+                    checked={p.winner}
+                    onCheckedChange={(v) =>
+                      setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, winner: v } : row)))
                     }
-                    className="border-[var(--color-mid)]/35 bg-[var(--color-dark)]/80"
-                    aria-label={t("boardGameMatches.score")}
+                    aria-label={t("boardGameMatches.winner")}
                   />
+                  <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-400/90" aria-hidden />
+                  <span className="hidden text-xs font-medium text-[var(--color-light)] sm:inline">
+                    {t("boardGameMatches.winner")}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between gap-3 sm:flex-col sm:justify-center sm:px-1">
-                  <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-[var(--color-mid)]/10 px-3 py-2 sm:flex-col sm:py-2.5">
-                    <Switch
-                      checked={p.winner}
-                      onCheckedChange={(v) =>
-                        setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, winner: v } : row)))
-                      }
-                      aria-label={t("boardGameMatches.winner")}
-                    />
-                    <span className="flex items-center gap-1 text-xs font-medium text-[var(--color-light)]">
-                      <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-400/90" aria-hidden />
-                      {t("boardGameMatches.winner")}
-                    </span>
-                  </div>
-                  {players.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 text-red-400/90 hover:bg-red-500/15 hover:text-red-300"
-                      onClick={() => setPlayers((prev) => prev.filter((_, j) => j !== i))}
-                      aria-label={t("boardGameMatches.removePlayer")}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+                {players.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="ml-auto shrink-0 text-red-400/90 hover:bg-red-500/15 hover:text-red-300 sm:ml-0"
+                    onClick={() => setPlayers((prev) => prev.filter((_, j) => j !== i))}
+                    aria-label={t("boardGameMatches.removePlayer")}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </motion.div>
             ))}
           </div>
@@ -666,6 +612,56 @@ export const BoardGameMatchesSection = forwardRef<
           )}
         </div>
       </section>
+
+      {logId ? (
+        <section className="flex flex-col gap-4">
+          <motion.div className="flex items-center gap-2.5">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--btn-gradient-start)]/25 to-[var(--btn-gradient-end)]/20 text-[var(--color-lightest)] ring-1 ring-[var(--color-mid)]/30">
+              <History className="h-5 w-5" aria-hidden />
+            </span>
+            <div>
+              <h3 className="text-base font-semibold text-[var(--color-lightest)]">{t("boardGameMatches.previousSessions")}</h3>
+              <p className="text-xs text-[var(--color-light)]">{t("boardGameMatches.playHistorySubtitle")}</p>
+            </div>
+          </motion.div>
+          {loadingList ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
+            </div>
+          ) : matches.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[var(--color-mid)]/40 bg-[var(--color-mid)]/5 px-6 py-10 text-center"
+            >
+              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--color-dark)] text-[var(--color-light)] ring-1 ring-[var(--color-mid)]/30">
+                <Dice5 className="h-7 w-7" aria-hidden />
+              </span>
+              <p className="max-w-sm text-sm text-[var(--color-light)]">{t("boardGameMatches.noMatchesYet")}</p>
+            </motion.div>
+          ) : (
+            <ul className="m-0 flex list-none flex-col gap-3 p-0">
+              {matches.map((m, i) => (
+                <motion.li
+                  key={m.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(i * 0.04, 0.24), type: "spring", stiffness: 380, damping: 28 }}
+                >
+                  <MatchHistoryCard
+                    match={m}
+                    previousMatch={getChronologicalPreviousMatch(matchesChronologicalAsc, m)}
+                    formatPlayed={formatPlayed}
+                    deleting={deletingId === m.id}
+                    onDelete={() => handleDelete(m.id)}
+                    t={t}
+                  />
+                </motion.li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 });

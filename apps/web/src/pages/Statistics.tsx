@@ -199,7 +199,7 @@ function SpendFinanceLogRow({ log, t, onNavigate }: { log: Log; t: SpendFinanceT
       <div className="flex gap-3">
         <ItemImage
           src={log.image}
-          className="h-[4.5rem] w-[3.25rem] shrink-0 rounded-lg object-cover ring-1 ring-black/20"
+          className="h-[4.5rem] w-[3.25rem] shrink-0 rounded-lg object-cover ring-1 ring-black/20 sm:h-[3.6rem] sm:w-[2.6rem]"
           mediaType={log.mediaType}
           boardGameSource={log.boardGameSource}
         />
@@ -2150,7 +2150,7 @@ export function Statistics() {
                           transition={tapTransition}
                           className={`flex min-w-0 flex-row overflow-hidden rounded-lg border bg-[var(--color-dark)] text-left text-inherit no-underline shadow-[var(--shadow-card)] transition-[opacity,border-color] hover:opacity-95 max-md:min-h-[44px] ${listBorderClass} ${status == null ? "hover:border-black" : ""}`}
                         >
-                            <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-l-lg">
+                            <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-l-lg sm:h-[5.6rem] sm:w-16">
                               <ItemImage
                                 src={log.image}
                                 className="h-full w-full"
