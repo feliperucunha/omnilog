@@ -66,6 +66,10 @@ function stripeCustomerIdString(
   return customer?.id ?? null;
 }
 
+function isStripeResourceMissing(err: unknown): boolean {
+  return err instanceof Stripe.errors.StripeError && err.code === "resource_missing";
+}
+
 /**
  * Periodic reconciliation against Stripe for every user with a
  * `stripeSubscriptionId` (regardless of current tier). Safety net for setups
@@ -92,13 +96,17 @@ export async function syncStripeSubscriptions(): Promise<{
   downgraded: number;
   reupgraded: number;
   cancellationsDetected: number;
+  clearedStale: number;
 }> {
   let refreshed = 0;
   let downgraded = 0;
   let reupgraded = 0;
   let cancellationsDetected = 0;
+  let clearedStale = 0;
   const stripe = getStripe();
-  if (!stripe) return { refreshed, downgraded, reupgraded, cancellationsDetected };
+  if (!stripe) {
+    return { refreshed, downgraded, reupgraded, cancellationsDetected, clearedStale };
+  }
 
   const users = await prisma.user.findMany({
     where: { stripeSubscriptionId: { not: null } },
@@ -194,6 +202,24 @@ export async function syncStripeSubscriptions(): Promise<{
         });
       }
     } catch (err) {
+      if (isStripeResourceMissing(err)) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            stripeSubscriptionId: null,
+            subscriptionEndsAt: null,
+            subscriptionCancelAtPeriodEnd: false,
+            subscriptionInterval: null,
+            ...(user.tier !== "admin" ? { tier: "free" as const } : {}),
+          },
+        });
+        if (user.tier === "pro") downgraded++;
+        clearedStale++;
+        console.warn(
+          `[syncStripeSubscriptions] Cleared missing Stripe subscription ${subscriptionId} for user ${user.id}`
+        );
+        continue;
+      }
       console.error(
         `[syncStripeSubscriptions] Failed to sync ${subscriptionId} for user ${user.id}:`,
         err
@@ -201,7 +227,7 @@ export async function syncStripeSubscriptions(): Promise<{
     }
   }
 
-  return { refreshed, downgraded, reupgraded, cancellationsDetected };
+  return { refreshed, downgraded, reupgraded, cancellationsDetected, clearedStale };
 }
 
 export const stripeRouter = Router();
@@ -284,9 +310,7 @@ stripeRouter.post(
           },
         });
       } catch (err) {
-        const code =
-          err instanceof Stripe.errors.StripeError ? err.code ?? err.type : undefined;
-        if (code === "resource_missing") {
+        if (isStripeResourceMissing(err)) {
           await prisma.user.update({
             where: { id: userId },
             data: {

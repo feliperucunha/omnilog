@@ -196,11 +196,17 @@ app.listen(PORT, () => {
       console.error("[billing-sync] Google Play sync failed:", err);
     }
     try {
-      const { refreshed, downgraded, reupgraded, cancellationsDetected } =
+      const { refreshed, downgraded, reupgraded, cancellationsDetected, clearedStale } =
         await syncStripeSubscriptions();
-      if (refreshed > 0 || downgraded > 0 || reupgraded > 0 || cancellationsDetected > 0) {
+      if (
+        refreshed > 0 ||
+        downgraded > 0 ||
+        reupgraded > 0 ||
+        cancellationsDetected > 0 ||
+        clearedStale > 0
+      ) {
         console.log(
-          `Stripe subscription sync: ${refreshed} refreshed, ${downgraded} downgraded, ${reupgraded} re-upgraded, ${cancellationsDetected} cancellation(s) detected`
+          `Stripe subscription sync: ${refreshed} refreshed, ${downgraded} downgraded, ${reupgraded} re-upgraded, ${cancellationsDetected} cancellation(s) detected, ${clearedStale} stale id(s) cleared`
         );
       }
     } catch (err) {
