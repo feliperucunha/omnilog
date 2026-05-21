@@ -6,6 +6,11 @@ import {
 } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
+import { upstreamFetch } from "../lib/upstreamFetch.js";
+
+async function tmdbFetch(url: string, init?: RequestInit): Promise<Response> {
+  return upstreamFetch(url, { ...init, provider: "tmdb", retry: true });
+}
 
 const BASE = "https://api.themoviedb.org/3";
 const IMAGE_BASE = "https://image.tmdb.org/t/p/w200";
@@ -48,8 +53,8 @@ export async function getMovieById(id: string, apiKey?: string | null): Promise<
   const key = getKey(apiKey);
   if (!key) return null;
   const [res, providersRes] = await Promise.all([
-    fetch(`${BASE}/movie/${id}?api_key=${key}`),
-    fetch(`${BASE}/movie/${id}/watch/providers?api_key=${key}`),
+    tmdbFetch(`${BASE}/movie/${id}?api_key=${key}`),
+    tmdbFetch(`${BASE}/movie/${id}/watch/providers?api_key=${key}`),
   ]);
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res.ok) return null;
@@ -109,7 +114,7 @@ export async function getMovieById(id: string, apiKey?: string | null): Promise<
 export async function getTvById(id: string, apiKey?: string | null): Promise<ItemDetail | null> {
   const key = getKey(apiKey);
   if (!key) return null;
-  const res = await fetch(`${BASE}/tv/${id}?api_key=${key}`);
+  const res = await tmdbFetch(`${BASE}/tv/${id}?api_key=${key}`);
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res.ok) return null;
   const data = (await res.json()) as {
@@ -168,7 +173,7 @@ export async function getTvSeasonEpisodeNumbers(
 ): Promise<number[]> {
   const key = getKey(apiKey);
   if (!key) return [];
-  const res = await fetch(
+  const res = await tmdbFetch(
     `${BASE}/tv/${seriesId}/season/${seasonNumber}?api_key=${key}`
   );
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
@@ -208,13 +213,13 @@ async function fetchMergedTmdbSearchRows<T extends { id: number }>(
   endpoint: "movie" | "tv"
 ): Promise<T[]> {
   const qEnc = encodeURIComponent(q);
-  const res1 = await fetch(`${BASE}/search/${endpoint}?api_key=${key}&query=${qEnc}&page=1`);
+  const res1 = await tmdbFetch(`${BASE}/search/${endpoint}?api_key=${key}&query=${qEnc}&page=1`);
   if (res1.status === 401 || res1.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res1.ok) return [];
   const data1 = (await res1.json()) as { results?: T[] };
   const page1 = data1.results ?? [];
 
-  const res2 = await fetch(`${BASE}/search/${endpoint}?api_key=${key}&query=${qEnc}&page=2`);
+  const res2 = await tmdbFetch(`${BASE}/search/${endpoint}?api_key=${key}&query=${qEnc}&page=2`);
   let page2: T[] = [];
   if (res2.ok) {
     const data2 = (await res2.json()) as { results?: T[] };
@@ -330,7 +335,7 @@ export async function getMovieRecommendationsMerged(
   const out: SearchResult[] = [];
   const paths = [`movie/${movieId}/recommendations`, `movie/${movieId}/similar`] as const;
   for (const path of paths) {
-    const res = await fetch(`${BASE}/${path}?api_key=${key}&language=en-US`);
+    const res = await tmdbFetch(`${BASE}/${path}?api_key=${key}&language=en-US`);
     if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
     if (!res.ok) continue;
     const data = (await res.json()) as {
@@ -364,7 +369,7 @@ export async function getTvRecommendationsMerged(
   const out: SearchResult[] = [];
   const paths = [`tv/${tvId}/recommendations`, `tv/${tvId}/similar`] as const;
   for (const path of paths) {
-    const res = await fetch(`${BASE}/${path}?api_key=${key}&language=en-US`);
+    const res = await tmdbFetch(`${BASE}/${path}?api_key=${key}&language=en-US`);
     if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
     if (!res.ok) continue;
     const data = (await res.json()) as {
@@ -394,7 +399,7 @@ const TMDB_DISCOVER_MIN_VOTES_TV = 80;
 export async function getPopularMovies(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
   const key = getKey(apiKey);
   if (!key) return [];
-  const res = await fetch(
+  const res = await tmdbFetch(
     `${BASE}/discover/movie?api_key=${key}&sort_by=vote_average.desc&vote_count.gte=${TMDB_DISCOVER_MIN_VOTES_MOVIE}&language=en-US&page=1`
   );
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
@@ -414,7 +419,7 @@ export async function getPopularMovies(apiKey?: string | null, max = 12): Promis
 export async function getPopularTv(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
   const key = getKey(apiKey);
   if (!key) return [];
-  const res = await fetch(
+  const res = await tmdbFetch(
     `${BASE}/discover/tv?api_key=${key}&sort_by=vote_average.desc&vote_count.gte=${TMDB_DISCOVER_MIN_VOTES_TV}&language=en-US&page=1`
   );
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");

@@ -34,6 +34,8 @@ import { fetchBoardGameRecommendationsMerged } from "../services/boardGameRecomm
 import { fetchBookRecommendationsMerged } from "../services/bookRecommendations.js";
 import { fetchMangaRecommendationsMerged } from "../services/mangaRecommendations.js";
 import { sortRecommendationsByScoreDesc } from "../lib/recommendationsSort.js";
+import { createRouteTimer } from "../lib/routeTiming.js";
+import { normalizeSearchQueryKey, withSearchResultsCache } from "../lib/responseCache.js";
 
 export const searchRouter = Router();
 
@@ -542,6 +544,13 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
     return Object.keys(freeSearchFields).length > 0 ? { ...out, ...freeSearchFields } : out;
   };
 
+  const timer = createRouteTimer();
+  const searchQueryKey = normalizeSearchQueryKey(
+    q,
+    sort,
+    type === "boardgames" ? boardProvider : undefined
+  );
+
   try {
     switch (type as MediaType) {
       case "movies": {
@@ -550,6 +559,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           const key = getFreeSearchKey(req, type, boardProvider);
           const { used } = getFreeSearchUsage(key, clientUsed);
           if (used >= FREE_SEARCH_LIMIT_PER_CATEGORY) {
+            timer.finish(res);
             return res.json(
               addPromptIfUserHasNoKey(
                 { results: [] },
@@ -563,9 +573,16 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           }
           incrementFreeSearch(key, clientUsed);
         }
-        const out = await searchMovies(q, keys?.tmdbApiKey, { link: tmdbMeta.link, tutorial: tmdbMeta.tutorial }, sort);
+        timer.setProvider("tmdb");
+        const { data: out, cacheHit } = await timer.trackExternal(() =>
+          withSearchResultsCache(prisma, type, searchQueryKey, () =>
+            searchMovies(q, keys?.tmdbApiKey, { link: tmdbMeta.link, tutorial: tmdbMeta.tutorial }, sort)
+          )
+        );
+        timer.setCacheHit(cacheHit);
         const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
         const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
+        timer.finish(res, { provider: "tmdb" });
         return res.json(
           addPromptIfUserHasNoKey(
             out,
@@ -596,9 +613,14 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           }
           incrementFreeSearch(key, clientUsed);
         }
-        const out = await searchTv(q, keys?.tmdbApiKey, { link: tmdbMeta.link, tutorial: tmdbMeta.tutorial }, sort);
+        timer.setProvider("tmdb");
+        const { data: out, cacheHit } = await withSearchResultsCache(prisma, type, searchQueryKey, () =>
+          searchTv(q, keys?.tmdbApiKey, { link: tmdbMeta.link, tutorial: tmdbMeta.tutorial }, sort)
+        );
+        timer.setCacheHit(cacheHit);
         const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
         const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
+        timer.finish(res, { provider: "tmdb" });
         return res.json(
           addPromptIfUserHasNoKey(
             out,
@@ -633,14 +655,19 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           incrementFreeSearch(key, clientUsed);
         }
         if (boardProvider === "ludopedia") {
-          const out = await searchBoardGamesLudopedia(
-            q,
-            keys?.ludopediaApiToken,
-            { link: ludopediaMeta.link, tutorial: ludopediaMeta.tutorial },
-            sort
+          timer.setProvider("ludopedia");
+          const { data: out, cacheHit } = await withSearchResultsCache(prisma, type, searchQueryKey, () =>
+            searchBoardGamesLudopedia(
+              q,
+              keys?.ludopediaApiToken,
+              { link: ludopediaMeta.link, tutorial: ludopediaMeta.tutorial },
+              sort
+            )
           );
+          timer.setCacheHit(cacheHit);
           const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
           const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
+          timer.finish(res, { provider: "ludopedia" });
           return res.json(
             addPromptIfUserHasNoKey(
               out,
@@ -652,9 +679,14 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
             )
           );
         }
-        const out = await searchBoardGames(q, keys?.bggApiToken, { link: bggMeta.link, tutorial: bggMeta.tutorial }, sort);
+        timer.setProvider("bgg");
+        const { data: out, cacheHit } = await withSearchResultsCache(prisma, type, searchQueryKey, () =>
+          searchBoardGames(q, keys?.bggApiToken, { link: bggMeta.link, tutorial: bggMeta.tutorial }, sort)
+        );
+        timer.setCacheHit(cacheHit);
         const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
         const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
+        timer.finish(res, { provider: "bgg" });
         return res.json(
           addPromptIfUserHasNoKey(
             out,
@@ -685,9 +717,14 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           }
           incrementFreeSearch(key, clientUsed);
         }
-        const out = await searchGames(q, keys?.rawgApiKey, { link: rawgMeta.link, tutorial: rawgMeta.tutorial }, sort);
+        timer.setProvider("rawg");
+        const { data: out, cacheHit } = await withSearchResultsCache(prisma, type, searchQueryKey, () =>
+          searchGames(q, keys?.rawgApiKey, { link: rawgMeta.link, tutorial: rawgMeta.tutorial }, sort)
+        );
+        timer.setCacheHit(cacheHit);
         const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
         const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
+        timer.finish(res, { provider: "rawg" });
         return res.json(
           addPromptIfUserHasNoKey(
             out,
@@ -700,16 +737,31 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         );
       }
       case "books": {
-        const results = await searchBooks(q, sort);
-        return res.json({ results });
+        timer.setProvider("openlibrary");
+        const { data: cached, cacheHit } = await withSearchResultsCache(prisma, type, searchQueryKey, async () => ({
+          results: await searchBooks(q, sort),
+        }));
+        timer.setCacheHit(cacheHit);
+        timer.finish(res, { provider: "openlibrary" });
+        return res.json(cached);
       }
       case "anime": {
-        const results = await searchAnime(q, sort);
-        return res.json({ results });
+        timer.setProvider("jikan");
+        const { data: cached, cacheHit } = await withSearchResultsCache(prisma, type, searchQueryKey, async () => ({
+          results: await searchAnime(q, sort),
+        }));
+        timer.setCacheHit(cacheHit);
+        timer.finish(res, { provider: "jikan" });
+        return res.json(cached);
       }
       case "manga": {
-        const results = await searchManga(q, sort);
-        return res.json({ results });
+        timer.setProvider("jikan");
+        const { data: cached, cacheHit } = await withSearchResultsCache(prisma, type, searchQueryKey, async () => ({
+          results: await searchManga(q, sort),
+        }));
+        timer.setCacheHit(cacheHit);
+        timer.finish(res, { provider: "jikan" });
+        return res.json(cached);
       }
       case "comics": {
         const comicvineKey = keys?.comicVineApiKey ?? process.env.COMIC_VINE_API_KEY ?? null;
@@ -731,9 +783,14 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           }
           incrementFreeSearch(key, clientUsed);
         }
-        const out = await searchComics(q, keys?.comicVineApiKey, { link: comicvineMeta.link, tutorial: comicvineMeta.tutorial }, sort);
+        timer.setProvider("comicvine");
+        const { data: out, cacheHit } = await withSearchResultsCache(prisma, type, searchQueryKey, () =>
+          searchComics(q, keys?.comicVineApiKey, { link: comicvineMeta.link, tutorial: comicvineMeta.tutorial }, sort)
+        );
+        timer.setCacheHit(cacheHit);
         const key = !userHasKey ? getFreeSearchKey(req, type, boardProvider) : "";
         const usage = key ? getFreeSearchUsage(key, clientUsed) : null;
+        timer.finish(res, { provider: "comicvine" });
         return res.json(
           addPromptIfUserHasNoKey(
             out,

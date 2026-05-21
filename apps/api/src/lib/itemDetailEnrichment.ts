@@ -6,10 +6,10 @@ import { getGameById } from "../services/rawg.js";
 import { getBookById } from "../services/openLibrary.js";
 import { getBoardGameById } from "../services/bgg.js";
 import { getBoardGameByIdLudopedia } from "../services/ludopedia.js";
+import { runWithConcurrency } from "./concurrency.js";
 
 const STALE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 const TOMBSTONE_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_BUDGET_MS = 2500;
 const MAX_PARALLEL = 6;
 
 const ENRICHED_MEDIA_TYPES = new Set(["tv", "movies", "anime", "manga", "games", "books", "boardgames"]);
@@ -203,25 +203,14 @@ function isTombstoneRow(row: CacheRow): boolean {
   );
 }
 
-async function runWithConcurrency<T>(
-  items: T[],
-  limit: number,
-  worker: (item: T) => Promise<void>
+async function refreshStaleEnrichmentInBackground(
+  prisma: PrismaClient,
+  stale: EnrichmentInput[],
+  apiKey: string | null
 ): Promise<void> {
-  let i = 0;
-  const runners: Promise<void>[] = [];
-  for (let k = 0; k < Math.min(limit, items.length); k++) {
-    runners.push(
-      (async () => {
-        while (true) {
-          const idx = i++;
-          if (idx >= items.length) return;
-          await worker(items[idx]!);
-        }
-      })()
-    );
-  }
-  await Promise.all(runners);
+  await runWithConcurrency(stale, MAX_PARALLEL, async (p) => {
+    await fetchAndUpsertOne(prisma, p, apiKey);
+  });
 }
 
 type SerializedLogLike = {
@@ -242,7 +231,7 @@ export type WithItemEnrichment<T extends SerializedLogLike> = T & {
 export async function attachItemEnrichment<T extends SerializedLogLike>(
   prisma: PrismaClient,
   logs: T[],
-  opts?: { apiKey?: string | null; budgetMs?: number }
+  opts?: { apiKey?: string | null }
 ): Promise<WithItemEnrichment<T>[]> {
   const enrichable = logs.filter((l) => ENRICHED_MEDIA_TYPES.has(l.mediaType));
   if (enrichable.length === 0) return logs as WithItemEnrichment<T>[];
@@ -280,7 +269,7 @@ export async function attachItemEnrichment<T extends SerializedLogLike>(
 export async function attachItemEnrichmentSingle<T extends SerializedLogLike>(
   prisma: PrismaClient,
   log: T,
-  opts?: { apiKey?: string | null; budgetMs?: number }
+  opts?: { apiKey?: string | null }
 ): Promise<WithItemEnrichment<T>> {
   const [enriched] = await attachItemEnrichment(prisma, [log], opts);
   return enriched!;
@@ -289,7 +278,7 @@ export async function attachItemEnrichmentSingle<T extends SerializedLogLike>(
 export async function getItemEnrichmentMap(
   prisma: PrismaClient,
   pairs: EnrichmentInput[],
-  opts?: { apiKey?: string | null; budgetMs?: number }
+  opts?: { apiKey?: string | null }
 ): Promise<Map<string, ItemEnrichment>> {
   const out = new Map<string, ItemEnrichment>();
   const seen = new Set<string>();
@@ -321,29 +310,11 @@ export async function getItemEnrichmentMap(
     if (ageMs > ttl) stale.push(p);
   }
 
-  if (stale.length === 0) return out;
-
-  const apiKey = opts?.apiKey ?? null;
-  const budgetMs = opts?.budgetMs ?? DEFAULT_BUDGET_MS;
-  const work = runWithConcurrency(stale, MAX_PARALLEL, async (p) => {
-    const enriched = await fetchAndUpsertOne(prisma, p, apiKey);
-    if (enriched != null) out.set(cacheKey(p.mediaType, p.externalId), enriched);
-  });
-
-  let timedOut = false;
-  await new Promise<void>((resolve) => {
-    const timer = setTimeout(() => {
-      timedOut = true;
-      resolve();
-    }, budgetMs);
-    work.finally(() => {
-      clearTimeout(timer);
-      resolve();
+  if (stale.length > 0) {
+    const apiKey = opts?.apiKey ?? null;
+    void refreshStaleEnrichmentInBackground(prisma, stale, apiKey).catch((err) => {
+      console.error("item enrichment background refresh failed:", err);
     });
-  });
-
-  if (timedOut) {
-    work.catch(() => {});
   }
 
   return out;

@@ -6,6 +6,11 @@ import {
 } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { searchAnimeAnilist } from "./anilist.js";
+import { upstreamFetch } from "../lib/upstreamFetch.js";
+
+async function jikanFetch(url: string, init?: RequestInit): Promise<Response> {
+  return upstreamFetch(url, { ...init, provider: "jikan", retry: true });
+}
 
 /** Map our sort value to Jikan order_by and sort (asc/desc). */
 function jikanOrderParams(sort: string | undefined): { order_by?: string; sort?: string } {
@@ -83,7 +88,7 @@ function toItemDetail(
 }
 
 export async function getAnimeById(id: string): Promise<ItemDetail | null> {
-  const res = await fetch(`${BASE}/anime/${id}`);
+  const res = await jikanFetch(`${BASE}/anime/${id}`);
   if (!res.ok) return null;
   const data = (await res.json()) as {
     data?: {
@@ -209,7 +214,7 @@ export async function searchAnime(q: string, sort?: string): Promise<SearchResul
 }
 
 export async function getMangaById(id: string): Promise<ItemDetail | null> {
-  const res = await fetch(`${BASE}/manga/${id}`);
+  const res = await jikanFetch(`${BASE}/manga/${id}`);
   if (!res.ok) return null;
   const data = (await res.json()) as {
     data?: {
@@ -292,7 +297,7 @@ export async function searchManga(q: string, sort?: string): Promise<SearchResul
 
 /** Jikan /anime/{id}/recommendations (rate-limit friendly: caller should not burst). */
 export async function getAnimeRecommendationsForId(animeId: string, maxTotal = 16): Promise<SearchResult[]> {
-  const res = await fetch(`${BASE}/anime/${animeId}/recommendations`);
+  const res = await jikanFetch(`${BASE}/anime/${animeId}/recommendations`);
   if (!res.ok) return [];
   const data = (await res.json()) as {
     data?: Array<{
@@ -322,7 +327,7 @@ export async function getAnimeRecommendationsForId(animeId: string, maxTotal = 1
 
 /** Highest MAL score first (better default than popularity when user has no logs). */
 export async function getTopMangaByScore(max = 12): Promise<SearchResult[]> {
-  const res = await fetch(`${BASE}/manga?order_by=score&sort=desc&limit=${max}`);
+  const res = await jikanFetch(`${BASE}/manga?order_by=score&sort=desc&limit=${max}`);
   if (!res.ok) return [];
   const data = (await res.json()) as {
     data?: Array<{
@@ -351,7 +356,7 @@ export const getTopMangaPopular = getTopMangaByScore;
 
 /** Highest MAL score first (better default than popularity when user has no logs). */
 export async function getTopAnimeByScore(max = 12): Promise<SearchResult[]> {
-  const res = await fetch(`${BASE}/anime?order_by=score&sort=desc&limit=${max}`);
+  const res = await jikanFetch(`${BASE}/anime?order_by=score&sort=desc&limit=${max}`);
   if (!res.ok) return [];
   const data = (await res.json()) as {
     data?: Array<{

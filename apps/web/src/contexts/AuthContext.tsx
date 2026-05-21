@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useLocation } from "react-router-dom";
 import { apiFetch, ApiError } from "@/lib/api";
+import { resetSessionLogsCacheWarm } from "@/lib/logsPageCache";
 import * as storage from "@/lib/storage";
 import { clearAuthSession } from "@/lib/storage";
 
@@ -162,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Listen for 401 from api.ts so we clear state before redirect. */
   useEffect(() => {
     const handleLogout = () => {
+      resetSessionLogsCacheWarm();
       void clearAuthSession();
       setState({ token: null, user: null, initializing: false });
     };
@@ -170,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (token: string, user: User) => {
+    resetSessionLogsCacheWarm();
     if (token !== COOKIE_SESSION) {
       await Promise.all([
         storage.setItem(TOKEN_KEY, token),
@@ -188,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore network errors; still clear local state
     }
+    resetSessionLogsCacheWarm();
     await clearAuthSession();
     setState({ token: null, user: null, initializing: false });
   }, []);

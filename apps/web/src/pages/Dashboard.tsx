@@ -11,6 +11,7 @@ import {
   getCachedEntry,
   HEAVY_PAGE_TTL_MS,
   invalidateLogsAndItemsCache,
+  requestLogsCacheWarm,
   LOGS_INVALIDATED_EVENT,
 } from "@/lib/api";
 import {
@@ -22,7 +23,6 @@ import {
   prefetchDashboardCategoryView,
   registerFollowedUserIds,
   registerLogsPageCacheContext,
-  warmDashboardAndStatisticsCaches,
   warmFriendFeedCaches,
 } from "@/lib/logsPageCache";
 import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
@@ -385,16 +385,12 @@ export function Dashboard() {
       tzOffsetMinutes,
       isPro,
     });
-    warmDashboardAndStatisticsCaches(visibleTypes, tzOffsetMinutes, isPro);
+  }, [visibleTypes, visibleTypesOrderReady, tzOffsetMinutes, isPro]);
+
+  useEffect(() => {
+    if (!visibleTypesOrderReady) return;
     prefetchDashboardCategoryView(selectedCategory, new URLSearchParams(searchParamsKey));
-  }, [
-    visibleTypes,
-    visibleTypesOrderReady,
-    tzOffsetMinutes,
-    isPro,
-    selectedCategory,
-    searchParamsKey,
-  ]);
+  }, [visibleTypesOrderReady, selectedCategory, searchParamsKey]);
 
   useEffect(() => {
     fetchFollows();
@@ -462,6 +458,7 @@ export function Dashboard() {
     fetchFeed();
     fetchFollows();
     invalidateLogsAndItemsCache();
+    requestLogsCacheWarm();
   });
 
   useEffect(() => {

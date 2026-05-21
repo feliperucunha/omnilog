@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch, ApiError, invalidateApiCache } from "@/lib/api";
+import { apiFetchSWR, ApiError, invalidateApiCache } from "@/lib/api";
 import type { ProfileVisibility } from "@geeklogs/shared";
 
 export interface MeResponse {
@@ -70,7 +70,10 @@ export function MeProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true);
     try {
-      const data = await apiFetch<MeResponse>("/me", { skipAuthRedirect: true });
+      const { data } = await apiFetchSWR<MeResponse>("/me", {
+        ttlMs: 30_000,
+        skipAuthRedirect: true,
+      });
       setMe(data);
     } catch (e) {
       setMe(null);

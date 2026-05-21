@@ -1,4 +1,7 @@
 import type { SearchResult } from "@geeklogs/shared";
+import { mapWithConcurrency } from "./concurrency.js";
+
+const SEED_FETCH_CONCURRENCY = 4;
 
 /**
  * Merge TMDB/RAWG/Jikan recommendation lists with dedupe and exclude-already-logged ids.
@@ -11,11 +14,13 @@ export async function collectFromSeeds(
   exclude: Set<string>,
   max: number
 ): Promise<SearchResult[]> {
+  if (seeds.length === 0) return [];
   const seen = new Set<string>();
   const out: SearchResult[] = [];
-  for (const seed of seeds) {
-    if (out.length >= max) break;
-    const batch = await fetchOne(seed);
+
+  const batches = await mapWithConcurrency(seeds, SEED_FETCH_CONCURRENCY, (seed) => fetchOne(seed));
+
+  for (const batch of batches) {
     for (const row of batch) {
       if (exclude.has(row.id) || seen.has(row.id)) continue;
       seen.add(row.id);

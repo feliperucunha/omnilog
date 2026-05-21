@@ -339,3 +339,21 @@ model ItemDetailCache {
   @@id([mediaType, externalId])
 }
 
+model SearchResponseCache {
+  mediaType String
+  queryKey  String
+  payload   Json
+  fetchedAt DateTime @default(now()) @updatedAt
+
+  @@id([mediaType, queryKey])
+}
+
+model ItemPayloadCache {
+  mediaType  String
+  externalId String
+  payload    Json
+  fetchedAt  DateTime @default(now()) @updatedAt
+
+  @@id([mediaType, externalId])
+}
+

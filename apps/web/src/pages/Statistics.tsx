@@ -23,12 +23,12 @@ import {
   HEAVY_PAGE_TTL_MS,
   apiFetchSWR,
   invalidateLogsAndItemsCache,
+  requestLogsCacheWarm,
 } from "@/lib/api";
 import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import {
   loadWithSWR,
   registerLogsPageCacheContext,
-  warmStatisticsCaches,
 } from "@/lib/logsPageCache";
 import {
   StatisticsSummarySkeleton,
@@ -773,7 +773,6 @@ export function Statistics() {
       tzOffsetMinutes,
       isPro,
     });
-    warmStatisticsCaches(visibleTypes, tzOffsetMinutes, isPro);
   }, [visibleTypes, visibleTypesOrderReady, tzOffsetMinutes, isPro]);
 
   useEffect(() => {
@@ -1055,6 +1054,7 @@ export function Statistics() {
 
   const refreshAll = useCallback(() => {
     invalidateLogsAndItemsCache();
+    requestLogsCacheWarm();
     void fetchStats();
     void fetchGenreStats();
     void fetchGamePlatformStats();

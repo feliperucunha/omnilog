@@ -289,6 +289,12 @@ export function invalidateLogsAndItemsCache(): void {
   markStaleByPrefix("/me");
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(LOGS_INVALIDATED_EVENT));
+  }
+}
+
+/** Explicit dashboard/statistics cache warm (initial load, pull-to-refresh). */
+export function requestLogsCacheWarm(): void {
+  if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(LOGS_CACHE_WARM_EVENT));
   }
 }
@@ -636,6 +642,8 @@ async function revalidateGet<T>(
 
 export type ApiFetchSWROptions = ApiFetchOptions & {
   ttlMs?: number;
+  /** When true, revalidate even if the cached entry is still within TTL. */
+  revalidate?: boolean;
   /** Called when a background revalidation returns (only if JSON changed). */
   onUpdate?: (data: unknown) => void;
   onRefreshing?: (refreshing: boolean) => void;
@@ -656,7 +664,7 @@ export async function apiFetchSWR<T>(
   }
 
   const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
-  const { ttlMs: _ttl, onUpdate, onRefreshing, ...fetchOpts } = options ?? {};
+  const { ttlMs: _ttl, revalidate, onUpdate, onRefreshing, ...fetchOpts } = options ?? {};
   const entry = getCachedEntry<T>("GET", path);
 
   if (!entry) {
@@ -667,6 +675,10 @@ export async function apiFetchSWR<T>(
     } finally {
       onRefreshing?.(false);
     }
+  }
+
+  if (!entry.isStale && !revalidate) {
+    return { data: entry.data, fromCache: true };
   }
 
   const runBackground = async () => {

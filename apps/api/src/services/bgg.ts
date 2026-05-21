@@ -2,6 +2,11 @@ import { XMLParser } from "fast-xml-parser";
 import { decodeHtmlEntities, type SearchResult, type ItemDetail, SEARCH_RESULTS_PAGE_SIZE } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
+import { upstreamFetch } from "../lib/upstreamFetch.js";
+
+async function bggFetch(url: string, init?: RequestInit): Promise<Response> {
+  return upstreamFetch(url, { ...init, provider: "bgg", retry: true });
+}
 
 const BASE = "https://boardgamegeek.com/xmlapi2";
 
@@ -204,7 +209,7 @@ export async function getBoardGamesByIdsForImport(ids: string[], apiToken?: stri
   const parser = new XMLParser({ ignoreAttributes: false });
   for (let offset = 0; offset < ids.length; offset += BGG_THING_ID_BATCH_MAX) {
     const chunk = ids.slice(offset, offset + BGG_THING_ID_BATCH_MAX);
-    const res = await fetch(`${BASE}/thing?id=${chunk.map((id) => encodeURIComponent(id)).join(",")}&stats=1`, {
+    const res = await bggFetch(`${BASE}/thing?id=${chunk.map((id) => encodeURIComponent(id)).join(",")}&stats=1`, {
       headers: bggHeaders(token),
     });
     if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("bgg");
@@ -233,7 +238,7 @@ export async function getBoardGamesByIdsForImport(ids: string[], apiToken?: stri
 export async function getBoardGameById(id: string, apiToken?: string | null): Promise<ItemDetail | null> {
   const token = apiToken ?? process.env.BGG_API_TOKEN;
   if (!token) return null;
-  const res = await fetch(`${BASE}/thing?id=${encodeURIComponent(id)}&stats=1`, { headers: bggHeaders(token) });
+  const res = await bggFetch(`${BASE}/thing?id=${encodeURIComponent(id)}&stats=1`, { headers: bggHeaders(token) });
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("bgg");
   if (!res.ok) return null;
   const xml = await res.text();
@@ -264,7 +269,7 @@ export async function searchBoardGames(
       ? { results: [], requiresApiKey: "bgg", link: meta.link, tutorial: meta.tutorial }
       : { results: [] };
   }
-  const res = await fetch(
+  const res = await bggFetch(
     `${BASE}/search?query=${encodeURIComponent(q)}&type=boardgame`,
     { headers: bggHeaders(token) }
   );
@@ -292,7 +297,7 @@ export async function searchBoardGames(
   const thingById = new Map<string, ThingRow>();
   for (let offset = 0; offset < idsOrdered.length; offset += BGG_THING_ID_BATCH_MAX) {
     const chunk = idsOrdered.slice(offset, offset + BGG_THING_ID_BATCH_MAX);
-    const thingRes = await fetch(`${BASE}/thing?id=${chunk.join(",")}&stats=1`, { headers: bggHeaders(token) });
+    const thingRes = await bggFetch(`${BASE}/thing?id=${chunk.join(",")}&stats=1`, { headers: bggHeaders(token) });
     if (thingRes.status === 401 || thingRes.status === 403) throw new InvalidApiKeyError("bgg");
     if (!thingRes.ok) return { results: [] };
     const thingXml = await thingRes.text();

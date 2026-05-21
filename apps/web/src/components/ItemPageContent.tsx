@@ -19,7 +19,8 @@ import {
 } from "@geeklogs/shared";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { apiFetch, apiFetchCached, invalidateApiCache, invalidateLogsAndItemsCache } from "@/lib/api";
+import { apiFetch, invalidateApiCache, invalidateLogsAndItemsCache } from "@/lib/api";
+import { loadWithSWR } from "@/lib/logsPageCache";
 import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import { decodeItemPageDataForDisplay, decodeItemReviewForDisplay } from "@/lib/decodeDisplayFields";
 import { useAuth } from "@/contexts/AuthContext";
@@ -484,33 +485,33 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
 
   const fetchItem = useCallback(() => {
     setError(null);
-    setLoading(true);
     const params = new URLSearchParams({
       reviewsPage: "1",
       reviewsLimit: "0",
     });
-    apiFetchCached<ItemPageData>(
-      `/items/${mediaType}/${id}?${params.toString()}`,
-      { ttlMs: 5 * 60 * 1000 }
-    )
-      .then((d) => setData(decodeItemPageDataForDisplay(d)))
-      .catch((err) => setError(err instanceof Error ? err.message : t("dashboard.couldntLoadLogs")))
-      .finally(() => setLoading(false));
+    const path = `/items/${mediaType}/${id}?${params.toString()}`;
+    void loadWithSWR<ItemPageData>(
+      path,
+      (d) => setData(decodeItemPageDataForDisplay(d)),
+      {
+        setLoading,
+        showLoadingOnMiss: true,
+        onError: () => setError(t("dashboard.couldntLoadLogs")),
+      }
+    );
   }, [mediaType, id, t]);
 
   const fetchReviews = useCallback(
     (page: number, sort: ReviewSortKey) => {
-      setReviewsLoading(true);
       const params = new URLSearchParams({
         page: String(page),
         limit: String(REVIEWS_PAGE_SIZE),
         sort,
       });
-      apiFetchCached<ReviewsResponse>(
-        `/items/${mediaType}/${id}/reviews?${params.toString()}`,
-        { ttlMs: 2 * 60 * 1000 }
-      )
-        .then((res) => {
+      const reviewsPath = `/items/${mediaType}/${id}/reviews?${params.toString()}`;
+      void loadWithSWR<ReviewsResponse>(
+        reviewsPath,
+        (res) => {
           setData((prev) =>
             prev
               ? {
@@ -523,9 +524,9 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                 }
               : prev
           );
-        })
-        .catch(() => {})
-        .finally(() => setReviewsLoading(false));
+        },
+        { setLoading: setReviewsLoading, showLoadingOnMiss: false }
+      );
     },
     [mediaType, id]
   );

@@ -24,9 +24,16 @@ let registeredFollowedUserIds: string[] = [];
 let registeredTzOffset = -new Date().getTimezoneOffset();
 let registeredIsPro = false;
 let warmListenerInstalled = false;
+let sessionDashboardLogsWarmed = false;
+let sessionStatisticsWarmed = false;
 
 export function registerFollowedUserIds(userIds: string[]): void {
   registeredFollowedUserIds = userIds;
+}
+
+export function resetSessionLogsCacheWarm(): void {
+  sessionDashboardLogsWarmed = false;
+  sessionStatisticsWarmed = false;
 }
 
 export function registerLogsPageCacheContext(options: {
@@ -152,8 +159,8 @@ export function buildFeedPath(userId?: string): string {
   return userId ? `/logs/feed?userId=${encodeURIComponent(userId)}` : "/logs/feed";
 }
 
-function prefetchGet(path: string): void {
-  void apiFetchSWR(path, { ttlMs: HEAVY_PAGE_TTL_MS });
+function prefetchGet(path: string, options?: { revalidate?: boolean }): void {
+  void apiFetchSWR(path, { ttlMs: HEAVY_PAGE_TTL_MS, revalidate: options?.revalidate });
 }
 
 export function warmFriendFeedCaches(userIds: string[]): void {
@@ -170,67 +177,90 @@ export function prefetchDashboardCategoryView(
   prefetchGet(buildStatusCountsPath(mediaType));
 }
 
-function warmStatisticsForFilter(filter: MediaType | "all", tz: number, isPro: boolean): void {
-  const mq = mediaQuery(filter);
-  prefetchGet(`/logs/stats?group=summary&timezoneOffsetMinutes=${tz}${mq}`);
-  prefetchGet(`/logs/stats?group=category&timezoneOffsetMinutes=${tz}${mq}`);
-  prefetchGet(`/logs/stats?group=genre&timezoneOffsetMinutes=${tz}${mq}`);
-  if (isPro) {
-    prefetchGet(`/logs?limit=5&sort=dateDesc${mq}`);
-  } else {
-    prefetchGet(
-      `/logs?limit=5&sort=dateDesc&forStatistics=1&timezoneOffsetMinutes=${tz}${mq}`
-    );
-  }
-  if (filter === "games" || filter === "all") {
-    prefetchGet(`/logs/stats?group=gamePlatforms&timezoneOffsetMinutes=${tz}${mq}`);
-  }
-  if (filter === "all" || (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(filter)) {
-    prefetchGet(
-      `/logs/stats?group=purchaseSpending&period=month&timezoneOffsetMinutes=${tz}${mq}`
-    );
-  }
-  if (isPro) {
-    prefetchGet(`/logs/stats?group=completedByMonth&timezoneOffsetMinutes=${tz}${mq}`);
-    prefetchGet(`/logs/stats?group=categoryByMonth&timezoneOffsetMinutes=${tz}${mq}`);
-  }
-}
-
 export function warmDashboardLogsCaches(
   mediaTypes: MediaType[] = registeredMediaTypes,
-  followedUserIds?: string[]
+  followedUserIds?: string[],
+  options?: { force?: boolean; revalidate?: boolean }
 ): void {
-  prefetchGet("/logs/counts");
-  prefetchGet(FOLLOWS_PATH);
-  prefetchGet(MILESTONES_PATH);
-  prefetchGet(buildFeedPath());
+  if (sessionDashboardLogsWarmed && !options?.force) return;
+  if (!options?.force) sessionDashboardLogsWarmed = true;
+  const prefetchOpts = options?.revalidate ? { revalidate: true as const } : undefined;
+  prefetchGet("/logs/counts", prefetchOpts);
+  prefetchGet(FOLLOWS_PATH, prefetchOpts);
+  prefetchGet(MILESTONES_PATH, prefetchOpts);
+  prefetchGet(buildFeedPath(), prefetchOpts);
   if (followedUserIds?.length) warmFriendFeedCaches(followedUserIds);
 
   for (const mt of mediaTypes) {
-    prefetchGet(buildDefaultLogsListPath(mt));
-    prefetchGet(buildStatusCountsPath(mt));
+    prefetchGet(buildDefaultLogsListPath(mt), prefetchOpts);
+    prefetchGet(buildStatusCountsPath(mt), prefetchOpts);
   }
 }
 
 export function warmStatisticsCaches(
   mediaTypes: MediaType[] = registeredMediaTypes,
   tzOffsetMinutes: number = registeredTzOffset,
-  isPro: boolean = registeredIsPro
+  isPro: boolean = registeredIsPro,
+  options?: { force?: boolean; revalidate?: boolean }
 ): void {
-  warmStatisticsForFilter("all", tzOffsetMinutes, isPro);
+  if (sessionStatisticsWarmed && !options?.force) return;
+  if (!options?.force) sessionStatisticsWarmed = true;
+  const prefetchOpts = options?.revalidate ? { revalidate: true as const } : undefined;
+  warmStatisticsForFilter("all", tzOffsetMinutes, isPro, prefetchOpts);
   for (const mt of mediaTypes) {
-    warmStatisticsForFilter(mt, tzOffsetMinutes, isPro);
+    warmStatisticsForFilter(mt, tzOffsetMinutes, isPro, prefetchOpts);
   }
 }
+
+function warmStatisticsForFilter(
+  filter: MediaType | "all",
+  tz: number,
+  isPro: boolean,
+  prefetchOpts?: { revalidate?: boolean }
+): void {
+  const mq = mediaQuery(filter);
+  prefetchGet(`/logs/stats?group=summary&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
+  prefetchGet(`/logs/stats?group=category&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
+  prefetchGet(`/logs/stats?group=genre&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
+  if (isPro) {
+    prefetchGet(`/logs?limit=5&sort=dateDesc${mq}`, prefetchOpts);
+  } else {
+    prefetchGet(
+      `/logs?limit=5&sort=dateDesc&forStatistics=1&timezoneOffsetMinutes=${tz}${mq}`,
+      prefetchOpts
+    );
+  }
+  if (filter === "games" || filter === "all") {
+    prefetchGet(`/logs/stats?group=gamePlatforms&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
+  }
+  if (filter === "all" || (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(filter)) {
+    prefetchGet(
+      `/logs/stats?group=purchaseSpending&period=month&timezoneOffsetMinutes=${tz}${mq}`,
+      prefetchOpts
+    );
+  }
+  if (isPro) {
+    prefetchGet(`/logs/stats?group=completedByMonth&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
+    prefetchGet(`/logs/stats?group=categoryByMonth&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
+  }
+}
+
+let warmDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+const WARM_DEBOUNCE_MS = 400;
 
 export function warmDashboardAndStatisticsCaches(
   mediaTypes: MediaType[] = registeredMediaTypes,
   tzOffsetMinutes: number = registeredTzOffset,
   isPro: boolean = registeredIsPro,
-  followedUserIds?: string[]
+  followedUserIds?: string[],
+  options?: { force?: boolean; revalidate?: boolean }
 ): void {
-  warmDashboardLogsCaches(mediaTypes, followedUserIds);
-  warmStatisticsCaches(mediaTypes, tzOffsetMinutes, isPro);
+  if (warmDebounceTimer != null) clearTimeout(warmDebounceTimer);
+  warmDebounceTimer = setTimeout(() => {
+    warmDebounceTimer = null;
+    warmDashboardLogsCaches(mediaTypes, followedUserIds, options);
+    warmStatisticsCaches(mediaTypes, tzOffsetMinutes, isPro, options);
+  }, WARM_DEBOUNCE_MS);
 }
 
 export async function loadWithSWR<T>(
@@ -273,7 +303,8 @@ export function installLogsPageCacheListeners(): void {
       registeredMediaTypes,
       registeredTzOffset,
       registeredIsPro,
-      registeredFollowedUserIds
+      registeredFollowedUserIds,
+      { force: true, revalidate: true }
     );
   };
 

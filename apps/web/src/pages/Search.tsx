@@ -14,7 +14,15 @@ import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
-import { apiFetch, apiFetchCached, invalidateApiCache, LOGS_INVALIDATED_EVENT } from "@/lib/api";
+import {
+  apiFetch,
+  apiFetchCached,
+  apiFetchSWR,
+  HEAVY_PAGE_TTL_MS,
+  invalidateApiCache,
+  LOGS_INVALIDATED_EVENT,
+} from "@/lib/api";
+import { buildDefaultLogsListPath } from "@/lib/logsPageCache";
 import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import { SearchSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
@@ -330,7 +338,9 @@ export function Search() {
         const params = new URLSearchParams({ type: searchType, q: q.trim() });
         if (sort && sort !== "relevance") params.set("sort", sort);
         if (searchType === "boardgames" && boardProvider) params.set("boardGameProvider", boardProvider);
-        const data = await apiFetch<SearchResponse>(`/search?${params.toString()}`, {
+        const searchPath = `/search?${params.toString()}`;
+        const { data } = await apiFetchSWR<SearchResponse>(searchPath, {
+          ttlMs: 10 * 60 * 1000,
           headers: { "X-Free-Search-Used": String(clientUsed) },
         });
         const list = (data.results ?? []).map(decodeSearchResultForDisplay);
@@ -423,7 +433,7 @@ export function Search() {
       setLogsByExternalId(new Map());
       return;
     }
-    apiFetchCached<Log[]>(`/logs?mediaType=${mediaType}`, { ttlMs: 2 * 60 * 1000 })
+    apiFetchCached<Log[]>(buildDefaultLogsListPath(mediaType), { ttlMs: HEAVY_PAGE_TTL_MS })
       .then((logs) => {
         const map = new Map<string, Log>();
         for (const log of logs) map.set(log.externalId, log);

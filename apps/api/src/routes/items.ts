@@ -18,6 +18,13 @@ import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
 import { tierHasProFeatures } from "../lib/userTier.js";
 import { getAllReviewerMilestonesForMediumBatch } from "../services/milestone.service.js";
 import { loadItemReviewsPaginated } from "../lib/itemReviews.js";
+import { mapWithConcurrency } from "../lib/concurrency.js";
+import {
+  getItemPayloadCached,
+  scheduleItemPayloadCacheRefresh,
+  setItemPayloadCached,
+} from "../lib/responseCache.js";
+import { createRouteTimer } from "../lib/routeTiming.js";
 
 export const itemsRouter = Router();
 itemsRouter.use(optionalAuthMiddleware);
@@ -92,10 +99,16 @@ itemsRouter.get("/:mediaType/:externalId/progress-options", async (req: Authenti
         return;
       }
       const seasons = Array.from({ length: item.seasonsCount }, (_, i) => i + 1);
-      const episodesBySeason: Record<string, number[]> = {};
-      for (const sn of seasons) {
+      const seasonEps = await mapWithConcurrency(seasons, 4, async (sn) => {
         const eps = await getTvSeasonEpisodeNumbers(externalId, sn, keys?.tmdbApiKey);
-        episodesBySeason[String(sn)] = eps.length > 0 ? eps : Array.from({ length: 24 }, (_, i) => i + 1);
+        return {
+          sn: String(sn),
+          eps: eps.length > 0 ? eps : Array.from({ length: 24 }, (_, i) => i + 1),
+        };
+      });
+      const episodesBySeason: Record<string, number[]> = {};
+      for (const { sn, eps } of seasonEps) {
+        episodesBySeason[sn] = eps;
       }
       res.json({ seasons, episodesBySeason });
       return;
@@ -226,17 +239,18 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
 
   let boardProviderUsed: "bgg" | "ludopedia" | null = null;
 
-  let item = null;
-  try {
+  const timer = createRouteTimer();
+  const cachedItem = await timer.trackDb(() => getItemPayloadCached(prisma, mediaType, externalId));
+
+  const fetchUpstreamItem = async () => {
     switch (mediaType) {
       case "movies":
-        item = await getMovieById(externalId, keys?.tmdbApiKey);
-        break;
+        return getMovieById(externalId, keys?.tmdbApiKey);
       case "tv":
-        item = await getTvById(externalId, keys?.tmdbApiKey);
-        break;
+        return getTvById(externalId, keys?.tmdbApiKey);
       case "boardgames": {
-        let boardProvider: "bgg" | "ludopedia" = keys?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
+        let boardProvider: "bgg" | "ludopedia" =
+          keys?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
         if (req.user) {
           const logWithSource = await prisma.log.findFirst({
             where: { userId: req.user.userId, mediaType: "boardgames", externalId },
@@ -246,28 +260,42 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
             boardProvider = logWithSource.boardGameSource;
         }
         boardProviderUsed = boardProvider;
-        item =
+        const bg =
           boardProvider === "ludopedia"
             ? await getBoardGameByIdLudopedia(externalId, keys?.ludopediaApiToken)
             : await getBoardGameById(externalId, keys?.bggApiToken);
-        if (item) (item as { itemSource?: "bgg" | "ludopedia" }).itemSource = boardProvider;
-        break;
+        if (bg) (bg as { itemSource?: "bgg" | "ludopedia" }).itemSource = boardProvider;
+        return bg;
       }
       case "games":
-        item = await getGameById(externalId, keys?.rawgApiKey);
-        break;
+        return getGameById(externalId, keys?.rawgApiKey);
       case "books":
-        item = await getBookById(externalId);
-        break;
+        return getBookById(externalId);
       case "anime":
-        item = await getAnimeById(externalId);
-        break;
+        return getAnimeById(externalId);
       case "manga":
-        item = await getMangaById(externalId);
-        break;
+        return getMangaById(externalId);
       case "comics":
-        item = await getVolumeById(externalId, keys?.comicVineApiKey);
-        break;
+        return getVolumeById(externalId, keys?.comicVineApiKey);
+      default:
+        return null;
+    }
+  };
+
+  let item = cachedItem && (cachedItem.fresh || cachedItem.stale) ? cachedItem.data : null;
+  if (cachedItem?.stale) {
+    timer.setCacheHit(true);
+    scheduleItemPayloadCacheRefresh(prisma, mediaType, externalId, fetchUpstreamItem);
+  } else if (cachedItem?.fresh) {
+    timer.setCacheHit(true);
+  }
+
+  try {
+    if (!item) {
+      item = await timer.trackExternal(fetchUpstreamItem);
+      if (item) {
+        void setItemPayloadCached(prisma, mediaType, externalId, item);
+      }
     }
   } catch (err) {
     if (err instanceof InvalidApiKeyError) {
@@ -319,6 +347,7 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
   const itemImage =
     item.image ?? item.thumbnail ?? (logWithImage?.image as string | null) ?? null;
 
+  timer.finish(res, { provider: mediaType });
   res.json({
     item: {
       ...item,

@@ -119,6 +119,47 @@ export function sortSlimLogsBySortParam(sl: SlimLogSortRow[], sort: string): Sli
   return [...sl].sort((a, b) => compareSlimLogsForSort(a, b, s));
 }
 
+function extractEqString(field: unknown): string | undefined {
+  if (typeof field === "string") return field;
+  return undefined;
+}
+
+async function fetchSlimLogsMatchingGenre(
+  prisma: PrismaClient,
+  where: Prisma.LogWhereInput,
+  genre: string
+): Promise<SlimLogSortRow[]> {
+  const userId = extractEqString(where.userId);
+  const mediaType = extractEqString(where.mediaType);
+  if (!userId || !mediaType) {
+    const slim = await prisma.log.findMany({
+      where,
+      select: {
+        id: true,
+        genres: true,
+        updatedAt: true,
+        matchesPlayed: true,
+        hoursToBeat: true,
+        grade: true,
+      },
+    });
+    return slim.filter((row) => logHasGenreExact(row, genre));
+  }
+
+  return prisma.$queryRaw<SlimLogSortRow[]>`
+    SELECT l.id, l.genres, l."updatedAt", l."matchesPlayed", l."hoursToBeat", l.grade
+    FROM "Log" l
+    WHERE l."userId" = ${userId}
+      AND l."mediaType" = ${mediaType}
+      AND l.genres IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements_text(l.genres::jsonb) AS elem(val)
+        WHERE trim(elem.val) = ${genre}
+      )
+  `;
+}
+
 export async function fetchLogsWithGenreFilter(
   prisma: PrismaClient,
   opts: {
@@ -131,18 +172,7 @@ export async function fetchLogsWithGenreFilter(
   }
 ): Promise<{ data: ReturnType<typeof serializeLog>[]; nextCursor: string | null } | ReturnType<typeof serializeLog>[]> {
   const { where, sort, genre, takeSize, cursorId, usePagination } = opts;
-  const slim = await prisma.log.findMany({
-    where,
-    select: {
-      id: true,
-      genres: true,
-      updatedAt: true,
-      matchesPlayed: true,
-      hoursToBeat: true,
-      grade: true,
-    },
-  });
-  const matched = slim.filter((row) => logHasGenreExact(row, genre));
+  const matched = await fetchSlimLogsMatchingGenre(prisma, where, genre);
   const sorted = sortSlimLogsBySortParam(matched, sort);
 
   const mapOrderedFull = async (pageSlim: SlimLogSortRow[]): Promise<PrismaLog[]> => {

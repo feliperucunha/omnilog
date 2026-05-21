@@ -83,7 +83,8 @@ export async function fetchGradedReviewsForItem(
   externalId: string,
   logs: LogWithUser[],
   reactionMap: Map<string, { likesCount: number; dislikesCount: number; userReaction: "like" | "dislike" | null }>,
-  reviewerBadgesMap: Map<string, { badges: { label: string; icon: string; level: number }[]; count: number }>
+  reviewerBadgesMap: Map<string, { badges: { label: string; icon: string; level: number }[]; count: number }>,
+  userIds?: string[]
 ) {
   const fromLogs = logs.filter((l) => hasReviewContent(l.grade, l.review)).map((l) => {
     const stats = reactionMap.get(l.id);
@@ -104,7 +105,11 @@ export async function fetchGradedReviewsForItem(
 
   const scopedRows = await prisma.scopedReview.findMany({
     where: {
-      log: { mediaType, externalId },
+      log: {
+        mediaType,
+        externalId,
+        ...(userIds?.length ? { userId: { in: userIds } } : {}),
+      },
       ...gradedLogOrReviewWhere,
     },
     include: {
@@ -161,48 +166,100 @@ export async function fetchGradedReviewsForItem(
 
 type ItemReviewRow = ReturnType<typeof logRowToItemReview>;
 
-function sortReviewGroupsByPrimary(
-  groups: { userId: string; reviews: ItemReviewRow[]; primary: ItemReviewRow }[],
-  sort: "recent" | "oldest" | "likes" | "dislikes"
-) {
-  const copy = [...groups];
+type ReviewerSortRow = {
+  userId: string;
+  primaryCreatedAt: string;
+  primaryLikes: number;
+  primaryDislikes: number;
+};
+
+function sortReviewerRows(rows: ReviewerSortRow[], sort: "recent" | "oldest" | "likes" | "dislikes") {
+  const copy = [...rows];
   if (sort === "oldest") {
-    copy.sort(
-      (a, b) => new Date(a.primary.createdAt).getTime() - new Date(b.primary.createdAt).getTime()
-    );
+    copy.sort((a, b) => new Date(a.primaryCreatedAt).getTime() - new Date(b.primaryCreatedAt).getTime());
   } else if (sort === "likes") {
-    copy.sort((a, b) => (b.primary.likesCount ?? 0) - (a.primary.likesCount ?? 0));
+    copy.sort((a, b) => b.primaryLikes - a.primaryLikes || new Date(b.primaryCreatedAt).getTime() - new Date(a.primaryCreatedAt).getTime());
   } else if (sort === "dislikes") {
-    copy.sort((a, b) => (b.primary.dislikesCount ?? 0) - (a.primary.dislikesCount ?? 0));
+    copy.sort((a, b) => b.primaryDislikes - a.primaryDislikes || new Date(b.primaryCreatedAt).getTime() - new Date(a.primaryCreatedAt).getTime());
   } else {
-    copy.sort(
-      (a, b) => new Date(b.primary.createdAt).getTime() - new Date(a.primary.createdAt).getTime()
-    );
+    copy.sort((a, b) => new Date(b.primaryCreatedAt).getTime() - new Date(a.primaryCreatedAt).getTime());
   }
   return copy;
 }
 
-function paginateReviewsByUser(
-  reviews: ItemReviewRow[],
-  sort: "recent" | "oldest" | "likes" | "dislikes",
-  skip: number,
-  take: number
-): { pageReviews: ItemReviewRow[]; reviewsTotal: number } {
-  const byUser = groupItemReviewsByUser(reviews);
-  const groups = [...byUser.entries()]
-    .map(([userId, list]) => {
-      const primary = pickPrimaryScopedReview(list);
-      if (!primary) return null;
-      return { userId, reviews: list, primary };
-    })
-    .filter((g): g is { userId: string; reviews: ItemReviewRow[]; primary: ItemReviewRow } => g != null);
+export async function buildReviewerSortRows(
+  prisma: PrismaClient,
+  mediaType: MediaType,
+  externalId: string,
+  sort: "recent" | "oldest" | "likes" | "dislikes"
+): Promise<ReviewerSortRow[]> {
+  const logs = await prisma.log.findMany({
+    where: { mediaType, externalId, ...gradedLogOrReviewWhere },
+    select: {
+      id: true,
+      userId: true,
+      grade: true,
+      review: true,
+      createdAt: true,
+    },
+  });
 
-  const sortedGroups = sortReviewGroupsByPrimary(groups, sort);
-  const pageGroups = sortedGroups.slice(skip, skip + take);
-  return {
-    pageReviews: pageGroups.flatMap((g) => g.reviews),
-    reviewsTotal: sortedGroups.length,
-  };
+  const logIds = logs.map((l) => l.id);
+  const reactionMap =
+    sort === "likes" || sort === "dislikes"
+      ? await getReactionsForLogs(logIds, null)
+      : new Map<string, { likesCount: number; dislikesCount: number; userReaction: null }>();
+
+  const byUser = new Map<string, ReviewerSortRow>();
+  for (const l of logs) {
+    if (!hasReviewContent(l.grade, l.review)) continue;
+    const stats = reactionMap.get(l.id);
+    const createdAt = l.createdAt.toISOString();
+    const existing = byUser.get(l.userId);
+    if (!existing || new Date(createdAt) > new Date(existing.primaryCreatedAt)) {
+      byUser.set(l.userId, {
+        userId: l.userId,
+        primaryCreatedAt: createdAt,
+        primaryLikes: stats?.likesCount ?? 0,
+        primaryDislikes: stats?.dislikesCount ?? 0,
+      });
+    }
+  }
+
+  if (mediaType === "tv" || mediaType === "anime") {
+    const scopedRows = await prisma.scopedReview.findMany({
+      where: { log: { mediaType, externalId }, ...gradedLogOrReviewWhere },
+      select: {
+        id: true,
+        createdAt: true,
+        grade: true,
+        review: true,
+        log: { select: { id: true, userId: true } },
+      },
+    });
+    const scopedLogIds = [...new Set(scopedRows.map((s) => s.log.id))];
+    const scopedReactions =
+      sort === "likes" || sort === "dislikes"
+        ? await getReactionsForLogs(scopedLogIds, null)
+        : reactionMap;
+
+    for (const sr of scopedRows) {
+      if (!hasReviewContent(sr.grade, sr.review)) continue;
+      const stats = scopedReactions.get(sr.log.id);
+      const createdAt = sr.createdAt.toISOString();
+      const existing = byUser.get(sr.log.userId);
+      if (!existing || new Date(createdAt) > new Date(existing.primaryCreatedAt)) {
+        byUser.set(sr.log.userId, {
+          userId: sr.log.userId,
+          primaryCreatedAt: createdAt,
+          primaryLikes: stats?.likesCount ?? 0,
+          primaryDislikes: stats?.dislikesCount ?? 0,
+        });
+      }
+    }
+  }
+
+  return sortReviewerRows([...byUser.values()], sort);
 }
 
 export async function loadItemReviewsPaginated(
@@ -216,20 +273,36 @@ export async function loadItemReviewsPaginated(
     currentUserId: string | null;
   }
 ) {
-  const logs = (
-    await prisma.log.findMany({
-      where: { mediaType, externalId, ...gradedLogOrReviewWhere },
-      include: { user: { select: { id: true, email: true, username: true, tier: true } } },
-    })
-  ).filter((l) => hasReviewContent(l.grade, l.review));
+  const reviewerRows = await buildReviewerSortRows(prisma, mediaType, externalId, opts.sort);
+  const reviewsTotal = reviewerRows.length;
+  const pageUserIds = reviewerRows.slice(opts.skip, opts.skip + opts.take).map((r) => r.userId);
+
+  if (pageUserIds.length === 0) {
+    const meanAgg = await prisma.log.aggregate({
+      where: { mediaType, externalId, grade: { not: null } },
+      _avg: { grade: true },
+    });
+    return { reviews: [], reviewsTotal: 0, meanGrade: meanAgg._avg.grade };
+  }
+
+  const logs = await prisma.log.findMany({
+    where: {
+      mediaType,
+      externalId,
+      userId: { in: pageUserIds },
+      ...gradedLogOrReviewWhere,
+    },
+    include: { user: { select: { id: true, email: true, username: true, tier: true } } },
+  });
 
   const logIds = logs.map((l) => l.id);
-  const userIds = [...new Set(logs.map((l) => l.userId))];
-
   const scopedRows =
     mediaType === "tv" || mediaType === "anime"
       ? await prisma.scopedReview.findMany({
-          where: { log: { mediaType, externalId }, ...gradedLogOrReviewWhere },
+          where: {
+            log: { mediaType, externalId, userId: { in: pageUserIds } },
+            ...gradedLogOrReviewWhere,
+          },
           include: {
             log: {
               include: { user: { select: { id: true, email: true, username: true, tier: true } } },
@@ -238,14 +311,16 @@ export async function loadItemReviewsPaginated(
         })
       : [];
 
-  for (const sr of scopedRows) {
-    if (!userIds.includes(sr.log.userId)) userIds.push(sr.log.userId);
-  }
-
   const allLogIdsForReactions = [...new Set([...logIds, ...scopedRows.map((s) => s.logId)])];
-  const [reactionMap, reviewerBadgesMap] = await Promise.all([
+  const userIds = [...new Set([...pageUserIds])];
+
+  const [reactionMap, reviewerBadgesMap, meanAgg] = await Promise.all([
     getReactionsForLogs(allLogIdsForReactions, opts.currentUserId),
     getAllReviewerMilestonesForMediumBatch(userIds, mediaType),
+    prisma.log.aggregate({
+      where: { mediaType, externalId, grade: { not: null } },
+      _avg: { grade: true },
+    }),
   ]);
 
   const merged = await fetchGradedReviewsForItem(
@@ -254,21 +329,23 @@ export async function loadItemReviewsPaginated(
     externalId,
     logs as LogWithUser[],
     reactionMap,
-    reviewerBadgesMap
+    reviewerBadgesMap,
+    pageUserIds
   );
 
-  const { pageReviews, reviewsTotal } = paginateReviewsByUser(
-    merged,
-    opts.sort,
-    opts.skip,
-    opts.take
+  const pageUserSet = new Set(pageUserIds);
+  const pageReviews = merged.filter(
+    (r): r is ItemReviewRow => typeof r.userId === "string" && pageUserSet.has(r.userId)
   );
 
-  const allGrades = merged.map((r) => r.grade).filter((g): g is number => g != null);
-  const meanGrade =
-    allGrades.length > 0 ? allGrades.reduce((a, b) => a + b, 0) / allGrades.length : null;
+  const byUser = groupItemReviewsByUser(pageReviews);
+  const ordered: ItemReviewRow[] = [];
+  for (const userId of pageUserIds) {
+    const list = byUser.get(userId);
+    if (list?.length) ordered.push(...(list as ItemReviewRow[]));
+  }
 
-  return { reviews: pageReviews, reviewsTotal, meanGrade };
+  const meanGrade = meanAgg._avg.grade;
+
+  return { reviews: ordered, reviewsTotal, meanGrade };
 }
-
-// fix LogWithUser - logs from prisma have userId on log not user.id

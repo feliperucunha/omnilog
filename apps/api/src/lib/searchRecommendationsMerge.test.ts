@@ -19,7 +19,22 @@ describe("collectFromSeeds", () => {
     });
     const out = await collectFromSeeds(["a", "b"], fetchOne, new Set(["9"]), 10);
     expect(fetchOne).toHaveBeenCalledTimes(2);
+    expect(fetchOne).toHaveBeenCalledWith("a");
+    expect(fetchOne).toHaveBeenCalledWith("b");
     expect(out.map((x) => x.id)).toEqual(["1", "2", "3"]);
+  });
+
+  it("fetches seeds in parallel", async () => {
+    const order: string[] = [];
+    const fetchOne = vi.fn(async (seed: string) => {
+      order.push(`start-${seed}`);
+      await new Promise((resolve) => setTimeout(resolve, seed === "slow" ? 30 : 5));
+      order.push(`end-${seed}`);
+      return [r(seed)];
+    });
+    await collectFromSeeds(["fast", "slow", "mid"], fetchOne, new Set(), 10);
+    expect(fetchOne).toHaveBeenCalledTimes(3);
+    expect(order.indexOf("end-fast")).toBeLessThan(order.indexOf("end-slow"));
   });
 
   it("stops at max", async () => {
