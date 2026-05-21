@@ -57,7 +57,7 @@ interface MeContextValue {
 const MeContext = createContext<MeContextValue | null>(null);
 
 export function MeProvider({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
+  const { token, initializing } = useAuth();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const wasLoadingRef = useRef(false);
@@ -84,13 +84,14 @@ export function MeProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   useEffect(() => {
+    if (initializing) return;
     if (!token) {
       setMe(null);
       setLoading(false);
       return;
     }
     refetch();
-  }, [token, refetch]);
+  }, [token, initializing, refetch]);
 
   /** Bust client GET cache for search so recommendations/search responses match latest /me feature flags. */
   useEffect(() => {

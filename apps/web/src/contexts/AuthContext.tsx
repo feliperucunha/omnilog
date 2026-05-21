@@ -6,8 +6,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useLocation } from "react-router-dom";
 import { apiFetch, ApiError } from "@/lib/api";
 import * as storage from "@/lib/storage";
+import { clearAuthSession } from "@/lib/storage";
 
 const TOKEN_KEY = "geeklogs_token";
 const USER_KEY = "geeklogs_user";
@@ -34,6 +36,8 @@ interface AuthContextValue extends AuthState {
   logout: () => Promise<void>;
   setToken: (token: string | null) => void;
   setUser: (user: User | null) => void;
+  signingOut: boolean;
+  setSigningOut: (value: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -45,6 +49,15 @@ function isNative(): boolean {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    if (signingOut && location.pathname === "/login") {
+      setSigningOut(false);
+    }
+  }, [location.pathname, signingOut]);
+
   /** On native, never block on "checking session" – start ready so the app shows immediately. Session restore runs in background. */
   const [state, setState] = useState<AuthState>(() => ({
     token: null,
@@ -75,13 +88,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         if (token && userJson && token !== COOKIE_SESSION) {
           try {
-            const user = JSON.parse(userJson) as User;
-            if (user.onboarded === undefined) user.onboarded = true;
-            setState({ token, user, initializing: false });
-            return;
-          } catch {
-            // invalid user json
+            const data = await apiFetch<{ user: User }>("/me", {
+              skipAuthRedirect: true,
+              timeout: 60_000,
+            });
+            if (cancelled) return;
+            if (data?.user) {
+              const user = { ...data.user, onboarded: data.user.onboarded ?? true };
+              await storage.setItem(TOKEN_KEY, token);
+              await storage.setItem(USER_KEY, JSON.stringify(user));
+              setState({ token, user, initializing: false });
+              return;
+            }
+          } catch (e) {
+            if (cancelled) return;
+            if (!(e instanceof ApiError && e.statusCode === 401)) {
+              // network / server — fall through to unauthenticated
+            }
           }
+          await clearAuthSession();
         }
       } catch {
         // ignore
@@ -136,7 +161,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** Listen for 401 from api.ts so we clear state before redirect. */
   useEffect(() => {
-    const handleLogout = () => setState({ token: null, user: null, initializing: false });
+    const handleLogout = () => {
+      void clearAuthSession();
+      setState({ token: null, user: null, initializing: false });
+    };
     window.addEventListener("auth:logout", handleLogout);
     return () => window.removeEventListener("auth:logout", handleLogout);
   }, []);
@@ -160,8 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore network errors; still clear local state
     }
-    await storage.removeItem(TOKEN_KEY);
-    await storage.removeItem(USER_KEY);
+    await clearAuthSession();
     setState({ token: null, user: null, initializing: false });
   }, []);
 
@@ -183,6 +210,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     setToken,
     setUser,
+    signingOut,
+    setSigningOut,
   };
 
   return (

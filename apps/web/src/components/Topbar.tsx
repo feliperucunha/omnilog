@@ -1,5 +1,5 @@
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Settings, Info, LogOut } from "lucide-react";
+import { Settings, Info, LogOut, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -37,7 +37,7 @@ const LOCALE_SHORT_LABELS: Record<Locale, string> = {
 
 export function Topbar() {
   const { t, locale, setLocale } = useLocale();
-  const { token, user, logout } = useAuth();
+  const { token, user, logout, signingOut, setSigningOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const pageTitleContext = usePageTitle();
@@ -56,9 +56,15 @@ export function Topbar() {
   };
 
   const handleLogout = async () => {
-    await logout();
-    toast.success(t("toast.loggedOut"));
-    navigate("/login");
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await logout();
+      toast.success(t("toast.loggedOut"));
+      navigate("/login", { replace: true });
+    } catch {
+      setSigningOut(false);
+    }
   };
 
   const initial = user?.email?.charAt(0)?.toUpperCase() ?? "?";
@@ -200,10 +206,15 @@ export function Topbar() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-red-400 focus:text-red-400 focus:bg-red-500/20"
-                onClick={handleLogout}
+                disabled={signingOut}
+                onClick={() => void handleLogout()}
               >
-                <LogOut className="size-4" />
-                {t("nav.logOut")}
+                {signingOut ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <LogOut className="size-4" />
+                )}
+                {signingOut ? t("nav.signingOut") : t("nav.logOut")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

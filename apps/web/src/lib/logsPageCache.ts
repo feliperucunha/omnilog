@@ -9,7 +9,6 @@ import {
   getCachedEntry,
   HEAVY_PAGE_TTL_MS,
   LOGS_CACHE_WARM_EVENT,
-  LOGS_INVALIDATED_EVENT,
 } from "@/lib/api";
 import { updateCachedEntriesMatching } from "@/lib/cache.js";
 
@@ -279,5 +278,4 @@ export function installLogsPageCacheListeners(): void {
   };
 
   window.addEventListener(LOGS_CACHE_WARM_EVENT, onWarm);
-  window.addEventListener(LOGS_INVALIDATED_EVENT, onWarm);
 }

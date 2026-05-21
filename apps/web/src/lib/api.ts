@@ -61,7 +61,8 @@ import {
   markStaleByPrefix,
 } from "./cache.js";
 
-import { getItemSync, removeItem } from "./storage.js";
+import { clearAuthSession, getItemSync } from "./storage.js";
+import { isPublicAuthPath } from "./authSession.js";
 
 /** Sentinel for cookie-based sessions (no token in storage). */
 const COOKIE_SESSION = "cookie";
@@ -90,6 +91,25 @@ export function getAuthHeaders(): HeadersInit {
 /** Dispatch so AuthContext can clear state on 401 (e.g. when using cookie session). */
 function dispatchLogout(): void {
   window.dispatchEvent(new CustomEvent("auth:logout"));
+}
+
+let sessionExpiryHandling: Promise<void> | null = null;
+
+async function handleSessionExpired(): Promise<void> {
+  if (sessionExpiryHandling) return sessionExpiryHandling;
+  sessionExpiryHandling = (async () => {
+    await clearAuthSession();
+    dispatchLogout();
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      if (!isPublicAuthPath(path)) {
+        window.location.assign("/login");
+      }
+    }
+  })().finally(() => {
+    sessionExpiryHandling = null;
+  });
+  return sessionExpiryHandling;
 }
 
 /** Error code returned by API for log limit (free tier). Check err.message === this to show tier message. */
@@ -327,9 +347,7 @@ async function performSingleFetchAttempt<T>(
       }
       const message = parseErrorResponse(text, MSG.sessionEnded);
       if (!skipAuthRedirect) {
-        void removeItem("geeklogs_token").then(() => removeItem("geeklogs_user"));
-        dispatchLogout();
-        window.location.href = "/login";
+        void handleSessionExpired();
       } else {
         /**
          * Session probe and similar calls use skipAuthRedirect; 401 means "no session" but the API

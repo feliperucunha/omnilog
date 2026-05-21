@@ -182,3 +182,16 @@ export function getItemSync(key: string): string | null {
   }
   return cache.get(key) ?? null;
 }
+
+/** Clear auth token/user from memory, localStorage, cookie, and native Preferences. */
+export async function clearAuthSession(): Promise<void> {
+  cache.delete(TOKEN_KEY);
+  cache.delete(USER_KEY);
+  if (isNativePlatform()) {
+    await nativeRemoveItem(TOKEN_KEY);
+    await nativeRemoveItem(USER_KEY);
+  } else {
+    webRemoveItem(TOKEN_KEY);
+    webRemoveItem(USER_KEY);
+  }
+}

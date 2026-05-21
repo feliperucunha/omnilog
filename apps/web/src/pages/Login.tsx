@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -135,7 +136,7 @@ export function Login() {
             </h1>
           </CardHeader>
           <CardContent className="pt-0">
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} aria-busy={loading}>
               <div className="flex flex-col gap-4">
                 <div className="space-y-2">
                   <Label>{t("login.emailOrUsername")}</Label>
@@ -145,6 +146,7 @@ export function Login() {
                     placeholder={t("login.emailOrUsername")}
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); clearFieldError("email"); }}
+                    disabled={loading}
                     required
                     className={cn(fieldErrors.email && "border-red-500 focus-visible:ring-red-500")}
                     aria-invalid={!!fieldErrors.email}
@@ -163,6 +165,7 @@ export function Login() {
                     placeholder={t("common.placeholderPassword")}
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); clearFieldError("password"); }}
+                    disabled={loading}
                     required
                     className={cn(fieldErrors.password && "border-red-500 focus-visible:ring-red-500")}
                     aria-invalid={!!fieldErrors.password}
@@ -184,6 +187,7 @@ export function Login() {
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
+                    disabled={loading}
                     className="h-4 w-4 shrink-0 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
                   />
                   <span className="text-sm text-[var(--color-light)]">
@@ -203,8 +207,16 @@ export function Login() {
                     type="submit"
                     className="w-full"
                     disabled={loading}
+                    aria-busy={loading}
                   >
-                    {loading ? t("login.signingIn") : t("login.signIn")}
+                    {loading ? (
+                      <span className="inline-flex items-center justify-center gap-2">
+                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                        {t("login.signingIn")}
+                      </span>
+                    ) : (
+                      t("login.signIn")
+                    )}
                   </Button>
                 </motion.div>
               </div>

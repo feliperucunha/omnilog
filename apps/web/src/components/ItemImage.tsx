@@ -23,6 +23,8 @@ interface ItemImageProps {
   activeBoardGameProvider?: BoardGameProvider | null;
   /** When true, container shrinks to image size (img uses w-auto h-auto with object-contain). Use for modals. */
   fitContent?: boolean;
+  /** Blurred cover backdrop + contained foreground (square/landscape art in a fixed frame). */
+  containBackdrop?: boolean;
   /** Optional loading: "eager" for above-the-fold/modals so images load immediately. */
   loading?: "lazy" | "eager";
   /** Optional referrerPolicy; use "no-referrer" if external CDN blocks referrer. */
@@ -47,6 +49,7 @@ export function ItemImage({
   boardGameSource,
   activeBoardGameProvider,
   fitContent = false,
+  containBackdrop = false,
   loading,
   referrerPolicy,
   onImageNaturalDimensions,
@@ -64,8 +67,13 @@ export function ItemImage({
     boardGameSource ?? null,
     activeBoardGameProvider ?? null
   );
-  const useBggBlurStack = bggBoardFraming && imgClassName === undefined;
-  const effectiveImgClassName = imgClassName === undefined ? "object-cover" : imgClassName;
+  const useBggBlurStack =
+    containBackdrop || (bggBoardFraming && imgClassName === undefined);
+  const effectiveImgClassName = useBggBlurStack
+    ? "object-cover"
+    : imgClassName === undefined
+      ? "object-cover"
+      : imgClassName;
 
   const rootClass = [
     "flex-shrink-0 overflow-hidden bg-[var(--color-darkest)]",

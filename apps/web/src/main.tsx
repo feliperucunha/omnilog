@@ -13,6 +13,7 @@ import { LogCompleteProvider } from "@/contexts/LogCompleteContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ApiWakePing } from "@/components/ApiWakePing";
 import { ColdStartLoader } from "@/components/ColdStartLoader";
+import { AuthSigningOverlay } from "@/components/AuthSigningOverlay";
 import { AppVersionModal } from "@/components/AppVersionModal";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import { AppVersionProvider } from "@/contexts/AppVersionContext";
@@ -41,6 +42,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       <ThemeSync />
                       <LocaleSync />
                       <ColdStartLoader />
+                      <AuthSigningOverlay />
                       <ApiWakePing />
                       <App />
                       <CookieConsentBanner />

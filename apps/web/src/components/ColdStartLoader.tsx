@@ -5,7 +5,7 @@ import { setOnFirstApiResponse, setOnFirstApiError } from "@/lib/api";
 import { LoadingErrorCode } from "@/lib/loadingErrorCodes";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { removeItem } from "@/lib/storage";
+import { clearAuthSession } from "@/lib/storage";
 
 /** Progress bar reaches ~100% over this duration (aligned with max wait so we don’t show “timed out” UI before retries finish). */
 const COLD_START_PROGRESS_DURATION_MS = 180_000;
@@ -79,10 +79,10 @@ export function ColdStartLoader() {
   };
 
   const handleSignIn = (): void => {
-    void removeItem("geeklogs_token");
-    void removeItem("geeklogs_user");
-    window.dispatchEvent(new CustomEvent("auth:logout"));
-    window.location.href = "/login";
+    void clearAuthSession().then(() => {
+      window.dispatchEvent(new CustomEvent("auth:logout"));
+      window.location.assign("/login");
+    });
   };
 
   const isAuthError =

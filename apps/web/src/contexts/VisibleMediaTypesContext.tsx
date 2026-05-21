@@ -84,21 +84,13 @@ export function VisibleMediaTypesProvider({ children }: { children: ReactNode })
   }, [token, me?.user?.id, me?.visibleMediaTypes]);
 
   useEffect(() => {
-    if (!token) return;
-    warmDashboardAndStatisticsCaches(
-      [...MEDIA_TYPES],
-      -new Date().getTimezoneOffset(),
-      tierHasProFeatures(me?.tier)
-    );
-  }, [token, me?.tier]);
-
-  useEffect(() => {
-    if (!visibleTypesOrderReady || visibleTypes.length === 0) return;
+    if (!token || loading || !me) return;
     const tz = -new Date().getTimezoneOffset();
-    const isPro = tierHasProFeatures(me?.tier);
+    const isPro = tierHasProFeatures(me.tier);
     registerLogsPageCacheContext({ mediaTypes: visibleTypes, tzOffsetMinutes: tz, isPro });
+    if (!visibleTypesOrderReady || visibleTypes.length === 0) return;
     warmDashboardAndStatisticsCaches(visibleTypes, tz, isPro);
-  }, [visibleTypes, visibleTypesOrderReady, me?.tier, token]);
+  }, [token, loading, me, visibleTypes, visibleTypesOrderReady]);
 
   const value = useMemo(
     () => ({

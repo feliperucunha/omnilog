@@ -12,13 +12,24 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Logo, getLogoSrc } from "@/components/Logo";
 import { getHeroImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
 import { isBggBoardGameImageContext } from "@/lib/boardGameImageFit";
+import {
+  logCompleteAndroidHeroImgClass,
+  logCompleteHeroFrameStyle,
+  logCompleteHeroWrapperClass,
+  logCompletePrioritizeTextSpace,
+  buildLogCompleteShareLayout,
+  logCompleteShareHeroObjectFit,
+  logCompleteShareTextLimits,
+  logCompleteUsesContainBackdrop,
+  resolveLogCompleteHeroLayout,
+  type ImageNaturalSize,
+} from "@/lib/logCompleteHeroLayout";
 import { overlayVariants, modalContentVariants } from "@/lib/animations";
 import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, SPEND_TRACKED_MEDIA_TYPES } from "@geeklogs/shared";
 import { boardGameOwnershipFromBooleans } from "@/lib/boardGameOwnership";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { showErrorToast } from "@/lib/errorToast";
 import { triggerImpact } from "@/lib/capacitorHaptics";
-import { cn } from "@/lib/utils";
 import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
 import { isCapacitorAndroid } from "@/lib/androidOverlayBack";
 
@@ -139,19 +150,18 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const stars = grade != null ? gradeToStars(grade) : null;
   const statusLabel = status ? getStatusLabel(t, status, state.mediaType) : t("logComplete.logged");
   const heroImageUrl = getHeroImageUrl(image) ?? image;
-  const bggBoardFraming = isBggBoardGameImageContext(
+  const assumeLandscapeBoardGame = isBggBoardGameImageContext(
     mediaType,
     heroImageUrl,
     null,
     me?.boardGameProvider ?? null
   );
-  /** BGG box art is landscape; a shorter card + hero keeps the modal from feeling overly tall on web and native. */
-  const bggShorterCard = bggBoardFraming;
-  /**
-   * BGG blur+contain stack letterboxes landscape art in a portrait slot; empty bands use `color-darkest` and read as
-   * black behind the top controls. Ludopedia uses plain cover and fills the frame. Here we use cover for BGG too.
-   */
-  const heroImgClassName = bggBoardFraming ? "h-full w-full object-cover object-center" : undefined;
+  const [heroNaturalSize, setHeroNaturalSize] = useState<ImageNaturalSize | null>(null);
+  const heroLayout = resolveLogCompleteHeroLayout(heroNaturalSize, assumeLandscapeBoardGame);
+  const androidHeroLayout = nativeUi && androidWebView;
+  const useContainBackdrop = logCompleteUsesContainBackdrop(heroLayout, androidHeroLayout);
+  const reviewTrimmed = review?.trim() ?? "";
+  const prioritizeText = nativeUi && logCompletePrioritizeTextSpace(reviewTrimmed, title);
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [shareInProgress, setShareInProgress] = useState(false);
   const [cachedHeroDataUrl, setCachedHeroDataUrl] = useState<string | null>(null);
@@ -167,6 +177,10 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
+
+  useEffect(() => {
+    setHeroNaturalSize(null);
+  }, [heroImageUrl]);
 
   useEffect(() => {
     if (!heroImageUrl || !nativeUi) {
@@ -328,26 +342,38 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
     </div>
   );
 
-  const heroWebWrapperClass = cn(
-    "relative w-full md:h-auto md:min-h-0",
-    bggShorterCard
-      ? "h-[36vh] min-h-[136px] md:aspect-[7/8] md:max-h-[min(40vh,360px)]"
-      : "h-[60vh] min-h-[190px] md:aspect-[2/3]"
+  const heroWrapperClass = logCompleteHeroWrapperClass({
+    layout: heroLayout,
+    androidWebView: androidHeroLayout,
+    compactForText: prioritizeText,
+  });
+  const heroFrameStyle = logCompleteHeroFrameStyle({
+    natural: heroNaturalSize,
+    layout: heroLayout,
+    androidWebView: androidHeroLayout,
+    compactForText: prioritizeText,
+  });
+  const heroWrapperStyle = heroFrameStyle ?? undefined;
+
+  const heroImage = (
+    <ItemImage
+      src={heroImageUrl}
+      className="absolute inset-0 h-full w-full"
+      mediaType={mediaType}
+      activeBoardGameProvider={me?.boardGameProvider ?? null}
+      containBackdrop={useContainBackdrop}
+      imgClassName={androidHeroLayout ? logCompleteAndroidHeroImgClass(heroLayout) : undefined}
+      fitContent={false}
+      loading="eager"
+      referrerPolicy="no-referrer"
+      onImageNaturalDimensions={(width, height) => setHeroNaturalSize({ width, height })}
+    />
   );
 
   const imageSection = (
     <div className="relative flex-shrink-0 overflow-hidden rounded-t-2xl md:rounded-t-3xl">
-      <div className={heroWebWrapperClass}>
-        <ItemImage
-          src={heroImageUrl}
-          className="absolute inset-0 h-full w-full"
-          mediaType={mediaType}
-          activeBoardGameProvider={me?.boardGameProvider ?? null}
-          imgClassName={heroImgClassName}
-          fitContent={false}
-          loading="eager"
-          referrerPolicy="no-referrer"
-        />
+      <div className={heroWrapperClass} style={heroWrapperStyle}>
+        {heroImage}
         <div
           className="absolute inset-0 z-[2]"
           style={{
@@ -359,34 +385,16 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
     </div>
   );
 
-  /**
-   * Android WebView often mis-resolves `vh` vs chrome/insets, yielding a tiny hero (sliver of image).
-   * Prefer aspect-ratio + `dvh` caps on Android; keep existing vh layout elsewhere.
-   */
-  const heroNativeWrapperClass = cn(
-    "relative w-full md:h-auto md:min-h-0",
-    androidWebView
-      ? bggShorterCard
-        ? "aspect-[7/8] min-h-[132px] max-h-[min(44dvh,360px)] w-full md:aspect-[7/8] md:max-h-[min(38vh,340px)]"
-        : "aspect-[2/3] min-h-[200px] max-h-[min(52dvh,440px)] w-full md:aspect-[2/3] md:max-h-none"
-      : bggShorterCard
-        ? "h-[32vh] min-h-[124px] max-h-[40dvh] md:max-h-[min(38vh,340px)] md:aspect-[7/8]"
-        : "h-[48vh] min-h-[156px] max-h-[56dvh] md:max-h-none md:aspect-[2/3]"
-  );
-
   const imageSectionNative = (
-    <div className="relative flex-shrink-0 overflow-hidden rounded-t-2xl md:rounded-t-3xl" style={{ transform: "none", willChange: "auto" }}>
-      <div className={heroNativeWrapperClass}>
-        <ItemImage
-          src={heroImageUrl}
-          className="absolute inset-0 h-full w-full"
-          mediaType={mediaType}
-          activeBoardGameProvider={me?.boardGameProvider ?? null}
-          imgClassName={heroImgClassName}
-          fitContent={false}
-          loading="eager"
-          referrerPolicy="no-referrer"
-        />
+    <div
+      className="relative flex-shrink-0 overflow-hidden rounded-t-2xl md:rounded-t-3xl"
+      style={{ transform: "none", willChange: "auto" }}
+    >
+      <div
+        className={heroWrapperClass}
+        style={{ transform: "none", willChange: "auto", ...heroWrapperStyle }}
+      >
+        {heroImage}
         <div
           className="absolute inset-0 z-[2]"
           style={{
@@ -415,7 +423,11 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
         id="log-complete-title"
         role="heading"
         aria-level={1}
-        className="mb-2 min-w-0 break-words text-lg font-bold leading-tight text-[var(--color-lightest)] md:mb-4 md:text-[1.75rem]"
+        className={
+          nativeUi
+            ? "mb-2 min-w-0 break-words text-lg font-bold leading-snug text-[var(--color-lightest)] [overflow-wrap:anywhere] line-clamp-4"
+            : "mb-2 min-w-0 break-words text-lg font-bold leading-tight text-[var(--color-lightest)] md:mb-4 md:text-[1.75rem]"
+        }
       >
         {title}
       </div>
@@ -434,9 +446,15 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
           )}
         </div>
       )}
-      {review != null && review.trim() !== "" && (
-        <p className="mb-3 line-clamp-3 text-[11px] leading-snug text-[var(--color-light)] whitespace-pre-wrap md:mb-4 md:line-clamp-4 md:text-[0.8125rem] md:leading-relaxed">
-          {review.trim()}
+      {reviewTrimmed !== "" && (
+        <p
+          className={
+            nativeUi
+              ? "mb-3 text-xs leading-relaxed text-[var(--color-light)] whitespace-pre-wrap"
+              : "mb-3 line-clamp-3 text-[11px] leading-snug text-[var(--color-light)] whitespace-pre-wrap md:mb-4 md:line-clamp-4 md:text-[0.8125rem] md:leading-relaxed"
+          }
+        >
+          {reviewTrimmed}
         </p>
       )}
 
@@ -461,25 +479,16 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
    * Share scene: same proportions as the small native reference (320×760 / 348×808) but scaled to
    * SHARE_EXPORT_SCENE_WIDTH_PX so html-to-image captures a large layout + moderate pixelRatio (sharp text,
    * stable filters). Footer uses a plain <img> logo — `Logo`’s mix-blend-lighten often disappears in capture.
-   * BGG: shorter hero matches modal (7/8 vs 2/3 → scale hero by 16/21); scene and card max shrink by the same delta.
+   * Shorter hero for square/landscape art keeps share card text legible (same idea as modal).
    */
-  const shareBase = (() => {
-    const compact = { sceneH: 760, cardW: 288, cardMaxH: 604, heroH: 348, refSceneW: 320 };
-    const wide = { sceneH: 808, cardW: 308, cardMaxH: 652, heroH: 382, refSceneW: 348 };
-    if (!bggShorterCard) {
-      return compactShareLayout ? compact : wide;
-    }
-    const bggHeroScale = 16 / 21; // (8/7) / (3/2): modal BGG aspect 7/8 vs default 2/3
-    const pick = compactShareLayout ? compact : wide;
-    const heroH = Math.max(1, Math.round(pick.heroH * bggHeroScale));
-    const delta = pick.heroH - heroH;
-    return {
-      ...pick,
-      heroH,
-      sceneH: pick.sceneH - delta,
-      cardMaxH: pick.cardMaxH - delta,
-    };
-  })();
+  const shareTextLimits = logCompleteShareTextLimits(reviewTrimmed, title);
+  const shareBase = buildLogCompleteShareLayout({
+    heroLayout,
+    compactShareLayout,
+    prioritizeText,
+    natural: heroNaturalSize,
+  });
+  const shareHeroObjectFit = logCompleteShareHeroObjectFit(heroLayout);
   const shareLayoutScale = SHARE_EXPORT_SCENE_WIDTH_PX / shareBase.refSceneW;
   const sz = (n: number) => Math.max(1, Math.round(n * shareLayoutScale));
   const shareSceneWidth = SHARE_EXPORT_SCENE_WIDTH_PX;
@@ -579,7 +588,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
             {/* Hero: fixed height; title/review scroll above pinned footer */}
             <div style={{ position: "relative", width: "100%", height: shareHeroHeight, flexShrink: 0, overflow: "hidden" }}>
               {cachedHeroDataUrl ? (
-                bggBoardFraming ? (
+                useContainBackdrop ? (
                   <>
                     <img
                       src={cachedHeroDataUrl}
@@ -621,7 +630,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                     style={{
                       width: "100%",
                       height: "100%",
-                      objectFit: "cover",
+                      objectFit: shareHeroObjectFit,
                       objectPosition: "center",
                       display: "block",
                     }}
@@ -652,7 +661,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                 flex: 1,
                 flexDirection: "column",
                 minHeight: 0,
-                overflowY: "auto",
+                overflowY: "hidden",
                 overflowX: "hidden",
                 padding: `${sz(8)}px ${sz(12)}px ${sz(6)}px`,
               }}
@@ -681,9 +690,10 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                   lineHeight: 1.25,
                   color: nativeColors.text,
                   display: "-webkit-box",
-                  WebkitLineClamp: 2,
+                  WebkitLineClamp: shareTextLimits.titleLineClamp,
                   WebkitBoxOrient: "vertical",
                   overflow: "hidden",
+                  overflowWrap: "anywhere",
                 }}
               >
                 {title}
@@ -716,21 +726,22 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
                   )}
                 </div>
               )}
-              {review != null && review.trim() !== "" && (
+              {reviewTrimmed !== "" && shareTextLimits.reviewLineClamp > 0 && (
                 <p
                   style={{
                     marginBottom: sz(4),
                     fontSize: sz(10),
-                    lineHeight: 1.4,
+                    lineHeight: 1.45,
                     color: nativeColors.textMuted,
                     display: "-webkit-box",
-                    WebkitLineClamp: 3,
+                    WebkitLineClamp: shareTextLimits.reviewLineClamp,
                     WebkitBoxOrient: "vertical",
                     overflow: "hidden",
                     whiteSpace: "pre-wrap",
+                    overflowWrap: "anywhere",
                   }}
                 >
-                  {review.trim()}
+                  {reviewTrimmed}
                 </p>
               )}
             </div>
