@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Nav } from "@/components/Nav";
 import { Topbar } from "@/components/Topbar";
@@ -7,6 +7,7 @@ import { InvalidApiKeyBanner } from "@/components/InvalidApiKeyBanner";
 import { PageTitleProvider, usePageTitle } from "@/contexts/PageTitleContext";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
+import { isPullToRefreshEnabled } from "@/lib/appPtrRefresh";
 import { useAuth } from "@/contexts/AuthContext";
 import { FORCE_ONBOARDING_UI } from "@/lib/onboardingDev";
 import { OnboardingForm } from "@/pages/Onboarding";
@@ -17,16 +18,15 @@ function AppLayoutContent() {
   const pageTitle = usePageTitle();
   const belowNavbar = pageTitle?.belowNavbar;
   const location = useLocation();
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const ptrEnabled =
-    location.pathname === "/" || location.pathname === "/search";
-  const ptr = usePullToRefresh({ enabled: ptrEnabled, scrollRef });
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const ptrEnabled = isPullToRefreshEnabled(location.pathname);
+  const ptr = usePullToRefresh({ enabled: ptrEnabled, scrollEl });
 
   return (
     <>
       <Topbar />
       <div
-        ref={scrollRef}
+        ref={setScrollEl}
         className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto"
       >
         <PullToRefreshIndicator

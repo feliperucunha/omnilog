@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { SettingsSkeleton } from "@/components/skeletons";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { apiFetch, invalidateApiCache, apiFetchFile, downloadFile } from "@/lib/api";
+import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
 import { toast } from "sonner";
 import { showErrorToast } from "@/lib/errorToast";
@@ -204,6 +205,12 @@ export function Settings() {
       setProfileVisibility(me.profileVisibility);
     }
   }, [me?.profileVisibility]);
+
+  useAppPtrRefresh(() => {
+    invalidateApiCache("/me");
+    void refetchMe();
+    void refetchVisibleTypes();
+  });
 
   const handleProfileVisibilityChange = async (
     key: keyof ProfileVisibility,

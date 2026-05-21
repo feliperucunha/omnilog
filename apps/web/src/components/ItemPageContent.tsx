@@ -19,7 +19,8 @@ import {
 } from "@geeklogs/shared";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { apiFetch, apiFetchCached, invalidateLogsAndItemsCache } from "@/lib/api";
+import { apiFetch, apiFetchCached, invalidateApiCache, invalidateLogsAndItemsCache } from "@/lib/api";
+import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import { decodeItemPageDataForDisplay, decodeItemReviewForDisplay } from "@/lib/decodeDisplayFields";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLogComplete } from "@/contexts/LogCompleteContext";
@@ -542,6 +543,14 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
     fetchReviews(reviewsPage, reviewsSort);
   }, [data?.item, reviewsPage, reviewsSort, fetchReviews]);
 
+  useAppPtrRefresh(() => {
+    invalidateApiCache(`/items/${mediaType}/${id}`);
+    invalidateLogsAndItemsCache();
+    fetchItem();
+    setReviewsPage(1);
+    fetchReviews(1, reviewsSort);
+  });
+
   const refreshReviewsAfterSave = useCallback(() => {
     invalidateLogsAndItemsCache();
     setReviewsPage(1);
@@ -816,7 +825,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             mechanics={mediaType === "boardgames" ? (item.mechanics ?? undefined) : undefined}
             affinityContextDraft={affinityContextDraft}
             onSaved={refreshReviewsAfterSave}
-            onSavedComplete={(state) => showLogComplete(state)}
+            onSavedComplete={(state) => showLogComplete(state, onBack)}
           />
         )}
 

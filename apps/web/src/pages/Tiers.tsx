@@ -18,6 +18,7 @@ import { tierHasUnlimitedLogs } from "@/lib/userTier";
 import { isCapacitorNative } from "@/lib/androidOverlayBack";
 import { openExternalUrl } from "@/lib/openExternalUrl";
 import { buildNativeProCheckoutUrl, buildWebLoginUrlWithFromPath } from "@/lib/publicWebOrigin";
+import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 
 const FREE_LOG_LIMIT = 500;
 
@@ -112,6 +113,10 @@ export function Tiers() {
       remove?.();
     };
   }, [token, refetch]);
+
+  useAppPtrRefresh(() => {
+    void refetch();
+  });
 
   const tier = me?.tier ?? "free";
   const logCount = me?.logCount ?? 0;

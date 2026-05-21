@@ -24,9 +24,9 @@ export type PullToRefreshVisualState = {
  */
 export function usePullToRefresh(opts: {
   enabled: boolean;
-  scrollRef: React.RefObject<HTMLElement | null>;
+  scrollEl: HTMLElement | null;
 }): PullToRefreshVisualState {
-  const { enabled, scrollRef } = opts;
+  const { enabled, scrollEl } = opts;
   const [pullRawDy, setPullRawDy] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const startYRef = useRef(0);
@@ -43,7 +43,7 @@ export function usePullToRefresh(opts: {
       return;
     }
 
-    const el = scrollRef.current;
+    const el = scrollEl;
     if (!el) return;
 
     const clearRefreshTimer = () => {
@@ -129,10 +129,10 @@ export function usePullToRefresh(opts: {
       setPullRawDy(0);
     };
 
-    el.addEventListener("touchstart", onStart, { passive: true });
-    el.addEventListener("touchmove", onMove, { passive: true });
-    el.addEventListener("touchend", onEnd, { passive: true });
-    el.addEventListener("touchcancel", onCancel, { passive: true });
+    el.addEventListener("touchstart", onStart, { passive: true, capture: true });
+    el.addEventListener("touchmove", onMove, { passive: true, capture: true });
+    el.addEventListener("touchend", onEnd, { passive: true, capture: true });
+    el.addEventListener("touchcancel", onCancel, { passive: true, capture: true });
 
     return () => {
       clearRefreshTimer();
@@ -141,7 +141,7 @@ export function usePullToRefresh(opts: {
       el.removeEventListener("touchend", onEnd);
       el.removeEventListener("touchcancel", onCancel);
     };
-  }, [enabled, scrollRef]);
+  }, [enabled, scrollEl]);
 
   if (!enabled || !isNativeMobile()) {
     return { pullRawDy: 0, isRefreshing: false, thresholdPx: PULL_TO_REFRESH_THRESHOLD_PX };

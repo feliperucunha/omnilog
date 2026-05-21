@@ -16,7 +16,15 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { apiFetch, ApiError, getCachedEntry, HEAVY_PAGE_TTL_MS, apiFetchSWR } from "@/lib/api";
+import {
+  apiFetch,
+  ApiError,
+  getCachedEntry,
+  HEAVY_PAGE_TTL_MS,
+  apiFetchSWR,
+  invalidateLogsAndItemsCache,
+} from "@/lib/api";
+import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import {
   loadWithSWR,
   registerLogsPageCacheContext,
@@ -1044,6 +1052,39 @@ export function Statistics() {
   useEffect(() => {
     void fetchLogs();
   }, [fetchLogs]);
+
+  const refreshAll = useCallback(() => {
+    invalidateLogsAndItemsCache();
+    void fetchStats();
+    void fetchGenreStats();
+    void fetchGamePlatformStats();
+    void fetchPurchaseSpending();
+    if (genreGraphMode === "statusOverTime") {
+      const apiGroup =
+        !isPro ? "completedByMonth" : statusOverTimeGroup === "year" ? "completedByYear" : "completedByMonth";
+      void fetchStatusOverTimeStats(apiGroup);
+    }
+    if (genreGraphMode === "byCategory") {
+      const apiGroup =
+        !isPro ? "categoryByMonth" : categoryOverTimeGroup === "year" ? "categoryByYear" : "categoryByMonth";
+      void fetchCategoryOverTimeStats(apiGroup);
+    }
+    fetchLogs();
+  }, [
+    fetchStats,
+    fetchGenreStats,
+    fetchGamePlatformStats,
+    fetchPurchaseSpending,
+    genreGraphMode,
+    isPro,
+    statusOverTimeGroup,
+    categoryOverTimeGroup,
+    fetchStatusOverTimeStats,
+    fetchCategoryOverTimeStats,
+    fetchLogs,
+  ]);
+
+  useAppPtrRefresh(refreshAll);
 
   const recent = logs.slice(0, 5);
   const displayedStats = useMemo(() => {

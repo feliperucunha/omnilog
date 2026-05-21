@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence } from "framer-motion";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { LogCompleteModal } from "@/components/LogCompleteModal";
@@ -12,7 +12,7 @@ export function getShowCompleteModal(): boolean {
 }
 
 interface LogCompleteContextValue {
-  showLogComplete: (state: LogCompleteState) => void;
+  showLogComplete: (state: LogCompleteState, onDismiss?: () => void) => void;
   closeLogComplete: () => void;
 }
 
@@ -26,17 +26,25 @@ export function useLogComplete(): LogCompleteContextValue {
 
 export function LogCompleteProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<LogCompleteState | null>(null);
+  const onDismissRef = useRef<(() => void) | undefined>(undefined);
 
   /** Preload so getItemSync returns correct value (Android/Capacitor). */
   useEffect(() => {
     void storage.getItem(SHOW_COMPLETE_MODAL_STORAGE_KEY);
   }, []);
 
-  const showLogComplete = useCallback((s: LogCompleteState) => {
+  const showLogComplete = useCallback((s: LogCompleteState, onDismiss?: () => void) => {
     if (!getShowCompleteModal()) return;
+    onDismissRef.current = onDismiss;
     setState(s);
   }, []);
-  const closeLogComplete = useCallback(() => setState(null), []);
+
+  const closeLogComplete = useCallback(() => {
+    const onDismiss = onDismissRef.current;
+    onDismissRef.current = undefined;
+    setState(null);
+    onDismiss?.();
+  }, []);
 
   return (
     <LogCompleteContext.Provider value={{ showLogComplete, closeLogComplete }}>

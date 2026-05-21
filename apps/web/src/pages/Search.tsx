@@ -15,7 +15,7 @@ import { getStatusLabel } from "@/lib/statusLabel";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { apiFetch, apiFetchCached, invalidateApiCache, LOGS_INVALIDATED_EVENT } from "@/lib/api";
-import { APP_PTR_REFRESH_EVENT } from "@/lib/appPtrRefresh";
+import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import { SearchSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
 import {
@@ -499,22 +499,18 @@ export function Search() {
     await runSearch(query);
   };
 
-  useEffect(() => {
-    const onPtr = () => {
-      clearSearchPageCache();
-      invalidateApiCache("/search");
-      if (hasSearched && query.trim()) {
-        void runSearch(query);
-      } else {
-        setRecByMediaType({});
-        setRecMetaByMediaType({});
-        setRecLoadingByMediaType({});
-        setRecRefreshNonce((n) => n + 1);
-      }
-    };
-    window.addEventListener(APP_PTR_REFRESH_EVENT, onPtr);
-    return () => window.removeEventListener(APP_PTR_REFRESH_EVENT, onPtr);
-  }, [hasSearched, query, runSearch]);
+  useAppPtrRefresh(() => {
+    clearSearchPageCache();
+    invalidateApiCache("/search");
+    if (hasSearched && query.trim()) {
+      void runSearch(query);
+    } else {
+      setRecByMediaType({});
+      setRecMetaByMediaType({});
+      setRecLoadingByMediaType({});
+      setRecRefreshNonce((n) => n + 1);
+    }
+  });
 
   const handleFollowClick = useCallback(
     async (e: React.MouseEvent, targetUserId: string, currentlyFollowing: boolean) => {

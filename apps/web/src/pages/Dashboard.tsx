@@ -25,7 +25,7 @@ import {
   warmDashboardAndStatisticsCaches,
   warmFriendFeedCaches,
 } from "@/lib/logsPageCache";
-import { APP_PTR_REFRESH_EVENT } from "@/lib/appPtrRefresh";
+import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
@@ -455,18 +455,14 @@ export function Dashboard() {
     [selectedCategory, setSearchParams]
   );
 
-  useEffect(() => {
-    const onPtr = () => {
-      fetchCounts();
-      if (!token) return;
-      fetchMilestones();
-      fetchFeed();
-      fetchFollows();
-      invalidateLogsAndItemsCache();
-    };
-    window.addEventListener(APP_PTR_REFRESH_EVENT, onPtr);
-    return () => window.removeEventListener(APP_PTR_REFRESH_EVENT, onPtr);
-  }, [token, fetchCounts, fetchFeed, fetchFollows, fetchMilestones]);
+  useAppPtrRefresh(() => {
+    fetchCounts();
+    if (!token) return;
+    fetchMilestones();
+    fetchFeed();
+    fetchFollows();
+    invalidateLogsAndItemsCache();
+  });
 
   useEffect(() => {
     const onLogsInvalidated = () => {
