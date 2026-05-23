@@ -50,6 +50,8 @@ DrawerFooter.displayName = "DrawerFooter";
 
 type DrawerContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   onClose?: () => void;
+  /** Optional class for the overlay (e.g. z-[300] for stacking above another modal). */
+  overlayClassName?: string;
   /** On mobile: height of the drawer. Desktop keeps centered modal. */
   mobileHeight?: "95%" | "30%" | "auto";
   /** Called with (animatedClose, closeImmediately). Use closeImmediately for X/close button so overlay and drawer close together. */
@@ -73,7 +75,7 @@ function isDrawerFooter(child: React.ReactNode): boolean {
 const DrawerContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   DrawerContentProps
->(({ className, children, onClose, onReady, onBeforeDismiss, mobileHeight = "95%", closeOnInteractOutside = true, ...props }, ref) => {
+>(({ className, children, onClose, onReady, onBeforeDismiss, overlayClassName, mobileHeight = "95%", closeOnInteractOutside = true, ...props }, ref) => {
   const [dataStateRef, radixOpen] = useRadixDataStateOpenRef<HTMLDivElement>();
   /** Mobile drag: transform the sheet surface (Content) so box-shadow moves with the panel, not a stuck “shadow frame”. */
   const dragSurfaceRef = React.useRef<HTMLDivElement | null>(null);
@@ -296,6 +298,7 @@ const DrawerContent = React.forwardRef<
     <DialogPortal>
       <DialogOverlay
         ref={overlayRef}
+        className={overlayClassName}
         onClick={closeOnInteractOutside ? closeImmediately : undefined}
         onPointerDown={closeOnInteractOutside ? closeImmediately : undefined}
       />

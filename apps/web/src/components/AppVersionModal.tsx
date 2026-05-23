@@ -1,12 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogTitle } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { GooglePlayIcon } from "@/components/GooglePlayIcon";
 import { useAppVersion } from "@/contexts/AppVersionContext";
@@ -14,9 +9,7 @@ import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { useLocale } from "@/contexts/LocaleContext";
 import { APP_VERSION } from "@geeklogs/shared";
 import { openAppStoreForUpdate } from "@/lib/appStoreLinks";
-import { registerAndroidOverlayClose } from "@/lib/androidOverlayBack";
 import { toast } from "sonner";
-import { paperShadow } from "@/lib/paperShadow";
 import { cn } from "@/lib/utils";
 
 function VersionCard({
@@ -62,16 +55,14 @@ export function AppVersionModal() {
   const { t } = useLocale();
   const ctx = useAppVersion();
   const showVersionModal = ctx?.showVersionModal ?? false;
+  const setShowVersionModal = ctx?.setShowVersionModal;
   const isNative = ctx?.isNative ?? false;
   const requiredVersion = ctx?.requiredVersion;
   const [isOpening, setIsOpening] = useState(false);
 
-  useEffect(() => {
-    if (!showVersionModal) return;
-    return registerAndroidOverlayClose(() => {});
-  }, [showVersionModal]);
-
-  if (!isNative || !showVersionModal) return null;
+  const handleClose = useCallback(() => {
+    setShowVersionModal?.(false);
+  }, [setShowVersionModal]);
 
   const handleUpdate = async () => {
     if (isOpening) return;
@@ -85,21 +76,22 @@ export function AppVersionModal() {
     }
   };
 
+  if (!isNative) return null;
+
   return (
-    <Dialog open>
-      <DialogContent
-        closeOnInteractOutside={false}
+    <Drawer
+      open={showVersionModal}
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
+    >
+      <DrawerContent
+        onClose={handleClose}
         overlayClassName="z-[300] bg-black/85 backdrop-blur-md"
-        className={cn(
-          "z-[300] gap-0 overflow-hidden border-[var(--color-surface-border)] p-0 sm:max-w-[24rem]",
-          "sm:rounded-2xl"
-        )}
-        style={paperShadow}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
+        mobileHeight="auto"
+        className="z-[300] flex max-w-[24rem] flex-col gap-0 overflow-hidden p-0 md:max-w-[24rem]"
       >
-        <div className="border-b border-[var(--color-surface-border)]/60 px-6 pb-6 pt-8">
+        <div className="border-b border-[var(--color-surface-border)]/60 px-6 pb-6 pt-4 md:pt-6">
           <div className="mx-auto flex w-fit flex-col items-center">
             <img
               src="/logo.png"
@@ -116,11 +108,9 @@ export function AppVersionModal() {
         </div>
 
         <div className="flex flex-col px-6 pb-2 pt-6 text-center">
-          <DialogHeader className="w-full space-y-2">
-            <DialogTitle className="min-w-0 text-[1.35rem] font-semibold leading-tight text-[var(--color-lightest)]">
-              <OverflowMarquee>{t("appVersion.title")}</OverflowMarquee>
-            </DialogTitle>
-          </DialogHeader>
+          <DialogTitle className="min-w-0 text-[1.35rem] font-semibold leading-tight text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("appVersion.title")}</OverflowMarquee>
+          </DialogTitle>
 
           <p className="mt-3 text-sm leading-relaxed text-[var(--color-light)]">
             {t("appVersion.message")}
@@ -148,7 +138,7 @@ export function AppVersionModal() {
           ) : null}
         </div>
 
-        <DialogFooter className="border-t border-[var(--color-surface-border)]/80 px-6 py-5">
+        <DrawerFooter className="flex-col gap-2 border-t border-[var(--color-surface-border)]/80 px-6 py-5">
           <Button
             type="button"
             className="btn-gradient w-full"
@@ -167,8 +157,17 @@ export function AppVersionModal() {
               </>
             )}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={isOpening}
+            onClick={handleClose}
+          >
+            {t("common.close")}
+          </Button>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   );
 }
