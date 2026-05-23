@@ -254,27 +254,31 @@ export function MediaLogs({
   /** When embedded (home): start with Load more button; after first click, switch to infinite scroll. When not embedded, use infinite scroll from the start. */
   const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(() => !embedded);
 
-  const buildLogsPath = useCallback(() => {
-    const params: Parameters<typeof buildLogsListPath>[0] = {
+  const buildLogsPath = useCallback(
+    (cursor?: string | null) => {
+      const params: Parameters<typeof buildLogsListPath>[0] = {
+        mediaType,
+        sort: sortBy,
+      };
+      if (statusFilter) params.status = statusFilter;
+      if (showCollectionOwnershipFilters && collectionFilter === "owned") params.own = true;
+      if (showCollectionOwnershipFilters && collectionFilter === "wantToBuy") params.wantToBuy = true;
+      const q = categorySearchQuery.trim();
+      if (q) params.q = q;
+      if (genreFilter) params.genre = genreFilter;
+      if (cursor) params.cursor = cursor;
+      return buildLogsListPath(params);
+    },
+    [
       mediaType,
-      sort: sortBy,
-    };
-    if (statusFilter) params.status = statusFilter;
-    if (showCollectionOwnershipFilters && collectionFilter === "owned") params.own = true;
-    if (showCollectionOwnershipFilters && collectionFilter === "wantToBuy") params.wantToBuy = true;
-    const q = categorySearchQuery.trim();
-    if (q) params.q = q;
-    if (genreFilter) params.genre = genreFilter;
-    return buildLogsListPath(params);
-  }, [
-    mediaType,
-    sortBy,
-    statusFilter,
-    collectionFilter,
-    categorySearchQuery,
-    genreFilter,
-    showCollectionOwnershipFilters,
-  ]);
+      sortBy,
+      statusFilter,
+      collectionFilter,
+      categorySearchQuery,
+      genreFilter,
+      showCollectionOwnershipFilters,
+    ]
+  );
 
   const milestoneProgress = milestoneProgressProp ?? (readOnly ? null : milestoneProgressFetched);
 
@@ -376,7 +380,9 @@ export function MediaLogs({
       if (q) params.set("q", q);
       if (genreFilter) params.set("genre", genreFilter);
       if (!reset && nextCursor) params.set("cursor", nextCursor);
-      const path = publicUserId ? `/users/${publicUserId}/logs?${params.toString()}` : buildLogsPath();
+      const path = publicUserId
+        ? `/users/${publicUserId}/logs?${params.toString()}`
+        : buildLogsPath(!reset ? nextCursor : undefined);
 
       const finish = () => {
         setLoading(false);

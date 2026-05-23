@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -7,8 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { GooglePlayIcon } from "@/components/GooglePlayIcon";
-import { GooglePlayUpdateButton } from "@/components/GooglePlayUpdateButton";
 import { useAppVersion } from "@/contexts/AppVersionContext";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -99,35 +99,18 @@ export function AppVersionModal() {
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
       >
-        <div className="relative overflow-hidden border-b border-[var(--color-surface-border)]/60 px-6 pb-8 pt-10">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#00F076]/12 via-[#4285F4]/6 to-transparent" />
-          <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#FFBA00]/10 blur-2xl" />
-          <div className="pointer-events-none absolute -left-12 top-8 h-32 w-32 rounded-full bg-[#00D6FF]/10 blur-2xl" />
-
-          <div className="relative mx-auto flex w-fit flex-col items-center">
-            <div className="relative">
-              <div className="h-[5.25rem] w-[5.25rem] overflow-hidden rounded-[1.35rem] shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10">
-                <img
-                  src="/logo.png"
-                  alt=""
-                  className="h-full w-full object-cover"
-                  width={84}
-                  height={84}
-                />
-              </div>
-              <div
-                className="absolute -bottom-2 -right-2 flex h-9 w-9 items-center justify-center rounded-xl bg-[#0d0d0d] shadow-lg ring-2 ring-[var(--color-dark)]"
-                title="Google Play"
-              >
-                <GooglePlayIcon className="h-6 w-6" />
-              </div>
-            </div>
-
-            <div className="mt-5 flex items-center gap-2 rounded-full bg-[var(--color-darkest)]/80 px-3 py-1.5 ring-1 ring-[var(--color-surface-border)] backdrop-blur-sm">
-              <GooglePlayIcon className="h-4 w-4" />
-              <span className="text-xs font-medium text-[var(--color-lightest)]">
-                {t("appVersion.playStoreBadge")}
-              </span>
+        <div className="border-b border-[var(--color-surface-border)]/60 px-6 pb-6 pt-8">
+          <div className="mx-auto flex w-fit flex-col items-center">
+            <img
+              src="/logo.png"
+              alt=""
+              className="h-16 w-16 object-contain"
+              width={64}
+              height={64}
+            />
+            <div className="mt-4 flex items-center gap-2 text-[var(--color-light)]">
+              <GooglePlayIcon className="h-4 w-4 shrink-0" />
+              <span className="text-xs font-medium">{t("appVersion.playStoreBadge")}</span>
             </div>
           </div>
         </div>
@@ -166,13 +149,24 @@ export function AppVersionModal() {
         </div>
 
         <DialogFooter className="border-t border-[var(--color-surface-border)]/80 px-6 py-5">
-          <GooglePlayUpdateButton
-            topLabel={t("appVersion.updateOn")}
-            storeLabel={t("appVersion.googlePlay")}
-            loadingLabel={t("appVersion.openingStore")}
-            isLoading={isOpening}
+          <Button
+            type="button"
+            className="btn-gradient w-full"
+            disabled={isOpening}
             onClick={() => void handleUpdate()}
-          />
+          >
+            {isOpening ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                {t("appVersion.openingStore")}
+              </>
+            ) : (
+              <>
+                <GooglePlayIcon className="h-4 w-4" />
+                {t("appVersion.updateButton")}
+              </>
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
