@@ -123,6 +123,16 @@ body {
   [class*="backdrop-blur"] {
     -webkit-backdrop-filter: var(--tw-backdrop-blur, blur(12px));
   }
+
+  .glass-dock {
+    background: color-mix(in srgb, var(--color-dark) 68%, transparent);
+    -webkit-backdrop-filter: blur(22px) saturate(1.35);
+    backdrop-filter: blur(22px) saturate(1.35);
+    border: 1px solid color-mix(in srgb, var(--color-lightest) 14%, transparent);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.42),
+      inset 0 1px 0 color-mix(in srgb, var(--color-lightest) 10%, transparent);
+  }
   /* Bottom drawer (mobile): sheet + scrim share duration/easing so motion reads as one surface (not “fast fade + slow slide”). */
   @media (max-width: 767px) {
     @keyframes drawer-slide-in {

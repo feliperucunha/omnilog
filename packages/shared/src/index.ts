@@ -55,3 +55,10 @@ export {
   mergeProfileVisibility,
   parseProfileVisibilityJson,
 } from "./profileVisibility.js";
+export {
+  ONBOARDING_SPOTLIGHT_IDS,
+  isOnboardingSpotlightId,
+  parseOnboardingSpotlightsDismissedJson,
+  mergeOnboardingSpotlightDismissed,
+} from "./onboardingSpotlights.js";
+export type { OnboardingSpotlightId } from "./onboardingSpotlights.js";

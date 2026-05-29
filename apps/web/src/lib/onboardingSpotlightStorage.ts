@@ -1,85 +1,128 @@
+import type { OnboardingSpotlightId } from "@geeklogs/shared";
+import { apiFetch } from "@/lib/api";
 import * as storage from "@/lib/storage";
 
 const PREFIX = "geeklogs-onboarding-spotlight-";
 
 export const ONBOARDING_SPOTLIGHT_KEYS = {
-  searchCategory: `${PREFIX}search-category`,
-  dashboardImport: `${PREFIX}dashboard-import`,
-  statisticsRecap: `${PREFIX}statistics-recap`,
-} as const;
+  searchCategory: "searchCategory",
+  dashboardImport: "dashboardImport",
+  statisticsRecap: "statisticsRecap",
+} as const satisfies Record<string, OnboardingSpotlightId>;
 
 export type OnboardingSpotlightKey =
   (typeof ONBOARDING_SPOTLIGHT_KEYS)[keyof typeof ONBOARDING_SPOTLIGHT_KEYS];
 
-function readWebLocal(key: OnboardingSpotlightKey): boolean {
+const LEGACY_LOCAL_KEYS: Record<OnboardingSpotlightId, string> = {
+  searchCategory: `${PREFIX}search-category`,
+  dashboardImport: `${PREFIX}dashboard-import`,
+  statisticsRecap: `${PREFIX}statistics-recap`,
+};
+
+function storageKey(id: OnboardingSpotlightId): string {
+  return `${PREFIX}${id}`;
+}
+
+function readWebLocal(id: OnboardingSpotlightId): boolean {
   try {
-    return localStorage.getItem(key) === "1";
+    if (localStorage.getItem(storageKey(id)) === "1") return true;
+    if (localStorage.getItem(LEGACY_LOCAL_KEYS[id]) === "1") return true;
   } catch {
     return false;
-  }
-}
-
-function writeWebLocal(key: OnboardingSpotlightKey): void {
-  try {
-    localStorage.setItem(key, "1");
-  } catch {
-    /* ignore */
-  }
-}
-
-/**
- * Web: synchronous localStorage.
- * Native (Capacitor): SharedPreferences via Preferences — survives Android app updates more reliably than WebView localStorage alone.
- */
-export async function loadOnboardingSpotlightDismissed(key: OnboardingSpotlightKey): Promise<boolean> {
-  if (typeof window === "undefined") return true;
-  if (!storage.isNativePlatform()) {
-    return readWebLocal(key);
-  }
-  try {
-    const v = await storage.getItem(key);
-    if (v === "1") return true;
-    if (readWebLocal(key)) {
-      await storage.setItem(key, "1");
-      return true;
-    }
-  } catch {
-    if (readWebLocal(key)) return true;
   }
   return false;
 }
 
-export async function saveOnboardingSpotlightDismissed(key: OnboardingSpotlightKey): Promise<void> {
-  if (typeof window === "undefined") return;
-  if (!storage.isNativePlatform()) {
-    writeWebLocal(key);
-    return;
-  }
+function writeWebLocal(id: OnboardingSpotlightId): void {
   try {
-    await storage.setItem(key, "1");
+    localStorage.setItem(storageKey(id), "1");
   } catch {
     /* ignore */
   }
-  writeWebLocal(key);
 }
 
-/** Sync read for web only; on native returns false (caller must load async). */
-export function isOnboardingSpotlightDoneSync(key: OnboardingSpotlightKey): boolean {
+export function isOnboardingSpotlightDismissedForAccount(
+  id: OnboardingSpotlightId,
+  dismissedFromServer: string[] | undefined
+): boolean {
+  return dismissedFromServer?.includes(id) ?? false;
+}
+
+export async function loadOnboardingSpotlightDismissed(
+  id: OnboardingSpotlightId,
+  options?: { dismissedFromServer?: string[]; hasToken?: boolean }
+): Promise<boolean> {
+  if (options?.hasToken) {
+    if (isOnboardingSpotlightDismissedForAccount(id, options.dismissedFromServer ?? [])) {
+      return true;
+    }
+    return readWebLocal(id);
+  }
+
   if (typeof window === "undefined") return true;
-  if (storage.isNativePlatform()) return false;
+  if (!storage.isNativePlatform()) {
+    return readWebLocal(id);
+  }
   try {
-    return localStorage.getItem(key) === "1";
+    const v = await storage.getItem(storageKey(id));
+    if (v === "1") return true;
+    if (readWebLocal(id)) {
+      await storage.setItem(storageKey(id), "1");
+      return true;
+    }
   } catch {
-    return true;
+    if (readWebLocal(id)) return true;
+  }
+  return false;
+}
+
+export async function saveOnboardingSpotlightDismissed(
+  id: OnboardingSpotlightId,
+  options?: {
+    hasToken?: boolean;
+    onServerDismissed?: (next: string[]) => void;
+  }
+): Promise<void> {
+  writeWebLocal(id);
+  if (storage.isNativePlatform()) {
+    try {
+      await storage.setItem(storageKey(id), "1");
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (options?.hasToken) {
+    const res = await apiFetch<{ onboardingSpotlightsDismissed: string[] }>(
+      "/me/onboarding-spotlights/dismiss",
+      {
+        method: "POST",
+        body: JSON.stringify({ spotlight: id }),
+      }
+    );
+    options.onServerDismissed?.(res.onboardingSpotlightsDismissed ?? []);
   }
 }
 
-/** @deprecated Prefer saveOnboardingSpotlightDismissed — kept for call-site clarity */
-export async function setOnboardingSpotlightDone(key: OnboardingSpotlightKey): Promise<void> {
-  await saveOnboardingSpotlightDismissed(key);
+export function isOnboardingSpotlightDoneSync(
+  id: OnboardingSpotlightId,
+  dismissedFromServer?: string[]
+): boolean {
+  if (dismissedFromServer) {
+    return isOnboardingSpotlightDismissedForAccount(id, dismissedFromServer);
+  }
+  if (typeof window === "undefined") return true;
+  if (storage.isNativePlatform()) return false;
+  return readWebLocal(id);
 }
 
-/** Find the first element with a non-zero layout box (e.g. desktop vs mobile duplicate targets). */
+export async function setOnboardingSpotlightDone(
+  id: OnboardingSpotlightId,
+  options?: Parameters<typeof saveOnboardingSpotlightDismissed>[1]
+): Promise<void> {
+  await saveOnboardingSpotlightDismissed(id, options);
+}
+
 export function getFirstVisibleByIds(ids: string[]): HTMLElement | null {
   for (const id of ids) {
     const el = document.getElementById(id);

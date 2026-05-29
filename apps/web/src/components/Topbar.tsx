@@ -1,5 +1,5 @@
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Settings, Info, LogOut, Loader2 } from "lucide-react";
+import { Settings, Info, LogOut, Loader2, CreditCard } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -148,7 +148,7 @@ export function Topbar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 max-md:min-h-[40px] max-md:min-w-[40px] max-md:h-10 max-md:10 rounded-full border border-[var(--color-light)] bg-[var(--color-mid)]/30 p-0 text-lg font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/50 focus-visible:ring-0 focus-visible:ring-offset-0"
+                className="h-10 w-10 max-md:min-h-[40px] max-md:min-w-[40px] max-md:h-10 max-md:w-10 rounded-full border border-[var(--color-light)] bg-[var(--color-mid)]/30 p-0 text-lg font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/50 focus-visible:ring-0 focus-visible:ring-offset-0"
                 aria-label={t("nav.settings")}
               >
                 {initial}
@@ -192,6 +192,12 @@ export function Topbar() {
                 </div>
               </div>
               <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/tiers" className="flex items-center gap-2">
+                  <CreditCard className="size-4" />
+                  {t("nav.plans")}
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link to="/settings" className="flex items-center gap-2">
                   <Settings className="size-4" />

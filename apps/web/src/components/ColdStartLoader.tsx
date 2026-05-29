@@ -13,6 +13,8 @@ const COLD_START_PROGRESS_DURATION_MS = 180_000;
 const MAX_TOTAL_WAIT_MS = 180_000;
 /** Show “server may be sleeping” hint after this many ms. */
 const SERVER_SLEEPING_HINT_MS = 15_000;
+/** Native: keep Capacitor splash until session restore finishes, for at least this long. */
+const NATIVE_MIN_SPLASH_MS = 1_200;
 
 type LoaderState = "loading" | "success" | "timed_out" | "error";
 
@@ -28,11 +30,12 @@ export function ColdStartLoader() {
   const [elapsedMs, setElapsedMs] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
   const rafRef = useRef<number>(0);
+  const [nativeMinSplashElapsed, setNativeMinSplashElapsed] = useState(!isNative());
 
-  /** On native (Android/iOS), skip the cold-start loader so the app is not stuck in a 0–100% → Try again loop when the first request fails or times out (e.g. network/API URL). The app then shows normally and any API errors appear in context. */
   useEffect(() => {
     if (!isNative()) return;
-    import("@capacitor/splash-screen").then(({ SplashScreen }) => SplashScreen.hide());
+    const id = setTimeout(() => setNativeMinSplashElapsed(true), NATIVE_MIN_SPLASH_MS);
+    return () => clearTimeout(id);
   }, []);
 
   useEffect(() => {
@@ -43,12 +46,12 @@ export function ColdStartLoader() {
     });
   }, []);
 
+  const nativeSplashReady = !initializing && nativeMinSplashElapsed;
+
   useEffect(() => {
-    if (state === "loading") return;
-    if (isNative()) {
-      import("@capacitor/splash-screen").then(({ SplashScreen }) => SplashScreen.hide());
-    }
-  }, [state]);
+    if (!isNative() || !nativeSplashReady) return;
+    import("@capacitor/splash-screen").then(({ SplashScreen }) => SplashScreen.hide());
+  }, [nativeSplashReady]);
 
   useEffect(() => {
     if (state !== "loading") return;

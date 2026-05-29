@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { MEDIA_TYPES } from "@geeklogs/shared";
+import { MEDIA_TYPES, isOnboardingSpotlightId } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { sanitizeText } from "../lib/sanitize.js";
 import { authMiddleware } from "../middleware/auth.js";
@@ -10,6 +10,11 @@ import { getNextBoardGameCollectionImportTime } from "../services/boardGameColle
 import { isBetaBannerEnabled, isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
 import { APP_SETTING_KEYS, getAppSettingValue } from "../lib/appSettings.js";
 import { getProfileVisibilityFromUser } from "../lib/profileVisibility.js";
+import {
+  addDismissedOnboardingSpotlight,
+  getOnboardingSpotlightsDismissed,
+  serializeOnboardingSpotlightsDismissed,
+} from "../lib/onboardingSpotlights.js";
 
 export const meRouter = Router();
 
@@ -18,6 +23,10 @@ meRouter.use(authMiddleware);
 const productEventSchema = z.object({
   name: z.string().min(1).max(64),
   props: z.record(z.string(), z.unknown()).optional(),
+});
+
+const dismissSpotlightSchema = z.object({
+  spotlight: z.string().refine((v) => isOnboardingSpotlightId(v), { message: "Invalid spotlight id" }),
 });
 
 /** POST /me/product-events — structured product analytics (logged server-side; wire to your pipeline later). */
@@ -42,6 +51,33 @@ meRouter.post("/product-events", async (req: AuthenticatedRequest, res) => {
     })
   );
   res.json({ ok: true });
+});
+
+/** POST /me/onboarding-spotlights/dismiss — record tutorial balloon dismissed (once per account). */
+meRouter.post("/onboarding-spotlights/dismiss", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const parsed = dismissSpotlightSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { onboardingSpotlightsDismissed: true },
+  });
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const next = addDismissedOnboardingSpotlight(
+    user.onboardingSpotlightsDismissed,
+    parsed.data.spotlight
+  );
+  await prisma.user.update({
+    where: { id: req.user.userId },
+    data: { onboardingSpotlightsDismissed: serializeOnboardingSpotlightsDismissed(next) },
+  });
+  res.json({ onboardingSpotlightsDismissed: next });
 });
 
 /** GET /me/milestones/progress - Per-medium and global milestone progress (reviews + logs). Simple next-milestone + progress. */
@@ -103,6 +139,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       ludopediaApiToken: true,
       comicVineApiKey: true,
       lastBoardGameCollectionImportAt: true,
+      onboardingSpotlightsDismissed: true,
     },
   });
   if (!user) {
@@ -176,6 +213,10 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     user.lastBoardGameCollectionImportAt
   );
 
+  const onboardingSpotlightsDismissed = getOnboardingSpotlightsDismissed(
+    user.onboardingSpotlightsDismissed
+  );
+
   res.json({
     user: {
       id: user.id,
@@ -183,6 +224,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       email: user.email,
       onboarded: user.onboarded,
     },
+    onboardingSpotlightsDismissed,
     theme,
     locale,
     recapEmailsEnabled: user.recapEmailsEnabled ?? true,

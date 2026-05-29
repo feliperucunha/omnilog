@@ -27,7 +27,7 @@ function AppLayoutContent() {
       <Topbar />
       <div
         ref={setScrollEl}
-        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto max-md:[scroll-padding-bottom:max(5.5rem,calc(4.75rem+env(safe-area-inset-bottom)))]"
       >
         <PullToRefreshIndicator
           pullRawDy={ptr.pullRawDy}
@@ -39,7 +39,7 @@ function AppLayoutContent() {
             {belowNavbar}
           </div>
         )}
-        <div className="flex min-w-0 flex-1 flex-col p-4 md:p-6">
+        <div className="flex min-w-0 flex-1 flex-col p-4 max-md:pb-[max(5.5rem,calc(4.75rem+env(safe-area-inset-bottom)))] md:p-6">
           <InvalidApiKeyBanner />
           <Outlet />
           <AdBanner />
@@ -86,7 +86,7 @@ export function AppLayout() {
     <div className="flex h-dvh min-h-0 min-w-0">
       <Nav />
       <main
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-[max(6rem,calc(6rem+env(safe-area-inset-bottom)))] md:pb-6 md:pl-[255px]"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-0 md:pb-6 md:pl-[255px]"
       >
         <PageTitleProvider>
           <AppLayoutContent />

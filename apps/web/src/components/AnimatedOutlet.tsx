@@ -1,18 +1,22 @@
 import { useLocation, Outlet } from "react-router-dom";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { pageTransition } from "@/lib/animations";
+import { getMainNavTransitionKey } from "@/lib/mainNav";
 
 export function AnimatedOutlet() {
   const location = useLocation();
+  const transitionKey = getMainNavTransitionKey(location.pathname);
   return (
-    <motion.div
-      key={location.pathname}
-      className="flex flex-col min-h-0 flex-1"
-      {...pageTransition}
-    >
-      <div className="flex flex-1 flex-col min-h-0">
-        <Outlet />
-      </div>
-    </motion.div>
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={transitionKey}
+        className="flex min-h-0 flex-1 flex-col"
+        {...pageTransition}
+      >
+        <div className="flex min-h-0 flex-1 flex-col">
+          <Outlet />
+        </div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

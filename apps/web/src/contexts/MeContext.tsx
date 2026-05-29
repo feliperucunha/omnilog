@@ -46,6 +46,7 @@ export interface MeResponse {
       message: string;
     };
   };
+  onboardingSpotlightsDismissed?: string[];
 }
 
 interface MeContextValue {

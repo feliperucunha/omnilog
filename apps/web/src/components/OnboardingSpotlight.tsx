@@ -2,6 +2,8 @@ import { useCallback, useEffect, useId, useLayoutEffect, useState, type CSSPrope
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useMe } from "@/contexts/MeContext";
 import {
   loadOnboardingSpotlightDismissed,
   saveOnboardingSpotlightDismissed,
@@ -49,6 +51,9 @@ export function OnboardingSpotlight({
   className,
 }: OnboardingSpotlightProps) {
   const { t } = useLocale();
+  const { token } = useAuth();
+  const { me, loading: meLoading, refetch: refetchMe } = useMe();
+  const dismissedFromServer = me?.onboardingSpotlightsDismissed;
   const titleId = useId().replace(/:/g, "");
   const maskId = useId().replace(/:/g, "");
   const [dismissed, setDismissed] = useState<boolean | null>(null);
@@ -60,14 +65,18 @@ export function OnboardingSpotlight({
   useEffect(() => {
     if (!enabled) return;
     if (dismissed !== null) return;
+    if (token && meLoading) return;
     let cancelled = false;
-    void loadOnboardingSpotlightDismissed(storageKey).then((done) => {
+    void loadOnboardingSpotlightDismissed(storageKey, {
+      hasToken: !!token,
+      dismissedFromServer: token ? dismissedFromServer : undefined,
+    }).then((done) => {
       if (!cancelled) setDismissed(done);
     });
     return () => {
       cancelled = true;
     };
-  }, [storageKey, enabled, dismissed]);
+  }, [storageKey, enabled, dismissed, token, meLoading, dismissedFromServer]);
 
   const updateLayout = useCallback(() => {
     if (dismissed !== false || !enabled) {
@@ -154,11 +163,15 @@ export function OnboardingSpotlight({
   }, [active, enabled, dismissed, updateLayout]);
 
   const close = useCallback(() => {
-    void saveOnboardingSpotlightDismissed(storageKey).finally(() => {
-      setDismissed(true);
-      setActive(false);
+    setDismissed(true);
+    setActive(false);
+    void saveOnboardingSpotlightDismissed(storageKey, {
+      hasToken: !!token,
+      onServerDismissed: () => {
+        void refetchMe();
+      },
     });
-  }, [storageKey]);
+  }, [storageKey, token, refetchMe]);
 
   useEffect(() => {
     if (!active || !enabled || dismissed !== false) return;

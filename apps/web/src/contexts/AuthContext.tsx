@@ -59,11 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [location.pathname, signingOut]);
 
-  /** On native, never block on "checking session" – start ready so the app shows immediately. Session restore runs in background. */
   const [state, setState] = useState<AuthState>(() => ({
     token: null,
     user: null,
-    initializing: !isNative(),
+    initializing: true,
   }));
 
   /** Load from storage first (web: localStorage + cookie; native: Capacitor Preferences + localStorage fallback). Then cookie /me on web if none. */
@@ -71,14 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     const native = isNative();
 
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    if (!native) {
-      /** Web: safety timeout if /me hangs (storage is sync-friendly). Long enough for cold-start retries in api.ts. */
-      timeoutId = setTimeout(() => {
-        if (cancelled) return;
-        setState((prev) => (prev.initializing ? { ...prev, initializing: false } : prev));
-      }, 120_000);
-    }
+    const authTimeoutMs = native ? 60_000 : 120_000;
+    const timeoutId = setTimeout(() => {
+      if (cancelled) return;
+      setState((prev) => (prev.initializing ? { ...prev, initializing: false } : prev));
+    }, authTimeoutMs);
 
     (async () => {
       try {
@@ -88,6 +84,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ]);
         if (cancelled) return;
         if (token && userJson && token !== COOKIE_SESSION) {
+          try {
+            const parsed = JSON.parse(userJson) as User;
+            setState({
+              token,
+              user: { ...parsed, onboarded: parsed.onboarded ?? true },
+              initializing: true,
+            });
+          } catch {
+            // ignore corrupt cache; validate via /me below
+          }
           try {
             const data = await apiFetch<{ user: User }>("/me", {
               skipAuthRedirect: true,
