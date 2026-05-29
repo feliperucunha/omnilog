@@ -1,68 +1,27 @@
-import { useCallback, useState } from "react";
-import { ArrowRight, Loader2 } from "lucide-react";
-import { DialogTitle } from "@/components/ui/dialog";
+import { useState } from "react";
+import { ArrowUpCircle, Loader2 } from "lucide-react";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { GooglePlayIcon } from "@/components/GooglePlayIcon";
 import { useAppVersion } from "@/contexts/AppVersionContext";
-import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { useLocale } from "@/contexts/LocaleContext";
 import { APP_VERSION } from "@geeklogs/shared";
 import { openAppStoreForUpdate } from "@/lib/appStoreLinks";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-function VersionCard({
-  label,
-  version,
-  variant,
-}: {
-  label: string;
-  version: string;
-  variant: "current" | "required";
-}) {
-  const isRequired = variant === "required";
-  return (
-    <div
-      className={cn(
-        "flex min-w-0 flex-1 flex-col gap-1 rounded-xl px-3 py-2.5 text-left",
-        isRequired
-          ? "bg-[var(--btn-gradient-start)]/12 ring-1 ring-[var(--btn-gradient-start)]/35"
-          : "bg-[var(--color-darkest)]/90 ring-1 ring-[var(--color-surface-border)]"
-      )}
-    >
-      <span
-        className={cn(
-          "text-[10px] font-semibold uppercase tracking-[0.12em]",
-          isRequired ? "text-[var(--btn-gradient-start)]" : "text-[var(--color-mid)]"
-        )}
-      >
-        {label}
-      </span>
-      <span
-        className={cn(
-          "truncate text-base font-semibold tabular-nums tracking-tight",
-          isRequired ? "text-[var(--color-lightest)]" : "text-[var(--color-light)]"
-        )}
-      >
-        v{version}
-      </span>
-    </div>
-  );
-}
-
 export function AppVersionModal() {
   const { t } = useLocale();
   const ctx = useAppVersion();
   const showVersionModal = ctx?.showVersionModal ?? false;
-  const setShowVersionModal = ctx?.setShowVersionModal;
   const isNative = ctx?.isNative ?? false;
-  const requiredVersion = ctx?.requiredVersion;
+  const latestVersion = ctx?.latestVersion;
+  const dismissUpdatePrompt = ctx?.dismissUpdatePrompt;
   const [isOpening, setIsOpening] = useState(false);
 
-  const handleClose = useCallback(() => {
-    setShowVersionModal?.(false);
-  }, [setShowVersionModal]);
+  const handleDismiss = () => {
+    dismissUpdatePrompt?.();
+  };
 
   const handleUpdate = async () => {
     if (isOpening) return;
@@ -82,66 +41,85 @@ export function AppVersionModal() {
     <Drawer
       open={showVersionModal}
       onOpenChange={(open) => {
-        if (!open) handleClose();
+        if (!open) handleDismiss();
       }}
     >
       <DrawerContent
-        onClose={handleClose}
-        overlayClassName="z-[300] bg-black/85 backdrop-blur-md"
+        onClose={handleDismiss}
+        overlayClassName="z-[300] bg-black/60 backdrop-blur-sm"
         mobileHeight="auto"
-        className="z-[300] flex max-w-[24rem] flex-col gap-0 overflow-hidden p-0 md:max-w-[24rem]"
+        className="z-[300] max-w-[26rem] gap-0 overflow-hidden border-[var(--color-surface-border)]/50 bg-[var(--color-dark)] p-0 md:max-w-[26rem]"
       >
-        <div className="border-b border-[var(--color-surface-border)]/60 px-6 pb-6 pt-4 md:pt-6">
-          <div className="mx-auto flex w-fit flex-col items-center">
-            <img
-              src="/logo.png"
-              alt=""
-              className="h-16 w-16 object-contain"
-              width={64}
-              height={64}
-            />
-            <div className="mt-4 flex items-center gap-2 text-[var(--color-light)]">
-              <GooglePlayIcon className="h-4 w-4 shrink-0" />
-              <span className="text-xs font-medium">{t("appVersion.playStoreBadge")}</span>
+        <div className="relative overflow-hidden px-6 pb-1 pt-3">
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[var(--btn-gradient-start)]/20 via-[var(--btn-gradient-end)]/8 to-transparent"
+            aria-hidden
+          />
+          <div className="relative flex flex-col items-center text-center">
+            <div
+              className={cn(
+                "flex h-14 w-14 items-center justify-center rounded-2xl",
+                "bg-gradient-to-br from-[var(--btn-gradient-start)]/25 to-[var(--btn-gradient-end)]/15",
+                "ring-1 ring-[var(--btn-gradient-start)]/30 shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+              )}
+            >
+              <ArrowUpCircle
+                className="h-7 w-7 text-[var(--btn-gradient-start)]"
+                strokeWidth={1.75}
+                aria-hidden
+              />
             </div>
+            <h2 className="mt-4 text-xl font-semibold tracking-tight text-[var(--color-lightest)]">
+              {t("appVersion.title")}
+            </h2>
+            <p className="mt-2 max-w-[18rem] text-sm leading-relaxed text-[var(--color-light)]">
+              {t("appVersion.message")}
+            </p>
           </div>
         </div>
 
-        <div className="flex flex-col px-6 pb-2 pt-6 text-center">
-          <DialogTitle className="min-w-0 text-[1.35rem] font-semibold leading-tight text-[var(--color-lightest)]">
-            <OverflowMarquee>{t("appVersion.title")}</OverflowMarquee>
-          </DialogTitle>
-
-          <p className="mt-3 text-sm leading-relaxed text-[var(--color-light)]">
-            {t("appVersion.message")}
-          </p>
-
-          {requiredVersion ? (
-            <div className="mt-5 flex items-stretch gap-2">
-              <VersionCard
-                label={t("appVersion.currentShort")}
-                version={APP_VERSION}
-                variant="current"
-              />
+        {latestVersion ? (
+          <div className="mx-6 mt-4 rounded-2xl bg-[var(--color-darkest)]/80 p-4 ring-1 ring-[var(--color-surface-border)]/80">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 text-left">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-mid)]">
+                  {t("appVersion.currentShort")}
+                </p>
+                <p className="mt-0.5 text-base font-semibold tabular-nums text-[var(--color-light)]">
+                  v{APP_VERSION}
+                </p>
+              </div>
               <div
-                className="flex shrink-0 items-center justify-center text-[var(--color-mid)]"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-mid)]/20 text-[var(--color-light)]"
                 aria-hidden
               >
-                <ArrowRight className="h-4 w-4" />
+                →
               </div>
-              <VersionCard
-                label={t("appVersion.requiredShort")}
-                version={requiredVersion}
-                variant="required"
-              />
+              <div className="min-w-0 text-right">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--btn-gradient-start)]">
+                  {t("appVersion.latestShort")}
+                </p>
+                <p className="mt-0.5 text-base font-semibold tabular-nums text-[var(--color-lightest)]">
+                  v{latestVersion}
+                </p>
+              </div>
             </div>
-          ) : null}
-        </div>
+            <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-[var(--color-light)]">
+              <GooglePlayIcon className="h-3.5 w-3.5 shrink-0 opacity-80" />
+              <span>{t("appVersion.playStoreBadge")}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="mx-6 mt-4 flex items-center justify-center gap-1.5 rounded-2xl bg-[var(--color-darkest)]/60 px-4 py-3 text-xs text-[var(--color-light)] ring-1 ring-[var(--color-surface-border)]/60">
+            <GooglePlayIcon className="h-3.5 w-3.5 shrink-0" />
+            <span>{t("appVersion.playStoreBadge")}</span>
+          </div>
+        )}
 
-        <DrawerFooter className="flex-col gap-2 border-t border-[var(--color-surface-border)]/80 px-6 py-5">
+        <DrawerFooter className="mt-2 flex-col gap-2.5 border-0 bg-transparent px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5">
           <Button
             type="button"
-            className="btn-gradient w-full"
+            className="btn-gradient h-12 w-full rounded-xl text-base font-semibold shadow-[0_4px_20px_rgba(0,0,0,0.25)]"
             disabled={isOpening}
             onClick={() => void handleUpdate()}
           >
@@ -157,15 +135,14 @@ export function AppVersionModal() {
               </>
             )}
           </Button>
-          <Button
+          <button
             type="button"
-            variant="outline"
-            className="w-full"
+            className="w-full py-2.5 text-sm font-medium text-[var(--color-light)] transition-colors hover:text-[var(--color-lightest)] disabled:opacity-50"
             disabled={isOpening}
-            onClick={handleClose}
+            onClick={handleDismiss}
           >
-            {t("common.close")}
-          </Button>
+            {t("appVersion.notNow")}
+          </button>
         </DrawerFooter>
       </DrawerContent>
     </Drawer>

@@ -20,7 +20,7 @@ import {
   FOLLOWS_PATH,
   loadWithSWR,
   MILESTONES_PATH,
-  prefetchDashboardCategoryView,
+  prefetchDashboardPageCaches,
   registerFollowedUserIds,
   registerLogsPageCacheContext,
   warmFriendFeedCaches,
@@ -385,12 +385,12 @@ export function Dashboard() {
       tzOffsetMinutes,
       isPro,
     });
-  }, [visibleTypes, visibleTypesOrderReady, tzOffsetMinutes, isPro]);
-
-  useEffect(() => {
-    if (!visibleTypesOrderReady) return;
-    prefetchDashboardCategoryView(selectedCategory, new URLSearchParams(searchParamsKey));
-  }, [visibleTypesOrderReady, selectedCategory, searchParamsKey]);
+    prefetchDashboardPageCaches(
+      visibleTypes,
+      selectedCategory,
+      new URLSearchParams(searchParamsKey)
+    );
+  }, [visibleTypes, visibleTypesOrderReady, tzOffsetMinutes, isPro, selectedCategory, searchParamsKey]);
 
   useEffect(() => {
     fetchFollows();

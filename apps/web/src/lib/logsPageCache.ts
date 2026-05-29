@@ -177,6 +177,25 @@ export function prefetchDashboardCategoryView(
   prefetchGet(buildStatusCountsPath(mediaType));
 }
 
+export function prefetchDashboardPageCaches(
+  mediaTypes: MediaType[],
+  category?: MediaType,
+  searchParams?: URLSearchParams
+): void {
+  prefetchGet("/logs/counts");
+  for (const mt of mediaTypes) {
+    prefetchGet(buildDefaultLogsListPath(mt));
+    prefetchGet(buildStatusCountsPath(mt));
+  }
+  if (category != null && searchParams) {
+    prefetchDashboardCategoryView(category, searchParams);
+  }
+}
+
+export function revalidateLogsListInBackground(path: string): void {
+  void apiFetchSWR(path, { ttlMs: HEAVY_PAGE_TTL_MS });
+}
+
 export function warmDashboardLogsCaches(
   mediaTypes: MediaType[] = registeredMediaTypes,
   followedUserIds?: string[],

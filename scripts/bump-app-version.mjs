@@ -54,7 +54,7 @@ const build = spawnSync(
 );
 if (build.status !== 0) {
   console.error(
-    "bump-app-version: failed to rebuild @geeklogs/shared. The API reads APP_VERSION from packages/shared/dist/version.js; without this rebuild it will keep the previous version and the web will get APP_VERSION_MISMATCH 401s."
+    "bump-app-version: failed to rebuild @geeklogs/shared. The API reads APP_VERSION from packages/shared/dist/version.js; without this rebuild /api/health may report a stale version for the optional update prompt."
   );
   process.exit(build.status === null ? 1 : build.status);
 }

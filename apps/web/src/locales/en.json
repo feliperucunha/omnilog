@@ -257,8 +257,6 @@
     "adminFlag_wake_api_ping_hint": "While the app is open, periodically pings the API so free hosts that sleep after idle (e.g. Koyeb) stay warm. The app also pings once on every load to start waking the API. You can set API env WAKE_API_PING_ENABLED=true instead of this flag. Turn off when you move to a paid always-on plan.",
     "adminFlag_beta_banner_enabled": "Show initial welcome banner",
     "adminFlag_beta_banner_enabled_hint": "When on, users who have not dismissed it yet see the welcome / beta announcement modal on the dashboard (content is editable under Beta banner message). When off, that modal is not shown.",
-    "adminFlag_ignore_app_version_check": "Ignore native app version gate",
-    "adminFlag_ignore_app_version_check_hint": "When on, the API accepts any X-App-Version and native clients do not show the update-required screen. Use for testing or temporary compatibility; leave off in production.",
     "adminDigestTitle": "Monthly recap email",
     "adminDigestIntro": "Sends a digest for the previous calendar month (UTC) to your account email. The API must have SMTP configured.",
     "adminDigestSend": "Send recap to my email",
@@ -924,19 +922,15 @@
     "logLimitReached": "You've reached the 500-log limit on the Free plan. Upgrade to Pro for unlimited logs."
   },
   "appVersion": {
-    "title": "Update required",
-    "message": "A new version of Geeklogs is available on the Play Store. Update now to keep using the app.",
+    "title": "Update available",
+    "message": "A newer Geeklogs is on Google Play with fixes and improvements. You can keep using this version or update whenever you like.",
     "updateButton": "Update on Google Play",
+    "notNow": "Not now",
     "playStoreBadge": "Google Play",
-    "updateOn": "Update on",
-    "googlePlay": "Google Play",
     "openingStore": "Opening…",
     "currentShort": "Installed",
-    "requiredShort": "Required",
-    "openStoreFailed": "Couldn’t open the Play Store. Try again or search for Geeklogs in the Play Store app.",
-    "currentLabel": "Installed · {{version}}",
-    "requiredLabel": "Required · {{version}}",
-    "versionHint": "Your version: {{current}} · Required: {{required}}"
+    "latestShort": "Latest",
+    "openStoreFailed": "Couldn’t open the Play Store. Try again or search for Geeklogs in the Play Store app."
   },
   "coldStart": {
     "error": "Geeklogs couldn’t finish loading. Check that you’re online, then tap Try again. If you haven’t opened the app in a while, it may need a little extra time the first time.",
@@ -949,7 +943,7 @@
     "code_FORBIDDEN": "You don’t have access to that. If that surprises you, sign out and sign back in, or contact support.",
     "code_NOT_FOUND": "We couldn’t find what you were looking for. It may have been removed, or the link might be old.",
     "code_CLIENT_ERROR": "We couldn’t make sense of that action. Double-check what you entered and try again.",
-    "code_VERSION_MISMATCH": "This version of Geeklogs is too old. Update it from the App Store, Play Store, or wherever you installed it, then open the app again.",
+    "code_VERSION_MISMATCH": "Something went wrong while loading. Tap Try again, or install the latest update from your app store if one is available.",
     "code_UNKNOWN": "Something unexpected went wrong while loading. Tap Try again. If it keeps happening, close the app completely and open it again, or install the latest update."
   },
   "errorBoundary": {

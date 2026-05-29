@@ -236,8 +236,6 @@
     "adminFlag_wake_api_ping_hint": "Con la app abierta, hace pings periódicos para que hosts gratuitos que duermen (p. ej. Koyeb) no enfríen tanto. La app también hace un ping al cargar para empezar a despertar la API. Puedes usar la variable WAKE_API_PING_ENABLED=true en la API en lugar de esta opción. Desactívalo si pasas a un plan siempre activo.",
     "adminFlag_beta_banner_enabled": "Mostrar banner de bienvenida inicial",
     "adminFlag_beta_banner_enabled_hint": "Si está activo, quienes aún no lo cerraron ven el modal de bienvenida / beta en el panel (el texto se edita en Mensaje del banner beta). Si está desactivado, ese modal no se muestra.",
-    "adminFlag_ignore_app_version_check": "Omitir control de versión en la app nativa",
-    "adminFlag_ignore_app_version_check_hint": "Si está activo, la API acepta cualquier X-App-Version y las apps nativas no muestran la pantalla de actualización obligatoria. Úsalo para pruebas o compatibilidad temporal; en producción déjalo desactivado.",
     "adminDigestTitle": "Correo de resumen mensual",
     "adminDigestIntro": "Envía un resumen del mes civil anterior (UTC) a tu correo de la cuenta. La API debe tener SMTP configurado.",
     "adminDigestSend": "Enviar resumen a mi correo",
@@ -904,19 +902,15 @@
     "logLimitReached": "Has alcanzado el límite de 500 logs del plan Gratis. Pasa a Pro para logs ilimitados."
   },
   "appVersion": {
-    "title": "Actualización obligatoria",
-    "message": "Hay una nueva versión de Geeklogs en Play Store. Actualiza ahora para seguir usando la app.",
+    "title": "Actualización disponible",
+    "message": "Hay una versión más nueva de Geeklogs en Play Store con mejoras. Puedes seguir con esta versión o actualizar cuando quieras.",
     "updateButton": "Actualizar en Google Play",
+    "notNow": "Ahora no",
     "playStoreBadge": "Google Play",
-    "updateOn": "Actualizar en",
-    "googlePlay": "Google Play",
     "openingStore": "Abriendo…",
-    "openStoreFailed": "No se pudo abrir Play Store. Inténtalo de nuevo o busca Geeklogs en la app de Play Store.",
     "currentShort": "Instalada",
-    "requiredShort": "Requerida",
-    "currentLabel": "Instalada · {{version}}",
-    "requiredLabel": "Requerida · {{version}}",
-    "versionHint": "Tu versión: {{current}} · Requerida: {{required}}"
+    "latestShort": "Última",
+    "openStoreFailed": "No se pudo abrir Play Store. Inténtalo de nuevo o busca Geeklogs en la app de Play Store."
   },
   "coldStart": {
     "error": "Geeklogs no pudo terminar de cargar. Comprueba que tienes internet y pulsa Reintentar. Si hace tiempo que no abres la app, la primera vez puede tardar un poco más.",
@@ -929,7 +923,7 @@
     "code_FORBIDDEN": "No tienes acceso a eso. Si te sorprende, cierra sesión y vuelve a entrar, o contacta con soporte.",
     "code_NOT_FOUND": "No encontramos lo que buscas. Puede haberse eliminado o el enlace puede estar antiguo.",
     "code_CLIENT_ERROR": "No pudimos entender esa acción. Revisa lo que escribiste e inténtalo de nuevo.",
-    "code_VERSION_MISMATCH": "Esta versión de Geeklogs es antigua. Actualízala en la App Store, Play Store o donde la instalaste y vuelve a abrir la app.",
+    "code_VERSION_MISMATCH": "Algo falló al cargar. Pulsa Reintentar o instala la última actualización en tu tienda de apps, si hay una.",
     "code_UNKNOWN": "Pasó algo inesperado al cargar. Pulsa Reintentar. Si sigue pasando, cierra la app por completo y ábrela de nuevo, o instala la última actualización."
   },
   "errorBoundary": {

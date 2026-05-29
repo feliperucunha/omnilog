@@ -24,6 +24,7 @@ import {
   buildLogsListPath,
   buildLogsListPathFromFilters,
   readCachedLogsListResponse,
+  revalidateLogsListInBackground,
   upsertLogInClientCaches,
 } from "@/lib/logsPageCache";
 import { LogForm } from "@/components/LogForm";
@@ -432,8 +433,8 @@ export function MediaLogs({
           setError(null);
         },
       })
-        .then(({ data }) => {
-          applyLogsResponse(data, true);
+        .then(({ data, fromCache }) => {
+          if (!fromCache) applyLogsResponse(data, true);
           setError(null);
         })
         .catch((err) => {
@@ -528,13 +529,19 @@ export function MediaLogs({
       setNextCursor(cached.cursor);
       setError(null);
       setLoading(false);
-    } else {
+      revalidateLogsListInBackground(path);
+      return;
+    }
+
+    setError(null);
+    if (logsRef.current.length === 0) {
       setLogs([]);
       setNextCursor(null);
-      setError(null);
       setLoading(true);
+      fetchLogsRef.current(true);
+    } else {
+      fetchLogsRef.current(true);
     }
-    fetchLogsRef.current(true);
   }, [
     mediaType,
     statusFilter,
@@ -772,7 +779,7 @@ export function MediaLogs({
   if (loading && logs.length === 0) {
     return (
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={embedded ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.2 }}
       >
@@ -1288,7 +1295,12 @@ export function MediaLogs({
           )}
         </motion.div>
       ) : (
-        <motion.div variants={staggerContainer} initial="initial" animate="animate" className="min-w-0 overflow-hidden">
+        <motion.div
+          variants={staggerContainer}
+          initial={embedded ? false : "initial"}
+          animate="animate"
+          className="min-w-0 overflow-hidden"
+        >
           <div className={LOG_LIST_CARD_GRID}>
             {logs.map((log) => {
               const isDropped = log.status === "dropped";

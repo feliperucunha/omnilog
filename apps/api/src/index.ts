@@ -23,12 +23,10 @@ import { adminRouter } from "./routes/admin.js";
 import { boardGameCollectionImportRouter } from "./routes/boardGameCollectionImport.js";
 import { prisma } from "./lib/prisma.js";
 import { runMonthlyDigestIfDue } from "./lib/monthlyDigest.js";
-import { isWakeApiPingEnabled, shouldSkipAppVersionMiddleware } from "./lib/featureFlags.js";
+import { isWakeApiPingEnabled } from "./lib/featureFlags.js";
 import { runSeedBadges } from "./scripts/seedBadges.js";
 import { runSeedMilestones } from "./scripts/seedMilestones.js";
-import { APP_VERSION, isAppVersionOlder } from "@geeklogs/shared";
-
-const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
+import { APP_VERSION } from "@geeklogs/shared";
 
 const app = express();
 // When behind a proxy (e.g. Heroku), trust X-Forwarded-* so rate-limit and IP logging work correctly.
@@ -64,39 +62,6 @@ app.post("/api/billing/google-play/pubsub", (req, res) =>
   void handleGooglePlayPubSubPush(req, res)
 );
 
-/** Require X-App-Version (sent only by native Capacitor clients) to match APP_VERSION. Web clients omit the header and are not gated. */
-app.use("/api", async (req, res, next) => {
-  if (
-    req.path === "/health" ||
-    req.path === "/health/" ||
-    req.path === "/wake-ping-config" ||
-    req.path === "/wake-ping-config/" ||
-    req.path === "/billing/google-play/pubsub" ||
-    req.path === "/billing/google-play/pubsub/"
-  ) {
-    return next();
-  }
-  const clientVersion = req.headers["x-app-version"];
-  if (clientVersion == null) {
-    return next();
-  }
-  if (await shouldSkipAppVersionMiddleware()) {
-    return next();
-  }
-  const clientVersionStr = Array.isArray(clientVersion) ? clientVersion[0] : clientVersion;
-  if (
-    typeof clientVersionStr === "string" &&
-    isAppVersionOlder(clientVersionStr, APP_VERSION)
-  ) {
-    return res.status(401).json({
-      code: APP_VERSION_MISMATCH_CODE,
-      error: "App version outdated. Please update the app from the store.",
-      requiredVersion: APP_VERSION,
-    });
-  }
-  next();
-});
-
 const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
 // Default allows batch import: ~2 requests per row (search + create), so 500 rows ≈ 1000 requests
 const rateLimitMax = Number(process.env.RATE_LIMIT_MAX) || 2500;
@@ -123,9 +88,8 @@ app.use("/api/follows", followsRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/board-games", boardGameCollectionImportRouter);
 
-app.get("/api/health", async (_req, res) => {
-  const ignoreClientVersionCheck = await shouldSkipAppVersionMiddleware();
-  res.json({ ok: true, version: APP_VERSION, ignoreClientVersionCheck });
+app.get("/api/health", (_req, res) => {
+  res.json({ ok: true, version: APP_VERSION });
 });
 
 /** Public: whether clients should ping /api/health on an interval (free-tier sleep). No auth / no app version header. */

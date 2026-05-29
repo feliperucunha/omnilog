@@ -1,10 +1,4 @@
-import {
-  apiFetch,
-  getApiBase,
-  getAuthHeaders,
-  APP_VERSION_MISMATCH_CODE,
-  isNativePlatform,
-} from "./api";
+import { apiFetch, getApiBase, getAuthHeaders } from "./api";
 import { removeItem } from "./storage";
 import type { BoardGameProvider } from "@geeklogs/shared";
 
@@ -59,16 +53,6 @@ export async function startBoardGameCollectionImport(body: {
   });
   const text = await res.text();
   if (res.status === 401) {
-    let code: string | undefined;
-    try {
-      code = (JSON.parse(text) as { code?: string }).code;
-    } catch {
-      /* ignore */
-    }
-    if (code === APP_VERSION_MISMATCH_CODE && isNativePlatform()) {
-      window.dispatchEvent(new CustomEvent("app:version-mismatch", { detail: {} }));
-      throw new CollectionImportStartError("App version outdated. Please update and try again.", 401);
-    }
     void removeItem("geeklogs_token").then(() => removeItem("geeklogs_user"));
     window.dispatchEvent(new CustomEvent("auth:logout"));
     window.location.href = "/login";

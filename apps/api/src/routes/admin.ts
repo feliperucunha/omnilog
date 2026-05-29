@@ -3,11 +3,9 @@ import { z } from "zod";
 import { authMiddleware, type AuthenticatedRequest } from "../middleware/auth.js";
 import { prisma } from "../lib/prisma.js";
 import {
-  FEATURE_FLAG_KEYS,
   isKnownFeatureFlagKey,
   listFeatureFlags,
   setFeatureFlagEnabled,
-  invalidateIgnoreAppVersionCheckCache,
 } from "../lib/featureFlags.js";
 import { APP_SETTING_KEYS, upsertAppSettingValue } from "../lib/appSettings.js";
 import { formatDigestMonthLabel } from "../lib/digestI18n.js";
@@ -107,9 +105,6 @@ adminRouter.patch("/feature-flags/:key", async (req: AuthenticatedRequest, res) 
   }
   try {
     const updated = await setFeatureFlagEnabled(key, parsed.data.enabled);
-    if (key === FEATURE_FLAG_KEYS.IGNORE_APP_VERSION_CHECK) {
-      invalidateIgnoreAppVersionCheckCache();
-    }
     res.json({
       data: {
         key: updated.key,

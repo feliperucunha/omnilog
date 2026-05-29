@@ -67,8 +67,6 @@ import { isPublicAuthPath } from "./authSession.js";
 /** Sentinel for cookie-based sessions (no token in storage). */
 const COOKIE_SESSION = "cookie";
 
-export const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
-
 export function isNativePlatform(): boolean {
   const w = typeof window !== "undefined"
     ? (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } })
@@ -151,8 +149,6 @@ const HTML_RESPONSE_MESSAGE =
 
 /** Fallbacks when the backend doesn’t return a clear message (plain language, no jargon). */
 const MSG = {
-  versionOutdated:
-    "This copy of Geeklogs is too old. Update it from the store or site where you installed it, then open the app again.",
   sessionEnded: "Your sign-in has expired. Please sign in again to keep using your lists and reviews.",
   genericServer:
     "Geeklogs couldn’t finish that just now. Please try again in a minute or two—especially if you haven’t opened the app in a while.",
@@ -237,7 +233,6 @@ function sleep(ms: number): Promise<void> {
 function isRetryableAfterError(err: unknown): boolean {
   if (err instanceof InvalidApiKeyError || err instanceof ApiValidationError) return false;
   if (err instanceof ApiError) {
-    if (err.loadingErrorCode === LoadingErrorCodeEnum.VERSION_MISMATCH) return false;
     if (RETRYABLE_HTTP_STATUSES.has(err.statusCode)) return true;
     /** Proxy / sleeping host often returns HTML instead of JSON. */
     if (err.message === HTML_RESPONSE_MESSAGE) return true;
@@ -254,12 +249,6 @@ function fireFirstApiErrorFromCaught(err: unknown): void {
     return;
   }
   if (err instanceof ApiError) {
-    if (
-      err.loadingErrorCode === LoadingErrorCodeEnum.VERSION_MISMATCH &&
-      isNativePlatform()
-    ) {
-      return;
-    }
     fireFirstApiErrorOnce(err.loadingErrorCode ?? statusToLoadingErrorCode(err.statusCode));
     return;
   }
@@ -331,26 +320,6 @@ async function performSingleFetchAttempt<T>(
     const text = await res.text();
 
     if (res.status === 401) {
-      let code: string | undefined;
-      try {
-        const data = JSON.parse(text) as { code?: string };
-        code = data.code;
-      } catch {
-        /* ignore */
-      }
-      if (code === APP_VERSION_MISMATCH_CODE && isNativePlatform()) {
-        let requiredVersion: string | undefined;
-        try {
-          const body = JSON.parse(text) as { requiredVersion?: string };
-          requiredVersion = body.requiredVersion;
-        } catch {
-          /* ignore */
-        }
-        window.dispatchEvent(
-          new CustomEvent("app:version-mismatch", { detail: { requiredVersion } })
-        );
-        throw new ApiError(parseErrorResponse(text, MSG.versionOutdated), 401, LoadingErrorCodeEnum.VERSION_MISMATCH);
-      }
       const message = parseErrorResponse(text, MSG.sessionEnded);
       if (!skipAuthRedirect) {
         void handleSessionExpired();

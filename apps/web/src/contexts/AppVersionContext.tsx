@@ -9,73 +9,67 @@ import {
 import { Capacitor } from "@capacitor/core";
 import { APP_VERSION, isAppVersionOlder } from "@geeklogs/shared";
 import { getApiBase } from "@/lib/api";
+import {
+  readDismissedUpdateVersion,
+  writeDismissedUpdateVersion,
+} from "@/lib/updatePromptStorage";
 
 interface AppVersionContextValue {
   showVersionModal: boolean;
   setShowVersionModal: (show: boolean) => void;
   isNative: boolean;
-  requiredVersion: string | null;
+  latestVersion: string | null;
+  dismissUpdatePrompt: () => void;
 }
 
 const AppVersionContext = createContext<AppVersionContextValue | null>(null);
 
 export function AppVersionProvider({ children }: { children: ReactNode }) {
   const [showVersionModal, setShowVersionModal] = useState(false);
-  const [requiredVersion, setRequiredVersion] = useState<string | null>(null);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const isNative = Capacitor.isNativePlatform();
 
-  const applyHealthPayload = useCallback(
-    (data: { version?: string; ignoreClientVersionCheck?: boolean }) => {
-      if (data.ignoreClientVersionCheck === true) {
-        setShowVersionModal(false);
-        setRequiredVersion(null);
-        return;
-      }
-      const serverVersion = data.version?.trim();
-      if (!serverVersion) return;
-      if (isAppVersionOlder(APP_VERSION, serverVersion)) {
-        setRequiredVersion(serverVersion);
-        setShowVersionModal(true);
-      } else {
-        setShowVersionModal(false);
-        setRequiredVersion(null);
-      }
-    },
-    []
-  );
+  const applyHealthPayload = useCallback((data: { version?: string }) => {
+    const serverVersion = data.version?.trim();
+    if (!serverVersion) return;
+    if (!isAppVersionOlder(APP_VERSION, serverVersion)) {
+      setLatestVersion(null);
+      setShowVersionModal(false);
+      return;
+    }
+    setLatestVersion(serverVersion);
+    const dismissed = readDismissedUpdateVersion();
+    if (dismissed === serverVersion) {
+      setShowVersionModal(false);
+      return;
+    }
+    setShowVersionModal(true);
+  }, []);
 
   const checkVersion = useCallback(async () => {
     if (!isNative) return;
     try {
       const res = await fetch(`${getApiBase()}/health`, { credentials: "omit" });
       if (!res.ok) return;
-      const data = (await res.json()) as {
-        version?: string;
-        ignoreClientVersionCheck?: boolean;
-      };
+      const data = (await res.json()) as { version?: string };
       applyHealthPayload(data);
     } catch {
-      /* ignore; 401 APP_VERSION_MISMATCH will open the gate */
+      /* optional prompt only */
     }
   }, [isNative, applyHealthPayload]);
 
+  const dismissUpdatePrompt = useCallback(() => {
+    if (latestVersion) writeDismissedUpdateVersion(latestVersion);
+    setShowVersionModal(false);
+  }, [latestVersion]);
+
   useEffect(() => {
     if (!isNative) return;
-
-    const handleMismatch = (event: Event) => {
-      const detail = (event as CustomEvent<{ requiredVersion?: string }>).detail;
-      if (detail?.requiredVersion) {
-        setRequiredVersion(detail.requiredVersion);
-      }
-      setShowVersionModal(true);
-      void checkVersion();
-    };
 
     const handleCheckRequest = () => {
       void checkVersion();
     };
 
-    window.addEventListener("app:version-mismatch", handleMismatch);
     window.addEventListener("app:check-version", handleCheckRequest);
     void checkVersion();
 
@@ -96,7 +90,6 @@ export function AppVersionProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
-      window.removeEventListener("app:version-mismatch", handleMismatch);
       window.removeEventListener("app:check-version", handleCheckRequest);
       void resumeHandle?.remove();
     };
@@ -104,7 +97,13 @@ export function AppVersionProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppVersionContext.Provider
-      value={{ showVersionModal, setShowVersionModal, isNative, requiredVersion }}
+      value={{
+        showVersionModal,
+        setShowVersionModal,
+        isNative,
+        latestVersion,
+        dismissUpdatePrompt,
+      }}
     >
       {children}
     </AppVersionContext.Provider>
