@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { useEnsureRouteContentVisible } from "@/hooks/useEnsureRouteContentVisible";
 import { Nav } from "@/components/Nav";
 import { Topbar } from "@/components/Topbar";
 import { AdBanner } from "@/components/AdBanner";
@@ -15,6 +16,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 function AppLayoutContent() {
+  useEnsureRouteContentVisible();
   const pageTitle = usePageTitle();
   const belowNavbar = pageTitle?.belowNavbar;
   const location = useLocation();

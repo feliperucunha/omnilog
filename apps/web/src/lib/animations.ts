@@ -26,11 +26,11 @@ export const tweenMedium = {
   ease: [0.25, 0.46, 0.45, 0.94] as const,
 };
 
-/** Page/content enter: slight fade + slide up */
+/** Page/content enter — opacity stays 1 so WebView never leaves route content invisible but tappable. */
 export const pageVariants = {
-  initial: { opacity: 0, y: 12 },
+  initial: { opacity: 1, y: 0 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -8 },
+  exit: { opacity: 1, y: 0 },
 };
 
 export const pageTransition = {
@@ -52,7 +52,7 @@ export const staggerContainer = {
 };
 
 export const staggerItem = {
-  initial: { opacity: 0, y: 10 },
+  initial: { opacity: 1, y: 0 },
   animate: { opacity: 1, y: 0 },
   transition: springSoft,
 };

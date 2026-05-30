@@ -14,6 +14,12 @@ import { tierHasProFeatures } from "@/lib/userTier";
  * iOS: back is a no-op; other listeners run where supported.
  */
 export function CapacitorAndroidIntegration() {
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    document.documentElement.classList.add("capacitor-native");
+    return () => document.documentElement.classList.remove("capacitor-native");
+  }, []);
+
   const navigate = useNavigate();
   const { refetch: refetchMe, me } = useMe();
   const { visibleTypes } = useVisibleMediaTypes();

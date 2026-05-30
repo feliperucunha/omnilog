@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { MotionConfig } from "framer-motion";
 import { BrowserRouter } from "react-router-dom";
+import { isCapacitorNative } from "@/lib/androidOverlayBack";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LocaleProvider } from "@/contexts/LocaleContext";
@@ -26,8 +28,11 @@ import "./index.css";
 
 initSentry();
 
+const reducedMotion = isCapacitorNative() ? "always" : "user";
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
+    <MotionConfig reducedMotion={reducedMotion}>
     <ThemeProvider>
       <LocaleProvider>
         <ErrorBoundary>
@@ -65,5 +70,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </ErrorBoundary>
       </LocaleProvider>
     </ThemeProvider>
+    </MotionConfig>
   </React.StrictMode>
 );

@@ -10,6 +10,7 @@ export function ItemPage() {
 
   return (
     <ItemPageContent
+      key={`${mediaType}:${id}`}
       mediaType={mediaType}
       id={id}
       onBack={() => navigate(-1)}

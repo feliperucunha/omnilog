@@ -39,7 +39,8 @@ import {
 } from "@/components/skeletons";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
-import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
+import { tapScale, tapTransition } from "@/lib/animations";
+import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
 import { itemDetailPath } from "@/lib/itemRoutes";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -2148,9 +2149,7 @@ export function Statistics() {
               ) : (
                 <motion.ul
                   className="m-0 flex min-h-0 min-w-0 flex-1 list-none flex-col gap-2 overflow-y-auto p-0"
-                  variants={staggerContainer}
-                  initial="initial"
-                  animate="animate"
+                  {...listStaggerParentProps}
                 >
                   {recent.map((log) => {
                     const status = log.status ?? undefined;
@@ -2184,7 +2183,11 @@ export function Statistics() {
                         ? formatTimeToFinish(log.startedAt, log.completedAt)
                         : "";
                     return (
-                      <motion.li key={log.id} variants={staggerItem} className="list-none">
+                      <motion.li
+                        key={log.id}
+                        variants={listStaggerItemVariants}
+                        className={`list-none ${listStaggerItemClassName}`}
+                      >
                         <MotionLink
                           to={itemDetailPath(log.mediaType, log.externalId)}
                           whileTap={tapScale}

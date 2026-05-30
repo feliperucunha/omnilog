@@ -41,11 +41,11 @@ import {
   BGG_CONTAIN_FOREGROUND_IMG_CLASS,
   isBggBoardGameImageContext,
 } from "@/lib/boardGameImageFit";
-import { staggerContainer, staggerItem } from "@/lib/animations";
+import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps, visibleEnterProps } from "@/lib/motionPolicy";
 import { useLocale } from "@/contexts/LocaleContext";
 import { paperShadow } from "@/lib/paperShadow";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
-import { isCapacitorAndroid, isCapacitorNative } from "@/lib/androidOverlayBack";
+import { isCapacitorAndroid } from "@/lib/androidOverlayBack";
 import { cn } from "@/lib/utils";
 
 /** Android WebView: `filter: blur()` on the BGG backdrop can break compositing so body text never paints. */
@@ -463,7 +463,6 @@ interface ReviewsResponse {
 }
 
 export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps) {
-  const nativeApp = isCapacitorNative();
   const androidWebView = isCapacitorAndroid();
   const { t, locale } = useLocale();
   const { showLogComplete } = useLogComplete();
@@ -651,11 +650,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
 
   if (loading && !data) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.2 }}
-      >
+      <motion.div {...visibleEnterProps}>
         <ItemPageSkeleton />
       </motion.div>
     );
@@ -691,7 +686,13 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <motion.div {...visibleEnterProps}>
+        <ItemPageSkeleton />
+      </motion.div>
+    );
+  }
 
   const { item, reviews, meanGrade, reviewsTotal = 0, reviewsPage: currentPage = 1, reviewsLimit: pageSize = REVIEWS_PAGE_SIZE } = data;
   const label = t(`nav.${mediaType}`);
@@ -702,12 +703,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
   const bggHeroFraming = isBggBoardGameImageContext(mediaType, heroUrl, item.itemSource ?? null, undefined);
 
   return (
-    <motion.div
-      initial={nativeApp ? false : { opacity: 0, y: 8 }}
-      animate={nativeApp ? { opacity: 1 } : { opacity: 1, y: 0 }}
-      transition={nativeApp ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 25 }}
-      className="min-w-0 overflow-x-hidden"
-    >
+    <motion.div {...visibleEnterProps} className="min-w-0 overflow-x-hidden">
       <div className="flex min-w-0 flex-col gap-8">
         {/* Hero header: high-res image background with strong gradient for readable text */}
         <header className="relative min-h-[min(38vh,280px)] w-full overflow-hidden rounded-xl sm:min-h-[min(42vh,360px)]">
@@ -893,11 +889,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             </Card>
           ) : (
             <>
-              <motion.div
-                variants={staggerContainer}
-                initial="initial"
-                animate="animate"
-              >
+              <motion.div {...listStaggerParentProps}>
                 <div className="flex flex-col gap-4">
                   {reviewDisplayGroups.map((group) => {
                     const primary = pickPrimaryScopedReview(group.reviews) ?? group.reviews[0]!;
@@ -921,7 +913,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                               ? "border border-emerald-600"
                               : "border border-[var(--color-mid)]";
                     return (
-                    <motion.div key={r.id} variants={staggerItem}>
+                    <motion.div key={r.id} variants={listStaggerItemVariants} className={listStaggerItemClassName}>
                       <Card
                         className={`overflow-hidden bg-[var(--color-dark)] p-0 ${listBorderClass}`}
                         style={paperShadow}

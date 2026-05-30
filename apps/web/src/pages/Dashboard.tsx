@@ -58,7 +58,8 @@ import { gradeToStars } from "@/lib/gradeStars";
 import { formatLogScopeLabel, getLogCardDisplay } from "@/lib/logDisplay";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
+import { tapScale, tapTransition } from "@/lib/animations";
+import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
 import { itemDetailPath } from "@/lib/itemRoutes";
 import {
   LOG_CARD_BODY_GAP,
@@ -777,12 +778,7 @@ export function Dashboard() {
               </Link>
             </Card>
           ) : (
-            <motion.ul
-              className="list-none m-0 min-w-0 p-0"
-              variants={staggerContainer}
-              initial="initial"
-              animate="animate"
-            >
+            <motion.ul className="list-none m-0 min-w-0 p-0" {...listStaggerParentProps}>
               <div className="flex min-w-0 flex-col gap-2">
                 {feed.map(({ log, user: feedUser }) => {
                   const display = getLogCardDisplay(log);
@@ -812,7 +808,11 @@ export function Dashboard() {
                             : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
                   const isExpanded = expandedReviewLogId === log.id;
                   return (
-                  <motion.li key={log.id} variants={staggerItem} className="list-none">
+                  <motion.li
+                    key={log.id}
+                    variants={listStaggerItemVariants}
+                    className={`list-none ${listStaggerItemClassName}`}
+                  >
                     <div
                       className={`flex min-w-0 flex-row overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${!isExpanded ? LOG_CARD_HEIGHT_FEED_COLLAPSED : LOG_CARD_HEIGHT_FEED_EXPANDED} ${listBorderClass}`}
                       style={paperShadow}

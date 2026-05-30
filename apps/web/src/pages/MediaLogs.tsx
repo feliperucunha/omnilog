@@ -43,7 +43,8 @@ import { MediaLogsSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
-import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
+import { tapScale, tapTransition } from "@/lib/animations";
+import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps, visibleEnterProps } from "@/lib/motionPolicy";
 import { itemDetailPath } from "@/lib/itemRoutes";
 import {
   LOG_CARD_ACTION_COLUMN,
@@ -778,11 +779,7 @@ export function MediaLogs({
 
   if (loading && logs.length === 0) {
     return (
-      <motion.div
-        initial={embedded ? false : { opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.2 }}
-      >
+      <motion.div {...visibleEnterProps}>
         <MediaLogsSkeleton />
       </motion.div>
     );
@@ -1295,12 +1292,7 @@ export function MediaLogs({
           )}
         </motion.div>
       ) : (
-        <motion.div
-          variants={staggerContainer}
-          initial={embedded ? false : "initial"}
-          animate="animate"
-          className="min-w-0 overflow-hidden"
-        >
+        <motion.div {...listStaggerParentProps} className="min-w-0 overflow-hidden">
           <div className={LOG_LIST_CARD_GRID}>
             {logs.map((log) => {
               const isDropped = log.status === "dropped";
@@ -1330,7 +1322,11 @@ export function MediaLogs({
               const display = getLogCardDisplay(log);
               const scopeLabel = formatLogScopeLabel(t, display);
               return (
-              <motion.div key={log.id} variants={staggerItem} className="min-h-0 sm:h-full">
+              <motion.div
+                key={log.id}
+                variants={listStaggerItemVariants}
+                className={`min-h-0 sm:h-full ${listStaggerItemClassName}`}
+              >
                 <div className="h-full">
                   <Card
                     className={`relative flex flex-row min-h-0 overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${embedded && !isReviewExpanded ? LOG_CARD_HEIGHT_EMBEDDED_COLLAPSED : embedded ? LOG_CARD_HEIGHT_EMBEDDED : LOG_CARD_HEIGHT_DEFAULT} ${listBorderClass}`}

@@ -43,7 +43,8 @@ import {
 } from "@/lib/searchPageCache";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
-import { staggerContainer, staggerItem, tapScale, tapTransition } from "@/lib/animations";
+import { tapScale, tapTransition } from "@/lib/animations";
+import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -804,7 +805,7 @@ export function Search() {
       )}
 
       {hasSearched && !loading && searchFilter === SEARCH_USERS_TYPE && userResults.length > 0 && (
-        <motion.div variants={staggerContainer} initial="initial" animate="animate">
+        <motion.div {...listStaggerParentProps}>
           <div className="flex flex-col gap-2">
             {userResults.map((user) => {
               const isOwnProfile = token && me?.user?.id === user.id;
@@ -813,8 +814,8 @@ export function Search() {
               return (
                 <motion.div
                   key={user.id}
-                  variants={staggerItem}
-                  className="flex min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-sm)]"
+                  variants={listStaggerItemVariants}
+                  className={`${listStaggerItemClassName} flex min-w-0 items-center gap-3 overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-sm)]`}
                 >
                   <Link
                     to={`/${user.username ?? user.id}`}
@@ -877,7 +878,7 @@ export function Search() {
       )}
 
       {hasSearched && !loading && searchFilter !== SEARCH_USERS_TYPE && results.length > 0 && (
-        <motion.div variants={staggerContainer} initial="initial" animate="animate" className="min-w-0">
+        <motion.div {...listStaggerParentProps} className="min-w-0">
           <div className={SEARCH_RESULT_CARD_GRID}>
             {results.map((item) => {
               const userLog = token ? logsByExternalId.get(item.id) : undefined;
@@ -924,7 +925,11 @@ export function Search() {
               }
               const metaLine = metaParts.join(" · ") || "—";
               return (
-              <motion.div key={item.id} variants={staggerItem} className="min-h-0 min-w-0 sm:h-full">
+              <motion.div
+                key={item.id}
+                variants={listStaggerItemVariants}
+                className={`min-h-0 min-w-0 sm:h-full ${listStaggerItemClassName}`}
+              >
                 <motion.div whileTap={tapScale} transition={tapTransition} className={SEARCH_RESULT_CARD_SHELL}>
                   <button
                     type="button"

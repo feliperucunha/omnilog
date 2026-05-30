@@ -3,4 +3,4 @@
  * bumps the patch on each commit. Native clients may show an optional update prompt when
  * the deployed API reports a newer version via /api/health.
  */
-export const APP_VERSION = "1.0.22";
+export const APP_VERSION = "1.0.23";
