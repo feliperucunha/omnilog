@@ -504,6 +504,7 @@
     "searchConfirmHint": "Pulsa Intro para buscar",
     "searchTitlesPlaceholder": "Buscar {{category}}…",
     "couldntLoadLogs": "No se pudieron cargar los logs",
+    "updatingList": "Actualizando lista…",
     "filterAll": "Todos",
     "filterCollection": "Colección / quiero comprar",
     "filterOwned": "En mi colección",
@@ -902,14 +903,13 @@
     "logLimitReached": "Has alcanzado el límite de 500 logs del plan Gratis. Pasa a Pro para logs ilimitados."
   },
   "appVersion": {
+    "appName": "Geeklogs",
     "title": "Actualización disponible",
-    "message": "Hay una versión más nueva de Geeklogs en Play Store con mejoras. Puedes seguir con esta versión o actualizar cuando quieras.",
-    "updateButton": "Actualizar en Google Play",
+    "message": "Hay una nueva versión lista con las últimas correcciones y mejoras.",
+    "versionAvailable": "Versión {{version}} en Google Play",
+    "updateButton": "Actualizar",
     "notNow": "Ahora no",
-    "playStoreBadge": "Google Play",
     "openingStore": "Abriendo…",
-    "currentShort": "Instalada",
-    "latestShort": "Última",
     "openStoreFailed": "No se pudo abrir Play Store. Inténtalo de nuevo o busca Geeklogs en la app de Play Store."
   },
   "coldStart": {

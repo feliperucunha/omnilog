@@ -1,4 +1,3 @@
-import { APP_VERSION } from "@geeklogs/shared";
 import type { LoadingErrorCode } from "./loadingErrorCodes.js";
 import { LoadingErrorCode as LoadingErrorCodeEnum } from "./loadingErrorCodes.js";
 
@@ -79,12 +78,12 @@ export function getAuthHeaders(): HeadersInit {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
-  if (isNativePlatform()) {
-    headers["X-App-Version"] = APP_VERSION;
-  }
   if (token && token !== COOKIE_SESSION) headers["Authorization"] = `Bearer ${token}`;
   return headers;
 }
+
+/** Legacy API error code when an old server still gates on X-App-Version (must not trigger logout). */
+const APP_VERSION_MISMATCH_CODE = "APP_VERSION_MISMATCH";
 
 /** Dispatch so AuthContext can clear state on 401 (e.g. when using cookie session). */
 function dispatchLogout(): void {
@@ -233,6 +232,7 @@ function sleep(ms: number): Promise<void> {
 function isRetryableAfterError(err: unknown): boolean {
   if (err instanceof InvalidApiKeyError || err instanceof ApiValidationError) return false;
   if (err instanceof ApiError) {
+    if (err.loadingErrorCode === LoadingErrorCodeEnum.VERSION_MISMATCH) return false;
     if (RETRYABLE_HTTP_STATUSES.has(err.statusCode)) return true;
     /** Proxy / sleeping host often returns HTML instead of JSON. */
     if (err.message === HTML_RESPONSE_MESSAGE) return true;
@@ -249,6 +249,10 @@ function fireFirstApiErrorFromCaught(err: unknown): void {
     return;
   }
   if (err instanceof ApiError) {
+    if (err.loadingErrorCode === LoadingErrorCodeEnum.VERSION_MISMATCH) {
+      fireFirstApiErrorOnce(LoadingErrorCodeEnum.VERSION_MISMATCH);
+      return;
+    }
     fireFirstApiErrorOnce(err.loadingErrorCode ?? statusToLoadingErrorCode(err.statusCode));
     return;
   }
@@ -320,15 +324,20 @@ async function performSingleFetchAttempt<T>(
     const text = await res.text();
 
     if (res.status === 401) {
+      let mismatchCode: string | undefined;
+      try {
+        mismatchCode = (JSON.parse(text) as { code?: string }).code;
+      } catch {
+        /* ignore */
+      }
+      if (mismatchCode === APP_VERSION_MISMATCH_CODE) {
+        const message = parseErrorResponse(text, MSG.sessionEnded);
+        throw new ApiError(message, 401, LoadingErrorCodeEnum.VERSION_MISMATCH);
+      }
       const message = parseErrorResponse(text, MSG.sessionEnded);
       if (!skipAuthRedirect) {
         void handleSessionExpired();
       } else {
-        /**
-         * Session probe and similar calls use skipAuthRedirect; 401 means "no session" but the API
-         * responded. Treat as cold-start success so guests are not stuck on the loading/error overlay
-         * (e.g. public profile at /:userId).
-         */
         fireFirstApiResponseOnce();
       }
       throw new ApiError(message, 401);
@@ -416,7 +425,6 @@ async function performSinglePublicFetchAttempt<T>(path: string, options?: Reques
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
-        ...(isNativePlatform() ? { "X-App-Version": APP_VERSION } : {}),
         ...options?.headers,
       },
     });

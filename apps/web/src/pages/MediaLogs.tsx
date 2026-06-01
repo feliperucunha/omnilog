@@ -24,7 +24,6 @@ import {
   buildLogsListPath,
   buildLogsListPathFromFilters,
   readCachedLogsListResponse,
-  revalidateLogsListInBackground,
   upsertLogInClientCaches,
 } from "@/lib/logsPageCache";
 import { LogForm } from "@/components/LogForm";
@@ -39,7 +38,7 @@ import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatLogScopeLabel, getLogCardDisplay } from "@/lib/logDisplay";
 import { formatTimeToFinish } from "@/lib/formatDuration";
-import { MediaLogsSkeleton } from "@/components/skeletons";
+import { MediaLogsListSkeleton, MediaLogsSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
@@ -222,6 +221,7 @@ export function MediaLogs({
   const [logs, setLogs] = useState<Log[]>(() => embeddedCacheOnMount?.logs ?? []);
   const [nextCursor, setNextCursor] = useState<string | null>(() => embeddedCacheOnMount?.cursor ?? null);
   const [loading, setLoading] = useState(() => !publicUserId && !embeddedCacheOnMount);
+  const [listRefreshing, setListRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingLog, setEditingLog] = useState<Log | null>(null);
@@ -367,6 +367,10 @@ export function MediaLogs({
       if (reset) {
         setError(null);
         setNextCursor(null);
+        setListRefreshing(true);
+        if (logsRef.current.length === 0) {
+          setLoading(true);
+        }
       } else {
         setLoadingMore(true);
       }
@@ -388,11 +392,15 @@ export function MediaLogs({
 
       const finish = () => {
         setLoading(false);
+        setListRefreshing(false);
         setLoadingMore(false);
       };
 
       if (publicUserId) {
-        if (reset) setLoading(true);
+        if (reset) {
+          setLoading(true);
+          setListRefreshing(true);
+        }
         void apiFetchPublic<LogsResponse>(path)
           .then((response) => {
             applyLogsResponse(response, reset);
@@ -423,8 +431,6 @@ export function MediaLogs({
       if (cached) {
         applyLogsResponse(cached.data, true);
         setLoading(false);
-      } else if (logsRef.current.length === 0) {
-        setLoading(true);
       }
 
       void apiFetchSWR<LogsResponse>(path, {
@@ -524,25 +530,26 @@ export function MediaLogs({
     }
 
     const path = buildLogsPath();
+    setListRefreshing(true);
+    setError(null);
+
     const cached = readCachedLogsListResponse(path);
     if (cached) {
       setLogs(cached.list.map(decodeLogForDisplay));
       setNextCursor(cached.cursor);
-      setError(null);
       setLoading(false);
-      revalidateLogsListInBackground(path);
+      void apiFetchSWR<LogsResponse>(path, { ttlMs: HEAVY_PAGE_TTL_MS }).finally(() =>
+        setListRefreshing(false)
+      );
       return;
     }
 
-    setError(null);
     if (logsRef.current.length === 0) {
       setLogs([]);
       setNextCursor(null);
       setLoading(true);
-      fetchLogsRef.current(true);
-    } else {
-      fetchLogsRef.current(true);
     }
+    fetchLogsRef.current(true);
   }, [
     mediaType,
     statusFilter,
@@ -777,7 +784,7 @@ export function MediaLogs({
   const showCategorySearchClear =
     categorySearchDraft.trim() !== "" || categorySearchQuery !== "";
 
-  if (loading && logs.length === 0) {
+  if (loading && logs.length === 0 && !listRefreshing) {
     return (
       <motion.div {...visibleEnterProps}>
         <MediaLogsSkeleton />
@@ -1269,31 +1276,50 @@ export function MediaLogs({
 
       </div>
 
-      {logs.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          className="flex flex-1 flex-col items-center justify-center min-h-[50vh] py-12"
-        >
-          <p className="text-center text-[var(--color-light)]">
-            {categorySearchQuery.trim()
-              ? t("mediaLogs.noTitlesMatchSearch")
-              : t("mediaLogs.noLogsFor", { label: label.toLowerCase() })}
-          </p>
-          {!readOnly && logs.length === 0 && !categorySearchQuery.trim() && (
-            <Link
-              to="/"
-              state={{ mediaType }}
-              className="mt-4 inline-block text-[var(--color-lightest)] underline hover:no-underline"
-            >
-              {t("mediaLogs.searchAndAddOne")}
-            </Link>
-          )}
-        </motion.div>
-      ) : (
-        <motion.div {...listStaggerParentProps} className="min-w-0 overflow-hidden">
-          <div className={LOG_LIST_CARD_GRID}>
+      <div
+        className="relative min-h-[10rem] min-w-0"
+        aria-busy={listRefreshing || loading}
+        aria-live="polite"
+      >
+        {listRefreshing && logs.length > 0 && (
+          <div
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-xl bg-[var(--color-dark)]/75 backdrop-blur-[2px]"
+            role="status"
+          >
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-lightest)]" aria-hidden />
+            <p className="text-sm font-medium text-[var(--color-lightest)]">
+              {t("mediaLogs.updatingList")}
+            </p>
+          </div>
+        )}
+
+        {logs.length === 0 && (loading || listRefreshing) ? (
+          <MediaLogsListSkeleton count={embedded ? 6 : 8} />
+        ) : logs.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className="flex flex-1 flex-col items-center justify-center min-h-[50vh] py-12"
+          >
+            <p className="text-center text-[var(--color-light)]">
+              {categorySearchQuery.trim()
+                ? t("mediaLogs.noTitlesMatchSearch")
+                : t("mediaLogs.noLogsFor", { label: label.toLowerCase() })}
+            </p>
+            {!readOnly && logs.length === 0 && !categorySearchQuery.trim() && (
+              <Link
+                to="/"
+                state={{ mediaType }}
+                className="mt-4 inline-block text-[var(--color-lightest)] underline hover:no-underline"
+              >
+                {t("mediaLogs.searchAndAddOne")}
+              </Link>
+            )}
+          </motion.div>
+        ) : (
+          <motion.div {...listStaggerParentProps} className="min-w-0 overflow-hidden">
+            <div className={LOG_LIST_CARD_GRID}>
             {logs.map((log) => {
               const isDropped = log.status === "dropped";
               const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
@@ -1631,8 +1657,9 @@ export function MediaLogs({
               </div>
             </>
           )}
-        </motion.div>
-      )}
+          </motion.div>
+        )}
+      </div>
 
       {!readOnly && editingLog && (
         <LogForm

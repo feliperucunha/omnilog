@@ -524,6 +524,7 @@
     "searchConfirmHint": "Press Enter to search",
     "searchTitlesPlaceholder": "Search {{category}}…",
     "couldntLoadLogs": "Couldn't load logs",
+    "updatingList": "Updating list…",
     "filterAll": "All",
     "filterCollection": "Own / wishlist",
     "filterOwned": "Owned",
@@ -922,14 +923,13 @@
     "logLimitReached": "You've reached the 500-log limit on the Free plan. Upgrade to Pro for unlimited logs."
   },
   "appVersion": {
+    "appName": "Geeklogs",
     "title": "Update available",
-    "message": "A newer Geeklogs is on Google Play with fixes and improvements. You can keep using this version or update whenever you like.",
-    "updateButton": "Update on Google Play",
+    "message": "A new version is ready with the latest fixes and improvements.",
+    "versionAvailable": "Version {{version}} on Google Play",
+    "updateButton": "Update",
     "notNow": "Not now",
-    "playStoreBadge": "Google Play",
     "openingStore": "Opening…",
-    "currentShort": "Installed",
-    "latestShort": "Latest",
     "openStoreFailed": "Couldn’t open the Play Store. Try again or search for Geeklogs in the Play Store app."
   },
   "coldStart": {
