@@ -132,7 +132,7 @@ export async function recentBoardGamesForStats(
       externalId: entry.log.externalId,
       title: entry.log.title,
       image: entry.log.image,
-      boardGameSource: entry.log.boardGameSource,
+      boardGameSource: entry.log.boardGameSource as BoardGameProvider | null,
       matchCount: entry.matchCount,
       wins: entry.wins,
       lastPlayedAt: entry.lastPlayedAt.toISOString(),
