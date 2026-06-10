@@ -38,6 +38,119 @@ function matchCountsAsWinForUser(players: BoardGameMatchPlayer[], userId: string
   return false;
 }
 
+function userScoreFromMatch(players: BoardGameMatchPlayer[], userId: string): number | null {
+  const row = players.find((p) => p.appUserId === userId);
+  const score = row?.score;
+  if (score == null || typeof score !== "number" || !Number.isFinite(score)) return null;
+  return score;
+}
+
+export type RecentBoardGameStatEntry = {
+  logId: string;
+  externalId: string;
+  title: string;
+  image: string | null;
+  boardGameSource: string | null;
+  matchCount: number;
+  wins: number;
+  lastPlayedAt: string;
+  lastScore: number | null;
+};
+
+export type BoardGameMatchStatsSort = "recent" | "mostPlayed" | "leastPlayed";
+
+export async function recentBoardGamesForStats(
+  userId: string,
+  playedAtWhere?: Prisma.BoardGameMatchWhereInput,
+  sort: BoardGameMatchStatsSort = "recent",
+  limit = 24
+): Promise<RecentBoardGameStatEntry[]> {
+  const base: Prisma.BoardGameMatchWhereInput = {
+    log: { userId, mediaType: "boardgames" },
+  };
+  const where = playedAtWhere ? { AND: [base, playedAtWhere] } : base;
+  const rows = await prisma.boardGameMatch.findMany({
+    where,
+    select: {
+      playedAt: true,
+      players: true,
+      log: {
+        select: {
+          id: true,
+          externalId: true,
+          title: true,
+          image: true,
+          boardGameSource: true,
+        },
+      },
+    },
+    orderBy: { playedAt: "desc" },
+  });
+
+  type Acc = {
+    log: (typeof rows)[number]["log"];
+    matchCount: number;
+    wins: number;
+    lastPlayedAt: Date;
+    lastScore: number | null;
+  };
+  const byLog = new Map<string, Acc>();
+
+  for (const row of rows) {
+    const logId = row.log.id;
+    const players = parseBoardGamePlayersJson(row.players);
+    let acc = byLog.get(logId);
+    if (!acc) {
+      acc = {
+        log: row.log,
+        matchCount: 0,
+        wins: 0,
+        lastPlayedAt: row.playedAt,
+        lastScore: userScoreFromMatch(players, userId),
+      };
+      byLog.set(logId, acc);
+    }
+    acc.matchCount += 1;
+    if (matchCountsAsWinForUser(players, userId)) acc.wins += 1;
+  }
+
+  const sorted = [...byLog.values()].sort((a, b) => {
+    if (sort === "mostPlayed") {
+      if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
+      return b.lastPlayedAt.getTime() - a.lastPlayedAt.getTime();
+    }
+    if (sort === "leastPlayed") {
+      if (a.matchCount !== b.matchCount) return a.matchCount - b.matchCount;
+      return b.lastPlayedAt.getTime() - a.lastPlayedAt.getTime();
+    }
+    return b.lastPlayedAt.getTime() - a.lastPlayedAt.getTime();
+  });
+
+  return sorted.slice(0, limit)
+    .map((entry) => ({
+      logId: entry.log.id,
+      externalId: entry.log.externalId,
+      title: entry.log.title,
+      image: entry.log.image,
+      boardGameSource: entry.log.boardGameSource,
+      matchCount: entry.matchCount,
+      wins: entry.wins,
+      lastPlayedAt: entry.lastPlayedAt.toISOString(),
+      lastScore: entry.lastScore,
+    }));
+}
+
+export async function sumAllPagesReadForStats(
+  userId: string,
+  logWhere?: Prisma.LogWhereInput
+): Promise<number> {
+  let total = 0;
+  for (const mediaType of READING_MEDIA_TYPES) {
+    total += await sumPagesReadForStats(userId, mediaType, logWhere);
+  }
+  return total;
+}
+
 export async function sumPagesReadForStats(
   userId: string,
   mediaType: MediaType,

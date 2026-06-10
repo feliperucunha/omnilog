@@ -263,6 +263,8 @@ import {
   countBoardGameWinsForStats,
   gamePlatformStatsForUser,
   isReadingMediaType,
+  recentBoardGamesForStats,
+  sumAllPagesReadForStats,
   sumPagesReadForStats,
 } from "../lib/statsCategoryMetrics.js";
 import { tierHasProFeatures, tierHasUnlimitedLogs } from "../lib/userTier.js";
@@ -286,6 +288,7 @@ import {
   type PurchasePeriod,
 } from "../lib/purchaseFields.js";
 import {
+  completedAtBoundsForStatsPeriod,
   freeTierStatisticsMonthRange,
   freeTierStatisticsMonthWhere,
 } from "../lib/statisticsScope.js";
@@ -721,9 +724,11 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
                       ? "purchaseSpending"
                       : groupParam === "gamePlatforms"
                         ? "gamePlatforms"
-                        : groupParam === "month"
-                          ? "month"
-                          : "month";
+                        : groupParam === "recentBoardGames"
+                          ? "recentBoardGames"
+                          : groupParam === "month"
+                            ? "month"
+                            : "month";
 
   if (group === "purchaseSpending") {
     const periodRaw = typeof req.query.period === "string" ? req.query.period.trim() : "month";
@@ -904,15 +909,20 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       lifetimeNetByCurrency,
     };
     const highlightWhere = freeMonthWhere ?? undefined;
-    if (statsMediaType && isReadingMediaType(statsMediaType)) {
-      summaryPayload.totalPagesRead = await sumPagesReadForStats(
-        userId,
-        statsMediaType,
-        highlightWhere
-      );
-    }
-    if (statsMediaType === "boardgames") {
+    if (!statsMediaType) {
+      summaryPayload.totalPagesRead = await sumAllPagesReadForStats(userId, highlightWhere);
       summaryPayload.boardGamesWon = await countBoardGameWinsForStats(userId, highlightWhere);
+    } else {
+      if (isReadingMediaType(statsMediaType)) {
+        summaryPayload.totalPagesRead = await sumPagesReadForStats(
+          userId,
+          statsMediaType,
+          highlightWhere
+        );
+      }
+      if (statsMediaType === "boardgames") {
+        summaryPayload.boardGamesWon = await countBoardGameWinsForStats(userId, highlightWhere);
+      }
     }
     res.json({
       group: "summary",
@@ -922,13 +932,33 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 
   if (group === "gamePlatforms") {
-    if (statsMediaType !== "games") {
+    if (statsMediaType != null && statsMediaType !== "games") {
       res.json({ group: "gamePlatforms", data: [] });
       return;
     }
     const platformWhere = freeMonthWhere ?? undefined;
     const entries = await gamePlatformStatsForUser(userId, platformWhere);
     res.json({ group: "gamePlatforms", data: entries });
+    return;
+  }
+
+  if (group === "recentBoardGames") {
+    if (statsMediaType != null && statsMediaType !== "boardgames") {
+      res.json({ group: "recentBoardGames", data: [] });
+      return;
+    }
+    const periodRaw = typeof req.query.period === "string" ? req.query.period.trim() : "month";
+    let period: "month" | "year" = periodRaw === "year" ? "year" : "month";
+    if (!fullStatsAccess) period = "month";
+    const range = purchaseLogCreatedAtRange(period, tzOffsetMinutes);
+    const playedAtWhere = range
+      ? { playedAt: { gte: range.gte, lte: range.lte } }
+      : undefined;
+    const sortRaw = typeof req.query.sort === "string" ? req.query.sort.trim() : "recent";
+    const sort =
+      sortRaw === "mostPlayed" ? "mostPlayed" : sortRaw === "leastPlayed" ? "leastPlayed" : "recent";
+    const entries = await recentBoardGamesForStats(userId, playedAtWhere, sort);
+    res.json({ group: "recentBoardGames", period, sort, data: entries });
     return;
   }
 
@@ -1098,6 +1128,53 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
       byDateMediaType
     ),
     orderBy: [{ completedAt: "desc" }, { startedAt: "desc" }, { updatedAt: "desc" }],
+  });
+  const enriched = await enrichLogsForClient(prisma, logs.map(serializeLog));
+  res.json({ data: enriched });
+});
+
+/** GET /logs/by-period?period=YYYY-MM|YYYY&granularity=month|year - Logs completed in that stats period (same buckets as completedByMonth/Year). */
+logsRouter.get("/by-period", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tier: true },
+  });
+  const hasProAccess = user != null && tierHasProFeatures(user.tier);
+  const periodParam = typeof req.query.period === "string" ? req.query.period.trim() : "";
+  const granularity = req.query.granularity === "year" ? "year" : "month";
+  const bounds = completedAtBoundsForStatsPeriod(periodParam, granularity);
+  if (!bounds) {
+    res.status(400).json({ error: "Invalid period; use YYYY-MM for month or YYYY for year" });
+    return;
+  }
+  const tzOffsetMinutes = typeof req.query.timezoneOffsetMinutes === "string"
+    ? parseInt(req.query.timezoneOffsetMinutes, 10)
+    : 0;
+  const tz = Number.isFinite(tzOffsetMinutes) ? tzOffsetMinutes : 0;
+  const freeMonthRange = hasProAccess ? undefined : freeTierStatisticsMonthRange(tz);
+  if (!hasProAccess) {
+    if (!freeMonthRange || bounds.lte < freeMonthRange.gte || bounds.gte > freeMonthRange.lte) {
+      res.json({ data: [] });
+      return;
+    }
+  }
+  let completedGte = bounds.gte;
+  let completedLte = bounds.lte;
+  if (freeMonthRange) {
+    completedGte = new Date(Math.max(completedGte.getTime(), freeMonthRange.gte.getTime()));
+    completedLte = new Date(Math.min(completedLte.getTime(), freeMonthRange.lte.getTime()));
+  }
+  const byPeriodMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
+  const logs = await prisma.log.findMany({
+    where: applyStatsMediaFilter(
+      {
+        userId,
+        completedAt: { gte: completedGte, lte: completedLte },
+      },
+      byPeriodMediaType
+    ),
+    orderBy: [{ completedAt: "desc" }, { updatedAt: "desc" }],
   });
   const enriched = await enrichLogsForClient(prisma, logs.map(serializeLog));
   res.json({ data: enriched });

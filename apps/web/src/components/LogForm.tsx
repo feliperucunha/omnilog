@@ -811,6 +811,9 @@ export function LogForm(props: LogFormProps) {
           onLogUpdated={(lg) => {
             onLogRefreshed?.(lg);
           }}
+          onMatchSaved={(savedLog) => {
+            props.onSaved(undefined, savedLog);
+          }}
         />
       ) : (
       <>

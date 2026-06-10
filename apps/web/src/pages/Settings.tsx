@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronDown, ChevronRight, Download, HelpCircle, Loader2 } from "lucide-react";
@@ -52,6 +52,48 @@ const LOCALE_SHORT_LABELS: Record<Locale, string> = {
   es: "ES",
 };
 
+function SettingsCollapsibleSection({
+  title,
+  open,
+  onToggle,
+  children,
+  className,
+}: {
+  title: ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]",
+        className
+      )}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 px-4 py-3 max-md:min-h-[44px] text-left text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-darkest)]/50 focus:outline-none"
+        aria-expanded={open}
+      >
+        {open ? (
+          <ChevronDown className="h-5 w-5 shrink-0 text-[var(--color-light)]" aria-hidden />
+        ) : (
+          <ChevronRight className="h-5 w-5 shrink-0 text-[var(--color-light)]" aria-hidden />
+        )}
+        <span className="min-w-0 flex-1 font-semibold">
+          {typeof title === "string" ? <OverflowMarquee>{title}</OverflowMarquee> : title}
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-[var(--color-surface-border)] px-4 pb-4 pt-4">{children}</div>
+      )}
+    </div>
+  );
+}
+
 export function Settings() {
   const { t, locale, setLocale } = useLocale();
   const { token } = useAuth();
@@ -75,6 +117,11 @@ export function Settings() {
   /** Order of categories: visible types first (this order), then hidden. Determines order on home and search. */
   const [orderedMediaTypes, setOrderedMediaTypes] = useState<MediaType[]>(() => [...MEDIA_TYPES]);
   const [searchParams] = useSearchParams();
+  const [generalOpen, setGeneralOpen] = useState(true);
+  const [profileVisibilityOpen, setProfileVisibilityOpen] = useState(true);
+  const [navigationOpen, setNavigationOpen] = useState(true);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [boardGameProviderOpen, setBoardGameProviderOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(() => searchParams.get("open") === "api-keys");
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminUsers, setAdminUsers] = useState<
@@ -481,13 +528,11 @@ export function Settings() {
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
     >
       <div className="flex flex-col gap-8">
-        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
-          <h2 className="mb-1 min-w-0 text-base font-semibold text-[var(--color-lightest)]">
-            <OverflowMarquee>{t("settings.general")}</OverflowMarquee>
-          </h2>
-          <p className="text-sm text-[var(--color-light)] mb-5">
-            {t("settings.generalIntro")}
-          </p>
+        <SettingsCollapsibleSection
+          title={t("settings.general")}
+          open={generalOpen}
+          onToggle={() => setGeneralOpen((prev) => !prev)}
+        >
           <div className="divide-y divide-[var(--color-mid)]/20">
             {me && (
               <div className="flex flex-col gap-2 py-4 first:pt-0">
@@ -600,20 +645,18 @@ export function Settings() {
               </div>
             </div>
           </div>
-        </Card>
+        </SettingsCollapsibleSection>
 
-        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        <SettingsCollapsibleSection
+          title={t("settings.profileVisibilityTitle")}
+          open={profileVisibilityOpen}
+          onToggle={() => setProfileVisibilityOpen((prev) => !prev)}
+        >
           <motion.div
             className="flex flex-col gap-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            <h3 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
-              <OverflowMarquee>{t("settings.profileVisibilityTitle")}</OverflowMarquee>
-            </h3>
-            <p className="text-sm text-[var(--color-light)]">
-              {t("settings.profileVisibilityIntro")}
-            </p>
             {me?.user.username ? (
               <p className="text-sm text-[var(--color-light)]">
                 <Link
@@ -706,22 +749,16 @@ export function Settings() {
               ))}
             </motion.div>
           </motion.div>
-        </Card>
+        </SettingsCollapsibleSection>
 
-        <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        <SettingsCollapsibleSection
+          title={t("settings.appNavigationTitle")}
+          open={navigationOpen}
+          onToggle={() => setNavigationOpen((prev) => !prev)}
+        >
           <div className="flex flex-col gap-4">
-            <h3 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
-              <OverflowMarquee>{t("settings.publicProfileCustomization")}</OverflowMarquee>
-            </h3>
             {me && tierHasProFeatures(me.tier) ? (
-              <>
-                <p className="text-sm text-[var(--color-light)]">
-                  {t("settings.visibleMediaTypesIntro")}
-                </p>
-                <p className="text-sm text-[var(--color-light)]">
-                  {t("settings.visibleMediaTypesOrderHint")}
-                </p>
-                <MediaCategoryDragList
+              <MediaCategoryDragList
                   order={orderedMediaTypes}
                   onReorder={(next) => {
                     setOrderedMediaTypes(next);
@@ -737,34 +774,27 @@ export function Settings() {
                   gripAriaLabel={t("settings.dragToReorder")}
                   listAriaLabel={t("settings.visibleMediaTypesLabel")}
                 />
-              </>
             ) : (
-              <>
+              <div className="flex flex-col gap-3">
                 <p className="text-sm text-[var(--color-light)]">
-                  {t("settings.publicProfileProOnlyIntro")}
+                  {t("settings.appNavigationProOnlyIntro")}
                 </p>
                 <Button variant="outline" className="w-fit" asChild>
                   <Link to="/tiers">{t("settings.publicProfileUpgrade")}</Link>
                 </Button>
-              </>
+              </div>
             )}
           </div>
-        </Card>
+        </SettingsCollapsibleSection>
 
         {me && (
-          <Card
-            className={cn(
-              "border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]",
-              !tierHasProFeatures(me.tier) && "opacity-75"
-            )}
+          <SettingsCollapsibleSection
+            title={t("tiers.exportLogs")}
+            open={exportOpen}
+            onToggle={() => setExportOpen((prev) => !prev)}
+            className={!tierHasProFeatures(me.tier) ? "opacity-75" : undefined}
           >
             <div className="flex flex-col gap-4">
-              <h3 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
-                <OverflowMarquee>{t("tiers.exportLogs")}</OverflowMarquee>
-              </h3>
-              <p className="text-sm text-[var(--color-light)]">
-                {t("tiers.proExportDesc")}
-              </p>
               {tierHasProFeatures(me.tier) ? (
                 <Button
                   type="button"
@@ -788,7 +818,7 @@ export function Settings() {
                 </Button>
               )}
             </div>
-          </Card>
+          </SettingsCollapsibleSection>
         )}
 
         {me && tierHasProFeatures(me.tier) && (
@@ -814,17 +844,16 @@ export function Settings() {
           </>
         )}
 
-        <Card className="relative overflow-hidden border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]">
+        <SettingsCollapsibleSection
+          title={t("settings.boardGameProviderLabel")}
+          open={boardGameProviderOpen}
+          onToggle={() => setBoardGameProviderOpen((prev) => !prev)}
+          className="relative overflow-hidden"
+        >
           <div
             className={cn("flex flex-col gap-4", savingBoardGameProvider && "pointer-events-none opacity-60")}
             aria-busy={savingBoardGameProvider}
           >
-            <h3 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
-              <OverflowMarquee>{t("settings.boardGameProviderLabel")}</OverflowMarquee>
-            </h3>
-            <p className="text-sm text-[var(--color-light)]">
-              {t("settings.boardGameProviderIntro")}
-            </p>
             <BoardGameProviderSelector
               value={me?.boardGameProvider ?? "bgg"}
               onValueChange={(next) => void handleBoardGameProviderChange(next)}
@@ -842,24 +871,14 @@ export function Settings() {
               <span className="text-sm font-medium text-[var(--color-lightest)]">{t("settings.saving")}</span>
             </div>
           )}
-        </Card>
+        </SettingsCollapsibleSection>
 
-        <div className="rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">
-          <button
-            type="button"
-            onClick={() => setAdvancedOpen((prev) => !prev)}
-            className="flex w-full items-center gap-2 px-4 py-3 max-md:min-h-[44px] text-left text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-darkest)]/50 focus:outline-none"
-            aria-expanded={advancedOpen}
-          >
-            {advancedOpen ? (
-              <ChevronDown className="h-5 w-5 shrink-0 text-[var(--color-light)]" aria-hidden />
-            ) : (
-              <ChevronRight className="h-5 w-5 shrink-0 text-[var(--color-light)]" aria-hidden />
-            )}
-            <span className="font-semibold">{t("settings.apiKeys")}</span>
-          </button>
-          {advancedOpen && (
-            <div className="border-t border-[var(--color-surface-border)] px-4 pb-4 pt-2">
+        <SettingsCollapsibleSection
+          title={t("settings.apiKeys")}
+          open={advancedOpen}
+          onToggle={() => setAdvancedOpen((prev) => !prev)}
+        >
+          <div>
               <div className="mb-4 flex items-start gap-2">
                 <div className="flex-1 space-y-1">
                   <p className="text-sm text-[var(--color-light)]">
@@ -986,27 +1005,15 @@ export function Settings() {
                   );
                 })}
               </div>
-            </div>
-          )}
-        </div>
+          </div>
+        </SettingsCollapsibleSection>
 
         {me?.tier === "admin" && (
-          <div className="rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]">
-            <button
-              type="button"
-              onClick={() => setAdminOpen((prev) => !prev)}
-              className="flex w-full items-center gap-2 px-4 py-3 max-md:min-h-[44px] text-left text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-darkest)]/50 focus:outline-none"
-              aria-expanded={adminOpen}
-            >
-              {adminOpen ? (
-                <ChevronDown className="h-5 w-5 shrink-0 text-[var(--color-light)]" aria-hidden />
-              ) : (
-                <ChevronRight className="h-5 w-5 shrink-0 text-[var(--color-light)]" aria-hidden />
-              )}
-              <span className="font-semibold">{t("settings.adminSection")}</span>
-            </button>
-            {adminOpen && (
-              <div className="border-t border-[var(--color-surface-border)] px-4 pb-4 pt-4">
+          <SettingsCollapsibleSection
+            title={t("settings.adminSection")}
+            open={adminOpen}
+            onToggle={() => setAdminOpen((prev) => !prev)}
+          >
                 <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-6 lg:items-start">
                   <section
                     className="min-w-0 lg:col-span-8"
@@ -1014,13 +1021,10 @@ export function Settings() {
                   >
                     <h3
                       id="admin-users-heading"
-                      className="mb-2 text-base font-semibold text-[var(--color-lightest)]"
+                      className="mb-3 text-base font-semibold text-[var(--color-lightest)]"
                     >
                       {t("settings.adminUsersTitle")}
                     </h3>
-                    <p className="mb-3 text-sm text-[var(--color-light)]">
-                      {t("settings.adminUsersIntro")}
-                    </p>
                     {adminUsersLoading && (
                       <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
                     )}
@@ -1077,13 +1081,10 @@ export function Settings() {
                     <section className="mt-8" aria-labelledby="admin-digest-heading">
                       <h3
                         id="admin-digest-heading"
-                        className="mb-2 text-base font-semibold text-[var(--color-lightest)]"
+                        className="mb-3 text-base font-semibold text-[var(--color-lightest)]"
                       >
                         {t("settings.adminDigestTitle")}
                       </h3>
-                      <p className="mb-3 max-w-xl text-sm text-[var(--color-light)]">
-                        {t("settings.adminDigestIntro")}
-                      </p>
                       <Button
                         type="button"
                         variant="secondary"
@@ -1109,13 +1110,10 @@ export function Settings() {
                   >
                     <h3
                       id="admin-feature-flags-heading"
-                      className="mb-2 text-base font-semibold text-[var(--color-lightest)]"
+                      className="mb-3 text-base font-semibold text-[var(--color-lightest)]"
                     >
                       {t("settings.adminFeatureFlagsTitle")}
                     </h3>
-                    <p className="mb-4 text-sm text-[var(--color-light)]">
-                      {t("settings.adminFeatureFlagsIntro")}
-                    </p>
                     {adminFeatureFlagsLoading && (
                       <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
                     )}
@@ -1164,9 +1162,7 @@ export function Settings() {
                     </ul>
                   </section>
                 </div>
-              </div>
-            )}
-          </div>
+          </SettingsCollapsibleSection>
         )}
       </div>
     </motion.div>

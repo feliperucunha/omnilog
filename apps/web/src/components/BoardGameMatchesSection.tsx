@@ -10,6 +10,12 @@ import {
 import type { BoardGameMatch, BoardGameMatchPlayer, Log } from "@geeklogs/shared";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,7 +32,6 @@ import {
   Calendar,
   ChevronDown,
   Dice5,
-  History,
   Loader2,
   Trash2,
   Trophy,
@@ -36,6 +41,16 @@ import {
 import { cn } from "@/lib/utils";
 
 type PlayerRow = { name: string; score: string; winner: boolean; appUserId?: string | null };
+
+type MeUser = NonNullable<ReturnType<typeof useMe>["me"]>["user"];
+
+function buildDefaultPlayers(meUser: MeUser | undefined): PlayerRow[] {
+  const selfName = meUser?.username?.trim() || meUser?.email?.trim() || "";
+  return [
+    { name: selfName, score: "", winner: false, appUserId: meUser?.id ?? null },
+    { name: "", score: "", winner: false, appUserId: null },
+  ];
+}
 
 /** Oldest session first — used to find each match’s immediate predecessor in time. */
 function sortBoardGameMatchesChronologicalAsc(list: BoardGameMatch[]): BoardGameMatch[] {
@@ -92,6 +107,10 @@ function todayDateInput(): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function isTodayDateInput(yyyyMmDd: string): boolean {
+  return yyyyMmDd === todayDateInput();
 }
 
 function dateInputToIso(yyyyMmDd: string): string | null {
@@ -342,22 +361,36 @@ export const BoardGameMatchesSection = forwardRef<
     onEnsureLog?: () => Promise<string>;
     /** When true, hide the section save button (parent provides one). */
     embedded?: boolean;
+    /** Called after a match is saved (e.g. close drawer/modal). */
+    onMatchSaved?: (log: Log) => void;
   }
->(function BoardGameMatchesSection({ logId, onLogUpdated, onEnsureLog, embedded = false }, ref) {
+>(function BoardGameMatchesSection({ logId, onLogUpdated, onEnsureLog, embedded = false, onMatchSaved }, ref) {
   const { t, locale } = useLocale();
   const { me } = useMe();
+  const meUser = me?.user;
   const [matches, setMatches] = useState<BoardGameMatch[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [playedDate, setPlayedDate] = useState(todayDateInput);
-  const [players, setPlayers] = useState<PlayerRow[]>([
-    { name: "", score: "", winner: false, appUserId: null },
-    { name: "", score: "", winner: false, appUserId: null },
-  ]);
+  const [players, setPlayers] = useState<PlayerRow[]>(() => buildDefaultPlayers(undefined));
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmMatchId, setDeleteConfirmMatchId] = useState<string | null>(null);
+  const playedDateInputRef = useRef<HTMLInputElement>(null);
+  const isPlayedToday = isTodayDateInput(playedDate);
 
   const matchesChronologicalAsc = useMemo(() => sortBoardGameMatchesChronologicalAsc(matches), [matches]);
+
+  useEffect(() => {
+    if (!meUser?.id) return;
+    setPlayers((prev) => {
+      const first = prev[0];
+      if (first?.appUserId === meUser.id && first.name.trim()) return prev;
+      if (first?.name.trim() || first?.appUserId) return prev;
+      const defaults = buildDefaultPlayers(meUser);
+      return [defaults[0]!, ...prev.slice(1)];
+    });
+  }, [meUser?.id, meUser?.username, meUser?.email]);
 
   const loadMatches = useCallback(() => {
     if (!logId) {
@@ -376,14 +409,58 @@ export const BoardGameMatchesSection = forwardRef<
     loadMatches();
   }, [loadMatches]);
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setPlayedDate(todayDateInput());
-    setPlayers([
-      { name: "", score: "", winner: false, appUserId: null },
-      { name: "", score: "", winner: false, appUserId: null },
-    ]);
+    setPlayers(buildDefaultPlayers(meUser));
     setNotes("");
-  };
+  }, [meUser]);
+
+  const submitNewMatch = useCallback(
+    async (
+      iso: string,
+      playersPayload: Array<{ name: string; score: number | null; winner: boolean; appUserId?: string }>,
+      matchNotes: string | null,
+      options?: { resetAfter?: boolean },
+    ): Promise<boolean> => {
+      setSaving(true);
+      try {
+        let targetLogId = logId;
+        if (!targetLogId) {
+          if (!onEnsureLog) {
+            toast.error(t("boardGameMatches.needLogFirst"));
+            return false;
+          }
+          targetLogId = await onEnsureLog();
+        }
+        const res = await apiFetch<{ match: BoardGameMatch; log: Log }>(`/logs/${targetLogId}/board-game-matches`, {
+          method: "POST",
+          body: JSON.stringify({
+            playedAt: iso,
+            players: playersPayload.map((p) => ({
+              name: p.name,
+              score: p.score,
+              winner: p.winner,
+              ...(p.appUserId ? { appUserId: p.appUserId } : {}),
+            })),
+            notes: matchNotes,
+          }),
+        });
+        invalidateLogsAndItemsCache();
+        onLogUpdated(res.log);
+        setMatches((prev) => [res.match, ...prev]);
+        if (options?.resetAfter) resetForm();
+        onMatchSaved?.(res.log);
+        toast.success(t("boardGameMatches.saved"));
+        return true;
+      } catch (err) {
+        showErrorToast(t, "E013", { originalError: err });
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [logId, onEnsureLog, onLogUpdated, onMatchSaved, resetForm, t],
+  );
 
   const handleSaveNew = useCallback(async (): Promise<boolean> => {
     const iso = dateInputToIso(playedDate);
@@ -408,63 +485,42 @@ export const BoardGameMatchesSection = forwardRef<
         return false;
       }
     }
-    setSaving(true);
-    try {
-      let targetLogId = logId;
-      if (!targetLogId) {
-        if (!onEnsureLog) {
-          toast.error(t("boardGameMatches.needLogFirst"));
-          return false;
-        }
-        targetLogId = await onEnsureLog();
-      }
-      const res = await apiFetch<{ match: BoardGameMatch; log: Log }>(`/logs/${targetLogId}/board-game-matches`, {
-        method: "POST",
-        body: JSON.stringify({
-          playedAt: iso,
-          players: withNames.map((p) => ({
-            name: p.name,
-            score: p.score,
-            winner: p.winner,
-            ...(p.appUserId ? { appUserId: p.appUserId } : {}),
-          })),
-          notes: notes.trim() || null,
-        }),
-      });
-      invalidateLogsAndItemsCache();
-      onLogUpdated(res.log);
-      setMatches((prev) => [res.match, ...prev]);
-      resetForm();
-      toast.success(t("boardGameMatches.saved"));
-      return true;
-    } catch (err) {
-      showErrorToast(t, "E013", { originalError: err });
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  }, [logId, notes, onEnsureLog, onLogUpdated, playedDate, players, t]);
+    return submitNewMatch(
+      iso,
+      withNames.map((p) => ({
+        name: p.name,
+        score: p.score,
+        winner: p.winner,
+        appUserId: p.appUserId,
+      })),
+      notes.trim() || null,
+      { resetAfter: true },
+    );
+  }, [notes, playedDate, players, submitNewMatch, t]);
 
   useImperativeHandle(ref, () => ({ saveNewMatch: handleSaveNew }), [handleSaveNew]);
 
-  const handleDelete = async (matchId: string) => {
-    if (!logId) return;
-    if (!window.confirm(t("boardGameMatches.deleteConfirm"))) return;
-    setDeletingId(matchId);
-    try {
-      const res = await apiFetch<{ log: Log }>(`/logs/${logId}/board-game-matches/${matchId}`, {
-        method: "DELETE",
-      });
-      invalidateLogsAndItemsCache();
-      onLogUpdated(res.log);
-      setMatches((prev) => prev.filter((m) => m.id !== matchId));
-      toast.success(t("boardGameMatches.deleted"));
-    } catch (err) {
-      showErrorToast(t, "E013", { originalError: err });
-    } finally {
-      setDeletingId(null);
-    }
-  };
+  const performDeleteMatch = useCallback(
+    async (matchId: string) => {
+      if (!logId) return;
+      setDeletingId(matchId);
+      try {
+        const res = await apiFetch<{ log: Log }>(`/logs/${logId}/board-game-matches/${matchId}`, {
+          method: "DELETE",
+        });
+        invalidateLogsAndItemsCache();
+        onLogUpdated(res.log);
+        setMatches((prev) => prev.filter((m) => m.id !== matchId));
+        setDeleteConfirmMatchId(null);
+        toast.success(t("boardGameMatches.deleted"));
+      } catch (err) {
+        showErrorToast(t, "E013", { originalError: err });
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [logId, onLogUpdated, t],
+  );
 
   const formatPlayed = (iso: string) => {
     const d = new Date(iso);
@@ -473,33 +529,43 @@ export const BoardGameMatchesSection = forwardRef<
   };
 
   return (
-    <div className="flex flex-col gap-8">
-      <section className="relative overflow-hidden rounded-2xl border border-[var(--color-mid)]/25 bg-gradient-to-b from-[var(--color-category-bg)]/80 to-[var(--color-dark)] p-5 shadow-[var(--shadow-category)] ring-1 ring-[var(--color-mid)]/10 sm:p-6">
-        <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-[var(--btn-gradient-start)]/10 blur-2xl" aria-hidden />
-        <div className="pointer-events-none absolute -bottom-10 left-1/3 h-24 w-40 rounded-full bg-[var(--btn-gradient-end)]/10 blur-2xl" aria-hidden />
-
-        <div className="relative flex flex-col gap-5">
-          <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--btn-gradient-start)] to-[var(--btn-gradient-end)] text-[var(--btn-text)] shadow-md">
-              <Dice5 className="h-6 w-6 shrink-0" aria-hidden />
-            </span>
-            <div>
-              <h3 className="text-lg font-semibold text-[var(--color-lightest)]">{t("boardGameMatches.newMatch")}</h3>
-              <p className="text-xs text-[var(--color-light)]">{t("boardGameMatches.newMatchSubtitle")}</p>
-            </div>
-          </div>
-
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-lightest)]">
               <Calendar className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />
               {t("boardGameMatches.playedDate")}
             </Label>
-            <Input
+            {isPlayedToday ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 min-w-[8rem] justify-start border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80 px-3 font-normal text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/15"
+                onClick={() => playedDateInputRef.current?.showPicker()}
+                aria-label={t("boardGameMatches.playedDate")}
+              >
+                {t("boardGameMatches.today")}
+              </Button>
+            ) : (
+              <Input
+                type="date"
+                value={playedDate}
+                onChange={(e) => setPlayedDate(e.target.value)}
+                className="max-w-[14rem] border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80"
+                aria-label={t("boardGameMatches.playedDate")}
+              />
+            )}
+            <input
+              ref={playedDateInputRef}
               type="date"
+              tabIndex={-1}
               value={playedDate}
               onChange={(e) => setPlayedDate(e.target.value)}
-              className="max-w-[14rem] border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80"
-              aria-label={t("boardGameMatches.playedDate")}
+              className={cn(
+                "max-w-[14rem] border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80",
+                isPlayedToday ? "pointer-events-none absolute h-px w-px overflow-hidden opacity-0" : "hidden",
+              )}
+              aria-hidden={isPlayedToday}
             />
           </div>
 
@@ -524,7 +590,7 @@ export const BoardGameMatchesSection = forwardRef<
               <motion.div
                 key={i}
                 layout
-                className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 ring-1 ring-white/5 sm:gap-3"
+                className="flex min-w-0 flex-wrap items-center gap-2 border-b border-[var(--color-mid)]/20 pb-3 last:border-b-0 last:pb-0 sm:gap-3"
               >
                 <div className="relative shrink-0">
                   <PlayerAvatar name={p.name || "?"} size="md" winner={p.winner} />
@@ -541,7 +607,7 @@ export const BoardGameMatchesSection = forwardRef<
                   <MatchPlayerNameField
                     value={p.name}
                     appUserId={p.appUserId}
-                    excludeUserId={me?.user?.id}
+                    excludeUserId={i === 0 ? undefined : meUser?.id}
                     t={t}
                     onChange={(next) =>
                       setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, ...next } : row)))
@@ -572,7 +638,7 @@ export const BoardGameMatchesSection = forwardRef<
                     {t("boardGameMatches.winner")}
                   </span>
                 </div>
-                {players.length > 1 && (
+                {players.length > 1 && i > 0 && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -602,7 +668,7 @@ export const BoardGameMatchesSection = forwardRef<
           {!embedded && (
             <Button
               type="button"
-              className="w-full rounded-xl py-6 text-base font-semibold sm:w-auto sm:px-10 sm:py-5"
+              className="w-full"
               disabled={saving}
               onClick={() => void handleSaveNew()}
             >
@@ -610,20 +676,14 @@ export const BoardGameMatchesSection = forwardRef<
               {saving ? t("common.saving") : t("boardGameMatches.saveMatch")}
             </Button>
           )}
-        </div>
-      </section>
+      </div>
 
       {logId ? (
-        <section className="flex flex-col gap-4">
-          <motion.div className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--btn-gradient-start)]/25 to-[var(--btn-gradient-end)]/20 text-[var(--color-lightest)] ring-1 ring-[var(--color-mid)]/30">
-              <History className="h-5 w-5" aria-hidden />
-            </span>
-            <div>
-              <h3 className="text-base font-semibold text-[var(--color-lightest)]">{t("boardGameMatches.previousSessions")}</h3>
-              <p className="text-xs text-[var(--color-light)]">{t("boardGameMatches.playHistorySubtitle")}</p>
-            </div>
-          </motion.div>
+        <div className="flex min-w-0 flex-col gap-4 border-t border-[var(--color-mid)]/25 pt-4">
+          <div>
+            <h3 className="text-sm font-medium text-[var(--color-lightest)]">{t("boardGameMatches.previousSessions")}</h3>
+            <p className="mt-1 text-xs text-[var(--color-light)]">{t("boardGameMatches.playHistorySubtitle")}</p>
+          </div>
           {loadingList ? (
             <div className="flex justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
@@ -653,15 +713,64 @@ export const BoardGameMatchesSection = forwardRef<
                     previousMatch={getChronologicalPreviousMatch(matchesChronologicalAsc, m)}
                     formatPlayed={formatPlayed}
                     deleting={deletingId === m.id}
-                    onDelete={() => handleDelete(m.id)}
+                    onDelete={() => setDeleteConfirmMatchId(m.id)}
                     t={t}
                   />
                 </motion.li>
               ))}
             </ul>
           )}
-        </section>
+        </div>
       ) : null}
+
+      <Dialog
+        open={deleteConfirmMatchId != null}
+        onOpenChange={(open) => {
+          if (!open && !deletingId) setDeleteConfirmMatchId(null);
+        }}
+      >
+        <DialogContent
+          className="z-[60] sm:max-w-sm"
+          overlayClassName="z-[60]"
+          onClose={() => {
+            if (!deletingId) setDeleteConfirmMatchId(null);
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-[var(--color-lightest)]">
+              {t("boardGameMatches.removeSession")}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-[var(--color-light)]">{t("boardGameMatches.deleteConfirm")}</p>
+          <div className="flex gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={deletingId != null}
+              onClick={() => setDeleteConfirmMatchId(null)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deletingId != null || deleteConfirmMatchId == null}
+              onClick={() => {
+                if (deleteConfirmMatchId) void performDeleteMatch(deleteConfirmMatchId);
+              }}
+            >
+              {deletingId != null ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  {t("common.deleting")}
+                </>
+              ) : (
+                t("common.delete")
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });

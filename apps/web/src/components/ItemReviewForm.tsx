@@ -465,7 +465,6 @@ export function ItemReviewForm({
       }
       if (myLog) {
         const currentStatus = myLog.status ?? myLog.listType ?? null;
-        const statusChanged = (status ?? null) !== currentStatus;
         const mechanicsMatch =
           !showBoardGameFields || sameStringList(mechanicList, myLog.mechanics ?? []);
         const affinityMatch =
@@ -541,22 +540,20 @@ export function ItemReviewForm({
           void refetchMe();
         }
         onSaved();
-        if (statusChanged) {
-          onSavedComplete?.({
-            image,
-            title,
-            grade: gradeNum ?? null,
-            status: status ?? undefined,
-            mediaType,
-            id: externalId,
-            review: review.trim() || null,
-            ...(showCollectionOwnership && { own, wantToBuy, sold }),
-            ...(showBoardGameFields && {
-              matchesPlayed:
-                mediaType === "boardgames" ? (updated.matchesPlayed ?? null) : toNum(matchesPlayed),
-            }),
-          });
-        }
+        onSavedComplete?.({
+          image,
+          title,
+          grade: gradeNum ?? null,
+          status: status ?? undefined,
+          mediaType,
+          id: externalId,
+          review: review.trim() || null,
+          ...(showCollectionOwnership && { own, wantToBuy, sold }),
+          ...(showBoardGameFields && {
+            matchesPlayed:
+              mediaType === "boardgames" ? (updated.matchesPlayed ?? null) : toNum(matchesPlayed),
+          }),
+        });
       } else {
         const createBody: Record<string, unknown> = {
           mediaType,
@@ -619,6 +616,17 @@ export function ItemReviewForm({
         toast.success(t("toast.reviewSaved"));
         invalidateLogsAndItemsCache();
         onSaved();
+        onSavedComplete?.({
+          image,
+          title,
+          grade: gradeForPayload(stars),
+          status: status ?? undefined,
+          mediaType,
+          id: externalId,
+          review: review.trim() || null,
+          ...(showCollectionOwnership && { own, wantToBuy, sold }),
+          ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
+        });
       } catch (err) {
         showErrorToast(t, "E012", { originalError: err });
       } finally {
@@ -629,8 +637,7 @@ export function ItemReviewForm({
     if (showBoardGameFields && boardMainTab === "matches") {
       setSaving(true);
       try {
-        const ok = await boardMatchesRef.current?.saveNewMatch();
-        if (ok) onSaved();
+        await boardMatchesRef.current?.saveNewMatch();
       } finally {
         setSaving(false);
       }
@@ -750,6 +757,7 @@ export function ItemReviewForm({
               setStatus(log.status ?? log.listType ?? status);
               if (log.matchesPlayed != null) setMatchesPlayed(log.matchesPlayed);
             }}
+            onMatchSaved={() => onSaved()}
           />
         ) : (
         <>

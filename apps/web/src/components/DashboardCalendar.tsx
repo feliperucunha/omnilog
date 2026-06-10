@@ -1,29 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { useLocale } from "@/contexts/LocaleContext";
-import { useIsMobile } from "@/hooks/useMediaQuery";
-import { ItemImage } from "@/components/ItemImage";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StarRating } from "@/components/StarRating";
-import { gradeToStars } from "@/lib/gradeStars";
-import { formatTimeToFinish } from "@/lib/formatDuration";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Drawer, DrawerContent } from "@/components/ui/drawer";
-import { IN_PROGRESS_STATUSES, type Log, type MediaType } from "@geeklogs/shared";
+import { LogActivitySheet } from "@/components/LogActivitySheet";
+import { type Log, type MediaType } from "@geeklogs/shared";
 import { paperShadow } from "@/lib/paperShadow";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
-import { itemDetailPath } from "@/lib/itemRoutes";
 
 const WEEKDAY_KEYS = [
   "dashboard.calendarMon",
@@ -73,7 +60,6 @@ export function DashboardCalendar({
   mediaType?: MediaType;
 }) {
   const { t, locale } = useLocale();
-  const isMobile = useIsMobile();
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [data, setData] = useState<CalendarData | null>(null);
@@ -312,134 +298,17 @@ export function DashboardCalendar({
         </div>
       </Card>
 
-      {canInteract && selectedDate && (
-        isMobile ? (
-          <Drawer open onOpenChange={(open) => !open && setSelectedDate(null)}>
-            <DrawerContent
-              mobileHeight="95%"
-              className="flex flex-col p-4 sm:p-6"
-              onClose={() => setSelectedDate(null)}
-            >
-              <div className="mt-6">
-                <OverflowMarquee className="mb-4 min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
-                  {t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) })}
-                </OverflowMarquee>
-                {dayLogsLoading ? (
-                  <div className="py-8 flex justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
-                  </div>
-                ) : dayLogs.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-[var(--color-light)]">
-                    {t("dashboard.calendarNoActivity")}
-                  </p>
-                ) : (
-                  <ul className="list-none m-0 p-0 flex flex-col gap-2">
-                    {dayLogs.map((log) => (
-                      <li key={log.id}>
-                        <Link
-                          to={itemDetailPath(log.mediaType, log.externalId)}
-                          className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
-                          onClick={() => setSelectedDate(null)}
-                        >
-                        <ItemImage
-                          src={log.image}
-                          className="h-14 w-10 shrink-0 rounded object-cover"
-                          mediaType={log.mediaType}
-                          boardGameSource={log.boardGameSource}
-                        />
-                        <div className="min-w-0 flex-1 flex flex-col gap-0.5 justify-center">
-                          <OverflowMarquee className="font-medium text-[var(--color-lightest)] text-sm">
-                            {log.title}
-                          </OverflowMarquee>
-                          <p className="text-xs text-[var(--color-light)]">
-                            {t(`nav.${log.mediaType}`)}
-                            {(() => {
-                              const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
-                              return duration ? <> · {t("dashboard.finishedIn", { duration })}</> : null;
-                            })()}
-                          </p>
-                          {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
-                            <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
-                              {t("common.inProgress")}
-                            </span>
-                          ) : log.grade != null ? (
-                            <StarRating value={gradeToStars(log.grade)} readOnly size="sm" showGradeText={false} />
-                          ) : null}
-                        </div>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </DrawerContent>
-          </Drawer>
-        ) : (
-          <Dialog open onOpenChange={(open) => !open && setSelectedDate(null)}>
-            <DialogContent
-              className="max-h-[85vh] flex flex-col max-w-md"
-              onClose={() => setSelectedDate(null)}
-            >
-              <DialogHeader className="shrink-0 space-y-0 pr-8 text-left sm:pr-10">
-                <DialogTitle className="min-w-0 text-[var(--color-lightest)]">
-                  <OverflowMarquee>
-                    {t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) })}
-                  </OverflowMarquee>
-                </DialogTitle>
-              </DialogHeader>
-              <div className="min-h-0 overflow-y-auto -mx-1 px-1">
-                {dayLogsLoading ? (
-                  <div className="py-8 flex justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-mid)] border-t-[var(--color-lightest)]" />
-                  </div>
-                ) : dayLogs.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-[var(--color-light)]">
-                    {t("dashboard.calendarNoActivity")}
-                  </p>
-                ) : (
-                  <ul className="list-none m-0 p-0 flex flex-col gap-2">
-                    {dayLogs.map((log) => (
-                      <li key={log.id}>
-                        <Link
-                          to={itemDetailPath(log.mediaType, log.externalId)}
-                          className="flex gap-3 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-3 text-inherit no-underline hover:bg-[var(--color-mid)]/15"
-                          onClick={() => setSelectedDate(null)}
-                        >
-                          <ItemImage
-                          src={log.image}
-                          className="h-14 w-10 shrink-0 rounded object-cover"
-                          mediaType={log.mediaType}
-                          boardGameSource={log.boardGameSource}
-                        />
-                          <div className="min-w-0 flex-1 flex flex-col gap-0.5 justify-center">
-                            <OverflowMarquee className="font-medium text-[var(--color-lightest)] text-sm">
-                              {log.title}
-                            </OverflowMarquee>
-                            <p className="text-xs text-[var(--color-light)]">
-                              {t(`nav.${log.mediaType}`)}
-                              {(() => {
-                                const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
-                                return duration ? <> · {t("dashboard.finishedIn", { duration })}</> : null;
-                              })()}
-                            </p>
-                            {log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status) ? (
-                              <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-medium text-white">
-                                {t("common.inProgress")}
-                              </span>
-                            ) : log.grade != null ? (
-                              <StarRating value={gradeToStars(log.grade)} readOnly size="sm" showGradeText={false} />
-                            ) : null}
-                          </div>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-        )
-      )}
+      <LogActivitySheet
+        open={canInteract && selectedDate != null}
+        onClose={() => setSelectedDate(null)}
+        title={
+          selectedDate
+            ? t("dashboard.calendarActivityOn", { date: formatCalendarDayDate(selectedDate, locale) })
+            : ""
+        }
+        logs={dayLogs}
+        loading={dayLogsLoading}
+      />
     </>
   );
 }

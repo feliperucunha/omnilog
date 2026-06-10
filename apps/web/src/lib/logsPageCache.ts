@@ -252,6 +252,12 @@ function warmStatisticsForFilter(
   if (filter === "games" || filter === "all") {
     prefetchGet(`/logs/stats?group=gamePlatforms&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
   }
+  if (filter === "boardgames" || filter === "all") {
+    prefetchGet(
+      `/logs/stats?group=recentBoardGames&period=month&sort=recent&timezoneOffsetMinutes=${tz}${mq}`,
+      prefetchOpts
+    );
+  }
   if (filter === "all" || (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(filter)) {
     prefetchGet(
       `/logs/stats?group=purchaseSpending&period=month&timezoneOffsetMinutes=${tz}${mq}`,
