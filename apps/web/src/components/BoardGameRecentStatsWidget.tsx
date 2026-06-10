@@ -8,6 +8,7 @@ import { tapScale, tapTransition } from "@/lib/animations";
 import { itemDetailPath } from "@/lib/itemRoutes";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
 import type { TFunction } from "@/contexts/LocaleContext";
+import type { BoardGameProvider } from "@geeklogs/shared";
 import { cn } from "@/lib/utils";
 
 export type RecentBoardGameStatEntry = {
@@ -15,7 +16,7 @@ export type RecentBoardGameStatEntry = {
   externalId: string;
   title: string;
   image: string | null;
-  boardGameSource: string | null;
+  boardGameSource: BoardGameProvider | null;
   matchCount: number;
   wins: number;
   lastPlayedAt: string;

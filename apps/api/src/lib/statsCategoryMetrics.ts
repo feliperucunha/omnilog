@@ -1,4 +1,4 @@
-import type { BoardGameMatchPlayer, MediaType } from "@geeklogs/shared";
+import type { BoardGameMatchPlayer, BoardGameProvider, MediaType } from "@geeklogs/shared";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
 const READING_MEDIA_TYPES = ["books", "manga", "comics"] as const;
@@ -50,7 +50,7 @@ export type RecentBoardGameStatEntry = {
   externalId: string;
   title: string;
   image: string | null;
-  boardGameSource: string | null;
+  boardGameSource: BoardGameProvider | null;
   matchCount: number;
   wins: number;
   lastPlayedAt: string;
