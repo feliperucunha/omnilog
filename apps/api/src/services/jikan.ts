@@ -5,7 +5,7 @@ import {
   SEARCH_RESULTS_PAGE_SIZE,
 } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
-import { searchAnimeAnilist } from "./anilist.js";
+import { getAnimeByIdAnilist, getMangaByIdAnilist, searchAnimeAnilist } from "./anilist.js";
 import { upstreamFetch } from "../lib/upstreamFetch.js";
 
 async function jikanFetch(url: string, init?: RequestInit): Promise<Response> {
@@ -87,7 +87,7 @@ function toItemDetail(
   };
 }
 
-export async function getAnimeById(id: string): Promise<ItemDetail | null> {
+async function getAnimeByIdJikan(id: string): Promise<ItemDetail | null> {
   const res = await jikanFetch(`${BASE}/anime/${id}`);
   if (!res.ok) return null;
   const data = (await res.json()) as {
@@ -144,6 +144,12 @@ export async function getAnimeById(id: string): Promise<ItemDetail | null> {
     themes: themes?.length ? themes : null,
     duration: duration ?? null,
   };
+}
+
+export async function getAnimeById(id: string): Promise<ItemDetail | null> {
+  const fromJikan = await getAnimeByIdJikan(id);
+  if (fromJikan) return fromJikan;
+  return getAnimeByIdAnilist(id);
 }
 
 function mergeAnimeSearchResults(
@@ -213,7 +219,7 @@ export async function searchAnime(q: string, sort?: string): Promise<SearchResul
   return sortSearchResults(merged, sort).slice(0, SEARCH_RESULTS_PAGE_SIZE);
 }
 
-export async function getMangaById(id: string): Promise<ItemDetail | null> {
+async function getMangaByIdJikan(id: string): Promise<ItemDetail | null> {
   const res = await jikanFetch(`${BASE}/manga/${id}`);
   if (!res.ok) return null;
   const data = (await res.json()) as {
@@ -270,6 +276,12 @@ export async function getMangaById(id: string): Promise<ItemDetail | null> {
     demographics: demographics?.length ? demographics : null,
     serialization: serialization ?? null,
   };
+}
+
+export async function getMangaById(id: string): Promise<ItemDetail | null> {
+  const fromJikan = await getMangaByIdJikan(id);
+  if (fromJikan) return fromJikan;
+  return getMangaByIdAnilist(id);
 }
 
 export async function searchManga(q: string, sort?: string): Promise<SearchResult[]> {
