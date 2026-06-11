@@ -27,8 +27,10 @@ import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import { SearchSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
 import {
+  buildSearchCategoryLocation,
   buildSearchLocation,
   openItemFromSearch,
+  parseSearchTypeParam,
   parseSearchUrl,
   SEARCH_USERS_TYPE,
   type SearchFilterParam,
@@ -42,6 +44,7 @@ import {
   type SearchPageUserResult,
 } from "@/lib/searchPageCache";
 import { ItemImage } from "@/components/ItemImage";
+import { BookPagesBadge } from "@/components/BookPagesBadge";
 import { GenreBadges } from "@/components/GenreBadges";
 import { tapScale, tapTransition } from "@/lib/animations";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
@@ -163,6 +166,12 @@ export function Search() {
     () => parseSearchUrl(urlSearchParams, defaultType),
     [urlSearchParams, defaultType]
   );
+  const hasUrlType =
+    urlSearchParams.has("type") || urlSearchParams.has("category");
+  const urlTypeFilter = useMemo(
+    () => parseSearchTypeParam(urlSearchParams, defaultType),
+    [urlSearchParams, defaultType]
+  );
   const pageCacheKey = useMemo(
     () => (urlRestore?.query.trim() ? buildSearchCacheKey(location.pathname, urlRestore) : null),
     [urlRestore, location.pathname]
@@ -171,7 +180,8 @@ export function Search() {
     () => (pageCacheKey ? getSearchPageCache(pageCacheKey) : null),
     [pageCacheKey]
   );
-  const stateMediaType = urlRestore?.searchFilter ?? state?.mediaType;
+  const stateMediaType =
+    urlRestore?.searchFilter ?? (hasUrlType ? urlTypeFilter : undefined) ?? state?.mediaType;
   const stateQuery = urlRestore?.query ?? state?.query ?? "";
   const [searchFilter, setSearchFilter] = useState<SearchFilterParam>(
     () => pageCache?.searchFilter ?? stateMediaType ?? defaultType
@@ -592,8 +602,11 @@ export function Search() {
         selectedValue={searchFilter}
         onSelect={(v) => {
           skipSortResetOnFilterChange.current = false;
-          setSearchFilter(v as SearchFilterParam);
-          if (query.trim()) runSearch(query, v as SearchFilterParam);
+          const nextFilter = v as SearchFilterParam;
+          setSearchFilter(nextFilter);
+          const loc = buildSearchCategoryLocation(location.pathname, location.search, nextFilter);
+          navigate(loc, { replace: true });
+          if (query.trim()) runSearch(query, nextFilter);
         }}
         showCount={false}
         mobileOnly={false}
@@ -616,6 +629,9 @@ export function Search() {
     t,
     setBelowNavbar,
     runSearch,
+    location.pathname,
+    location.search,
+    navigate,
   ]);
 
   const showRecommendations =
@@ -969,14 +985,22 @@ export function Search() {
                         {item.genres && item.genres.length > 0 && (
                           <GenreBadges genres={item.genres} maxCount={1} className="shrink-0" />
                         )}
+                        {mediaType === "books" && (
+                          <BookPagesBadge pagesCount={item.pagesCount} className="shrink-0" />
+                        )}
                         <OverflowMarquee className="min-w-0 flex-1 text-xs text-[var(--color-light)]">
                           {metaLine}
                         </OverflowMarquee>
                       </div>
                       <div className="flex min-w-0 flex-col gap-0.5 sm:hidden">
-                        {item.genres && item.genres.length > 0 && (
-                          <GenreBadges genres={item.genres} maxCount={1} />
-                        )}
+                        <div className="flex min-w-0 flex-wrap items-center gap-1">
+                          {item.genres && item.genres.length > 0 && (
+                            <GenreBadges genres={item.genres} maxCount={1} />
+                          )}
+                          {mediaType === "books" && (
+                            <BookPagesBadge pagesCount={item.pagesCount} />
+                          )}
+                        </div>
                         <OverflowMarquee className="text-xs text-[var(--color-light)]">
                           {metaLine}
                         </OverflowMarquee>

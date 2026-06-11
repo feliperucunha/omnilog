@@ -198,7 +198,7 @@ export function About() {
           <OverflowMarquee>{t("about.teamTitle")}</OverflowMarquee>
         </h2>
         <div
-          className="md:hidden scrollbar-hide -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden scroll-smooth scroll-pl-4 scroll-pr-4 px-4 pb-1 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]"
+          className="md:hidden scrollbar-hide -mx-2.5 flex snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden scroll-smooth scroll-pl-2.5 scroll-pr-2.5 px-2.5 pb-1 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]"
           role="list"
           aria-label={t("about.teamTitle")}
         >

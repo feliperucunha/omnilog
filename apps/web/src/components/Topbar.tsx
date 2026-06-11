@@ -72,7 +72,7 @@ export function Topbar() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex min-h-14 flex-shrink-0 items-center gap-3 sm:gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-3 sm:px-4 pt-[env(safe-area-inset-top)]"
+        "sticky top-0 z-30 flex min-h-14 flex-shrink-0 items-center gap-3 sm:gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-2.5 sm:px-4 pt-[env(safe-area-inset-top)]"
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">

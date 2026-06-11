@@ -93,7 +93,9 @@ export type OpenLibrarySearchOptions = {
   openLibraryApiSort?: "rating" | "rating_count";
 };
 
-const OL_FIELDS_WITH_RATING = "key,title,first_publish_year,cover_i,author_name,ratings_average";
+const OL_FIELDS_BASE =
+  "key,title,first_publish_year,cover_i,author_name,number_of_pages_median";
+const OL_FIELDS_WITH_RATING = `${OL_FIELDS_BASE},ratings_average`;
 
 export async function searchBooks(
   q: string,
@@ -104,6 +106,8 @@ export async function searchBooks(
   if (options?.openLibraryApiSort) {
     params.set("sort", options.openLibraryApiSort);
     params.set("fields", OL_FIELDS_WITH_RATING);
+  } else {
+    params.set("fields", OL_FIELDS_BASE);
   }
   const res = await fetch(`${BASE}/search.json?${params.toString()}`, {
     headers: { "User-Agent": "Geeklogs/1.0 (https://github.com/geeklogs)" },
@@ -117,21 +121,30 @@ export async function searchBooks(
       cover_i?: number;
       author_name?: string[];
       ratings_average?: number;
+      number_of_pages_median?: number;
     }>;
   };
   const docs = data.docs ?? [];
-  let results = docs.map((doc) => ({
-    id: doc.key.replace(/^\/works\//, ""),
-    title: decodeHtmlEntities(doc.title ?? "Unknown"),
-    image: doc.cover_i
-      ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
-      : null,
-    year: doc.first_publish_year != null ? String(doc.first_publish_year) : null,
-    subtitle: Array.isArray(doc.author_name)
-      ? doc.author_name.map((a) => decodeHtmlEntities(a)).join(", ")
-      : null,
-    score:
-      typeof doc.ratings_average === "number" && doc.ratings_average > 0 ? doc.ratings_average : null,
-  }));
+  let results = docs.map((doc) => {
+    const pagesMedian = doc.number_of_pages_median;
+    const pagesCount =
+      typeof pagesMedian === "number" && Number.isFinite(pagesMedian) && pagesMedian > 0
+        ? Math.round(pagesMedian)
+        : null;
+    return {
+      id: doc.key.replace(/^\/works\//, ""),
+      title: decodeHtmlEntities(doc.title ?? "Unknown"),
+      image: doc.cover_i
+        ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
+        : null,
+      year: doc.first_publish_year != null ? String(doc.first_publish_year) : null,
+      subtitle: Array.isArray(doc.author_name)
+        ? doc.author_name.map((a) => decodeHtmlEntities(a)).join(", ")
+        : null,
+      score:
+        typeof doc.ratings_average === "number" && doc.ratings_average > 0 ? doc.ratings_average : null,
+      pagesCount,
+    };
+  });
   return sortSearchResults(results, sort);
 }

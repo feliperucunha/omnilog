@@ -30,6 +30,7 @@ import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
 import { ExportLogsModal, type ExportLogsOptions } from "@/components/ExportLogsModal";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
+import { BookPagesBadge } from "@/components/BookPagesBadge";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
 import { LevelBadge } from "@/components/LevelBadge";
@@ -1446,10 +1447,8 @@ export function MediaLogs({
                           }
                           return null;
                         })()}
-                        {log.mediaType === "books" && typeof log.pagesCount === "number" && log.pagesCount > 0 && (
-                          <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
-                            {t("mediaLogs.bookPagesBadge", { count: String(log.pagesCount) })}
-                          </span>
+                        {log.mediaType === "books" && (
+                          <BookPagesBadge pagesCount={log.pagesCount} />
                         )}
                         {log.mediaType === "boardgames" && (() => {
                           const min = typeof log.playersMin === "number" && log.playersMin > 0 ? log.playersMin : null;

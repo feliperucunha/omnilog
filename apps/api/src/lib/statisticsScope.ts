@@ -14,6 +14,7 @@ export function freeTierStatisticsMonthWhere(tzOffsetMinutes: number): Prisma.Lo
     OR: [
       { createdAt: { gte: range.gte, lte: range.lte } },
       { completedAt: { gte: range.gte, lte: range.lte } },
+      { updatedAt: { gte: range.gte, lte: range.lte } },
     ],
   };
 }

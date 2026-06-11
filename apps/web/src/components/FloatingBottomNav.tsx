@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { navItemIsActive } from "@/lib/mainNav";
+import { useDashboardNavPath, useSearchNavPath } from "@/lib/searchNavigation";
 import { springSoft } from "@/lib/animations";
 import { cn } from "@/lib/utils";
 
@@ -95,7 +96,13 @@ export function FloatingBottomNav() {
   const location = useLocation();
   const dockRef = useRef<HTMLDivElement>(null);
 
-  const items = token ? AUTH_ITEMS : GUEST_ITEMS;
+  const searchNavPath = useSearchNavPath();
+  const dashboardNavPath = useDashboardNavPath();
+  const items = (token ? AUTH_ITEMS : GUEST_ITEMS).map((item) => {
+    if (item.to === "/") return { ...item, to: searchNavPath };
+    if (item.to === "/dashboard") return { ...item, to: dashboardNavPath };
+    return item;
+  });
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return;
@@ -106,7 +113,7 @@ export function FloatingBottomNav() {
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 md:hidden pointer-events-none"
+      className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 md:hidden pointer-events-none"
       data-floating-dock
     >
       <LayoutGroup id="floating-dock">

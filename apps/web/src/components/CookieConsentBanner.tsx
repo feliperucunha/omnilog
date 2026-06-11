@@ -37,7 +37,7 @@ export function CookieConsentBanner() {
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 z-[55] flex justify-center px-4 max-md:bottom-[max(5.5rem,calc(5rem+env(safe-area-inset-bottom,0px)))] md:bottom-8 md:px-6"
+      className="pointer-events-none fixed inset-x-0 z-[55] flex justify-center px-2.5 max-md:bottom-[max(5.5rem,calc(5rem+env(safe-area-inset-bottom,0px)))] md:bottom-8 md:px-6"
       role="dialog"
       aria-label={t("cookies.ariaLabel")}
     >

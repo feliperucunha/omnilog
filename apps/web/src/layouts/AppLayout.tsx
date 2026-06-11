@@ -41,7 +41,7 @@ function AppLayoutContent() {
             {belowNavbar}
           </div>
         )}
-        <div className="flex min-w-0 flex-1 flex-col p-4 max-md:pb-[max(5.5rem,calc(4.75rem+env(safe-area-inset-bottom)))] md:p-6">
+        <div className="flex min-w-0 flex-1 flex-col px-2.5 py-4 max-md:pb-[max(5.5rem,calc(4.75rem+env(safe-area-inset-bottom)))] md:p-6">
           <InvalidApiKeyBanner />
           <Outlet />
           <AdBanner />

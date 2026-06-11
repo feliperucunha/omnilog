@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Loader2 } from "lucide-react";
+import { Fingerprint, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,13 @@ import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
 import { safeInternalPathFromQuery } from "@/lib/safeInternalPath";
 import * as storage from "@/lib/storage";
+import {
+  clearSecureCredentials,
+  hasSecureCredentials,
+  isSecureCredentialStorageAvailable,
+  loadSecureCredentials,
+  saveSecureCredentials,
+} from "@/lib/secureCredentials";
 import type { AuthResponse } from "@geeklogs/shared";
 import { modalContentVariants } from "@/lib/animations";
 
@@ -30,19 +37,29 @@ export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [secureStorageAvailable, setSecureStorageAvailable] = useState(false);
+  const [hasSecureLogin, setHasSecureLogin] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
   const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  /** Load remember-me from persistent storage (works on Android/Capacitor). */
   useEffect(() => {
     let cancelled = false;
-    storage.getItem(REMEMBER_LOGIN_KEY).then((raw) => {
+    (async () => {
+      const [secureAvailable, secureSaved] = await Promise.all([
+        isSecureCredentialStorageAvailable(),
+        hasSecureCredentials(),
+      ]);
       if (cancelled) return;
+      setSecureStorageAvailable(secureAvailable);
+      setHasSecureLogin(secureSaved);
+      if (secureSaved) return;
+      const raw = await storage.getItem(REMEMBER_LOGIN_KEY);
+      if (cancelled || !raw) return;
       try {
-        if (!raw) return;
         const data = JSON.parse(raw) as { email?: string } | null;
         const parsedEmail = typeof data?.email === "string" ? data.email : "";
         setEmail(parsedEmail);
@@ -50,11 +67,46 @@ export function Login() {
       } catch {
         // ignore
       }
-    });
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const completeLogin = useCallback(
+    async (data: AuthResponse) => {
+      await login(data.token, { ...data.user, onboarded: data.user.onboarded ?? true });
+      toast.success(t("toast.welcomeBack"));
+      const from = safeInternalPathFromQuery(searchParams.get("from"));
+      if (from) {
+        navigate(from, { replace: true });
+        return;
+      }
+      navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
+    },
+    [login, navigate, searchParams, t]
+  );
+
+  const persistRememberMe = useCallback(
+    async (loginEmail: string, loginPassword: string) => {
+      if (secureStorageAvailable) {
+        await saveSecureCredentials(loginEmail, loginPassword);
+        setHasSecureLogin(true);
+        await storage.removeItem(REMEMBER_LOGIN_KEY);
+        return;
+      }
+      await storage.setItem(REMEMBER_LOGIN_KEY, JSON.stringify({ email: loginEmail }));
+    },
+    [secureStorageAvailable]
+  );
+
+  const clearRememberMe = useCallback(async () => {
+    if (secureStorageAvailable) {
+      await clearSecureCredentials();
+      setHasSecureLogin(false);
+    }
+    await storage.removeItem(REMEMBER_LOGIN_KEY);
+  }, [secureStorageAvailable]);
 
   const clearFieldError = (field: keyof LoginFieldErrors) => {
     setFieldErrors((prev) => {
@@ -62,6 +114,35 @@ export function Login() {
       delete next[field];
       return next;
     });
+  };
+
+  const handleBiometricSignIn = async () => {
+    setFieldErrors({});
+    setBiometricLoading(true);
+    try {
+      const creds = await loadSecureCredentials({
+        reason: t("login.biometricReason"),
+        title: t("login.biometricTitle"),
+        subtitle: t("app.name"),
+        description: t("login.biometricDescription"),
+        negativeButtonText: t("common.cancel"),
+      });
+      if (!creds) return;
+      const data = await apiFetch<AuthResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: creds.username,
+          password: creds.password,
+        }),
+        skipAuthRedirect: true,
+        timeout: 25_000,
+      });
+      await completeLogin(data);
+    } catch (err) {
+      showErrorToast(t, "E002", { originalError: err });
+    } finally {
+      setBiometricLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -84,21 +165,11 @@ export function Login() {
         timeout: 25_000,
       });
       if (rememberMe) {
-        void storage.setItem(
-          REMEMBER_LOGIN_KEY,
-          JSON.stringify({ email: email.trim() })
-        );
+        await persistRememberMe(email.trim(), password);
       } else {
-        void storage.removeItem(REMEMBER_LOGIN_KEY);
+        await clearRememberMe();
       }
-      await login(data.token, { ...data.user, onboarded: data.user.onboarded ?? true });
-      toast.success(t("toast.welcomeBack"));
-      const from = safeInternalPathFromQuery(searchParams.get("from"));
-      if (from) {
-        navigate(from, { replace: true });
-        return;
-      }
-      navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
+      await completeLogin(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("toast.loginFailed");
       if (err instanceof ApiValidationError) {
@@ -136,6 +207,30 @@ export function Login() {
             </h1>
           </CardHeader>
           <CardContent className="pt-0">
+            {hasSecureLogin && (
+              <motion.div whileTap={{ scale: 0.98 }} transition={{ duration: 0.1 }} className="mb-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={loading || biometricLoading}
+                  onClick={() => void handleBiometricSignIn()}
+                  aria-busy={biometricLoading}
+                >
+                  {biometricLoading ? (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                      {t("login.biometricSigningIn")}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Fingerprint className="h-4 w-4 shrink-0" aria-hidden />
+                      {t("login.biometricSignIn")}
+                    </span>
+                  )}
+                </Button>
+              </motion.div>
+            )}
             <form onSubmit={handleSubmit} aria-busy={loading}>
               <div className="flex flex-col gap-4">
                 <div className="space-y-2">
@@ -191,7 +286,7 @@ export function Login() {
                     className="h-4 w-4 shrink-0 rounded border-[var(--color-mid)] bg-[var(--color-darkest)] text-[var(--color-mid)] focus:ring-[var(--color-mid)]"
                   />
                   <span className="text-sm text-[var(--color-light)]">
-                    {t("login.rememberMe")}
+                    {secureStorageAvailable ? t("login.rememberMeSecure") : t("login.rememberMe")}
                   </span>
                 </label>
                 <p className="text-right text-sm">

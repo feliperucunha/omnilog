@@ -14,6 +14,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { Logo } from "@/components/Logo";
 import { FloatingBottomNav } from "@/components/FloatingBottomNav";
 import { navItemIsActive } from "@/lib/mainNav";
+import { useDashboardNavPath, useSearchNavPath } from "@/lib/searchNavigation";
 import { cn } from "@/lib/utils";
 
 const iconSize = 18;
@@ -80,11 +81,13 @@ function NavLinkItem({
 export function Nav() {
   const { t } = useLocale();
   const { token } = useAuth();
+  const searchNavPath = useSearchNavPath();
+  const dashboardNavPath = useDashboardNavPath();
 
   const navItems: { to: string; labelKey: string; icon: React.ReactNode }[] = [
-    { to: "/dashboard", labelKey: "nav.dashboard", icon: <Home size={iconSize} /> },
+    { to: dashboardNavPath, labelKey: "nav.dashboard", icon: <Home size={iconSize} /> },
     { to: "/statistics", labelKey: "nav.statistics", icon: <BarChart3 size={iconSize} /> },
-    { to: "/", labelKey: "nav.search", icon: <Search size={iconSize} /> },
+    { to: searchNavPath, labelKey: "nav.search", icon: <Search size={iconSize} /> },
     { to: "/settings", labelKey: "nav.settings", icon: <Settings size={iconSize} /> },
     { to: "/tiers", labelKey: "nav.plans", icon: <CreditCard size={iconSize} /> },
     { to: "/about", labelKey: "nav.about", icon: <Info size={iconSize} /> },
@@ -122,12 +125,12 @@ export function Nav() {
           ) : (
             <>
               <NavLinkItem
-                to="/dashboard"
+                to={dashboardNavPath}
                 label={t("nav.dashboard")}
                 icon={<Home size={iconSize} />}
               />
               <NavLinkItem
-                to="/"
+                to={searchNavPath}
                 label={t("nav.search")}
                 icon={<Search size={iconSize} />}
               />

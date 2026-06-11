@@ -26,6 +26,7 @@
     "@capacitor/keyboard": "^7.0.0",
     "@capacitor/share": "^7.0.0",
     "@capacitor/status-bar": "^7.0.0",
+    "@capgo/capacitor-native-biometric": "7.6.0",
     "@geeklogs/web": "workspace:*"
   },
   "capacitor": {

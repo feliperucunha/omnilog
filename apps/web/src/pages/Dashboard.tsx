@@ -51,6 +51,7 @@ import {
   type SharedFilters,
 } from "@/pages/MediaLogs";
 import { Select } from "@/components/ui/select";
+import { BookPagesBadge } from "@/components/BookPagesBadge";
 import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { StarRating } from "@/components/StarRating";
@@ -134,7 +135,7 @@ function CategoryOrderSkeletonStrip() {
       className="scrollbar-hide flex min-h-[3rem] min-w-0 overflow-x-auto scroll-smooth [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]"
       aria-busy
     >
-      <div className="flex min-w-max items-stretch gap-6 pl-3 pr-3">
+      <div className="flex min-w-max items-stretch gap-6 pl-2.5 pr-2.5 md:pl-3 md:pr-3">
         {Array.from({ length: 8 }, (_, i) => (
           <div key={i} className="flex shrink-0 flex-col items-center justify-start pt-3">
             <div className="h-4 w-16 max-w-[5rem] animate-pulse rounded bg-[var(--color-mid)]/30" />
@@ -883,10 +884,8 @@ export function Dashboard() {
                               {log.networks[0]}
                             </span>
                           )}
-                          {log.mediaType === "books" && typeof log.pagesCount === "number" && log.pagesCount > 0 && (
-                            <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
-                              {t("mediaLogs.bookPagesBadge", { count: String(log.pagesCount) })}
-                            </span>
+                          {log.mediaType === "books" && (
+                            <BookPagesBadge pagesCount={log.pagesCount} />
                           )}
                           {log.mediaType === "boardgames" && (() => {
                             const min = typeof log.playersMin === "number" && log.playersMin > 0 ? log.playersMin : null;

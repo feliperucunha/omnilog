@@ -29,6 +29,8 @@ import { usePageTitle } from "@/contexts/PageTitleContext";
 import { ItemReviewForm } from "@/components/ItemReviewForm";
 import { ItemPageSkeleton } from "@/components/skeletons";
 import { Select } from "@/components/ui/select";
+import { BookPagesBadge } from "@/components/BookPagesBadge";
+import { GamePlatformBadges } from "@/components/GamePlatformBadges";
 import { GenreBadges } from "@/components/GenreBadges";
 import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
@@ -76,6 +78,8 @@ function ItemDetailsBlock({
   const hasAuthors = item.authors && item.authors.length > 0;
   const hasPublisher = item.publisher && item.publisher.length > 0;
   const hasIssues = item.issuesCount != null && item.issuesCount > 0;
+  const hasPages =
+    mediaType === "books" && typeof item.pagesCount === "number" && item.pagesCount > 0;
   const hasPlatforms = item.platforms && item.platforms.length > 0;
   const hasChapters = item.chaptersCount != null && item.chaptersCount > 0;
   const hasVolumes = item.volumesCount != null && item.volumesCount > 0;
@@ -113,6 +117,7 @@ function ItemDetailsBlock({
     hasAuthors ||
     hasPublisher ||
     hasIssues ||
+    hasPages ||
     hasPlatforms ||
     hasChapters ||
     hasVolumes ||
@@ -191,6 +196,10 @@ function ItemDetailsBlock({
       )}
       <div className="flex flex-wrap items-center gap-2">
         {hasGenres && <GenreBadges genres={item.genres!} maxCount={2} className="[&_span]:px-3 [&_span]:py-1 [&_span]:text-xs" />}
+        {mediaType === "games" && hasPlatforms && (
+          <GamePlatformBadges platforms={item.platforms} className="w-full sm:w-auto" />
+        )}
+        {hasPages && <BookPagesBadge pagesCount={item.pagesCount} className="text-xs px-2.5 py-1" />}
         {hasScore && scoreDisplay && (
           <span className="inline-flex items-center rounded-md bg-[var(--btn-gradient-start)]/30 px-2.5 py-1 text-sm font-semibold text-[var(--color-lightest)]">
             {scoreDisplay}/10
@@ -277,7 +286,15 @@ function ItemDetailsBlock({
             <span className="text-[var(--color-lightest)] font-medium">{item.issuesCount}</span>
           </div>
         )}
-        {hasPlatforms && (
+        {hasPages && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.pages")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">
+              {t("mediaLogs.bookPagesBadge", { count: String(item.pagesCount) })}
+            </span>
+          </div>
+        )}
+        {hasPlatforms && mediaType !== "games" && (
           <div className="col-span-2 min-w-0 break-words sm:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.platforms")}: </span>
             <span className="text-[var(--color-lightest)]">{item.platforms!.join(", ")}</span>

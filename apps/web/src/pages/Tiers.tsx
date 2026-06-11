@@ -326,7 +326,7 @@ export function Tiers() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="mx-auto max-w-4xl space-y-8 px-4 py-6 pb-24 md:pb-20"
+      className="mx-auto max-w-4xl space-y-8 px-0 py-6 pb-24 md:px-4 md:pb-20"
     >
       <div className="text-center">
         <p className="mt-2 text-[var(--color-light)]">

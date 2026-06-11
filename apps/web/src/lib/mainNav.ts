@@ -1,6 +1,7 @@
 export function navItemIsActive(to: string, pathname: string): boolean {
-  if (to === "/") return pathname === "/" || pathname === "/search";
-  return pathname === to;
+  const pathOnly = to.split("?")[0] || "/";
+  if (pathOnly === "/") return pathname === "/" || pathname === "/search";
+  return pathname === pathOnly;
 }
 
 export function isItemDetailPath(pathname: string): boolean {

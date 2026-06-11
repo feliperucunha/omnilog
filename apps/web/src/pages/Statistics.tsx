@@ -23,6 +23,7 @@ import {
   HEAVY_PAGE_TTL_MS,
   apiFetchSWR,
   invalidateLogsAndItemsCache,
+  LOGS_INVALIDATED_EVENT,
   requestLogsCacheWarm,
 } from "@/lib/api";
 import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
@@ -41,6 +42,7 @@ import {
   BoardGameRecentStatsWidget,
   type RecentBoardGameStatEntry,
 } from "@/components/BoardGameRecentStatsWidget";
+import { GamePlatformStatsWidget } from "@/components/GamePlatformStatsWidget";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
 import { tapScale, tapTransition } from "@/lib/animations";
@@ -417,11 +419,12 @@ const STORAGE_KEY_RECENT = "geeklogs.statistics.recentLogsCollapsed";
 const STORAGE_KEY_SUMMARY = "geeklogs.statistics.summaryCollapsed";
 const STORAGE_KEY_PURCHASE = "geeklogs.statistics.purchaseCollapsed";
 const STORAGE_KEY_BOARD_GAME_MATCHES = "geeklogs.statistics.boardGameMatchesCollapsed";
+const STORAGE_KEY_GAME_PLATFORMS = "geeklogs.statistics.gamePlatformsCollapsed";
 const STORAGE_KEY_CALENDAR = "geeklogs.statistics.calendarCollapsed";
 const STORAGE_KEY_CHARTS = "geeklogs.statistics.chartsCollapsed";
 
 type StatsGroup = "category" | "month" | "year";
-type GenreGraphMode = "genre" | "statusOverTime" | "byCategory" | "platforms";
+type GenreGraphMode = "genre" | "statusOverTime" | "byCategory";
 type StatusOverTimeGroup = "month" | "year";
 interface StatsEntry {
   period: string;
@@ -552,7 +555,7 @@ function OverviewStatCard({
 function CategoryOrderSkeletonStrip() {
   return (
     <div className="scrollbar-hide flex min-h-[3rem] min-w-0 overflow-x-auto scroll-smooth [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]" aria-busy>
-      <div className="flex min-w-max items-stretch gap-6 pl-3 pr-3">
+      <div className="flex min-w-max items-stretch gap-6 pl-2.5 pr-2.5 md:pl-3 md:pr-3">
         {Array.from({ length: 8 }, (_, i) => (
           <div key={i} className="flex shrink-0 flex-col items-center justify-start pt-3">
             <div className="h-4 w-16 max-w-[5rem] animate-pulse rounded bg-[var(--color-mid)]/30" />
@@ -596,6 +599,7 @@ export function Statistics() {
   const [summaryCollapsed, setSummaryCollapsedState] = useState(false);
   const [purchaseCollapsed, setPurchaseCollapsedState] = useState(false);
   const [boardGameMatchesCollapsed, setBoardGameMatchesCollapsedState] = useState(false);
+  const [gamePlatformsCollapsed, setGamePlatformsCollapsedState] = useState(false);
   const [calendarCollapsed, setCalendarCollapsedState] = useState(false);
   const [chartsCollapsed, setChartsCollapsedState] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
@@ -641,15 +645,17 @@ export function Statistics() {
       storage.getItem(STORAGE_KEY_SUMMARY),
       storage.getItem(STORAGE_KEY_PURCHASE),
       storage.getItem(STORAGE_KEY_BOARD_GAME_MATCHES),
+      storage.getItem(STORAGE_KEY_GAME_PLATFORMS),
       storage.getItem(STORAGE_KEY_CALENDAR),
       storage.getItem(STORAGE_KEY_CHARTS),
-    ]).then(([statsVal, recentVal, summaryVal, purchaseVal, boardGameMatchesVal, calendarVal, chartsVal]) => {
+    ]).then(([statsVal, recentVal, summaryVal, purchaseVal, boardGameMatchesVal, gamePlatformsVal, calendarVal, chartsVal]) => {
       if (cancelled) return;
       if (statsVal === "true") setStatsCollapsedState(true);
       if (recentVal === "true") setRecentLogsCollapsedState(true);
       if (summaryVal === "true") setSummaryCollapsedState(true);
       if (purchaseVal === "true") setPurchaseCollapsedState(true);
       if (boardGameMatchesVal === "true") setBoardGameMatchesCollapsedState(true);
+      if (gamePlatformsVal === "true") setGamePlatformsCollapsedState(true);
       if (calendarVal === "true") setCalendarCollapsedState(true);
       if (chartsVal === "true") setChartsCollapsedState(true);
     });
@@ -681,6 +687,11 @@ export function Statistics() {
   const setBoardGameMatchesCollapsed = useCallback((value: boolean) => {
     setBoardGameMatchesCollapsedState(value);
     void storage.setItem(STORAGE_KEY_BOARD_GAME_MATCHES, String(value));
+  }, []);
+
+  const setGamePlatformsCollapsed = useCallback((value: boolean) => {
+    setGamePlatformsCollapsedState(value);
+    void storage.setItem(STORAGE_KEY_GAME_PLATFORMS, String(value));
   }, []);
 
   const setCalendarCollapsed = useCallback((value: boolean) => {
@@ -1001,6 +1012,15 @@ export function Statistics() {
       .finally(() => setLoading(false));
   }, [isPro, tzOffsetMinutes, statsMediaQuery]);
 
+  useEffect(() => {
+    const onLogsInvalidated = () => {
+      void fetchGamePlatformStats();
+      void fetchLogs();
+    };
+    window.addEventListener(LOGS_INVALIDATED_EVENT, onLogsInvalidated);
+    return () => window.removeEventListener(LOGS_INVALIDATED_EVENT, onLogsInvalidated);
+  }, [fetchGamePlatformStats, fetchLogs]);
+
   const recapCategoryOptions = useMemo(
     () => [
       { value: "all", label: t("recap.allMyMedia") },
@@ -1275,31 +1295,17 @@ export function Statistics() {
   const showPagesReadHighlight = isReadingCategory;
   const showBoardGamesWonHighlight = isAllCategories || categoryFilter === "boardgames";
   const showBoardGamesRecentWidget = isAllCategories || categoryFilter === "boardgames";
+  const showGamePlatformsWidget = isAllCategories || categoryFilter === "games";
   const showTimeConsumedWidget = isAllCategories;
-  const isGamesCategory = categoryFilter === "games";
 
-  const chartModeOptions = useMemo(() => {
-    const modes: { value: GenreGraphMode; label: string }[] = [
-      { value: "genre", label: t("dashboard.byGenre") },
-      { value: "statusOverTime", label: t("dashboard.byStatusOverTime") },
-      { value: "byCategory", label: t("dashboard.byCategory") },
-    ];
-    if (isGamesCategory || isAllCategories) {
-      return [{ value: "platforms", label: t("statistics.gamePlatformsTitle") }, ...modes];
-    }
-    return modes;
-  }, [isAllCategories, isGamesCategory, t]);
-
-  useEffect(() => {
-    if (isGamesCategory) {
-      setGenreGraphMode("platforms");
-    } else {
-      setGenreGraphMode((prev) => (prev === "platforms" ? "genre" : prev));
-    }
-  }, [isGamesCategory]);
-
-  const maxGamePlatformCount =
-    gamePlatformStats.length > 0 ? Math.max(...gamePlatformStats.map((s) => s.hours), 1) : 1;
+  const chartModeOptions = useMemo(
+    () => [
+      { value: "genre" as const, label: t("dashboard.byGenre") },
+      { value: "statusOverTime" as const, label: t("dashboard.byStatusOverTime") },
+      { value: "byCategory" as const, label: t("dashboard.byCategory") },
+    ],
+    [t]
+  );
 
   const spendMediaTypesWithActivity = useMemo(() => {
     const active = SPEND_TRACKED_MEDIA_TYPES.filter((mt) => {
@@ -1480,9 +1486,14 @@ export function Statistics() {
 
       <div className="flex flex-col gap-12">
       {!isPro && (
-        <p className="rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/10 px-4 py-3 text-sm leading-snug text-[var(--color-light)]">
-          {t("statistics.freeMonthNotice")}
-        </p>
+        <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <p className="text-sm leading-snug text-[var(--color-light)]">
+            {t("statistics.freeMonthNotice")}
+          </p>
+          <Button asChild className="btn-gradient w-full shrink-0 sm:w-auto">
+            <Link to="/tiers">{t("tiers.upgradeToPro")}</Link>
+          </Button>
+        </div>
       )}
       {loading && <StatisticsSummarySkeleton />}
       {!loading && (
@@ -1533,18 +1544,6 @@ export function Statistics() {
             icon={Clock}
             label={t("statistics.summaryHours")}
             value={summaryData.totalContentHours.toFixed(1)}
-            sub={
-              summaryData.completedLogsWithHours > 0 ? (
-                <span className="tabular-nums">
-                  {t(
-                    summaryData.completedLogsWithHours === 1
-                      ? "statistics.summaryHoursItems_one"
-                      : "statistics.summaryHoursItems_other",
-                    { count: String(summaryData.completedLogsWithHours) }
-                  )}
-                </span>
-              ) : undefined
-            }
           />
           <OverviewStatCard
             icon={Star}
@@ -1553,7 +1552,9 @@ export function Statistics() {
           />
           <OverviewStatCard
             icon={Scale}
-            label={t("statistics.summaryLifetimeBalance")}
+            label={
+              isPro ? t("statistics.summaryLifetimeBalance") : t("statistics.summaryMonthBalance")
+            }
             valueClassName="!text-base sm:!text-lg md:!text-lg lg:!text-xl xl:!text-xl 2xl:!text-2xl !leading-snug !tracking-tight"
             value={(() => {
               const net = summaryData.lifetimeNetByCurrency ?? {};
@@ -1645,6 +1646,38 @@ export function Statistics() {
                   games={recentBoardGames}
                   loading={recentBoardGamesLoading}
                   locale={locale}
+                  t={t}
+                />
+              </Card>
+            </section>
+          )}
+        </div>
+      )}
+
+      {showGamePlatformsWidget && visibleTypesOrderReady && (
+        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setGamePlatformsCollapsed(!gamePlatformsCollapsed)}
+            className={collapsibleSectionBtnClass}
+            aria-expanded={!gamePlatformsCollapsed}
+          >
+            {gamePlatformsCollapsed ? (
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            ) : (
+              <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+            )}
+            <span>{t("statistics.mostPlayedPlatformsTitle")}</span>
+          </button>
+          {!gamePlatformsCollapsed && (
+            <section aria-label={t("statistics.mostPlayedPlatformsTitle")} className="min-w-0 w-full">
+              <Card
+                className="flex min-h-0 min-w-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
+                style={paperShadow}
+              >
+                <GamePlatformStatsWidget
+                  stats={gamePlatformStats}
+                  loading={gamePlatformStatsLoading}
                   t={t}
                 />
               </Card>
@@ -1963,51 +1996,6 @@ export function Statistics() {
             )}
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {genreGraphMode === "platforms" && (
-            <div className="min-h-[12.5rem] min-w-0 flex-1">
-              {gamePlatformStatsLoading ? (
-                <StatisticsBarsSkeleton rows={6} />
-              ) : gamePlatformStats.length === 0 ? (
-                <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
-                  {t("statistics.gamePlatformsEmpty")}
-                </p>
-              ) : (
-                <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-                  {gamePlatformStats.map(({ period, hours, count }) => {
-                    const itemCount = count ?? hours;
-                    return (
-                      <div key={period} className={statBarGridClass}>
-                        <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                          <OverflowMarquee className={statBarMarqueeClass}>{period}</OverflowMarquee>
-                          {itemCount > 0 && (
-                            <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                              {t(
-                                itemCount === 1
-                                  ? "statistics.statItemsCount_one"
-                                  : "statistics.statItemsCount_other",
-                                { count: String(itemCount) }
-                              )}
-                            </span>
-                          )}
-                        </div>
-                        <div className={statBarTrackClass}>
-                          <div
-                            className={statBarFillClass}
-                            style={{
-                              width: `${Math.max(5, (hours / maxGamePlatformCount) * 100)}%`,
-                            }}
-                          />
-                        </div>
-                        <span className={statBarValueClass}>
-                          {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
           {genreGraphMode === "genre" && (
             <div className="min-h-[12.5rem] min-w-0 flex-1">
               {genreStatsLoading ? (

@@ -839,7 +839,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       statsMediaType
     );
 
-    const spendLifetimeWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
+    let spendLifetimeWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
       {
         userId,
         mediaType: { in: [...SPEND_TRACKED_MEDIA_TYPES] },
@@ -850,6 +850,9 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       },
       statsMediaType
     );
+    if (freeMonthRange) {
+      spendLifetimeWhere = mergeLogWhere(spendLifetimeWhere, logSpendStatsDateWhere(freeMonthRange));
+    }
 
     const [totalLogs, completedLogCount, reviewedLogs, completedLogs, spendLifetimeRows] =
       await Promise.all([

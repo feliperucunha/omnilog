@@ -57,7 +57,7 @@ export function StickyCategoryStrip({
         role="tablist"
         aria-label={ariaLabel}
       >
-        <div className="flex min-w-max items-stretch gap-6 pl-3 pr-3">
+        <div className="flex min-w-max items-stretch gap-6 pl-2.5 pr-2.5 md:pl-3 md:pr-3">
           {items.map((item) => {
             const selected = selectedValue === item.value;
             const label = showCount && item.count != null ? `${item.label} (${item.count})` : item.label;

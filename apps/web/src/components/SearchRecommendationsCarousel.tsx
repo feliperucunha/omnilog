@@ -14,6 +14,7 @@ import { getStatusLabel } from "@/lib/statusLabel";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
+import { BookPagesBadge } from "@/components/BookPagesBadge";
 import { GenreBadges } from "@/components/GenreBadges";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
@@ -169,9 +170,14 @@ export function SearchRecommendationsCarousel({
               {display?.grade != null ? (
                 <StarRating value={gradeToStars(display.grade)} readOnly size="sm" />
               ) : null}
-              {item.genres && item.genres.length > 0 && (
-                <GenreBadges genres={item.genres} maxCount={1} />
-              )}
+              <div className="flex min-w-0 flex-wrap items-center gap-1">
+                {item.genres && item.genres.length > 0 && (
+                  <GenreBadges genres={item.genres} maxCount={1} />
+                )}
+                {mediaType === "books" && (
+                  <BookPagesBadge pagesCount={item.pagesCount} />
+                )}
+              </div>
               <OverflowMarquee className="text-[10px] text-[var(--color-light)]">
                 {(() => {
                   const parts: string[] = [item.year ?? "", item.subtitle ?? ""].filter(Boolean);
