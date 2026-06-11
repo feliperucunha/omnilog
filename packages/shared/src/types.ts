@@ -85,6 +85,8 @@ export interface SearchResult {
    * Used for recommendation ordering when present.
    */
   score?: number | null;
+  /** Books: representative page count (median across editions when available). */
+  pagesCount?: number | null;
 }
 
 /** Sort option for search: value sent to API, labelKey for i18n (e.g. searchSort.titleAsc). */
