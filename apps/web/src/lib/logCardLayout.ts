@@ -7,6 +7,26 @@ export const LOG_CARD_IMAGE_COLUMN_ROUNDED_L =
 export const LOG_CARD_HEIGHT_EMBEDDED_COLLAPSED =
   "h-[193px] min-h-[193px] max-h-[193px] sm:h-[154px] sm:min-h-[154px] sm:max-h-[154px]";
 
+export const LOG_CARD_HEIGHT_EMBEDDED_GRID_COLLAPSED =
+  "h-[128px] min-h-[128px] max-h-[128px] sm:h-[108px] sm:min-h-[108px] sm:max-h-[108px] md:h-[100px] md:min-h-[100px] md:max-h-[100px]";
+
+export const LOG_CARD_IMAGE_COLUMN_GRID =
+  "relative w-[4.75rem] shrink-0 self-stretch overflow-hidden min-h-0 sm:w-[5.25rem] md:w-10";
+
+export const LOG_CARD_BODY_PADDING_GRID = "p-2 sm:p-2 md:p-1.5";
+
+export const LOG_CARD_BODY_GAP_GRID = "gap-1 sm:gap-0.5 md:gap-0.5";
+
+export const LOG_CARD_TITLE_GRID = "text-xs font-semibold leading-snug md:text-[11px] md:leading-tight";
+
+export const LOG_CARD_ACTION_COLUMN_GRID =
+  "flex w-9 flex-shrink-0 flex-col justify-center gap-0.5 border-l border-[var(--color-surface-border)] p-1 md:w-8 md:p-0.5";
+
+export const LOG_CARD_INCREMENT_BUTTON_GRID =
+  "flex h-8 min-w-8 items-center justify-center gap-0.5 rounded-lg border-0 bg-[var(--color-darkest)] px-1.5 shadow-[var(--shadow-sm)] transition-[transform,box-shadow] hover:scale-[1.04] hover:shadow-[var(--shadow-md)] active:scale-[0.98] disabled:scale-100 disabled:opacity-50 [@media(hover:hover)]:hover:bg-[var(--btn-gradient-start)] sm:h-7 sm:min-w-7 md:h-6 md:min-w-6 md:px-1";
+
+export const LOG_CARD_EDIT_BUTTON_GRID = "h-8 w-8 rounded-lg sm:h-7 sm:w-7 md:h-6 md:w-6";
+
 export const LOG_CARD_HEIGHT_EMBEDDED = "min-h-[160px] sm:min-h-[128px]";
 
 export const LOG_CARD_HEIGHT_DEFAULT = "min-h-[140px] sm:min-h-[128px]";
@@ -33,16 +53,39 @@ export const LOG_CARD_EDIT_BUTTON = "h-9 w-9 rounded-lg sm:h-8 sm:w-8";
 export const LOG_LIST_CARD_GRID =
   "grid min-w-0 grid-cols-1 gap-3 sm:grid sm:gap-4 sm:grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))]";
 
+export const LOG_LIST_CARD_GRID_DENSE =
+  "grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+
+export const LOG_LIST_CARD_GRID_MULTI =
+  "grid min-w-0 grid-cols-1 gap-2 min-[480px]:grid-cols-2 sm:gap-2.5 md:grid-cols-2 md:gap-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4";
+
 export const SEARCH_RESULT_CARD_GRID =
   "grid min-w-0 grid-cols-1 gap-3 sm:grid sm:gap-4 sm:grid-cols-[repeat(auto-fill,minmax(min(100%,9.5rem),1fr))]";
+
+export const SEARCH_RESULT_CARD_GRID_COMPACT = LOG_LIST_CARD_GRID_DENSE;
+
+export const SEARCH_RESULT_CARD_GRID_MULTI =
+  "grid min-w-0 grid-cols-1 gap-2 min-[400px]:grid-cols-2 sm:grid-cols-3 sm:gap-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4";
 
 export const SEARCH_RESULT_CARD_SHELL = "h-full w-full";
 
 export const SEARCH_RESULT_CARD_IMAGE =
   "w-20 h-28 flex-shrink-0 overflow-hidden relative rounded-l-lg sm:w-full sm:h-auto sm:aspect-[2/3] sm:rounded-l-none sm:rounded-t-lg";
 
+export const SEARCH_RESULT_CARD_IMAGE_COMPACT =
+  "relative w-full shrink-0 overflow-hidden aspect-[2/3]";
+
+export const SEARCH_RESULT_CARD_IMAGE_GRID =
+  "relative w-[3.75rem] h-[5.5rem] shrink-0 overflow-hidden rounded-l-lg sm:w-14 sm:h-[5.75rem] md:w-10 md:h-[4.25rem]";
+
 export const SEARCH_RESULT_CARD_BODY =
   "flex w-full flex-1 min-w-0 flex-col justify-center gap-0.5 p-3 overflow-hidden sm:justify-start sm:gap-0.5 sm:p-2.5 sm:pt-2 sm:flex-shrink-0 sm:min-h-[4.4rem]";
+
+export const SEARCH_RESULT_CARD_BODY_COMPACT =
+  "flex min-h-0 flex-1 flex-col gap-0.5 p-2 overflow-hidden";
+
+export const SEARCH_RESULT_CARD_BODY_GRID =
+  "flex min-w-0 flex-1 flex-col justify-center gap-0.5 overflow-hidden p-2 md:gap-0 md:p-1.5";
 
 export const RECOMMENDATION_CARD_WIDTH = "w-[9.5rem] sm:w-[8.8rem]";
 

@@ -4,12 +4,10 @@ import { LOG_CARD_HEIGHT_EMBEDDED_COLLAPSED, LOG_LIST_CARD_GRID } from "@/lib/lo
 export function DashboardSkeleton() {
   return (
     <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden">
-      {/* Category section: same rounded-xl border box as Dashboard (strip is in layout) */}
       <section
         aria-hidden
-        className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
+        className="flex min-w-0 flex-col gap-4 overflow-hidden max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0 max-md:shadow-none md:rounded-xl md:border md:border-[var(--color-category-border)] md:bg-[var(--color-category-bg)] md:p-4 md:shadow-[var(--shadow-category)]"
       >
-        {/* Embedded MediaLogs: desktop two rows (filters+search, bar+buttons), mobile toolbar, then cards */}
         <div className="hidden min-w-0 flex-col gap-3 md:flex">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -53,7 +51,7 @@ export function DashboardSkeleton() {
               <Skeleton className="h-8 w-8 rounded-md" />
             </div>
           </div>
-          <div className="relative min-w-0 max-w-xs">
+          <div className="relative min-w-0 w-full">
             <Skeleton className="h-10 w-full rounded-md" />
           </div>
         </div>
@@ -80,7 +78,6 @@ export function DashboardSkeleton() {
         </div>
       </section>
 
-      {/* Social section */}
       <section className="flex min-w-0 flex-col gap-4 overflow-hidden" aria-hidden>
         <div className="flex min-w-0 items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">

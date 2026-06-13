@@ -10,8 +10,6 @@ import {
   type MediaType,
   type SearchResult,
 } from "@geeklogs/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
-import { getStatusLabel } from "@/lib/statusLabel";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import {
@@ -25,6 +23,9 @@ import {
 import { buildDefaultLogsListPath } from "@/lib/logsPageCache";
 import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import { SearchSkeleton } from "@/components/skeletons";
+import { SearchResultCard } from "@/components/SearchResultCard";
+import { LogViewSelector } from "@/components/LogViewSelector";
+import { useLogViewPreference } from "@/hooks/useLogViewPreference";
 import { Logo } from "@/components/Logo";
 import {
   buildSearchCategoryLocation,
@@ -43,12 +44,7 @@ import {
   setSearchPageCache,
   type SearchPageUserResult,
 } from "@/lib/searchPageCache";
-import { ItemImage } from "@/components/ItemImage";
-import { BookPagesBadge } from "@/components/BookPagesBadge";
-import { GenreBadges } from "@/components/GenreBadges";
-import { tapScale, tapTransition } from "@/lib/animations";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
-import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
@@ -61,9 +57,6 @@ import { Link } from "react-router-dom";
 import { ChevronDown, Loader2, UserCheck } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
-import { StarRating } from "@/components/StarRating";
-import { gradeToStars } from "@/lib/gradeStars";
-import { getLogCardDisplay } from "@/lib/logDisplay";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { SearchRecommendationsCarousel } from "@/components/SearchRecommendationsCarousel";
 import { ApiKeyPrompt, type ApiKeyProvider } from "@/components/ApiKeyPrompt";
@@ -76,11 +69,9 @@ import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
 import {
-  LOG_CARD_TITLE,
-  SEARCH_RESULT_CARD_BODY,
-  SEARCH_RESULT_CARD_IMAGE,
   SEARCH_RESULT_CARD_GRID,
-  SEARCH_RESULT_CARD_SHELL,
+  SEARCH_RESULT_CARD_GRID_COMPACT,
+  SEARCH_RESULT_CARD_GRID_MULTI,
 } from "@/lib/logCardLayout";
 
 const FREE_SEARCH_USAGE_STORAGE_KEY = "geeklogs_free_search_usage";
@@ -202,6 +193,7 @@ export function Search() {
   const [loadingFollowId, setLoadingFollowId] = useState<string | null>(null);
   const [query, setQuery] = useState(() => pageCache?.query ?? stateQuery);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchLogView, setSearchLogView] = useLogViewPreference("search");
   const [results, setResults] = useState<SearchResult[]>(() => pageCache?.results ?? []);
   const [userResults, setUserResults] = useState<UserSearchResult[]>(() => pageCache?.userResults ?? []);
   const [loading, setLoading] = useState(false);
@@ -763,27 +755,34 @@ export function Search() {
             transition={{ type: "spring", stiffness: 300, damping: 35 }}
             className={hasSearched ? "flex flex-col gap-4 w-full" : "flex flex-col gap-4"}
           >
-            <UnifiedSearchBar
-              ref={searchInputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={
-                searchFilter === SEARCH_USERS_TYPE
-                  ? t("search.usersPlaceholder")
-                  : t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })
-              }
-              autoFocus={!hasSearched}
-              inputAriaLabel={t("search.search")}
-              clearAriaLabel={t("search.clearSearch")}
-              submitAriaLabel={t("search.search")}
-              showClear={query.trim() !== ""}
-              onClear={() => {
-                setQuery("");
-                searchInputRef.current?.focus();
-              }}
-              disableSubmitWhenEmpty
-              loading={loading}
-            />
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <UnifiedSearchBar
+                  ref={searchInputRef}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={
+                    searchFilter === SEARCH_USERS_TYPE
+                      ? t("search.usersPlaceholder")
+                      : t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })
+                  }
+                  autoFocus={!hasSearched}
+                  inputAriaLabel={t("search.search")}
+                  clearAriaLabel={t("search.clearSearch")}
+                  submitAriaLabel={t("search.search")}
+                  showClear={query.trim() !== ""}
+                  onClear={() => {
+                    setQuery("");
+                    searchInputRef.current?.focus();
+                  }}
+                  disableSubmitWhenEmpty
+                  loading={loading}
+                />
+              </div>
+              {hasSearched && searchFilter !== SEARCH_USERS_TYPE && (
+                <LogViewSelector value={searchLogView} onValueChange={setSearchLogView} />
+              )}
+            </div>
             {hasSearched && searchFilter !== SEARCH_USERS_TYPE && (
               <div className="flex w-full min-w-0 flex-wrap items-center gap-4">
                 <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 sm:min-w-[12rem]">
@@ -816,7 +815,7 @@ export function Search() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.2 }}
         >
-          <SearchSkeleton />
+          <SearchSkeleton view={searchLogView} />
         </motion.div>
       )}
 
@@ -895,120 +894,38 @@ export function Search() {
 
       {hasSearched && !loading && searchFilter !== SEARCH_USERS_TYPE && results.length > 0 && (
         <motion.div {...listStaggerParentProps} className="min-w-0">
-          <div className={SEARCH_RESULT_CARD_GRID}>
+          <div
+            className={
+              searchLogView === "compact"
+                ? SEARCH_RESULT_CARD_GRID_COMPACT
+                : searchLogView === "grid"
+                  ? SEARCH_RESULT_CARD_GRID_MULTI
+                  : SEARCH_RESULT_CARD_GRID
+            }
+          >
             {results.map((item) => {
               const userLog = token ? logsByExternalId.get(item.id) : undefined;
-              const status = userLog?.status ?? userLog?.listType;
-              const display = userLog ? getLogCardDisplay(userLog) : null;
-              const isDropped = status === "dropped";
-              const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-              const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
-              const listBorderClass =
-                status == null
-                  ? "border border-[var(--color-surface-border)]"
-                  : isDropped
-                    ? "border border-red-500"
-                    : isInProgress
-                      ? "border border-amber-400"
-                      : isCompleted
-                        ? "border border-emerald-600"
-                        : "border border-[var(--color-mid)]";
-              const badgeClass =
-                status == null
-                  ? ""
-                  : isDropped
-                    ? "bg-red-500/95 text-white"
-                    : isInProgress
-                      ? "bg-amber-400 text-[var(--color-darkest)]"
-                      : isCompleted
-                        ? "bg-emerald-600 text-white"
-                        : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
-              const metaParts: string[] = [item.year ?? "", item.subtitle ?? ""].filter(Boolean);
-              if (
-                mediaType === "games" &&
-                item.timeToBeatHours != null &&
-                item.timeToBeatHours > 0
-              ) {
-                const { hours, minutes } = formatTimeToBeatHours(item.timeToBeatHours);
-                metaParts.push(
-                  minutes > 0
-                    ? t("itemPage.timeToBeatHoursMinutes", {
-                        hours: String(hours),
-                        minutes: String(minutes),
-                      })
-                    : t("itemPage.timeToBeatHours", { hours: String(hours) })
-                );
-              }
-              const metaLine = metaParts.join(" · ") || "—";
               return (
-              <motion.div
-                key={item.id}
-                variants={listStaggerItemVariants}
-                className={`min-h-0 min-w-0 sm:h-full ${listStaggerItemClassName}`}
-              >
-                <motion.div whileTap={tapScale} transition={tapTransition} className={SEARCH_RESULT_CARD_SHELL}>
-                  <button
-                    type="button"
-                    onClick={() => openItemDetail(mediaType, item.id)}
-                    className={`h-full w-full flex flex-row sm:flex-col text-left overflow-hidden rounded-lg border bg-[var(--color-dark)] text-inherit no-underline shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 max-md:min-h-[44px] ${listBorderClass} ${status == null ? "hover:border-black" : ""}`}
-                  >
-                    <div className={SEARCH_RESULT_CARD_IMAGE}>
-                      <ItemImage
-                        src={item.image}
-                        className="h-full w-full"
-                        mediaType={mediaType}
-                        activeBoardGameProvider={mediaType === "boardgames" ? boardGameProvider : undefined}
-                      />
-                      {token && status && (
-                        <span
-                          className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] ${badgeClass}`}
-                          title={getStatusLabel(t, status, mediaType)}
-                        >
-                          {getStatusLabel(t, status, mediaType)}
-                        </span>
-                      )}
-                    </div>
-                    <div className={SEARCH_RESULT_CARD_BODY}>
-                      <OverflowMarquee className="text-[10px] font-medium uppercase text-[var(--color-light)] sm:hidden">
-                        {t(`nav.${mediaType}`)}
-                      </OverflowMarquee>
-                      <OverflowMarquee className={`${LOG_CARD_TITLE} text-[var(--color-lightest)] sm:leading-tight`}>
-                        {item.title}
-                      </OverflowMarquee>
-                      {display?.grade != null ? (
-                        <StarRating value={gradeToStars(display.grade)} readOnly size="sm" className="sm:hidden" />
-                      ) : null}
-                      <div className="hidden min-w-0 items-center gap-2 sm:flex">
-                        {display?.grade != null ? (
-                          <StarRating value={gradeToStars(display.grade)} readOnly size="sm" className="shrink-0" />
-                        ) : null}
-                        {item.genres && item.genres.length > 0 && (
-                          <GenreBadges genres={item.genres} maxCount={1} className="shrink-0" />
-                        )}
-                        {mediaType === "books" && (
-                          <BookPagesBadge pagesCount={item.pagesCount} className="shrink-0" />
-                        )}
-                        <OverflowMarquee className="min-w-0 flex-1 text-xs text-[var(--color-light)]">
-                          {metaLine}
-                        </OverflowMarquee>
-                      </div>
-                      <div className="flex min-w-0 flex-col gap-0.5 sm:hidden">
-                        <div className="flex min-w-0 flex-wrap items-center gap-1">
-                          {item.genres && item.genres.length > 0 && (
-                            <GenreBadges genres={item.genres} maxCount={1} />
-                          )}
-                          {mediaType === "books" && (
-                            <BookPagesBadge pagesCount={item.pagesCount} />
-                          )}
-                        </div>
-                        <OverflowMarquee className="text-xs text-[var(--color-light)]">
-                          {metaLine}
-                        </OverflowMarquee>
-                      </div>
-                    </div>
-                  </button>
+                <motion.div
+                  key={item.id}
+                  variants={listStaggerItemVariants}
+                  className={cn(
+                    "min-h-0 min-w-0",
+                    searchLogView === "list" && "sm:h-full",
+                    listStaggerItemClassName
+                  )}
+                >
+                  <SearchResultCard
+                    item={item}
+                    mediaType={mediaType}
+                    view={searchLogView}
+                    token={token}
+                    userLog={userLog}
+                    boardGameProvider={boardGameProvider}
+                    onOpen={() => openItemDetail(mediaType, item.id)}
+                    t={t}
+                  />
                 </motion.div>
-              </motion.div>
               );
             })}
           </div>

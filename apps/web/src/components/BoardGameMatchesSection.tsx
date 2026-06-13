@@ -542,8 +542,8 @@ export const BoardGameMatchesSection = forwardRef<
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex min-w-0 flex-col gap-4">
-          <div className="flex min-w-0 flex-wrap items-end gap-3 sm:gap-4">
-            <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2 sm:max-w-[28rem] sm:gap-4">
+            <div className="flex min-w-0 flex-col gap-2">
               <Label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-lightest)]">
                 <Calendar className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />
                 {t("boardGameMatches.playedDate")}
@@ -552,7 +552,7 @@ export const BoardGameMatchesSection = forwardRef<
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-10 min-w-[8rem] justify-start border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80 px-3 font-normal text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/15"
+                  className="h-10 w-full justify-start border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80 px-3 font-normal text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/15"
                   onClick={() => playedDateInputRef.current?.showPicker()}
                   aria-label={t("boardGameMatches.playedDate")}
                 >
@@ -563,7 +563,7 @@ export const BoardGameMatchesSection = forwardRef<
                   type="date"
                   value={playedDate}
                   onChange={(e) => setPlayedDate(e.target.value)}
-                  className="max-w-[14rem] border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80"
+                  className="h-10 w-full border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80"
                   aria-label={t("boardGameMatches.playedDate")}
                 />
               )}
@@ -574,13 +574,13 @@ export const BoardGameMatchesSection = forwardRef<
                 value={playedDate}
                 onChange={(e) => setPlayedDate(e.target.value)}
                 className={cn(
-                  "max-w-[14rem] border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80",
+                  "h-10 w-full border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80",
                   isPlayedToday ? "pointer-events-none absolute h-px w-px overflow-hidden opacity-0" : "hidden",
                 )}
                 aria-hidden={isPlayedToday}
               />
             </div>
-            <div className="min-w-0 space-y-2 sm:min-w-[10rem]">
+            <div className="flex min-w-0 flex-col gap-2">
               <Label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-lightest)]">
                 <Clock className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />
                 {t("boardGameMatches.sessionDuration")}
@@ -590,8 +590,8 @@ export const BoardGameMatchesSection = forwardRef<
                 onValueChange={(v) => setSessionDurationHours(Number(v) as BoardGameSessionDurationHours)}
                 options={boardGameSessionDurationOptions(t)}
                 aria-label={t("boardGameMatches.sessionDuration")}
-                className="w-full min-w-[10rem] max-w-[14rem]"
-                triggerClassName="w-full min-w-0"
+                className="w-full"
+                triggerClassName="h-10 w-full max-md:min-h-[44px] md:h-10 md:min-h-10 md:max-h-10"
               />
             </div>
           </div>

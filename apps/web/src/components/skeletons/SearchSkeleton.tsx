@@ -1,17 +1,55 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { SEARCH_RESULT_CARD_GRID, SEARCH_RESULT_CARD_IMAGE } from "@/lib/logCardLayout";
+import type { LogViewMode } from "@/lib/logViewPreference";
+import {
+  SEARCH_RESULT_CARD_GRID,
+  SEARCH_RESULT_CARD_GRID_COMPACT,
+  SEARCH_RESULT_CARD_GRID_MULTI,
+  SEARCH_RESULT_CARD_IMAGE,
+  SEARCH_RESULT_CARD_IMAGE_COMPACT,
+  SEARCH_RESULT_CARD_IMAGE_GRID,
+} from "@/lib/logCardLayout";
 
-export function SearchSkeleton() {
+export function SearchSkeleton({ view = "list" }: { view?: LogViewMode }) {
+  const gridClass =
+    view === "compact"
+      ? SEARCH_RESULT_CARD_GRID_COMPACT
+      : view === "grid"
+        ? SEARCH_RESULT_CARD_GRID_MULTI
+        : SEARCH_RESULT_CARD_GRID;
+
+  if (view === "compact") {
+    return (
+      <div className="flex flex-col gap-4 min-w-0">
+        <div className={gridClass}>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex flex-col overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)]"
+            >
+              <Skeleton className={SEARCH_RESULT_CARD_IMAGE_COMPACT} />
+              <div className="flex flex-col gap-1.5 p-2">
+                <Skeleton className="h-3 w-full rounded" />
+                <Skeleton className="h-2.5 w-3/4 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const imageClass = view === "grid" ? SEARCH_RESULT_CARD_IMAGE_GRID : SEARCH_RESULT_CARD_IMAGE;
+  const cardLayout = view === "grid" ? "flex-row" : "flex-row sm:flex-col";
+
   return (
     <div className="flex flex-col gap-4 min-w-0">
-      {/* Results grid: mobile = row cards (poster left), desktop = column cards (poster top) - same as Search result cards */}
-      <div className={SEARCH_RESULT_CARD_GRID}>
-        {Array.from({ length: 8 }).map((_, i) => (
+      <div className={gridClass}>
+        {Array.from({ length: view === "grid" ? 10 : 8 }).map((_, i) => (
           <div
             key={i}
-            className="flex flex-row sm:flex-col gap-3 sm:gap-0 overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)] min-h-0"
+            className={`flex ${cardLayout} gap-3 sm:gap-0 overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)] min-h-0`}
           >
-            <Skeleton className={SEARCH_RESULT_CARD_IMAGE} />
+            <Skeleton className={imageClass} />
             <div className="flex w-full flex-1 min-w-0 flex-col justify-center gap-1 p-3 sm:justify-start sm:gap-1 sm:min-h-[4.4rem] sm:p-2.5 sm:pt-2">
               <Skeleton className="h-3 w-12 rounded sm:w-14" />
               <Skeleton className="h-4 w-full max-w-[10rem] rounded sm:max-w-none" />

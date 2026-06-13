@@ -1,12 +1,11 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { MotionLink } from "@/components/MotionLink";
 import { motion } from "framer-motion";
-import { AlertTriangle, Plus, Download, Pencil, Loader2 } from "lucide-react";
+import { AlertTriangle, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { MediaType, Log } from "@geeklogs/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
+import { LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import {
   apiFetch,
@@ -30,35 +29,22 @@ import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
 import { ExportLogsModal, type ExportLogsOptions } from "@/components/ExportLogsModal";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
-import { BookPagesBadge } from "@/components/BookPagesBadge";
-import { ItemImage } from "@/components/ItemImage";
-import { GenreBadges } from "@/components/GenreBadges";
 import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
-import { StarRating } from "@/components/StarRating";
-import { gradeToStars } from "@/lib/gradeStars";
-import { formatLogScopeLabel, getLogCardDisplay } from "@/lib/logDisplay";
-import { formatTimeToFinish } from "@/lib/formatDuration";
 import { MediaLogsListSkeleton, MediaLogsSkeleton } from "@/components/skeletons";
 import { Logo } from "@/components/Logo";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { tapScale, tapTransition } from "@/lib/animations";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps, visibleEnterProps } from "@/lib/motionPolicy";
-import { itemDetailPath } from "@/lib/itemRoutes";
+import { LogViewSelector } from "@/components/LogViewSelector";
+import { MediaLogCard } from "@/components/MediaLogCard";
+import { useLogViewPreference } from "@/hooks/useLogViewPreference";
+import { resolveLogViewForContext } from "@/lib/logViewPreference";
 import {
-  LOG_CARD_ACTION_COLUMN,
-  LOG_CARD_BODY_GAP,
-  LOG_CARD_BODY_PADDING,
-  LOG_CARD_EDIT_BUTTON,
-  LOG_CARD_HEIGHT_DEFAULT,
-  LOG_CARD_HEIGHT_EMBEDDED,
-  LOG_CARD_HEIGHT_EMBEDDED_COLLAPSED,
-  LOG_CARD_IMAGE_COLUMN,
-  LOG_CARD_INCREMENT_BUTTON,
-  LOG_CARD_REVIEW_MAX_WIDTH,
-  LOG_CARD_TITLE,
   LOG_LIST_CARD_GRID,
+  LOG_LIST_CARD_GRID_DENSE,
+  LOG_LIST_CARD_GRID_MULTI,
 } from "@/lib/logCardLayout";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useLogComplete } from "@/contexts/LogCompleteContext";
@@ -82,29 +68,7 @@ import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
 
-const cardShadow = { boxShadow: "var(--shadow-card)" };
-
-const SCORE_SOURCE_LABELS: Partial<Record<MediaType, string>> = {
-  movies: "IMDB",
-  tv: "IMDB",
-  anime: "MAL",
-  manga: "MAL",
-  games: "RAWG",
-};
-
-const TV_ENDED_STATUSES = new Set(["ended", "canceled", "cancelled"]);
-const TV_ONGOING_STATUSES = new Set(["returning series", "in production", "pilot", "planned"]);
-const getTvAirState = (status: string | null | undefined): "ongoing" | "ended" | null => {
-  if (!status) return null;
-  const s = status.trim().toLowerCase();
-  if (TV_ENDED_STATUSES.has(s)) return "ended";
-  if (TV_ONGOING_STATUSES.has(s)) return "ongoing";
-  return null;
-};
-
 const LOGS_PAGE_SIZE = 24;
-/** Character count for review preview before "View more". ~2 lines on mobile. */
-const REVIEW_PREVIEW_LENGTH = 120;
 
 type LogsResponse = Log[] | { data: Log[]; nextCursor: string | null };
 
@@ -256,6 +220,8 @@ export function MediaLogs({
   const [milestoneProgressFetched, setMilestoneProgressFetched] = useState<CategoryMilestoneProgress | null>(null);
   /** When embedded (home): start with Load more button; after first click, switch to infinite scroll. When not embedded, use infinite scroll from the start. */
   const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(() => !embedded);
+  const logViewEnabled = embedded && !publicUserId;
+  const [dashboardLogView, setDashboardLogView] = useLogViewPreference("dashboard", logViewEnabled);
 
   const buildLogsPath = useCallback(
     (cursor?: string | null) => {
@@ -338,13 +304,6 @@ export function MediaLogs({
   /** +1 button only for types that track progress (tv, anime, manga, comics). Not for games, boardgames, movies, books. */
   const hasProgressButton =
     EPISODE_TYPES.includes(mediaType) || CHAPTER_TYPES.includes(mediaType) || VOLUME_TYPES.includes(mediaType);
-  /** Hide +1 when item is already complete/read/watched/played. */
-  const showIncrementForLog = (log: Log) =>
-    hasProgressButton &&
-    log.status != null &&
-    !(COMPLETED_STATUSES as readonly string[]).includes(log.status);
-
-  const showBoardGameMatchButton = (log: Log) => mediaType === "boardgames" && log.status != null;
 
   const getProgress = (log: Log): { field: "episode" | "chapter" | "volume"; value: number; labelKey: string } => {
     if (EPISODE_TYPES.includes(log.mediaType))
@@ -743,6 +702,33 @@ export function MediaLogs({
     }
   };
 
+  const showCategorySearchClear =
+    categorySearchDraft.trim() !== "" || categorySearchQuery !== "";
+
+  const activeLogView = resolveLogViewForContext(logViewEnabled, dashboardLogView);
+
+  const categorySearchBar = (
+    <form onSubmit={handleListSearchSubmit} className="relative min-h-11 max-md:min-h-[44px] min-w-0 flex-1">
+      <UnifiedSearchBar
+        ref={categorySearchInputRef}
+        value={categorySearchDraft}
+        onChange={handleCategorySearchDraftChange}
+        placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
+        title={t("mediaLogs.searchConfirmHint")}
+        inputAriaLabel={t("mediaLogs.searchTitlesLabel")}
+        clearAriaLabel={t("search.clearSearch")}
+        submitAriaLabel={t("search.search")}
+        showClear={showCategorySearchClear}
+        onClear={() => {
+          setCategorySearchDraft("");
+          setCategorySearchQuery("");
+          categorySearchInputRef.current?.focus();
+        }}
+        disableSubmitWhenEmpty={false}
+      />
+    </form>
+  );
+
   const hasProFeatures = tierHasProFeatures(me?.tier);
   const handleOpenExport = () => {
     if (!hasProFeatures) {
@@ -781,9 +767,6 @@ export function MediaLogs({
       setExportingCategory(false);
     }
   };
-
-  const showCategorySearchClear =
-    categorySearchDraft.trim() !== "" || categorySearchQuery !== "";
 
   if (loading && logs.length === 0 && !listRefreshing) {
     return (
@@ -986,28 +969,6 @@ export function MediaLogs({
                 triggerClassName="w-full min-w-0 max-w-none"
               />
             </div>
-            <form
-              onSubmit={handleListSearchSubmit}
-              className="relative min-h-10 min-w-0 [flex:1_1_12rem]"
-            >
-              <UnifiedSearchBar
-                ref={categorySearchInputRef}
-                value={categorySearchDraft}
-                onChange={handleCategorySearchDraftChange}
-                placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
-                title={t("mediaLogs.searchConfirmHint")}
-                inputAriaLabel={t("mediaLogs.searchTitlesLabel")}
-                clearAriaLabel={t("search.clearSearch")}
-                submitAriaLabel={t("search.search")}
-                showClear={showCategorySearchClear}
-                onClear={() => {
-                  setCategorySearchDraft("");
-                  setCategorySearchQuery("");
-                  categorySearchInputRef.current?.focus();
-                }}
-                disableSubmitWhenEmpty={false}
-              />
-            </form>
           </div>
         </div>
       )}
@@ -1252,30 +1213,16 @@ export function MediaLogs({
       </div>
       </div>
 
-      {/* 3. Search */}
-      {(embedded || readOnly) && (
-        <form onSubmit={handleListSearchSubmit} className="relative min-h-10 w-full min-w-0">
-          <UnifiedSearchBar
-            ref={categorySearchInputRef}
-            value={categorySearchDraft}
-            onChange={handleCategorySearchDraftChange}
-            placeholder={t("mediaLogs.searchTitlesPlaceholder", { category: label })}
-            title={t("mediaLogs.searchConfirmHint")}
-            inputAriaLabel={t("mediaLogs.searchTitlesLabel")}
-            clearAriaLabel={t("search.clearSearch")}
-            submitAriaLabel={t("search.search")}
-            showClear={showCategorySearchClear}
-            onClear={() => {
-              setCategorySearchDraft("");
-              setCategorySearchQuery("");
-              categorySearchInputRef.current?.focus();
-            }}
-            disableSubmitWhenEmpty={false}
-          />
-        </form>
-      )}
-
       </div>
+
+      {(embedded || readOnly) && (
+        <div className="flex min-w-0 items-center gap-2">
+          {categorySearchBar}
+          {logViewEnabled && (
+            <LogViewSelector value={dashboardLogView} onValueChange={setDashboardLogView} />
+          )}
+        </div>
+      )}
 
       <div
         className="relative min-h-[10rem] min-w-0"
@@ -1295,7 +1242,10 @@ export function MediaLogs({
         )}
 
         {logs.length === 0 && (loading || listRefreshing) ? (
-          <MediaLogsListSkeleton count={embedded ? 6 : 8} />
+          <MediaLogsListSkeleton
+            count={embedded ? (activeLogView === "compact" ? 12 : activeLogView === "grid" ? 10 : 6) : 8}
+            view={activeLogView}
+          />
         ) : logs.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -1320,308 +1270,48 @@ export function MediaLogs({
           </motion.div>
         ) : (
           <motion.div {...listStaggerParentProps} className="min-w-0 overflow-hidden">
-            <div className={LOG_LIST_CARD_GRID}>
-            {logs.map((log) => {
-              const isDropped = log.status === "dropped";
-              const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
-              const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);
-              const listBorderClass =
-                log.status == null
-                  ? "border border-[var(--color-surface-border)]"
-                  : isDropped
-                    ? "border border-red-500"
-                    : isInProgress
-                      ? "border border-amber-400"
-                      : isCompleted
-                        ? "border border-emerald-600"
-                        : "border border-[var(--color-mid)]";
-              const badgeClass =
-                log.status == null
-                  ? ""
-                  : isDropped
-                    ? "bg-red-500/95 text-white"
-                    : isInProgress
-                      ? "bg-amber-400 text-[var(--color-darkest)]"
-                      : isCompleted
-                        ? "bg-emerald-600 text-white"
-                        : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
-              const isReviewExpanded = embedded && expandedReviewLogId === log.id;
-              const display = getLogCardDisplay(log);
-              const scopeLabel = formatLogScopeLabel(t, display);
-              return (
+            <div
+              className={
+                activeLogView === "compact"
+                  ? LOG_LIST_CARD_GRID_DENSE
+                  : activeLogView === "grid"
+                    ? LOG_LIST_CARD_GRID_MULTI
+                    : LOG_LIST_CARD_GRID
+              }
+            >
+            {logs.map((log) => (
               <motion.div
                 key={log.id}
                 variants={listStaggerItemVariants}
-                className={`min-h-0 sm:h-full ${listStaggerItemClassName}`}
+                className={cn(
+                  "min-h-0",
+                  activeLogView === "list" && "sm:h-full",
+                  listStaggerItemClassName
+                )}
               >
                 <div className="h-full">
-                  <Card
-                    className={`relative flex flex-row min-h-0 overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${embedded && !isReviewExpanded ? LOG_CARD_HEIGHT_EMBEDDED_COLLAPSED : embedded ? LOG_CARD_HEIGHT_EMBEDDED : LOG_CARD_HEIGHT_DEFAULT} ${listBorderClass}`}
-                    style={cardShadow}
-                  >
-                    {!readOnly && deletingId === log.id && (
-                      <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0D1B2A]/70">
-                        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-light)]" />
-                      </div>
-                    )}
-                    {/* Left: image full height – flush with card edge, radius matches card (rounded-lg); click goes to item page */}
-                    <MotionLink
-                      to={itemDetailPath(log.mediaType, log.externalId)}
-                      whileTap={tapScale}
-                      transition={tapTransition}
-                      className={LOG_CARD_IMAGE_COLUMN}
-                    >
-                      <div className="absolute inset-0 min-h-0">
-                        <ItemImage
-                          src={log.image}
-                          className="h-full w-full min-h-0"
-                          mediaType={log.mediaType}
-                          boardGameSource={log.boardGameSource}
-                        />
-                      </div>
-                      {(() => {
-                        const sourceLabel = SCORE_SOURCE_LABELS[log.mediaType];
-                        const showScore = sourceLabel != null && typeof log.apiScore === "number" && log.apiScore > 0;
-                        if (!showScore) return null;
-                        return (
-                          <span
-                            className="absolute top-1 right-1 z-10 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-semibold text-yellow-300 backdrop-blur-sm sm:top-1.5 sm:right-1.5 sm:text-[10px] whitespace-nowrap"
-                            title={`${sourceLabel} ${log.apiScore!.toFixed(1)} / 10`}
-                          >
-                            {sourceLabel} {log.apiScore!.toFixed(1)}
-                          </span>
-                        );
-                      })()}
-                      {log.status && (
-                        <span
-                          className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] whitespace-nowrap ${badgeClass}`}
-                          title={getStatusLabel(t, log.status, log.mediaType)}
-                        >
-                          {getStatusLabel(t, log.status, log.mediaType)}
-                        </span>
-                      )}
-                    </MotionLink>
-                    {/* Middle: title, grade, badge, episode, review */}
-                    <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${LOG_CARD_BODY_GAP} ${LOG_CARD_BODY_PADDING} ${embedded && !isReviewExpanded ? "min-h-0" : ""}`}>
-                      <MotionLink
-                        to={itemDetailPath(log.mediaType, log.externalId)}
-                        whileTap={tapScale}
-                        transition={tapTransition}
-                        className="block min-w-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
-                      >
-                        <OverflowMarquee className={LOG_CARD_TITLE}>{log.title}</OverflowMarquee>
-                      </MotionLink>
-                      <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                        {display.grade != null ? (
-                          <StarRating value={gradeToStars(display.grade)} readOnly size="sm" />
-                        ) : (
-                          <span className="text-[var(--color-light)]">—</span>
-                        )}
-                        {scopeLabel ? (
-                          <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
-                            {scopeLabel}
-                          </span>
-                        ) : null}
-                        <GenreBadges genres={log.genres} maxCount={1} />
-                        {(log.mediaType === "tv" || log.mediaType === "movies" || log.mediaType === "anime") &&
-                          log.networks?.[0] && (
-                          <span className="rounded-full bg-[var(--color-mid)]/30 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
-                            {log.networks[0]}
-                          </span>
-                        )}
-                        {log.mediaType === "tv" && (() => {
-                          const air = getTvAirState(log.tvStatus);
-                          if (air === "ongoing") {
-                            return (
-                              <span className="rounded-full border border-amber-400/30 bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-200 whitespace-nowrap">
-                                {t("mediaLogs.tvOngoing")}
-                              </span>
-                            );
-                          }
-                          if (air === "ended") {
-                            return (
-                              <span className="rounded-full border border-emerald-500/30 bg-emerald-600/20 px-2 py-0.5 text-[10px] font-medium text-emerald-200 whitespace-nowrap">
-                                {t("mediaLogs.tvEnded")}
-                              </span>
-                            );
-                          }
-                          return null;
-                        })()}
-                        {log.mediaType === "books" && (
-                          <BookPagesBadge pagesCount={log.pagesCount} />
-                        )}
-                        {log.mediaType === "boardgames" && (() => {
-                          const min = typeof log.playersMin === "number" && log.playersMin > 0 ? log.playersMin : null;
-                          const max = typeof log.playersMax === "number" && log.playersMax > 0 ? log.playersMax : null;
-                          if (min == null && max == null) return null;
-                          const label =
-                            min != null && max != null && min !== max
-                              ? t("mediaLogs.boardgamePlayersBadgeRange", { min: String(min), max: String(max) })
-                              : t("mediaLogs.boardgamePlayersBadgeSingle", { count: String(min ?? max) });
-                          return (
-                            <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
-                              {label}
-                            </span>
-                          );
-                        })()}
-                        {(() => {
-                          const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
-                          return duration ? (
-                            <span className="text-[10px] sm:text-xs text-[var(--color-light)]">
-                              {t("dashboard.finishedIn", { duration })}
-                            </span>
-                          ) : null;
-                        })()}
-                        {showCollectionOwnershipFilters &&
-                          (log.own === true ||
-                            log.wantToBuy === true ||
-                            (mediaType === "boardgames" &&
-                              log.matchesPlayed != null &&
-                              log.matchesPlayed > 0)) && (
-                          <>
-                            {log.own === true && (
-                              <span className="text-[10px] sm:text-xs text-[var(--color-light)]">{t("itemReviewForm.own")}</span>
-                            )}
-                            {log.wantToBuy === true && (
-                              <span className="text-[10px] sm:text-xs text-[var(--color-light)]">
-                                {t("itemReviewForm.wantToBuy")}
-                              </span>
-                            )}
-                            {mediaType === "boardgames" &&
-                              log.matchesPlayed != null &&
-                              log.matchesPlayed > 0 && (
-                              <span className="text-[10px] sm:text-xs text-[var(--color-light)]">
-                                {t("itemReviewForm.matchesPlayed")}: {log.matchesPlayed}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                      {hasProgressButton && !isCompleted && (() => {
-                        const isEpisodeMedia = (EPISODE_TYPES as readonly MediaType[]).includes(log.mediaType);
-                        if (isEpisodeMedia) {
-                          const seasonValue = log.season ?? 0;
-                          const episodeValue = log.episode ?? 0;
-                          if (episodeValue <= 0 && seasonValue <= 0) return null;
-                          const label = seasonValue > 0
-                            ? t("mediaLogs.tvSeasonEpisode", { season: String(seasonValue), episode: String(episodeValue) })
-                            : t("mediaLogs.tvEpisodeOnly", { episode: String(episodeValue) });
-                          return (
-                            <span className="text-xs text-[var(--color-light)] whitespace-nowrap">
-                              {label}
-                            </span>
-                          );
-                        }
-                        const p = getProgress(log);
-                        return (
-                          <span className="text-xs text-[var(--color-light)]">
-                            {t(p.labelKey)}: {p.value}
-                          </span>
-                        );
-                      })()}
-                      <div className={`flex flex-col items-start gap-1 min-h-0 ${embedded && !isReviewExpanded ? "flex-1 overflow-hidden" : ""}`}>
-                        {display.review ? (
-                          (() => {
-                            const review = display.review!;
-                            const isExpanded = expandedReviewLogId === log.id;
-                            const truncated = review.length > REVIEW_PREVIEW_LENGTH;
-                            const preview = truncated && !isExpanded
-                              ? review.slice(0, REVIEW_PREVIEW_LENGTH)
-                              : review;
-                            const showClamp = embedded && truncated && !isExpanded;
-                            return (
-                              <>
-                                <div className={showClamp ? `line-clamp-2 w-full ${LOG_CARD_REVIEW_MAX_WIDTH}` : `w-full ${LOG_CARD_REVIEW_MAX_WIDTH}`}>
-                                  <p className="text-xs sm:text-sm text-[var(--color-light)] whitespace-pre-wrap break-words">
-                                    {preview}
-                                    {truncated && !isExpanded && " ... "}
-                                  </p>
-                                </div>
-                                {truncated && (
-                                  <Button
-                                    type="button"
-                                    variant="link"
-                                    size="sm"
-                                    className="shrink-0 h-auto p-0 text-xs text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      setExpandedReviewLogId(isExpanded ? null : log.id);
-                                    }}
-                                  >
-                                    {isExpanded ? t("social.viewLess") : t("social.viewMore")}
-                                  </Button>
-                                )}
-                              </>
-                            );
-                          })()
-                        ) : (
-                          <span className="invisible text-xs sm:text-sm line-clamp-2">—</span>
-                        )}
-                      </div>
-                    </div>
-                    {/* Right: +1 (primary) + edit — +1 only when progress type and not complete/read/watched */}
-                    {!readOnly && (
-                      <div className={LOG_CARD_ACTION_COLUMN}>
-                        {showIncrementForLog(log) && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleIncrement(log);
-                            }}
-                            disabled={incrementingId === log.id || deletingId === log.id}
-                            aria-label={t("mediaLogs.addOne")}
-                            className={LOG_CARD_INCREMENT_BUTTON}
-                          >
-                            {incrementingId === log.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-[var(--color-lightest)]" aria-hidden />
-                            ) : (
-                              <>
-                                <Plus className="h-4 w-4 shrink-0 text-[var(--color-lightest)]" aria-hidden />
-                                <span className="text-xs font-semibold tabular-nums text-[var(--color-lightest)]">1</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-                        {showBoardGameMatchButton(log) && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setBoardGameEditTab("matches");
-                              setEditingLog(log);
-                            }}
-                            disabled={deletingId === log.id}
-                            aria-label={t("mediaLogs.addMatch")}
-                            className={LOG_CARD_INCREMENT_BUTTON}
-                          >
-                            <Plus className="h-4 w-4 shrink-0 text-[var(--color-lightest)]" aria-hidden />
-                          </button>
-                        )}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className={`${LOG_CARD_EDIT_BUTTON} text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)] transition-colors`}
-                          onClick={() => {
-                            setBoardGameEditTab("review");
-                            setEditingLog(log);
-                          }}
-                          disabled={deletingId === log.id}
-                          aria-label={t("common.edit")}
-                        >
-                          <Pencil className="h-4 w-4" aria-hidden />
-                        </Button>
-                      </div>
-                    )}
-                  </Card>
+                  <MediaLogCard
+                    log={log}
+                    embedded={embedded}
+                    readOnly={readOnly}
+                    view={activeLogView}
+                    mediaType={mediaType}
+                    showCollectionOwnershipFilters={showCollectionOwnershipFilters}
+                    hasProgressButton={hasProgressButton}
+                    deletingId={deletingId}
+                    incrementingId={incrementingId}
+                    expandedReviewLogId={expandedReviewLogId}
+                    onExpandReview={setExpandedReviewLogId}
+                    onIncrement={handleIncrement}
+                    onEdit={(lg, tab) => {
+                      setBoardGameEditTab(tab);
+                      setEditingLog(lg);
+                    }}
+                    t={t}
+                  />
                 </div>
               </motion.div>
-            );
-            })}
+            ))}
           </div>
           {nextCursor != null && (
             <>

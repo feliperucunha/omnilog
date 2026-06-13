@@ -40,7 +40,6 @@ import {
   toMediaType,
 } from "@geeklogs/shared";
 import type { Log } from "@geeklogs/shared";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/useMediaQuery";
@@ -574,10 +573,6 @@ export function Dashboard() {
     return () => setBelowNavbar?.(null);
   }, [visibleTypes, visibleTypesOrderReady, selectedCategory, counts, t, setBelowNavbar, setCategory]);
 
-  const byType = Object.fromEntries(
-    MEDIA_TYPES.map((type) => [type, counts?.[type] ?? 0])
-  ) as Record<MediaType, number>;
-
   const betaMessageParagraphs = t("dashboard.betaModalMessage").split("\n\n");
 
   const betaBody = (
@@ -606,9 +601,6 @@ export function Dashboard() {
       {t("dashboard.betaModalGotIt")}
     </Button>
   );
-
-  const categoryCountSuffix = (type: MediaType) =>
-    counts != null ? ` (${byType[type] ?? 0})` : countsLoading ? " (…)" : "";
 
   const getDashboardImportSpotlightTarget = useCallback(
     () =>
@@ -664,30 +656,8 @@ export function Dashboard() {
       {visibleTypes.length > 0 && (
         <section
             aria-label={t("dashboard.category")}
-            className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
+            className="flex min-w-0 flex-col gap-4 overflow-hidden max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0 max-md:shadow-none md:rounded-xl md:border md:border-[var(--color-category-border)] md:bg-[var(--color-category-bg)] md:p-4 md:shadow-[var(--shadow-category)]"
           >
-            {/* Category toggle: mobile only; desktop uses strip below navbar */}
-            <div className="flex min-w-0 w-full shrink-0 justify-center overflow-hidden md:hidden">
-            <ToggleGroup
-              type="single"
-              value={selectedCategory}
-              onValueChange={(v) => v && setCategory(v as MediaType)}
-              className="hidden md:inline-flex flex-wrap justify-center gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-dark)] p-2 md:w-fit"
-              aria-label={t("dashboard.category")}
-            >
-              {visibleTypes.map((type) => (
-                <ToggleGroupItem
-                  key={type}
-                  value={type}
-                  className="rounded-md px-4 py-3 text-sm max-md:min-h-[44px] data-[state=on]:bg-gradient-to-br data-[state=on]:from-[var(--btn-gradient-start)] data-[state=on]:to-[var(--btn-gradient-end)] data-[state=on]:text-[var(--btn-text)] md:px-3 md:py-2"
-                  aria-label={`${t(`nav.${type}`)}${categoryCountSuffix(type)}`}
-                >
-                  {t(`nav.${type}`)}
-                  {categoryCountSuffix(type)}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </div>
           <MediaLogs
             key={selectedCategory}
             mediaType={selectedCategory}
@@ -706,11 +676,11 @@ export function Dashboard() {
 
       {token && (
         <section aria-label={t("social.sectionTitle")} className="flex min-w-0 flex-col gap-4 overflow-hidden">
-          <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
             <button
               type="button"
               onClick={toggleSocialCollapsed}
-              className="flex min-w-0 items-center gap-2 rounded-md py-1 max-md:min-h-[44px] max-md:py-3 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 max-md:min-h-[44px] max-md:py-3 text-left text-lg font-semibold text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20 focus:outline-none"
               aria-expanded={!socialCollapsed}
               aria-controls="dashboard-social-content"
               id="dashboard-social-heading"
@@ -743,8 +713,9 @@ export function Dashboard() {
                   })),
                 ]}
                 aria-label={t("social.filterByFriend")}
-                className="min-w-0 max-w-[12rem] shrink-0"
-                triggerClassName="min-w-0"
+                className="min-w-0 w-full max-md:h-auto max-md:self-auto md:w-[11rem] md:max-w-[min(100%,12rem)] md:shrink-0"
+                triggerClassName="h-10 w-full min-w-0 max-w-none max-md:min-h-[44px] md:h-10 md:min-h-10 md:max-h-10"
+                contentScrollable={followedUsers.length > 6}
               />
             )}
           </div>

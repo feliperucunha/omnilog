@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 /** Color palette for genre badges: solid backgrounds + white text for readability. Same genre name => same color. */
 const GENRE_COLORS = [
   "bg-emerald-600 text-white",
@@ -24,23 +26,23 @@ function getGenreColorClass(genre: string): string {
 export function GenreBadges({
   genres,
   maxCount = 2,
+  compact = false,
   className,
 }: {
   genres: string[] | null | undefined;
-  /** Max badges to show (default 2). Use 1 for search/list cards. */
   maxCount?: number;
-  /** Optional extra class on the wrapper. */
+  compact?: boolean;
   className?: string;
 }) {
   if (!genres || genres.length === 0) return null;
   const show = genres.slice(0, maxCount);
+  const badgeClass = compact
+    ? "max-w-[4.25rem] truncate rounded-full px-1.5 py-px text-[8px] font-medium"
+    : "rounded-full px-2 py-0.5 text-[10px] font-medium";
   return (
-    <span className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
+    <span className={cn("flex min-w-0 flex-wrap items-center gap-0.5", className)}>
       {show.map((g) => (
-        <span
-          key={g}
-          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${getGenreColorClass(g)}`}
-        >
+        <span key={g} className={cn(badgeClass, getGenreColorClass(g))}>
           {g}
         </span>
       ))}

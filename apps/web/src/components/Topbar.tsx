@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Settings, Info, LogOut, Loader2, CreditCard } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
+import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
 
 const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/": "nav.search",
@@ -41,6 +43,31 @@ export function Topbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const pageTitleContext = usePageTitle();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuTriggerRef = useRef<HTMLButtonElement>(null);
+  const userMenuContentRef = useRef<HTMLDivElement>(null);
+
+  useAndroidOverlayBack(userMenuOpen, () => setUserMenuOpen(false));
+
+  useEffect(() => {
+    setUserMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (userMenuTriggerRef.current?.contains(target)) return;
+      if (userMenuContentRef.current?.contains(target)) return;
+      setUserMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [userMenuOpen]);
+
   const fallbackTitleKey = ROUTE_TITLE_KEYS[location.pathname];
   const displayTitle =
     pageTitleContext?.pageTitle ?? (fallbackTitleKey ? t(fallbackTitleKey) : null);
@@ -143,9 +170,10 @@ export function Topbar() {
           </>
         )}
         {token && user && (
-          <DropdownMenu>
+          <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
             <DropdownMenuTrigger asChild>
               <Button
+                ref={userMenuTriggerRef}
                 variant="ghost"
                 size="icon"
                 className="h-10 w-10 max-md:min-h-[40px] max-md:min-w-[40px] max-md:h-10 max-md:w-10 rounded-full border border-[var(--color-light)] bg-[var(--color-mid)]/30 p-0 text-lg font-medium text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/50 focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -154,43 +182,44 @@ export function Topbar() {
                 {initial}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent ref={userMenuContentRef} align="end" className="w-56">
               <div className="px-2 py-2">
                 <p className="text-xs font-medium text-[var(--color-light)]">{user.email}</p>
               </div>
               <DropdownMenuSeparator />
-              <div
-                className="px-2 py-2"
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
+              <DropdownMenuItem
+                className="min-h-0 cursor-default p-0 focus:bg-transparent data-[highlighted]:bg-transparent"
+                onSelect={(e) => e.preventDefault()}
               >
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/40 px-3 py-2">
-                    <span className="text-xs font-medium text-[var(--color-light)]">{t("nav.theme")}</span>
-                    <ThemeSwitcher />
-                  </div>
-                  <div className="rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/40 p-1.5">
-                    <ToggleGroup
-                      type="single"
-                      value={locale}
-                      onValueChange={(v) => v && handleLocaleChange(v as Locale)}
-                      className="grid w-full grid-cols-3 gap-1"
-                      aria-label={t("settings.language")}
-                    >
-                      {LOCALE_OPTIONS.map((opt) => (
-                        <ToggleGroupItem
-                          key={opt.value}
-                          value={opt.value}
-                          className="h-9 text-xs font-semibold data-[state=on]:bg-[var(--color-mid)]/50"
-                          aria-label={opt.label}
-                        >
-                          {LOCALE_SHORT_LABELS[opt.value]}
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
+                <div className="w-full px-2 py-2">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/40 px-3 py-2">
+                      <span className="text-xs font-medium text-[var(--color-light)]">{t("nav.theme")}</span>
+                      <ThemeSwitcher />
+                    </div>
+                    <div className="rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/40 p-1.5">
+                      <ToggleGroup
+                        type="single"
+                        value={locale}
+                        onValueChange={(v) => v && handleLocaleChange(v as Locale)}
+                        className="grid w-full grid-cols-3 gap-1"
+                        aria-label={t("settings.language")}
+                      >
+                        {LOCALE_OPTIONS.map((opt) => (
+                          <ToggleGroupItem
+                            key={opt.value}
+                            value={opt.value}
+                            className="h-9 text-xs font-semibold data-[state=on]:bg-[var(--color-mid)]/50"
+                            aria-label={opt.label}
+                          >
+                            {LOCALE_SHORT_LABELS[opt.value]}
+                          </ToggleGroupItem>
+                        ))}
+                      </ToggleGroup>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link to="/tiers" className="flex items-center gap-2">
