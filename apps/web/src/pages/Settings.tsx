@@ -26,6 +26,7 @@ import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import {
   DEFAULT_PROFILE_VISIBILITY,
   MEDIA_TYPES,
+  type AnimeMangaTitleLanguage,
   type BoardGameProvider,
   type MediaType,
   type ProfileVisibility,
@@ -42,6 +43,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BoardGameProviderSelector } from "@/components/BoardGameProviderSelector";
+import { AnimeMangaTitleLanguageSelector } from "@/components/AnimeMangaTitleLanguageSelector";
 import { MediaCategoryDragList } from "@/components/MediaCategoryDragList";
 
 type KeysStatus = { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
@@ -113,6 +115,7 @@ export function Settings() {
   const [saving, setSaving] = useState<ApiKeyProvider | null>(null);
   const [savingMediaTypes, setSavingMediaTypes] = useState(false);
   const [savingBoardGameProvider, setSavingBoardGameProvider] = useState(false);
+  const [savingAnimeMangaTitleLanguage, setSavingAnimeMangaTitleLanguage] = useState(false);
   const [selectedMediaTypes, setSelectedMediaTypes] = useState<Set<MediaType>>(new Set(MEDIA_TYPES));
   /** Order of categories: visible types first (this order), then hidden. Determines order on home and search. */
   const [orderedMediaTypes, setOrderedMediaTypes] = useState<MediaType[]>(() => [...MEDIA_TYPES]);
@@ -121,7 +124,6 @@ export function Settings() {
   const [profileVisibilityOpen, setProfileVisibilityOpen] = useState(true);
   const [navigationOpen, setNavigationOpen] = useState(true);
   const [exportOpen, setExportOpen] = useState(false);
-  const [boardGameProviderOpen, setBoardGameProviderOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(() => searchParams.get("open") === "api-keys");
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminUsers, setAdminUsers] = useState<
@@ -346,6 +348,25 @@ export function Settings() {
       showErrorToast(t, "E008", { originalError: err });
     } finally {
       setSavingBoardGameProvider(false);
+    }
+  };
+
+  const handleAnimeMangaTitleLanguageChange = async (language: AnimeMangaTitleLanguage) => {
+    if ((me?.animeMangaTitleLanguage ?? "original") === language) return;
+    setSavingAnimeMangaTitleLanguage(true);
+    try {
+      await apiFetch("/settings/anime-manga-title-language", {
+        method: "PUT",
+        body: JSON.stringify({ language }),
+      });
+      await refetchMe();
+      invalidateApiCache("/search");
+      invalidateApiCache("/items");
+      toast.success(t("settings.animeMangaTitleLanguageSaved"));
+    } catch (err) {
+      showErrorToast(t, "E008", { originalError: err });
+    } finally {
+      setSavingAnimeMangaTitleLanguage(false);
     }
   };
 
@@ -756,7 +777,7 @@ export function Settings() {
           open={navigationOpen}
           onToggle={() => setNavigationOpen((prev) => !prev)}
         >
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-8">
             {me && tierHasProFeatures(me.tier) ? (
               <MediaCategoryDragList
                   order={orderedMediaTypes}
@@ -784,6 +805,64 @@ export function Settings() {
                 </Button>
               </div>
             )}
+
+            <div className="relative overflow-hidden">
+              <div className="mb-3">
+                <p className="text-sm font-semibold text-[var(--color-lightest)]">
+                  {t("settings.boardGameProviderLabel")}
+                </p>
+              </div>
+              <div
+                className={cn("flex flex-col gap-4", savingBoardGameProvider && "pointer-events-none opacity-60")}
+                aria-busy={savingBoardGameProvider}
+              >
+                <BoardGameProviderSelector
+                  value={me?.boardGameProvider ?? "bgg"}
+                  onValueChange={(next) => void handleBoardGameProviderChange(next)}
+                  disabled={savingBoardGameProvider}
+                />
+              </div>
+              {savingBoardGameProvider && (
+                <div
+                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-md bg-[var(--color-dark)]/75 backdrop-blur-[2px]"
+                  role="status"
+                  aria-live="polite"
+                  aria-label={t("settings.saving")}
+                >
+                  <Loader2 className="h-10 w-10 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
+                  <span className="text-sm font-medium text-[var(--color-lightest)]">{t("settings.saving")}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="relative overflow-hidden">
+              <div className="mb-3">
+                <p className="text-sm font-semibold text-[var(--color-lightest)]">
+                  {t("settings.animeMangaTitleLanguageLabel")}
+                </p>
+              </div>
+              <div
+                className={cn("flex flex-col gap-4", savingAnimeMangaTitleLanguage && "pointer-events-none opacity-60")}
+                aria-busy={savingAnimeMangaTitleLanguage}
+              >
+                <AnimeMangaTitleLanguageSelector
+                  value={me?.animeMangaTitleLanguage ?? "original"}
+                  onValueChange={(next) => void handleAnimeMangaTitleLanguageChange(next)}
+                  disabled={savingAnimeMangaTitleLanguage}
+                />
+              </div>
+              {savingAnimeMangaTitleLanguage && (
+                <div
+                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-md bg-[var(--color-dark)]/75 backdrop-blur-[2px]"
+                  role="status"
+                  aria-live="polite"
+                  aria-label={t("settings.saving")}
+                >
+                  <Loader2 className="h-10 w-10 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
+                  <span className="text-sm font-medium text-[var(--color-lightest)]">{t("settings.saving")}</span>
+                </div>
+              )}
+            </div>
           </div>
         </SettingsCollapsibleSection>
 
@@ -843,35 +922,6 @@ export function Settings() {
             )}
           </>
         )}
-
-        <SettingsCollapsibleSection
-          title={t("settings.boardGameProviderLabel")}
-          open={boardGameProviderOpen}
-          onToggle={() => setBoardGameProviderOpen((prev) => !prev)}
-          className="relative overflow-hidden"
-        >
-          <div
-            className={cn("flex flex-col gap-4", savingBoardGameProvider && "pointer-events-none opacity-60")}
-            aria-busy={savingBoardGameProvider}
-          >
-            <BoardGameProviderSelector
-              value={me?.boardGameProvider ?? "bgg"}
-              onValueChange={(next) => void handleBoardGameProviderChange(next)}
-              disabled={savingBoardGameProvider}
-            />
-          </div>
-          {savingBoardGameProvider && (
-            <div
-              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-md bg-[var(--color-dark)]/75 backdrop-blur-[2px]"
-              role="status"
-              aria-live="polite"
-              aria-label={t("settings.saving")}
-            >
-              <Loader2 className="h-10 w-10 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
-              <span className="text-sm font-medium text-[var(--color-lightest)]">{t("settings.saving")}</span>
-            </div>
-          )}
-        </SettingsCollapsibleSection>
 
         <SettingsCollapsibleSection
           title={t("settings.apiKeys")}

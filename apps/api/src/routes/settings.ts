@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
 import {
+  ANIME_MANGA_TITLE_LANGUAGES,
   BOARD_GAME_PROVIDERS,
   MEDIA_TYPES,
   mergeProfileVisibility,
+  resolveAnimeMangaTitleLanguage,
   type ProfileVisibility,
 } from "@geeklogs/shared";
 import { getProfileVisibilityFromUser } from "../lib/profileVisibility.js";
@@ -17,6 +19,7 @@ const onboardingSchema = z.object({
   theme: z.enum(["light", "dark"]),
   types: z.array(z.enum(MEDIA_TYPES as unknown as [string, ...string[]])),
   boardGameProvider: z.enum(BOARD_GAME_PROVIDERS as unknown as [string, ...string[]]).optional(),
+  animeMangaTitleLanguage: z.enum(ANIME_MANGA_TITLE_LANGUAGES as unknown as [string, ...string[]]).optional(),
   locale: z.enum(["en", "pt-BR", "es"]).optional(),
 });
 
@@ -34,6 +37,10 @@ const apiKeysSchema = z.object({
 
 const boardGameProviderSchema = z.object({
   provider: z.enum(["bgg", "ludopedia"]),
+});
+
+const animeMangaTitleLanguageSchema = z.object({
+  language: z.enum(ANIME_MANGA_TITLE_LANGUAGES as unknown as [string, ...string[]]),
 });
 
 /** Get which API keys the user has set (no values returned). */
@@ -252,6 +259,30 @@ settingsRouter.put("/board-game-provider", async (req: AuthenticatedRequest, res
   res.json({ ok: true, provider: parsed.data.provider });
 });
 
+settingsRouter.get("/anime-manga-title-language", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { animeMangaTitleLanguage: true },
+  });
+  const language = resolveAnimeMangaTitleLanguage(user?.animeMangaTitleLanguage);
+  res.json({ language });
+});
+
+settingsRouter.put("/anime-manga-title-language", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const parsed = animeMangaTitleLanguageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+  await prisma.user.update({
+    where: { id: req.user.userId },
+    data: { animeMangaTitleLanguage: parsed.data.language },
+  });
+  res.json({ ok: true, language: parsed.data.language });
+});
+
 const profileBadgesSchema = z.object({
   badgeIds: z.array(z.string().min(1)).max(3),
 });
@@ -344,6 +375,7 @@ settingsRouter.put("/onboarding", async (req: AuthenticatedRequest, res) => {
     visibleMediaTypes: string;
     onboarded: boolean;
     boardGameProvider?: string;
+    animeMangaTitleLanguage?: string;
     preferredLocale?: string;
   } = {
     preferredTheme: parsed.data.theme,
@@ -352,6 +384,9 @@ settingsRouter.put("/onboarding", async (req: AuthenticatedRequest, res) => {
   };
   if (typesSet.has("boardgames")) {
     data.boardGameProvider = parsed.data.boardGameProvider ?? "bgg";
+  }
+  if (typesSet.has("anime") || typesSet.has("manga")) {
+    data.animeMangaTitleLanguage = parsed.data.animeMangaTitleLanguage ?? "original";
   }
   if (parsed.data.locale) {
     data.preferredLocale = parsed.data.locale;

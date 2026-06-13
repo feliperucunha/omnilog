@@ -131,6 +131,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
       visibleMediaTypes: true,
       profileVisibility: true,
       boardGameProvider: true,
+      animeMangaTitleLanguage: true,
       country: true,
       defaultPurchaseCurrency: true,
       tmdbApiKey: true,
@@ -173,6 +174,8 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
   }
 
   const boardGameProvider = user.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg";
+  const animeMangaTitleLanguage =
+    user.animeMangaTitleLanguage === "english" ? "english" : "original";
   const tier =
     user.tier === "admin"
       ? "admin"
@@ -231,6 +234,7 @@ meRouter.get("/", async (req: AuthenticatedRequest, res) => {
     visibleMediaTypes,
     profileVisibility: getProfileVisibilityFromUser(user),
     boardGameProvider,
+    animeMangaTitleLanguage,
     tier,
     subscriptionEndsAt,
     subscriptionCancelAtPeriodEnd:

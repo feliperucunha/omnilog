@@ -18,12 +18,14 @@ export const ITEM_PAYLOAD_CACHE_STALE_MS = 7 * 24 * 60 * 60 * 1000;
 export function normalizeSearchQueryKey(
   q: string,
   sort?: string,
-  boardProvider?: string
+  boardProvider?: string,
+  titleLanguage?: string
 ): string {
   return JSON.stringify({
     q: q.trim().toLowerCase(),
     sort: sort ?? "",
     board: boardProvider ?? "",
+    titleLang: titleLanguage ?? "",
   });
 }
 

@@ -188,15 +188,6 @@ export async function countBoardGameWinsForStats(
   return wins;
 }
 
-function platformsFromItemPayload(payload: unknown): string[] {
-  if (payload == null || typeof payload !== "object") return [];
-  const platforms = (payload as { platforms?: unknown }).platforms;
-  if (!Array.isArray(platforms)) return [];
-  return platforms
-    .filter((p): p is string => typeof p === "string" && p.trim().length > 0)
-    .map((p) => p.trim());
-}
-
 export async function gamePlatformStatsForUser(
   userId: string,
   logWhere?: Prisma.LogWhereInput
@@ -204,40 +195,18 @@ export async function gamePlatformStatsForUser(
   const base: Prisma.LogWhereInput = {
     userId,
     mediaType: "games",
+    gamePlatform: { not: null },
   };
   const where = logWhere ? { AND: [base, logWhere] } : base;
   const logs = await prisma.log.findMany({
     where,
-    select: { gamePlatform: true, externalId: true },
+    select: { gamePlatform: true },
   });
-  if (logs.length === 0) return [];
-
-  const needsItemPlatforms = logs.filter((row) => !row.gamePlatform?.trim());
-  const platformByExternalId = new Map<string, string[]>();
-  if (needsItemPlatforms.length > 0) {
-    const externalIds = [...new Set(needsItemPlatforms.map((row) => row.externalId))];
-    const caches = await prisma.itemPayloadCache.findMany({
-      where: { mediaType: "games", externalId: { in: externalIds } },
-      select: { externalId: true, payload: true },
-    });
-    for (const cache of caches) {
-      const names = platformsFromItemPayload(cache.payload);
-      if (names.length > 0) platformByExternalId.set(cache.externalId, names);
-    }
-  }
-
   const byPlatform: Record<string, number> = {};
   for (const row of logs) {
-    const fromLog = row.gamePlatform?.trim();
-    if (fromLog) {
-      byPlatform[fromLog] = (byPlatform[fromLog] ?? 0) + 1;
-      continue;
-    }
-    const fromItem = platformByExternalId.get(row.externalId);
-    if (!fromItem) continue;
-    for (const platform of fromItem) {
-      byPlatform[platform] = (byPlatform[platform] ?? 0) + 1;
-    }
+    const platform = row.gamePlatform?.trim();
+    if (!platform) continue;
+    byPlatform[platform] = (byPlatform[platform] ?? 0) + 1;
   }
   return Object.entries(byPlatform)
     .sort(([, a], [, b]) => b - a || 0)

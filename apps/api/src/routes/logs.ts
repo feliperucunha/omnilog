@@ -7,6 +7,8 @@ import {
   LOG_STATUS_OPTIONS,
   MEDIA_TYPES,
   SPEND_TRACKED_MEDIA_TYPES,
+  DEFAULT_BOARD_GAME_SESSION_DURATION_HOURS,
+  isBoardGameSessionDurationHours,
   decodeHtmlEntities,
 } from "@geeklogs/shared";
 import type { BoardGameMatchPlayer, MediaType } from "@geeklogs/shared";
@@ -103,6 +105,7 @@ const boardGameMatchPlayerSchema = z.object({
 
 const createBoardGameMatchBodySchema = z.object({
   playedAt: z.string().min(1).max(40),
+  durationHours: z.number().optional(),
   players: z.array(boardGameMatchPlayerSchema).min(1).max(16),
   notes: z.string().max(50000).optional().nullable(),
 });
@@ -139,6 +142,7 @@ function serializeBoardGameMatchRow(row: {
   id: string;
   logId: string;
   playedAt: Date;
+  durationHours: number;
   players: string;
   notes: string | null;
   createdAt: Date;
@@ -147,6 +151,7 @@ function serializeBoardGameMatchRow(row: {
     id: row.id,
     logId: row.logId,
     playedAt: row.playedAt.toISOString(),
+    durationHours: row.durationHours,
     players: parseBoardGamePlayersJson(row.players),
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
@@ -259,6 +264,7 @@ import {
 } from "../lib/logGenreList.js";
 import { stringifyLogAffinityContext, logAffinityContextSchema } from "../lib/logAffinityContext.js";
 import { hoursFromCompletedLogForStats, rollupHoursFromCompletedLogs } from "../lib/completedLogHours.js";
+import { attachBoardGameSessionHours } from "../lib/boardGameSessionHours.js";
 import {
   countBoardGameWinsForStats,
   gamePlatformStatsForUser,
@@ -862,6 +868,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
         prisma.log.findMany({
           where: completedForHoursWhere,
           select: {
+            id: true,
             completedAt: true,
             contentHours: true,
             startedAt: true,
@@ -880,7 +887,9 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
           },
         }),
       ]);
-    const { totalHours, logsWithPositiveHours } = rollupHoursFromCompletedLogs(completedLogs);
+    const { totalHours, logsWithPositiveHours } = rollupHoursFromCompletedLogs(
+      await attachBoardGameSessionHours(completedLogs)
+    );
     const totalsPurchaseByCur: Record<string, number> = {};
     const totalsSaleByCur: Record<string, number> = {};
     for (const row of spendLifetimeRows) {
@@ -1064,11 +1073,20 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   );
   const logs = await prisma.log.findMany({
     where: hoursRollupWhere,
-    select: { completedAt: true, contentHours: true, startedAt: true, mediaType: true, hoursToBeat: true, matchesPlayed: true },
+    select: {
+      id: true,
+      completedAt: true,
+      contentHours: true,
+      startedAt: true,
+      mediaType: true,
+      hoursToBeat: true,
+      matchesPlayed: true,
+    },
   });
+  const logsWithSessionHours = await attachBoardGameSessionHours(logs);
   const byKeyHours: Record<string, number> = {};
   const byKeyCount: Record<string, number> = {};
-  for (const log of logs) {
+  for (const log of logsWithSessionHours) {
     const hours = hoursFromCompletedLogForStats(log);
     if (hours === null) continue;
     const completedAt = log.completedAt;
@@ -1978,6 +1996,12 @@ logsRouter.post("/:id/board-game-matches", async (req: AuthenticatedRequest, res
     res.status(400).json({ error: { playedAt: ["Invalid date"] } });
     return;
   }
+  const durationHoursRaw = parsed.data.durationHours ?? DEFAULT_BOARD_GAME_SESSION_DURATION_HOURS;
+  if (!isBoardGameSessionDurationHours(durationHoursRaw)) {
+    res.status(400).json({ error: { durationHours: ["Invalid session duration"] } });
+    return;
+  }
+  const durationHours = durationHoursRaw;
 
   const playersPayload: BoardGameMatchPlayer[] = [];
   for (const p of parsed.data.players) {
@@ -2035,6 +2059,7 @@ logsRouter.post("/:id/board-game-matches", async (req: AuthenticatedRequest, res
         data: {
           logId,
           playedAt,
+          durationHours,
           players: playersJson,
           notes,
         },

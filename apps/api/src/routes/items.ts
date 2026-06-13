@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { decodeHtmlEntities, MEDIA_TYPES } from "@geeklogs/shared";
+import { decodeHtmlEntities, MEDIA_TYPES, resolveAnimeMangaTitleLanguage } from "@geeklogs/shared";
 import type { MediaType } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
@@ -25,6 +25,7 @@ import {
   setItemPayloadCached,
 } from "../lib/responseCache.js";
 import { createRouteTimer } from "../lib/routeTiming.js";
+import { withAnimeMangaTitlePreference } from "../lib/animeMangaItemTitle.js";
 
 export const itemsRouter = Router();
 itemsRouter.use(optionalAuthMiddleware);
@@ -39,6 +40,7 @@ async function getUserKeys(userId: string) {
       ludopediaApiToken: true,
       comicVineApiKey: true,
       boardGameProvider: true,
+      animeMangaTitleLanguage: true,
     },
   });
   return user ?? undefined;
@@ -347,10 +349,18 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
   const itemImage =
     item.image ?? item.thumbnail ?? (logWithImage?.image as string | null) ?? null;
 
+  const responseItem =
+    mediaType === "anime" || mediaType === "manga"
+      ? withAnimeMangaTitlePreference(
+          item,
+          resolveAnimeMangaTitleLanguage(keys?.animeMangaTitleLanguage)
+        )
+      : item;
+
   timer.finish(res, { provider: mediaType });
   res.json({
     item: {
-      ...item,
+      ...responseItem,
       image: itemImage,
     },
     reviews,

@@ -1,5 +1,9 @@
 import {
   decodeHtmlEntities,
+  DEFAULT_ANIME_MANGA_TITLE_LANGUAGE,
+  pickJikanAnimeMangaTitle,
+  type AnimeMangaTitleLanguage,
+  type AnimeMangaTitleParts,
   type SearchResult,
   type ItemDetail,
   SEARCH_RESULTS_PAGE_SIZE,
@@ -26,6 +30,27 @@ function jikanOrderParams(sort: string | undefined): { order_by?: string; sort?:
 }
 
 const BASE = "https://api.jikan.moe/v4";
+
+type JikanTitleFields = {
+  title?: string | null;
+  title_english?: string | null;
+  title_japanese?: string | null;
+};
+
+function jikanTitleVariants(parts: JikanTitleFields): AnimeMangaTitleParts {
+  return {
+    romaji: parts.title?.trim() ? decodeHtmlEntities(parts.title.trim()) : null,
+    english: parts.title_english?.trim() ? decodeHtmlEntities(parts.title_english.trim()) : null,
+    native: parts.title_japanese?.trim() ? decodeHtmlEntities(parts.title_japanese.trim()) : null,
+  };
+}
+
+function jikanDisplayTitle(
+  parts: JikanTitleFields,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): string {
+  return decodeHtmlEntities(pickJikanAnimeMangaTitle(parts, preference));
+}
 
 /** Jikan caps `limit` at 25 per page; merge two pages for up to `SEARCH_RESULTS_PAGE_SIZE` unique MAL ids. */
 const JIKAN_SEARCH_PAGE_LIMIT = 25;
@@ -87,13 +112,18 @@ function toItemDetail(
   };
 }
 
-async function getAnimeByIdJikan(id: string): Promise<ItemDetail | null> {
+async function getAnimeByIdJikan(
+  id: string,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<ItemDetail | null> {
   const res = await jikanFetch(`${BASE}/anime/${id}`);
   if (!res.ok) return null;
   const data = (await res.json()) as {
     data?: {
       mal_id?: number;
       title?: string;
+      title_english?: string | null;
+      title_japanese?: string | null;
       year?: number;
       images?: { jpg?: { image_url?: string } };
       synopsis?: string;
@@ -109,6 +139,12 @@ async function getAnimeByIdJikan(id: string): Promise<ItemDetail | null> {
   };
   const d = data.data;
   if (!d) return null;
+  const titleFields: JikanTitleFields = {
+    title: d.title,
+    title_english: d.title_english,
+    title_japanese: d.title_japanese,
+  };
+  const titleVariants = jikanTitleVariants(titleFields);
   const synopsisRaw = d.synopsis?.trim().slice(0, 2000) || null;
   const description = synopsisRaw ? decodeHtmlEntities(synopsisRaw) : null;
   const genres = d.genres
@@ -130,7 +166,8 @@ async function getAnimeByIdJikan(id: string): Promise<ItemDetail | null> {
   const duration = (typeof d.duration === "string" && d.duration.trim()) ? decodeHtmlEntities(d.duration.trim()) : null;
   return {
     id: String(d.mal_id ?? id),
-    title: decodeHtmlEntities(d.title ?? "Unknown"),
+    title: jikanDisplayTitle(titleFields, preference),
+    titleVariants,
     image: d.images?.jpg?.image_url ?? null,
     year: d.year != null ? String(d.year) : null,
     subtitle: null,
@@ -146,10 +183,13 @@ async function getAnimeByIdJikan(id: string): Promise<ItemDetail | null> {
   };
 }
 
-export async function getAnimeById(id: string): Promise<ItemDetail | null> {
-  const fromJikan = await getAnimeByIdJikan(id);
+export async function getAnimeById(
+  id: string,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<ItemDetail | null> {
+  const fromJikan = await getAnimeByIdJikan(id, preference);
   if (fromJikan) return fromJikan;
-  return getAnimeByIdAnilist(id);
+  return getAnimeByIdAnilist(id, preference);
 }
 
 function mergeAnimeSearchResults(
@@ -191,10 +231,15 @@ function mergeAnimeSearchResults(
   return ordered;
 }
 
-async function searchAnimeJikan(q: string): Promise<SearchResult[]> {
+async function searchAnimeJikan(
+  q: string,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<SearchResult[]> {
   type Row = {
     mal_id: number;
     title?: string;
+    title_english?: string | null;
+    title_japanese?: string | null;
     year?: number;
     score?: number;
     images?: { jpg?: { image_url?: string } };
@@ -202,7 +247,7 @@ async function searchAnimeJikan(q: string): Promise<SearchResult[]> {
   const list = await fetchJikanSearchPages<Row>("anime", q, undefined);
   return list.map((item) => ({
     id: String(item.mal_id),
-    title: decodeHtmlEntities(item.title ?? "Unknown"),
+    title: jikanDisplayTitle(item, preference),
     image: item.images?.jpg?.image_url ?? null,
     year: item.year != null ? String(item.year) : null,
     subtitle: null,
@@ -210,22 +255,31 @@ async function searchAnimeJikan(q: string): Promise<SearchResult[]> {
   }));
 }
 
-export async function searchAnime(q: string, sort?: string): Promise<SearchResult[]> {
+export async function searchAnime(
+  q: string,
+  sort?: string,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<SearchResult[]> {
   const [anilistResults, jikanResults] = await Promise.all([
-    searchAnimeAnilist(q).catch(() => [] as SearchResult[]),
-    searchAnimeJikan(q),
+    searchAnimeAnilist(q, SEARCH_RESULTS_PAGE_SIZE, preference).catch(() => [] as SearchResult[]),
+    searchAnimeJikan(q, preference),
   ]);
   const merged = mergeAnimeSearchResults(anilistResults, jikanResults);
   return sortSearchResults(merged, sort).slice(0, SEARCH_RESULTS_PAGE_SIZE);
 }
 
-async function getMangaByIdJikan(id: string): Promise<ItemDetail | null> {
+async function getMangaByIdJikan(
+  id: string,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<ItemDetail | null> {
   const res = await jikanFetch(`${BASE}/manga/${id}`);
   if (!res.ok) return null;
   const data = (await res.json()) as {
     data?: {
       mal_id?: number;
       title?: string;
+      title_english?: string | null;
+      title_japanese?: string | null;
       published?: { from?: string };
       images?: { jpg?: { image_url?: string } };
       synopsis?: string;
@@ -241,6 +295,12 @@ async function getMangaByIdJikan(id: string): Promise<ItemDetail | null> {
   };
   const d = data.data;
   if (!d) return null;
+  const titleFields: JikanTitleFields = {
+    title: d.title,
+    title_english: d.title_english,
+    title_japanese: d.title_japanese,
+  };
+  const titleVariants = jikanTitleVariants(titleFields);
   const year = d.published?.from ? d.published.from.slice(0, 4) : null;
   const synopsisManga = d.synopsis?.trim().slice(0, 2000) || null;
   const description = synopsisManga ? decodeHtmlEntities(synopsisManga) : null;
@@ -263,7 +323,8 @@ async function getMangaByIdJikan(id: string): Promise<ItemDetail | null> {
   const serialization = serializationRaw ? decodeHtmlEntities(serializationRaw) : null;
   return {
     id: String(d.mal_id ?? id),
-    title: decodeHtmlEntities(d.title ?? "Unknown"),
+    title: jikanDisplayTitle(titleFields, preference),
+    titleVariants,
     image: d.images?.jpg?.image_url ?? null,
     year: year ?? null,
     subtitle: null,
@@ -278,16 +339,25 @@ async function getMangaByIdJikan(id: string): Promise<ItemDetail | null> {
   };
 }
 
-export async function getMangaById(id: string): Promise<ItemDetail | null> {
-  const fromJikan = await getMangaByIdJikan(id);
+export async function getMangaById(
+  id: string,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<ItemDetail | null> {
+  const fromJikan = await getMangaByIdJikan(id, preference);
   if (fromJikan) return fromJikan;
-  return getMangaByIdAnilist(id);
+  return getMangaByIdAnilist(id, preference);
 }
 
-export async function searchManga(q: string, sort?: string): Promise<SearchResult[]> {
+export async function searchManga(
+  q: string,
+  sort?: string,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<SearchResult[]> {
   type Row = {
     mal_id: number;
     title?: string;
+    title_english?: string | null;
+    title_japanese?: string | null;
     published?: { from?: string };
     score?: number;
     images?: { jpg?: { image_url?: string } };
@@ -297,7 +367,7 @@ export async function searchManga(q: string, sort?: string): Promise<SearchResul
     const year = item.published?.from ? item.published.from.slice(0, 4) : null;
     return {
       id: String(item.mal_id),
-      title: decodeHtmlEntities(item.title ?? "Unknown"),
+      title: jikanDisplayTitle(item, preference),
       image: item.images?.jpg?.image_url ?? null,
       year: year ?? null,
       subtitle: null,
@@ -308,7 +378,11 @@ export async function searchManga(q: string, sort?: string): Promise<SearchResul
 }
 
 /** Jikan /anime/{id}/recommendations (rate-limit friendly: caller should not burst). */
-export async function getAnimeRecommendationsForId(animeId: string, maxTotal = 16): Promise<SearchResult[]> {
+export async function getAnimeRecommendationsForId(
+  animeId: string,
+  maxTotal = 16,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<SearchResult[]> {
   const res = await jikanFetch(`${BASE}/anime/${animeId}/recommendations`);
   if (!res.ok) return [];
   const data = (await res.json()) as {
@@ -316,6 +390,8 @@ export async function getAnimeRecommendationsForId(animeId: string, maxTotal = 1
       entry?: {
         mal_id?: number;
         title?: string;
+        title_english?: string | null;
+        title_japanese?: string | null;
         year?: number;
         images?: { jpg?: { image_url?: string } };
       };
@@ -327,7 +403,7 @@ export async function getAnimeRecommendationsForId(animeId: string, maxTotal = 1
     if (e?.mal_id == null) continue;
     out.push({
       id: String(e.mal_id),
-      title: decodeHtmlEntities(e.title ?? "Unknown"),
+      title: jikanDisplayTitle(e, preference),
       image: e.images?.jpg?.image_url ?? null,
       year: e.year != null ? String(e.year) : null,
       subtitle: null,
@@ -338,13 +414,18 @@ export async function getAnimeRecommendationsForId(animeId: string, maxTotal = 1
 }
 
 /** Highest MAL score first (better default than popularity when user has no logs). */
-export async function getTopMangaByScore(max = 12): Promise<SearchResult[]> {
+export async function getTopMangaByScore(
+  max = 12,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<SearchResult[]> {
   const res = await jikanFetch(`${BASE}/manga?order_by=score&sort=desc&limit=${max}`);
   if (!res.ok) return [];
   const data = (await res.json()) as {
     data?: Array<{
       mal_id: number;
       title?: string;
+      title_english?: string | null;
+      title_japanese?: string | null;
       published?: { from?: string };
       score?: number;
       images?: { jpg?: { image_url?: string } };
@@ -354,7 +435,7 @@ export async function getTopMangaByScore(max = 12): Promise<SearchResult[]> {
     const year = item.published?.from ? item.published.from.slice(0, 4) : null;
     return {
       id: String(item.mal_id),
-      title: decodeHtmlEntities(item.title ?? "Unknown"),
+      title: jikanDisplayTitle(item, preference),
       image: item.images?.jpg?.image_url ?? null,
       year: year ?? null,
       subtitle: null,
@@ -367,13 +448,18 @@ export async function getTopMangaByScore(max = 12): Promise<SearchResult[]> {
 export const getTopMangaPopular = getTopMangaByScore;
 
 /** Highest MAL score first (better default than popularity when user has no logs). */
-export async function getTopAnimeByScore(max = 12): Promise<SearchResult[]> {
+export async function getTopAnimeByScore(
+  max = 12,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<SearchResult[]> {
   const res = await jikanFetch(`${BASE}/anime?order_by=score&sort=desc&limit=${max}`);
   if (!res.ok) return [];
   const data = (await res.json()) as {
     data?: Array<{
       mal_id: number;
       title?: string;
+      title_english?: string | null;
+      title_japanese?: string | null;
       year?: number;
       score?: number;
       images?: { jpg?: { image_url?: string } };
@@ -381,7 +467,7 @@ export async function getTopAnimeByScore(max = 12): Promise<SearchResult[]> {
   };
   return (data.data ?? []).map((item) => ({
     id: String(item.mal_id),
-    title: decodeHtmlEntities(item.title ?? "Unknown"),
+    title: jikanDisplayTitle(item, preference),
     image: item.images?.jpg?.image_url ?? null,
     year: item.year != null ? String(item.year) : null,
     subtitle: null,

@@ -1,4 +1,5 @@
-import type { SearchResult } from "@geeklogs/shared";
+import type { AnimeMangaTitleLanguage, SearchResult } from "@geeklogs/shared";
+import { DEFAULT_ANIME_MANGA_TITLE_LANGUAGE } from "@geeklogs/shared";
 import { buildMangaTagAffinityMaps, type MangaLogForAffinity } from "../lib/mangaAffinity.js";
 import { pickAffinitySearchQueries } from "../lib/boardGameAffinity.js";
 import { searchManga, getTopMangaByScore } from "./jikan.js";
@@ -17,8 +18,9 @@ export async function fetchMangaRecommendationsMerged(args: {
   maxResults: number;
   sort: string | undefined;
   maxSearchCalls?: number;
+  titlePreference?: AnimeMangaTitleLanguage;
 }): Promise<MangaRecommendationsOutcome> {
-  const { logs, exclude, maxResults, sort, maxSearchCalls = 2 } = args;
+  const { logs, exclude, maxResults, sort, maxSearchCalls = 2, titlePreference = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE } = args;
 
   const { scores, queryLabel } = buildMangaTagAffinityMaps(logs);
   const hadPositiveAffinity = [...scores.values()].some((v) => v > 0.06);
@@ -34,7 +36,7 @@ export async function fetchMangaRecommendationsMerged(args: {
 
   for (const q of queries) {
     if (byId.size >= maxResults) break;
-    const batch = await searchManga(q, sort ?? "score_desc");
+    const batch = await searchManga(q, sort ?? "score_desc", titlePreference);
     const rankBase = queryIndex * 1000;
     let i = 0;
     for (const row of batch) {
@@ -54,7 +56,7 @@ export async function fetchMangaRecommendationsMerged(args: {
     .map((x) => x.row)
     .slice(0, maxResults);
 
-  results = await topUpFromPopular(results, () => getTopMangaByScore(maxResults), exclude, maxResults);
+  results = await topUpFromPopular(results, () => getTopMangaByScore(maxResults, titlePreference), exclude, maxResults);
 
   return {
     results,

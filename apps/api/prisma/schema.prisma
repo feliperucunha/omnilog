@@ -65,6 +65,7 @@ model User {
   visibleMediaTypes    String?  // JSON array of media type strings; null = all
   profileVisibility    String?  // JSON ProfileVisibility; null = all public defaults
   boardGameProvider   String?  // "bgg" | "ludopedia"; null = bgg
+  animeMangaTitleLanguage String? // "original" | "english"; null = original
   tier                Tier     @default(free)
   stripeSubscriptionId  String?  @unique // Stripe subscription ID for Pro
   stripeCustomerId     String?  // Stripe customer ID (for billing portal)
@@ -287,6 +288,8 @@ model BoardGameMatch {
   /// JSON: [{ "name": string, "score": number | null, "winner": boolean }]
   players   String
   notes     String?
+  /// Session length in hours (30 min steps from 0.5 to 6; default 1).
+  durationHours Float    @default(1)
   createdAt DateTime @default(now())
 
   @@index([logId])

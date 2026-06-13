@@ -20,6 +20,7 @@ export interface MeResponse {
   visibleMediaTypes: string[];
   profileVisibility?: ProfileVisibility;
   boardGameProvider: "bgg" | "ludopedia";
+  animeMangaTitleLanguage: "original" | "english";
   tier: "free" | "beta" | "pro" | "admin";
   subscriptionEndsAt: string | null;
   /** True when the user is still Pro but Stripe is set to cancel at period end. */

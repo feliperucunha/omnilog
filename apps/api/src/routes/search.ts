@@ -1,7 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
-import { MEDIA_TYPES, SEARCH_RESULTS_PAGE_SIZE, SEARCH_SORT_OPTIONS } from "@geeklogs/shared";
+import { MEDIA_TYPES, SEARCH_RESULTS_PAGE_SIZE, SEARCH_SORT_OPTIONS, resolveAnimeMangaTitleLanguage } from "@geeklogs/shared";
 import type { MediaType, SearchResult } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { sanitizeText, SEARCH_QUERY_MAX_LENGTH } from "../lib/sanitize.js";
@@ -101,6 +101,7 @@ async function getUserKeys(userId: string) {
       ludopediaApiToken: true,
       comicVineApiKey: true,
       boardGameProvider: true,
+      animeMangaTitleLanguage: true,
     },
   });
   return user ?? undefined;
@@ -289,6 +290,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
         return;
       }
       case "anime": {
+        const titlePreference = resolveAnimeMangaTitleLanguage(keys?.animeMangaTitleLanguage);
         const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "anime") : new Set<string>();
         const seeds = req.user ? await getRecentSeedIds(req.user.userId, "anime", RECOMMENDATION_SEEDS_MAX) : [];
         let fromLogs = false;
@@ -296,7 +298,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
           seeds.length > 0
             ? await collectFromSeeds(
                 seeds,
-                (id) => getAnimeRecommendationsForId(id, 20),
+                (id) => getAnimeRecommendationsForId(id, 20, titlePreference),
                 exclude,
                 RECOMMENDATIONS_MAX
               )
@@ -304,7 +306,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
         if (results.length > 0) fromLogs = true;
         results = await topUpFromPopular(
           results,
-          () => getTopAnimeByScore(RECOMMENDATIONS_MAX),
+          () => getTopAnimeByScore(RECOMMENDATIONS_MAX, titlePreference),
           exclude,
           RECOMMENDATIONS_MAX
         );
@@ -344,6 +346,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
         return;
       }
       case "manga": {
+        const titlePreference = resolveAnimeMangaTitleLanguage(keys?.animeMangaTitleLanguage);
         const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "manga") : new Set<string>();
         const logs =
           req.user != null
@@ -363,6 +366,7 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
           maxResults: RECOMMENDATIONS_MAX,
           sort,
           maxSearchCalls: 2,
+          titlePreference,
         });
         const mangaResults = sortRecommendationsByScoreDesc(outcome.results).slice(0, RECOMMENDATIONS_MAX);
         res.json({
@@ -498,6 +502,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const clientUsed = getClientUsedFromRequest(req);
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
   const skipApiKeyUX = await isDisableApiKeyRequirementsEnabled();
+  const titlePreference = resolveAnimeMangaTitleLanguage(keys?.animeMangaTitleLanguage);
   const boardProvider =
     (type as string) === "boardgames"
       ? queryBoardProvider ?? (keys?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg")
@@ -548,7 +553,8 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const searchQueryKey = normalizeSearchQueryKey(
     q,
     sort,
-    type === "boardgames" ? boardProvider : undefined
+    type === "boardgames" ? boardProvider : undefined,
+    type === "anime" || type === "manga" ? titlePreference : undefined
   );
 
   try {
@@ -748,7 +754,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
       case "anime": {
         timer.setProvider("jikan");
         const { data: cached, cacheHit } = await withSearchResultsCache(prisma, type, searchQueryKey, async () => ({
-          results: await searchAnime(q, sort),
+          results: await searchAnime(q, sort, titlePreference),
         }));
         timer.setCacheHit(cacheHit);
         timer.finish(res, { provider: "jikan" });
@@ -757,7 +763,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
       case "manga": {
         timer.setProvider("jikan");
         const { data: cached, cacheHit } = await withSearchResultsCache(prisma, type, searchQueryKey, async () => ({
-          results: await searchManga(q, sort),
+          results: await searchManga(q, sort, titlePreference),
         }));
         timer.setCacheHit(cacheHit);
         timer.finish(res, { provider: "jikan" });

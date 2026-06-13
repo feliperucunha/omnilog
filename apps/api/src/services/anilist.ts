@@ -1,5 +1,9 @@
 import {
   decodeHtmlEntities,
+  pickAnimeMangaTitle,
+  type AnimeMangaTitleLanguage,
+  type AnimeMangaTitleParts,
+  DEFAULT_ANIME_MANGA_TITLE_LANGUAGE,
   SEARCH_RESULTS_PAGE_SIZE,
   type ItemDetail,
   type SearchResult,
@@ -7,11 +11,7 @@ import {
 
 const ANILIST_URL = "https://graphql.anilist.co";
 
-type AnilistTitle = {
-  romaji?: string | null;
-  english?: string | null;
-  native?: string | null;
-};
+type AnilistTitle = AnimeMangaTitleParts;
 
 type AnilistMediaRow = {
   idMal?: number | null;
@@ -21,15 +21,28 @@ type AnilistMediaRow = {
   averageScore?: number | null;
 };
 
-function queryHasCjk(text: string): boolean {
-  return /[\u3040-\u30ff\u4e00-\u9fff]/.test(text);
+function decodeAnilistTitleParts(title: AnilistTitle): AnimeMangaTitleParts {
+  return {
+    romaji: title.romaji?.trim() ? decodeHtmlEntities(title.romaji.trim()) : null,
+    english: title.english?.trim() ? decodeHtmlEntities(title.english.trim()) : null,
+    native: title.native?.trim() ? decodeHtmlEntities(title.native.trim()) : null,
+  };
 }
 
-function pickAnilistDetailTitle(title: AnilistTitle): string {
-  const english = title.english?.trim();
-  const romaji = title.romaji?.trim();
-  const native = title.native?.trim();
-  return decodeHtmlEntities(english || romaji || native || "Unknown");
+function pickAnilistTitle(
+  title: AnilistTitle,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): string {
+  return decodeHtmlEntities(pickAnimeMangaTitle(decodeAnilistTitleParts(title), preference));
+}
+
+/** @deprecated Query-based title pick; use user preference via pickAnilistTitle instead. */
+export function pickAnilistDisplayTitle(title: AnilistTitle, query: string): string {
+  const parts = decodeAnilistTitleParts(title);
+  const preferOriginal = /[\u3040-\u30ff\u4e00-\u9fff]/.test(query);
+  return decodeHtmlEntities(
+    pickAnimeMangaTitle(parts, preferOriginal ? "original" : "english")
+  );
 }
 
 function anilistDescription(raw: string | null | undefined): string | null {
@@ -50,20 +63,13 @@ async function anilistGraphql<T>(query: string, variables: Record<string, unknow
   return json.data ?? null;
 }
 
-export function pickAnilistDisplayTitle(title: AnilistTitle, query: string): string {
-  const romaji = title.romaji?.trim();
-  const english = title.english?.trim();
-  const native = title.native?.trim();
-  if (queryHasCjk(query)) {
-    return native || english || romaji || "Unknown";
-  }
-  return english || romaji || native || "Unknown";
-}
-
-function anilistRowToSearchResult(row: AnilistMediaRow, query: string): SearchResult | null {
+function anilistRowToSearchResult(
+  row: AnilistMediaRow,
+  preference: AnimeMangaTitleLanguage
+): SearchResult | null {
   if (row.idMal == null || row.idMal <= 0) return null;
   const title = row.title ?? {};
-  const label = decodeHtmlEntities(pickAnilistDisplayTitle(title, query));
+  const label = pickAnilistTitle(title, preference);
   const score =
     typeof row.averageScore === "number" && row.averageScore > 0
       ? row.averageScore / 10
@@ -81,7 +87,8 @@ function anilistRowToSearchResult(row: AnilistMediaRow, query: string): SearchRe
 
 export async function searchAnimeAnilist(
   q: string,
-  perPage = SEARCH_RESULTS_PAGE_SIZE
+  perPage = SEARCH_RESULTS_PAGE_SIZE,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
 ): Promise<SearchResult[]> {
   const query = `query ($search: String, $perPage: Int) {
     Page(page: 1, perPage: $perPage) {
@@ -111,7 +118,7 @@ export async function searchAnimeAnilist(
   const out: SearchResult[] = [];
   const seen = new Set<string>();
   for (const row of json.data?.Page?.media ?? []) {
-    const hit = anilistRowToSearchResult(row, q);
+    const hit = anilistRowToSearchResult(row, preference);
     if (!hit || seen.has(hit.id)) continue;
     seen.add(hit.id);
     out.push(hit);
@@ -138,7 +145,8 @@ type AnilistDetailMedia = {
 
 async function getMediaDetailAnilist(
   id: string,
-  type: "ANIME" | "MANGA"
+  type: "ANIME" | "MANGA",
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
 ): Promise<ItemDetail | null> {
   const idMal = parseInt(id, 10);
   if (!Number.isFinite(idMal) || idMal <= 0) return null;
@@ -168,6 +176,7 @@ async function getMediaDetailAnilist(
   const d = data?.Media;
   if (!d?.idMal) return null;
 
+  const titleParts = decodeAnilistTitleParts(d.title ?? {});
   const score =
     typeof d.averageScore === "number" && d.averageScore > 0 ? d.averageScore / 10 : null;
   const year = d.startDate?.year != null ? String(d.startDate.year) : null;
@@ -205,7 +214,8 @@ async function getMediaDetailAnilist(
 
   const base: ItemDetail = {
     id: String(d.idMal),
-    title: pickAnilistDetailTitle(d.title ?? {}),
+    title: pickAnilistTitle(d.title ?? {}, preference),
+    titleVariants: titleParts,
     image: d.coverImage?.large?.trim() || d.coverImage?.medium?.trim() || null,
     year,
     subtitle: null,
@@ -235,10 +245,16 @@ async function getMediaDetailAnilist(
   };
 }
 
-export async function getAnimeByIdAnilist(id: string): Promise<ItemDetail | null> {
-  return getMediaDetailAnilist(id, "ANIME");
+export async function getAnimeByIdAnilist(
+  id: string,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<ItemDetail | null> {
+  return getMediaDetailAnilist(id, "ANIME", preference);
 }
 
-export async function getMangaByIdAnilist(id: string): Promise<ItemDetail | null> {
-  return getMediaDetailAnilist(id, "MANGA");
+export async function getMangaByIdAnilist(
+  id: string,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<ItemDetail | null> {
+  return getMediaDetailAnilist(id, "MANGA", preference);
 }

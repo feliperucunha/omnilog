@@ -18,6 +18,8 @@ import {
   applyProfileVisibilityToPublicLog,
   getProfileVisibilityFromUser,
 } from "../lib/profileVisibility.js";
+import { attachBoardGameSessionHours } from "../lib/boardGameSessionHours.js";
+import { hoursFromCompletedLogForStats } from "../lib/completedLogHours.js";
 
 /** Public (no auth) read-only profile and logs for sharing. */
 
@@ -167,28 +169,22 @@ usersRouter.get("/:identifier/logs/stats", async (req: Request<{ identifier: str
       userId: user.id,
       completedAt: { not: null },
     },
-    select: { completedAt: true, contentHours: true, startedAt: true, mediaType: true, hoursToBeat: true, matchesPlayed: true },
+    select: {
+      id: true,
+      completedAt: true,
+      contentHours: true,
+      startedAt: true,
+      mediaType: true,
+      hoursToBeat: true,
+      matchesPlayed: true,
+    },
   });
+  const logsWithSessionHours = await attachBoardGameSessionHours(logs);
   const byKey: Record<string, number> = {};
-  const MS_PER_HOUR = 60 * 60 * 1000;
-  const FALLBACK_MAX_HOURS = 24;
-  const mediaType = (log: { mediaType: unknown }) => log.mediaType as string;
-  for (const log of logs) {
+  for (const log of logsWithSessionHours) {
     if (log.completedAt == null) continue;
-    let hours: number;
-    if (mediaType(log) === "boardgames") {
-      hours = (log.matchesPlayed ?? 0) * 1;
-    } else if (mediaType(log) === "games" && log.hoursToBeat != null && log.hoursToBeat > 0) {
-      hours = log.hoursToBeat;
-    } else if (log.contentHours != null && log.contentHours > 0) {
-      hours = log.contentHours;
-    } else if (log.startedAt != null) {
-      const elapsedMs = log.completedAt.getTime() - log.startedAt.getTime();
-      hours = Math.min(elapsedMs / MS_PER_HOUR, FALLBACK_MAX_HOURS);
-      if (hours <= 0) continue;
-    } else {
-      continue;
-    }
+    const hours = hoursFromCompletedLogForStats(log);
+    if (hours === null) continue;
     const key =
       group === "category"
         ? (log.mediaType as string)

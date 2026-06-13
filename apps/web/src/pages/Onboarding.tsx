@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BoardGameProviderSelectGrid } from "@/components/BoardGameProviderSelector";
+import { AnimeMangaTitleLanguageSelectGrid } from "@/components/AnimeMangaTitleLanguageSelector";
 import { BoardGameCollectionImportPanel } from "@/components/BoardGameCollectionImportPanel";
 import { useLocale, LOCALE_OPTIONS, type Locale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,7 +14,7 @@ import { useMe } from "@/contexts/MeContext";
 import { apiFetch, invalidateApiCache } from "@/lib/api";
 import { showErrorToast } from "@/lib/errorToast";
 import { FORCE_ONBOARDING_UI } from "@/lib/onboardingDev";
-import { MEDIA_TYPES, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
+import { MEDIA_TYPES, type AnimeMangaTitleLanguage, type BoardGameProvider, type MediaType } from "@geeklogs/shared";
 import { MediaCategoryDragList } from "@/components/MediaCategoryDragList";
 import { cn } from "@/lib/utils";
 import { trackProductEvent } from "@/lib/productAnalytics";
@@ -26,7 +27,7 @@ export type OnboardingFormProps = {
   onPreviewDismiss?: () => void;
 };
 
-type WizardStep = "language" | "theme" | "categories" | "boardgames";
+type WizardStep = "language" | "theme" | "categories" | "boardgames" | "animemanga";
 
 export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss }: OnboardingFormProps) {
   const { t, locale, setLocale } = useLocale();
@@ -41,6 +42,8 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
   const [theme, setTheme] = useState<"light" | "dark">(colorScheme);
   /** Saved preference for onboarding complete; BGG is the default until a successful import sets otherwise. */
   const [boardGameProvider, setBoardGameProvider] = useState<BoardGameProvider>("bgg");
+  const [animeMangaTitleLanguage, setAnimeMangaTitleLanguage] =
+    useState<AnimeMangaTitleLanguage>("original");
   const [boardGameImportSource, setBoardGameImportSource] = useState<BoardGameProvider | null>(null);
   const [boardGameImportRunning, setBoardGameImportRunning] = useState(false);
   const [draftLocale, setDraftLocale] = useState<Locale>(locale);
@@ -64,6 +67,7 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
   const stepSequence = useMemo((): WizardStep[] => {
     const seq: WizardStep[] = ["language", "theme", "categories"];
     if (selectedTypes.has("boardgames")) seq.push("boardgames");
+    if (selectedTypes.has("anime") || selectedTypes.has("manga")) seq.push("animemanga");
     return seq;
   }, [selectedTypes]);
 
@@ -91,12 +95,15 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
     }
   }, [previewMode, onPreviewDismiss, navigate]);
 
+  const hasAnimeOrManga = selectedTypes.has("anime") || selectedTypes.has("manga");
+
   const submitOnboarding = useCallback(
     async (opts: {
       theme: "light" | "dark";
       types: MediaType[];
       locale: Locale;
       boardGameProvider?: BoardGameProvider;
+      animeMangaTitleLanguage?: AnimeMangaTitleLanguage;
       analyticsPath: "custom" | "defaults" | "configure_later";
     }) => {
       if (!user) return;
@@ -105,6 +112,7 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
         types: MediaType[];
         locale: Locale;
         boardGameProvider?: BoardGameProvider;
+        animeMangaTitleLanguage?: AnimeMangaTitleLanguage;
       } = {
         theme: opts.theme,
         types: opts.types,
@@ -113,6 +121,10 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
       const hasBg = opts.types.includes("boardgames");
       if (hasBg) {
         body.boardGameProvider = opts.boardGameProvider ?? "bgg";
+      }
+      const hasAm = opts.types.includes("anime") || opts.types.includes("manga");
+      if (hasAm) {
+        body.animeMangaTitleLanguage = opts.animeMangaTitleLanguage ?? "original";
       }
       setLoading(true);
       try {
@@ -127,6 +139,7 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
         await refetchVisibleTypes();
         await refetchMe();
         invalidateApiCache("/search");
+        if (hasAm) invalidateApiCache("/items");
         navigateAfterDone();
       } catch (err) {
         showErrorToast(t, "E008", { originalError: err });
@@ -144,6 +157,7 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
       types: typesPayload,
       locale: draftLocale,
       boardGameProvider: selectedTypes.has("boardgames") ? (boardGameProvider as BoardGameProvider) : undefined,
+      animeMangaTitleLanguage: hasAnimeOrManga ? animeMangaTitleLanguage : undefined,
       analyticsPath: "custom",
     });
   };
@@ -336,6 +350,22 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
                 />
               </div>
             ) : null}
+          </div>
+        ) : null}
+
+        {currentStep === "animemanga" ? (
+          <div className="flex min-h-0 w-full min-w-0 flex-col gap-3">
+            <div className="space-y-1 text-center">
+              <h2 className="text-xl font-semibold tracking-tight text-[var(--color-lightest)]">
+                {t("onboarding.stepAnimeMangaTitle")}
+              </h2>
+              <p className="text-xs text-[var(--color-light)]">{t("onboarding.stepAnimeMangaHintShort")}</p>
+            </div>
+            <AnimeMangaTitleLanguageSelectGrid
+              value={animeMangaTitleLanguage}
+              onSelect={setAnimeMangaTitleLanguage}
+              disabled={loading}
+            />
           </div>
         ) : null}
       </motion.div>

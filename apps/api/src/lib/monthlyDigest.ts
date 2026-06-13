@@ -5,6 +5,7 @@ import { SPEND_TRACKED_MEDIA_TYPES } from "@geeklogs/shared";
 import { prisma } from "./prisma.js";
 import { logSpendStatsDateWhereHalfOpen } from "./purchaseFields.js";
 import { rollupHoursFromCompletedLogs, type CompletedLogForHours } from "./completedLogHours.js";
+import { attachBoardGameSessionHours } from "./boardGameSessionHours.js";
 import { isSmtpConfigured, sendMonthlyDigestEmail } from "./email.js";
 import { APP_SETTING_KEYS, getAppSettingValue, upsertAppSettingValue } from "./appSettings.js";
 import {
@@ -131,6 +132,7 @@ export async function computeUserDigestStats(userId: string, period: DigestPerio
     prisma.log.findMany({
       where: { userId, completedAt: { gte: start, lt: endExclusive } },
       select: {
+        id: true,
         completedAt: true,
         contentHours: true,
         startedAt: true,
@@ -171,7 +173,9 @@ export async function computeUserDigestStats(userId: string, period: DigestPerio
     }),
   ]);
 
-  const hoursRollup = rollupHoursFromCompletedLogs(completedLogs as CompletedLogForHours[]);
+  const hoursRollup = rollupHoursFromCompletedLogs(
+    (await attachBoardGameSessionHours(completedLogs)) as CompletedLogForHours[]
+  );
 
   const spendByCurrency: Record<string, number> = {};
   for (const row of purchaseLogs) {

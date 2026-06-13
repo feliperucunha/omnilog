@@ -1,6 +1,8 @@
 import type { LogAffinityContext } from "./affinityContext.js";
 import type { ScopedReview } from "./scopedReview.js";
 
+import type { AnimeMangaTitleParts } from "./animeMangaTitleLanguage.js";
+
 export const MEDIA_TYPES = [
   "movies",
   "tv",
@@ -171,6 +173,8 @@ export interface ItemDetail {
   thumbnail?: string | null;
   year?: string | null;
   subtitle?: string | null;
+  /** Anime/manga: alternate title forms for display preference (original vs English). */
+  titleVariants?: AnimeMangaTitleParts | null;
   /** When mediaType is boardgames: which API provided this data ("bgg" | "ludopedia"). Enables UI to show "Source: …". */
   itemSource?: "bgg" | "ludopedia" | null;
   /** Runtime in minutes (movies, TV, etc.) for content-hours stats */
@@ -435,6 +439,8 @@ export interface BoardGameMatch {
   id: string;
   logId: string;
   playedAt: string;
+  /** Session length in hours (0.5–6 in 30 min steps). */
+  durationHours: number;
   players: BoardGameMatchPlayer[];
   notes: string | null;
   createdAt: string;
@@ -442,6 +448,7 @@ export interface BoardGameMatch {
 
 export interface CreateBoardGameMatchInput {
   playedAt: string;
+  durationHours?: number;
   players: BoardGameMatchPlayer[];
   notes?: string | null;
 }

@@ -35,6 +35,20 @@ describe("hoursFromCompletedLogForStats", () => {
     ).toBe(3);
   });
 
+  it("prefers summed session duration over match count for boardgames", () => {
+    expect(
+      hoursFromCompletedLogForStats({
+        completedAt: d("2024-01-01T00:00:00.000Z"),
+        contentHours: null,
+        startedAt: null,
+        mediaType: "boardgames",
+        hoursToBeat: null,
+        matchesPlayed: 2,
+        boardGameSessionHours: 2.5,
+      })
+    ).toBe(2.5);
+  });
+
   it("returns 0 for boardgames with no matches (still a numeric attribution)", () => {
     expect(
       hoursFromCompletedLogForStats({

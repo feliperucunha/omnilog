@@ -13,6 +13,8 @@ export type CompletedLogForHours = {
   mediaType: string;
   hoursToBeat: number | null;
   matchesPlayed: number | null;
+  /** Sum of BoardGameMatch.durationHours when preloaded for stats. */
+  boardGameSessionHours?: number | null;
 };
 
 /**
@@ -22,6 +24,9 @@ export type CompletedLogForHours = {
 export function hoursFromCompletedLogForStats(log: CompletedLogForHours): number | null {
   if (log.completedAt == null) return null;
   if (log.mediaType === "boardgames") {
+    if (log.boardGameSessionHours != null) {
+      return log.boardGameSessionHours > 0 ? log.boardGameSessionHours : 0;
+    }
     return (log.matchesPlayed ?? 0) * 1;
   }
   if (log.mediaType === "games" && log.hoursToBeat != null && log.hoursToBeat > 0) {

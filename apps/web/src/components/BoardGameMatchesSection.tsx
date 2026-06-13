@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import type { BoardGameMatch, BoardGameMatchPlayer, Log } from "@geeklogs/shared";
+import { DEFAULT_BOARD_GAME_SESSION_DURATION_HOURS, type BoardGameSessionDurationHours } from "@geeklogs/shared";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select } from "@/components/ui/select";
 import { Logo } from "@/components/Logo";
 import { apiFetch, invalidateLogsAndItemsCache } from "@/lib/api";
 import { useLocale, type TFunction } from "@/contexts/LocaleContext";
@@ -31,6 +33,7 @@ import {
   ArrowUpRight,
   Calendar,
   ChevronDown,
+  Clock,
   Dice5,
   Loader2,
   Trash2,
@@ -39,6 +42,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { boardGameSessionDurationLabel, boardGameSessionDurationOptions } from "@/lib/boardGameSessionDuration";
 
 type PlayerRow = { name: string; score: string; winner: boolean; appUserId?: string | null };
 
@@ -371,6 +375,9 @@ export const BoardGameMatchesSection = forwardRef<
   const [matches, setMatches] = useState<BoardGameMatch[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [playedDate, setPlayedDate] = useState(todayDateInput);
+  const [sessionDurationHours, setSessionDurationHours] = useState<BoardGameSessionDurationHours>(
+    DEFAULT_BOARD_GAME_SESSION_DURATION_HOURS
+  );
   const [players, setPlayers] = useState<PlayerRow[]>(() => buildDefaultPlayers(undefined));
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -411,6 +418,7 @@ export const BoardGameMatchesSection = forwardRef<
 
   const resetForm = useCallback(() => {
     setPlayedDate(todayDateInput());
+    setSessionDurationHours(DEFAULT_BOARD_GAME_SESSION_DURATION_HOURS);
     setPlayers(buildDefaultPlayers(meUser));
     setNotes("");
   }, [meUser]);
@@ -418,6 +426,7 @@ export const BoardGameMatchesSection = forwardRef<
   const submitNewMatch = useCallback(
     async (
       iso: string,
+      durationHours: BoardGameSessionDurationHours,
       playersPayload: Array<{ name: string; score: number | null; winner: boolean; appUserId?: string }>,
       matchNotes: string | null,
       options?: { resetAfter?: boolean },
@@ -436,6 +445,7 @@ export const BoardGameMatchesSection = forwardRef<
           method: "POST",
           body: JSON.stringify({
             playedAt: iso,
+            durationHours,
             players: playersPayload.map((p) => ({
               name: p.name,
               score: p.score,
@@ -487,6 +497,7 @@ export const BoardGameMatchesSection = forwardRef<
     }
     return submitNewMatch(
       iso,
+      sessionDurationHours,
       withNames.map((p) => ({
         name: p.name,
         score: p.score,
@@ -496,7 +507,7 @@ export const BoardGameMatchesSection = forwardRef<
       notes.trim() || null,
       { resetAfter: true },
     );
-  }, [notes, playedDate, players, submitNewMatch, t]);
+  }, [notes, playedDate, players, sessionDurationHours, submitNewMatch, t]);
 
   useImperativeHandle(ref, () => ({ saveNewMatch: handleSaveNew }), [handleSaveNew]);
 
@@ -531,42 +542,58 @@ export const BoardGameMatchesSection = forwardRef<
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex min-w-0 flex-col gap-4">
-          <div className="space-y-2">
-            <Label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-lightest)]">
-              <Calendar className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />
-              {t("boardGameMatches.playedDate")}
-            </Label>
-            {isPlayedToday ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 min-w-[8rem] justify-start border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80 px-3 font-normal text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/15"
-                onClick={() => playedDateInputRef.current?.showPicker()}
-                aria-label={t("boardGameMatches.playedDate")}
-              >
-                {t("boardGameMatches.today")}
-              </Button>
-            ) : (
-              <Input
+          <div className="flex min-w-0 flex-wrap items-end gap-3 sm:gap-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-lightest)]">
+                <Calendar className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />
+                {t("boardGameMatches.playedDate")}
+              </Label>
+              {isPlayedToday ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 min-w-[8rem] justify-start border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80 px-3 font-normal text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/15"
+                  onClick={() => playedDateInputRef.current?.showPicker()}
+                  aria-label={t("boardGameMatches.playedDate")}
+                >
+                  {t("boardGameMatches.today")}
+                </Button>
+              ) : (
+                <Input
+                  type="date"
+                  value={playedDate}
+                  onChange={(e) => setPlayedDate(e.target.value)}
+                  className="max-w-[14rem] border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80"
+                  aria-label={t("boardGameMatches.playedDate")}
+                />
+              )}
+              <input
+                ref={playedDateInputRef}
                 type="date"
+                tabIndex={-1}
                 value={playedDate}
                 onChange={(e) => setPlayedDate(e.target.value)}
-                className="max-w-[14rem] border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80"
-                aria-label={t("boardGameMatches.playedDate")}
+                className={cn(
+                  "max-w-[14rem] border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80",
+                  isPlayedToday ? "pointer-events-none absolute h-px w-px overflow-hidden opacity-0" : "hidden",
+                )}
+                aria-hidden={isPlayedToday}
               />
-            )}
-            <input
-              ref={playedDateInputRef}
-              type="date"
-              tabIndex={-1}
-              value={playedDate}
-              onChange={(e) => setPlayedDate(e.target.value)}
-              className={cn(
-                "max-w-[14rem] border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80",
-                isPlayedToday ? "pointer-events-none absolute h-px w-px overflow-hidden opacity-0" : "hidden",
-              )}
-              aria-hidden={isPlayedToday}
-            />
+            </div>
+            <div className="min-w-0 space-y-2 sm:min-w-[10rem]">
+              <Label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-lightest)]">
+                <Clock className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />
+                {t("boardGameMatches.sessionDuration")}
+              </Label>
+              <Select
+                value={String(sessionDurationHours)}
+                onValueChange={(v) => setSessionDurationHours(Number(v) as BoardGameSessionDurationHours)}
+                options={boardGameSessionDurationOptions(t)}
+                aria-label={t("boardGameMatches.sessionDuration")}
+                className="w-full min-w-[10rem] max-w-[14rem]"
+                triggerClassName="w-full min-w-0"
+              />
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -814,6 +841,13 @@ function MatchHistoryCard({
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-mid)]/25 px-2.5 py-1 text-xs font-semibold text-[var(--color-lightest)] ring-1 ring-[var(--color-mid)]/20">
               <Calendar className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
               {formatPlayed(match.playedAt)}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-mid)]/15 px-2.5 py-1 text-xs font-medium text-[var(--color-light)] ring-1 ring-[var(--color-mid)]/20">
+              <Clock className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+              {boardGameSessionDurationLabel(
+                (match.durationHours ?? DEFAULT_BOARD_GAME_SESSION_DURATION_HOURS) as BoardGameSessionDurationHours,
+                t
+              )}
             </span>
             {winners.length > 0 && (
               <span className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-200/95 ring-1 ring-amber-400/25">

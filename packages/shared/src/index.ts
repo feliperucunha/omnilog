@@ -34,6 +34,21 @@ export type {
   CreateBoardGameMatchInput,
 } from "./types.js";
 export { APP_VERSION } from "./version.js";
+export {
+  ANIME_MANGA_TITLE_LANGUAGES,
+  DEFAULT_ANIME_MANGA_TITLE_LANGUAGE,
+  pickAnimeMangaTitle,
+  pickJikanAnimeMangaTitle,
+  resolveAnimeMangaTitleLanguage,
+  type AnimeMangaTitleLanguage,
+  type AnimeMangaTitleParts,
+} from "./animeMangaTitleLanguage.js";
+export {
+  BOARD_GAME_SESSION_DURATION_HOURS,
+  DEFAULT_BOARD_GAME_SESSION_DURATION_HOURS,
+  isBoardGameSessionDurationHours,
+  type BoardGameSessionDurationHours,
+} from "./boardGameSession.js";
 export { isAppVersionOlder, parseAppVersion } from "./versionCompare.js";
 export { decodeHtmlEntities } from "./htmlEntities.js";
 export {
