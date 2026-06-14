@@ -333,6 +333,7 @@ const profileVisibilitySchema = z.object({
   showCollectionTags: z.boolean(),
   showTvMetadata: z.boolean(),
   showEnrichmentDetails: z.boolean(),
+  showMarketListings: z.boolean(),
 });
 
 /** GET /settings/profile-visibility — what visitors see on the public profile. */

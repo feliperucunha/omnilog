@@ -245,6 +245,7 @@ export function MarketListingSection({
           amountMinor={priceMinor}
           onAmountMinorChange={setPriceMinor}
           t={t}
+          showOptionalHint={false}
         />
       )}
 

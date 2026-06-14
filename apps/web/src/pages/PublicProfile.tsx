@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchPublic } from "@/lib/api";
 import { PublicProfileSkeleton } from "@/components/skeletons";
+import { MarketListingCard } from "@/components/MarketListingCard";
+import { MarketListingDrawer } from "@/components/MarketListingDrawer";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
-import { MEDIA_TYPES, type MediaType, toMediaType } from "@geeklogs/shared";
+import { MEDIA_TYPES, type MediaType, type MarketListing, toMediaType } from "@geeklogs/shared";
 import {
   MediaLogs,
   type CollectionListFilter,
@@ -21,6 +23,8 @@ import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { LevelBadge } from "@/components/LevelBadge";
 import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
 import { showErrorToast } from "@/lib/errorToast";
+import { LOG_LIST_CARD_GRID_DENSE } from "@/lib/logCardLayout";
+import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -72,7 +76,7 @@ interface PublicProfileResponse {
 
 export function PublicProfile() {
   const { userId } = useParams<{ userId: string }>();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { token } = useAuth();
   const { me } = useMe();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -86,6 +90,9 @@ export function PublicProfile() {
   const [publicMilestoneProgress, setPublicMilestoneProgress] = useState<PublicMilestoneProgress | null>(null);
   const [pinnedHighlightsOpen, setPinnedHighlightsOpen] = useState(false);
   const [milestoneBadgesOpen, setMilestoneBadgesOpen] = useState(false);
+  const [marketListings, setMarketListings] = useState<MarketListing[]>([]);
+  const [drawerListing, setDrawerListing] = useState<MarketListing | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const isOwnProfile = !!me?.user?.id && !!profile?.id && me.user.id === profile.id;
 
   const visibleTypes = profile?.visibleMediaTypes ?? [];
@@ -136,6 +143,13 @@ export function PublicProfile() {
     apiFetchPublic<PublicMilestoneProgress>(`/users/${userId}/milestones/progress`)
       .then(setPublicMilestoneProgress)
       .catch(() => setPublicMilestoneProgress(null));
+  }, [userId, profile?.id]);
+
+  useEffect(() => {
+    if (!userId || !profile) return;
+    apiFetchPublic<{ data: MarketListing[] }>(`/users/${userId}/market/listings`)
+      .then((res) => setMarketListings(res.data ?? []))
+      .catch(() => setMarketListings([]));
   }, [userId, profile?.id]);
 
   const handleFollowClick = useCallback(async () => {
@@ -414,6 +428,39 @@ export function PublicProfile() {
         );
       })()}
 
+      {marketListings.length > 0 && (
+        <section
+          aria-label={t("publicProfile.marketSection")}
+          className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
+        >
+          <h2 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("publicProfile.marketSection")}</OverflowMarquee>
+          </h2>
+          <motion.div
+            {...listStaggerParentProps}
+            className={cn(LOG_LIST_CARD_GRID_DENSE)}
+          >
+            {marketListings.map((listing) => (
+              <motion.div
+                key={listing.id}
+                variants={listStaggerItemVariants}
+                className={listStaggerItemClassName}
+              >
+                <MarketListingCard
+                  listing={listing}
+                  t={t}
+                  locale={locale}
+                  onOpen={(row) => {
+                    setDrawerListing(row);
+                    setDrawerOpen(true);
+                  }}
+                />
+              </motion.div>
+            ))}
+          </motion.div>
+        </section>
+      )}
+
       {visibleTypes.length > 0 && (
         <section
           aria-label={t("dashboard.category")}
@@ -448,6 +495,21 @@ export function PublicProfile() {
         </section>
       )}
       </div>
+      <MarketListingDrawer
+        listing={drawerListing}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        t={t}
+        locale={locale}
+        onDeleted={
+          isOwnProfile
+            ? (listingId) => {
+                setMarketListings((prev) => prev.filter((l) => l.id !== listingId));
+                setDrawerListing(null);
+              }
+            : undefined
+        }
+      />
     </>
   );
 }

@@ -3,10 +3,14 @@ import { z } from "zod";
 import {
   MARKET_MEDIA_TYPES,
   isMarketMediaType,
+  isMarketSortValue,
   type MarketListing,
   type MarketListingsResponse,
+  type MarketSortValue,
 } from "@geeklogs/shared";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { marketSellerSelect, serializeMarketListing } from "../lib/marketListing.js";
 import { sanitizeText } from "../lib/sanitize.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
@@ -15,82 +19,252 @@ export const marketRouter = Router();
 
 const PAGE_SIZE = 24;
 
-const sellerSelect = {
-  id: true,
-  username: true,
-  email: true,
-  phone: true,
-  cityLabel: true,
-} as const;
+const sellerSelect = marketSellerSelect;
 
-function serializeListing(row: {
+function serializeListing(row: Parameters<typeof serializeMarketListing>[0]): MarketListing {
+  return serializeMarketListing(row);
+}
+
+type EffectiveMarketSort = Exclude<MarketSortValue, "relevance">;
+
+type CursorRow = {
   id: string;
-  userId: string;
-  logId: string;
-  mediaType: string;
-  externalId: string;
+  createdAt: Date;
+  updatedAt: Date;
   title: string;
-  image: string | null;
   priceMinor: number;
   priceCurrency: string;
   previousPriceMinor: number | null;
-  description: string;
-  acceptTrade: boolean;
-  localDelivery: boolean;
-  shipsByMail: boolean;
-  contactEmail: boolean;
-  contactWhatsapp: boolean;
-  city: string;
-  cityLabel: string;
-  country: string | null;
-  active: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  user: {
-    id: string;
-    username: string | null;
-    email: string;
-    phone: string | null;
-    cityLabel: string | null;
-  };
-}): MarketListing {
-  return {
-    id: row.id,
-    userId: row.userId,
-    logId: row.logId,
-    mediaType: row.mediaType as MarketListing["mediaType"],
-    externalId: row.externalId,
-    title: row.title,
-    image: row.image,
-    priceMinor: row.priceMinor,
-    priceCurrency: row.priceCurrency,
-    previousPriceMinor: row.previousPriceMinor,
-    description: row.description,
-    acceptTrade: row.acceptTrade,
-    localDelivery: row.localDelivery,
-    shipsByMail: row.shipsByMail,
-    contactEmail: row.contactEmail,
-    contactWhatsapp: row.contactWhatsapp,
-    city: row.city,
-    cityLabel: row.cityLabel,
-    country: row.country,
-    active: row.active,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-    seller: {
-      id: row.user.id,
-      username: row.user.username,
-      email: row.user.email,
-      phone: row.user.phone,
-      cityLabel: row.user.cityLabel,
-    },
-  };
+};
+
+type ListedCursorPayload = { v: 1; sort: "listed_desc" | "listed_asc"; at: string; id: string };
+type UpdatedCursorPayload = { v: 1; sort: "updated_desc"; at: string; id: string };
+type TitleCursorPayload = { v: 1; sort: "title_asc" | "title_desc"; title: string; id: string };
+type PriceCursorPayload = {
+  v: 1;
+  sort: "price_asc" | "price_desc";
+  priceMinor: number;
+  priceCurrency: string;
+  id: string;
+};
+type DealsCursorPayload = {
+  v: 1;
+  sort: "deals_desc";
+  previousPriceMinor: number | null;
+  priceMinor: number;
+  id: string;
+};
+type ListingCursorPayload =
+  | ListedCursorPayload
+  | UpdatedCursorPayload
+  | TitleCursorPayload
+  | PriceCursorPayload
+  | DealsCursorPayload;
+
+function effectiveMarketSort(sort: MarketSortValue): EffectiveMarketSort {
+  return sort === "relevance" ? "listed_desc" : sort;
+}
+
+function encodeListingCursor(sort: EffectiveMarketSort, row: CursorRow): string {
+  let payload: ListingCursorPayload;
+  switch (sort) {
+    case "title_asc":
+    case "title_desc":
+      payload = { v: 1, sort, title: row.title, id: row.id };
+      break;
+    case "price_asc":
+    case "price_desc":
+      payload = {
+        v: 1,
+        sort,
+        priceMinor: row.priceMinor,
+        priceCurrency: row.priceCurrency,
+        id: row.id,
+      };
+      break;
+    case "deals_desc":
+      payload = {
+        v: 1,
+        sort: "deals_desc",
+        previousPriceMinor: row.previousPriceMinor,
+        priceMinor: row.priceMinor,
+        id: row.id,
+      };
+      break;
+    case "updated_desc":
+      payload = { v: 1, sort: "updated_desc", at: row.updatedAt.toISOString(), id: row.id };
+      break;
+    case "listed_asc":
+      payload = { v: 1, sort: "listed_asc", at: row.createdAt.toISOString(), id: row.id };
+      break;
+    default:
+      payload = { v: 1, sort: "listed_desc", at: row.createdAt.toISOString(), id: row.id };
+  }
+  return Buffer.from(JSON.stringify(payload)).toString("base64url");
+}
+
+function decodeListingCursor(
+  raw: string | undefined,
+  sort: EffectiveMarketSort
+): ListingCursorPayload | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as ListingCursorPayload;
+    if (parsed?.v !== 1) return null;
+    if (parsed.sort === sort) return parsed;
+    if (
+      sort === "listed_desc" &&
+      (parsed.sort === "listed_desc" || parsed.sort === "updated_desc") &&
+      "at" in parsed
+    ) {
+      return { v: 1, sort: "listed_desc", at: parsed.at, id: parsed.id };
+    }
+  } catch {
+    // legacy cursor: plain ISO date
+  }
+  if (sort === "listed_desc" || sort === "updated_desc") {
+    const cursorDate = new Date(raw);
+    if (!Number.isNaN(cursorDate.getTime())) {
+      return sort === "updated_desc"
+        ? { v: 1, sort: "updated_desc", at: cursorDate.toISOString(), id: "" }
+        : { v: 1, sort: "listed_desc", at: cursorDate.toISOString(), id: "" };
+    }
+  }
+  return null;
+}
+
+function listingOrderBy(sort: EffectiveMarketSort): Prisma.MarketListingOrderByWithRelationInput[] {
+  switch (sort) {
+    case "listed_asc":
+      return [{ createdAt: "asc" }, { id: "asc" }];
+    case "updated_desc":
+      return [{ updatedAt: "desc" }, { id: "desc" }];
+    case "title_asc":
+      return [{ title: "asc" }, { id: "asc" }];
+    case "title_desc":
+      return [{ title: "desc" }, { id: "desc" }];
+    case "price_asc":
+      return [{ priceMinor: "asc" }, { priceCurrency: "asc" }, { id: "asc" }];
+    case "price_desc":
+      return [{ priceMinor: "desc" }, { priceCurrency: "desc" }, { id: "desc" }];
+    case "deals_desc":
+      return [
+        { previousPriceMinor: { sort: "desc", nulls: "last" } },
+        { priceMinor: "asc" },
+        { id: "asc" },
+      ];
+    default:
+      return [{ createdAt: "desc" }, { id: "desc" }];
+  }
+}
+
+function listingCursorWhere(
+  sort: EffectiveMarketSort,
+  cursor: ListingCursorPayload
+): Prisma.MarketListingWhereInput {
+  if (sort === "listed_asc" && cursor.sort === "listed_asc") {
+    const at = new Date(cursor.at);
+    return {
+      OR: [{ createdAt: { gt: at } }, { createdAt: at, id: { gt: cursor.id } }],
+    };
+  }
+  if (sort === "updated_desc" && cursor.sort === "updated_desc") {
+    const at = new Date(cursor.at);
+    if (!cursor.id) return { updatedAt: { lt: at } };
+    return {
+      OR: [{ updatedAt: { lt: at } }, { updatedAt: at, id: { lt: cursor.id } }],
+    };
+  }
+  if (sort === "title_asc" && cursor.sort === "title_asc") {
+    return {
+      OR: [
+        { title: { gt: cursor.title } },
+        { title: cursor.title, id: { gt: cursor.id } },
+      ],
+    };
+  }
+  if (sort === "title_desc" && cursor.sort === "title_desc") {
+    return {
+      OR: [
+        { title: { lt: cursor.title } },
+        { title: cursor.title, id: { lt: cursor.id } },
+      ],
+    };
+  }
+  if (sort === "price_asc" && cursor.sort === "price_asc") {
+    return {
+      OR: [
+        { priceMinor: { gt: cursor.priceMinor } },
+        {
+          priceMinor: cursor.priceMinor,
+          priceCurrency: { gt: cursor.priceCurrency },
+        },
+        {
+          priceMinor: cursor.priceMinor,
+          priceCurrency: cursor.priceCurrency,
+          id: { gt: cursor.id },
+        },
+      ],
+    };
+  }
+  if (sort === "price_desc" && cursor.sort === "price_desc") {
+    return {
+      OR: [
+        { priceMinor: { lt: cursor.priceMinor } },
+        {
+          priceMinor: cursor.priceMinor,
+          priceCurrency: { lt: cursor.priceCurrency },
+        },
+        {
+          priceMinor: cursor.priceMinor,
+          priceCurrency: cursor.priceCurrency,
+          id: { lt: cursor.id },
+        },
+      ],
+    };
+  }
+  if (sort === "deals_desc" && cursor.sort === "deals_desc") {
+    if (cursor.previousPriceMinor == null) {
+      return {
+        previousPriceMinor: null,
+        OR: [
+          { priceMinor: { gt: cursor.priceMinor } },
+          { priceMinor: cursor.priceMinor, id: { gt: cursor.id } },
+        ],
+      };
+    }
+    return {
+      OR: [
+        { previousPriceMinor: { lt: cursor.previousPriceMinor } },
+        {
+          previousPriceMinor: cursor.previousPriceMinor,
+          priceMinor: { gt: cursor.priceMinor },
+        },
+        {
+          previousPriceMinor: cursor.previousPriceMinor,
+          priceMinor: cursor.priceMinor,
+          id: { gt: cursor.id },
+        },
+        { previousPriceMinor: null },
+      ],
+    };
+  }
+  if (sort === "listed_desc" && cursor.sort === "listed_desc") {
+    const at = new Date(cursor.at);
+    if (!cursor.id) return { createdAt: { lt: at } };
+    return {
+      OR: [{ createdAt: { lt: at } }, { createdAt: at, id: { lt: cursor.id } }],
+    };
+  }
+  return {};
 }
 
 const listQuerySchema = z.object({
   mediaType: z.enum(MARKET_MEDIA_TYPES).optional(),
   q: z.string().max(128).optional(),
   city: z.string().max(128).optional(),
+  country: z.string().max(2).optional(),
+  sort: z.string().optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(48).optional(),
 });
@@ -101,43 +275,45 @@ marketRouter.get("/listings", async (req, res) => {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
-  const { mediaType, q, city, cursor } = parsed.data;
+  const { mediaType, q, city, country, cursor } = parsed.data;
   const limit = parsed.data.limit ?? PAGE_SIZE;
+  const sort: MarketSortValue =
+    parsed.data.sort && isMarketSortValue(parsed.data.sort) ? parsed.data.sort : "listed_desc";
+  const order = effectiveMarketSort(sort);
 
-  const where: {
-    active: boolean;
-    mediaType?: string;
-    city?: string;
-    OR?: Array<{ title: { contains: string; mode: "insensitive" } } | { description: { contains: string; mode: "insensitive" } }>;
-    createdAt?: { lt: Date };
-  } = { active: true };
+  const filters: Prisma.MarketListingWhereInput = { active: true };
 
-  if (mediaType) where.mediaType = mediaType;
-  if (city && city.trim()) where.city = city.trim();
+  if (mediaType) filters.mediaType = mediaType;
+  const countryCode = country?.trim().toUpperCase().slice(0, 2);
+  if (countryCode && countryCode.length === 2) {
+    filters.country = countryCode;
+  } else if (city && city.trim()) {
+    filters.city = city.trim();
+  }
   if (q && q.trim()) {
     const term = q.trim();
-    where.OR = [
+    filters.OR = [
       { title: { contains: term, mode: "insensitive" } },
       { description: { contains: term, mode: "insensitive" } },
     ];
   }
-  if (cursor) {
-    const cursorDate = new Date(cursor);
-    if (!Number.isNaN(cursorDate.getTime())) {
-      where.createdAt = { lt: cursorDate };
-    }
-  }
+
+  const decodedCursor = decodeListingCursor(cursor, order);
+  const where: Prisma.MarketListingWhereInput = decodedCursor
+    ? { AND: [filters, listingCursorWhere(order, decodedCursor)] }
+    : filters;
 
   const rows = await prisma.marketListing.findMany({
     where,
     include: { user: { select: sellerSelect } },
-    orderBy: { createdAt: "desc" },
+    orderBy: listingOrderBy(order),
     take: limit + 1,
   });
 
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
-  const nextCursor = hasMore ? page[page.length - 1]?.createdAt.toISOString() ?? null : null;
+  const last = page[page.length - 1];
+  const nextCursor = hasMore && last ? encodeListingCursor(order, last) : null;
 
   const body: MarketListingsResponse = {
     data: page.map(serializeListing),
@@ -159,15 +335,30 @@ marketRouter.get("/listings/:id", async (req, res) => {
 });
 
 marketRouter.get("/locations", async (_req, res) => {
-  const rows = await prisma.marketListing.findMany({
-    where: { active: true },
-    select: { city: true, cityLabel: true },
-    distinct: ["city"],
-    orderBy: { cityLabel: "asc" },
-    take: 200,
-  });
+  const [cityRows, countryRows] = await Promise.all([
+    prisma.marketListing.findMany({
+      where: { active: true },
+      select: { city: true, cityLabel: true },
+      distinct: ["city"],
+      orderBy: { cityLabel: "asc" },
+      take: 200,
+    }),
+    prisma.marketListing.findMany({
+      where: { active: true, country: { not: null } },
+      select: { country: true },
+      distinct: ["country"],
+      orderBy: { country: "asc" },
+      take: 100,
+    }),
+  ]);
   res.json({
-    data: rows.map((r) => ({ city: r.city, label: r.cityLabel })),
+    data: {
+      cities: cityRows.map((r) => ({ city: r.city, label: r.cityLabel })),
+      countries: countryRows
+        .map((r) => r.country)
+        .filter((c): c is string => Boolean(c))
+        .map((country) => ({ country })),
+    },
   });
 });
 

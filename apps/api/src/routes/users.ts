@@ -20,6 +20,7 @@ import {
 } from "../lib/profileVisibility.js";
 import { attachBoardGameSessionHours } from "../lib/boardGameSessionHours.js";
 import { hoursFromCompletedLogForStats } from "../lib/completedLogHours.js";
+import { marketSellerSelect, serializeMarketListing } from "../lib/marketListing.js";
 
 /** Public (no auth) read-only profile and logs for sharing. */
 
@@ -152,6 +153,27 @@ async function requirePublicUser(identifier: string) {
   if (!visibility.showPublicProfile) return null;
   return { user, visibility, visibleMediaTypes: parseVisibleMediaTypes(user) };
 }
+
+/** GET /users/:identifier/market/listings — public active market listings for profile. */
+usersRouter.get("/:identifier/market/listings", async (req: Request<{ identifier: string }>, res: Response) => {
+  const { identifier } = req.params;
+  const ctx = await requirePublicUser(identifier);
+  if (!ctx) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (!ctx.visibility.showMarketListings) {
+    res.json({ data: [] });
+    return;
+  }
+  const rows = await prisma.marketListing.findMany({
+    where: { userId: ctx.user.id, active: true },
+    include: { user: { select: marketSellerSelect } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: 48,
+  });
+  res.json({ data: rows.map(serializeMarketListing) });
+});
 
 /** GET /users/:identifier/logs/stats?group=category|month|year - Public stats. No auth. */
 usersRouter.get("/:identifier/logs/stats", async (req: Request<{ identifier: string }>, res: Response) => {

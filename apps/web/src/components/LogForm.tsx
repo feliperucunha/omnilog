@@ -1217,17 +1217,18 @@ export function LogForm(props: LogFormProps) {
       {/* Confirm delete: in-app modal above the edit dialog */}
       <Dialog open={confirmDeleteOpen} onOpenChange={(open) => !open && setConfirmDeleteOpen(false)}>
         <DialogContent
+          variant="compact"
           className="z-[60] sm:max-w-sm"
           overlayClassName="z-[60]"
           onClose={() => setConfirmDeleteOpen(false)}
         >
-          <DialogHeader>
+          <DialogHeader className="text-left">
             <DialogTitle className="text-[var(--color-lightest)]">{t("common.delete")}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-[var(--color-light)]">
             {t("common.deleteLogConfirm")}
           </p>
-          <div className="flex gap-2 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="ghost"

@@ -27,6 +27,7 @@ export interface MoneyAmountInputProps {
   disabled?: boolean;
   t: (key: string, values?: Record<string, string>) => string;
   className?: string;
+  showOptionalHint?: boolean;
 }
 
 /**
@@ -41,6 +42,7 @@ export function MoneyAmountInput({
   disabled,
   t,
   className,
+  showOptionalHint = true,
 }: MoneyAmountInputProps) {
   const baseId = useId();
   const normalizedProp = normalizeCurrencyCode(currency);
@@ -148,12 +150,14 @@ export function MoneyAmountInput({
             "shadow-none ring-0 outline-none placeholder:text-[var(--color-light)]/65",
             "focus-visible:ring-0"
           )}
-          aria-describedby={`${baseId}-hint`}
+          aria-describedby={showOptionalHint ? `${baseId}-hint` : undefined}
         />
       </div>
-      <p id={`${baseId}-hint`} className="text-xs text-[var(--color-light)]">
-        {t("money.optionalHint")}
-      </p>
+      {showOptionalHint && (
+        <p id={`${baseId}-hint`} className="text-xs text-[var(--color-light)]">
+          {t("money.optionalHint")}
+        </p>
+      )}
     </div>
   );
 }

@@ -47,17 +47,18 @@ export function MarketDeleteListingConfirmDialog({
   return (
     <Dialog open={open} onOpenChange={(next) => !deleting && onOpenChange(next)}>
       <DialogContent
+        variant="compact"
         className="z-[60] sm:max-w-sm"
         overlayClassName="z-[60]"
         onClose={() => !deleting && onOpenChange(false)}
       >
-        <DialogHeader>
+        <DialogHeader className="text-left">
           <DialogTitle className="text-[var(--color-lightest)]">
             {t("market.deleteListing")}
           </DialogTitle>
         </DialogHeader>
         <p className="text-sm text-[var(--color-light)]">{t("market.deleteListingConfirm")}</p>
-        <div className="flex gap-2 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button
             type="button"
             variant="ghost"

@@ -1,4 +1,4 @@
-import type { MediaType } from "./types.js";
+import type { SearchSortOption } from "./types.js";
 
 export const MARKET_MEDIA_TYPES = ["boardgames", "books", "manga", "comics"] as const;
 
@@ -6,6 +6,38 @@ export type MarketMediaType = (typeof MARKET_MEDIA_TYPES)[number];
 
 export function isMarketMediaType(value: string): value is MarketMediaType {
   return (MARKET_MEDIA_TYPES as readonly string[]).includes(value);
+}
+
+export const MARKET_SORT_VALUES = [
+  "relevance",
+  "listed_desc",
+  "listed_asc",
+  "price_asc",
+  "price_desc",
+  "deals_desc",
+  "title_asc",
+  "title_desc",
+  "updated_desc",
+] as const;
+
+export type MarketSortValue = (typeof MARKET_SORT_VALUES)[number];
+
+export const MARKET_SORT_OPTIONS: readonly SearchSortOption[] = [
+  { value: "relevance", labelKey: "searchSort.relevance" },
+  { value: "listed_desc", labelKey: "marketSort.listedNewest" },
+  { value: "listed_asc", labelKey: "marketSort.listedOldest" },
+  { value: "price_asc", labelKey: "marketSort.priceLowest" },
+  { value: "price_desc", labelKey: "marketSort.priceHighest" },
+  { value: "deals_desc", labelKey: "marketSort.deals" },
+  { value: "title_asc", labelKey: "searchSort.titleAsc" },
+  { value: "title_desc", labelKey: "searchSort.titleDesc" },
+  { value: "updated_desc", labelKey: "marketSort.recentlyUpdated" },
+];
+
+export const DEFAULT_MARKET_SORT: MarketSortValue = "listed_desc";
+
+export function isMarketSortValue(value: string): value is MarketSortValue {
+  return (MARKET_SORT_VALUES as readonly string[]).includes(value);
 }
 
 export type MarketListing = {
@@ -64,6 +96,23 @@ export type CitySuggestion = {
   city: string;
   country: string | null;
   countryCode: string | null;
+};
+
+export type CountrySuggestion = {
+  id: string;
+  label: string;
+  country: string;
+};
+
+export type MarketLocationFilter =
+  | { type: "city"; city: string; label: string }
+  | { type: "country"; country: string; label: string };
+
+export type MarketLocationsResponse = {
+  data: {
+    cities: { city: string; label: string }[];
+    countries: { country: string }[];
+  };
 };
 
 export type MyMarketListedLogIdsResponse = {

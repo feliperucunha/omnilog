@@ -7,14 +7,26 @@ import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import {
   MARKET_MEDIA_TYPES,
+  MARKET_SORT_OPTIONS,
+  DEFAULT_MARKET_SORT,
+  isMarketSortValue,
   type MarketListing,
+  type MarketLocationFilter,
+  type MarketLocationsResponse,
   type MarketMediaType,
   type MarketListingsResponse,
+  type MarketSortValue,
 } from "@geeklogs/shared";
 import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { MarketListingCard } from "@/components/MarketListingCard";
 import { MarketListingDrawer } from "@/components/MarketListingDrawer";
+import {
+  MarketLocationCombobox,
+  buildPresetCountries,
+  enrichMarketLocationLabel,
+  parseMarketLocationFromUrl,
+} from "@/components/MarketLocationCombobox";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useMe } from "@/contexts/MeContext";
@@ -26,10 +38,6 @@ import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentPro
 import { paperShadow } from "@/lib/paperShadow";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
-
-const ALL_LOCATIONS = "";
-
-type LocationOption = { city: string; label: string };
 
 export function Market() {
   const { t, locale } = useLocale();
@@ -43,10 +51,15 @@ export function Market() {
     MARKET_MEDIA_TYPES.includes(initialCategory) ? initialCategory : "boardgames"
   );
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
-  const [locationCity, setLocationCity] = useState(
-    searchParams.get("city") ?? me?.city ?? ALL_LOCATIONS
+  const initialSort = searchParams.get("sort");
+  const [sortBy, setSortBy] = useState<MarketSortValue>(
+    initialSort && isMarketSortValue(initialSort) ? initialSort : DEFAULT_MARKET_SORT
   );
-  const [locationOptions, setLocationOptions] = useState<LocationOption[]>([]);
+  const [locationFilter, setLocationFilter] = useState<MarketLocationFilter | null>(() =>
+    parseMarketLocationFromUrl(searchParams, me)
+  );
+  const [presetCities, setPresetCities] = useState<{ city: string; label: string }[]>([]);
+  const [presetCountryCodes, setPresetCountryCodes] = useState<{ country: string }[]>([]);
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +67,9 @@ export function Market() {
   const [drawerListing, setDrawerListing] = useState<MarketListing | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const locationInitialized = useRef(false);
+  const skipSortResetOnCategoryChange = useRef(
+    Boolean(initialSort && isMarketSortValue(initialSort))
+  );
 
   useEffect(() => {
     setPageTitle?.(t("market.title"));
@@ -62,17 +78,47 @@ export function Market() {
 
   useEffect(() => {
     if (locationInitialized.current || !me?.city) return;
-    if (!searchParams.get("city")) {
-      setLocationCity(me.city);
+    if (!searchParams.get("city") && !searchParams.get("country")) {
+      setLocationFilter({ type: "city", city: me.city, label: me.cityLabel ?? me.city });
     }
     locationInitialized.current = true;
-  }, [me?.city, searchParams]);
+  }, [me?.city, me?.cityLabel, searchParams]);
 
   useEffect(() => {
-    void apiFetch<{ data: LocationOption[] }>("/market/locations")
-      .then((res) => setLocationOptions(res.data ?? []))
-      .catch(() => setLocationOptions([]));
+    void apiFetch<MarketLocationsResponse>("/market/locations")
+      .then((res) => {
+        setPresetCities(res.data?.cities ?? []);
+        setPresetCountryCodes(res.data?.countries ?? []);
+      })
+      .catch(() => {
+        setPresetCities([]);
+        setPresetCountryCodes([]);
+      });
   }, []);
+
+  const comboboxCities = useMemo(() => {
+    const seen = new Set<string>();
+    const rows: { city: string; label: string }[] = [];
+    if (me?.city && me.cityLabel && !seen.has(me.city)) {
+      rows.push({ city: me.city, label: me.cityLabel });
+      seen.add(me.city);
+    }
+    for (const city of presetCities) {
+      if (seen.has(city.city)) continue;
+      seen.add(city.city);
+      rows.push(city);
+    }
+    return rows;
+  }, [presetCities, me?.city, me?.cityLabel]);
+
+  const comboboxCountries = useMemo(
+    () => buildPresetCountries(presetCountryCodes, locale),
+    [presetCountryCodes, locale]
+  );
+
+  useEffect(() => {
+    setLocationFilter((prev) => enrichMarketLocationLabel(prev, locale, comboboxCities));
+  }, [locale, comboboxCities]);
 
   const fetchListings = useCallback(
     async (opts: { append?: boolean; cursor?: string | null } = {}) => {
@@ -84,7 +130,12 @@ export function Market() {
         params.set("mediaType", category);
         params.set("limit", "24");
         if (query.trim()) params.set("q", query.trim());
-        if (locationCity) params.set("city", locationCity);
+        if (locationFilter?.type === "country") {
+          params.set("country", locationFilter.country);
+        } else if (locationFilter?.type === "city") {
+          params.set("city", locationFilter.city);
+        }
+        if (sortBy !== DEFAULT_MARKET_SORT) params.set("sort", sortBy);
         if (cursor) params.set("cursor", cursor);
         const res = await apiFetch<MarketListingsResponse>(
           `/market/listings?${params.toString()}`
@@ -99,8 +150,16 @@ export function Market() {
         setLoadingMore(false);
       }
     },
-    [category, query, locationCity, t]
+    [category, query, locationFilter, sortBy, t]
   );
+
+  useEffect(() => {
+    if (skipSortResetOnCategoryChange.current) {
+      skipSortResetOnCategoryChange.current = false;
+      return;
+    }
+    setSortBy(DEFAULT_MARKET_SORT);
+  }, [category]);
 
   useEffect(() => {
     void fetchListings();
@@ -110,26 +169,14 @@ export function Market() {
     const params = new URLSearchParams();
     params.set("category", category);
     if (query.trim()) params.set("q", query.trim());
-    if (locationCity) params.set("city", locationCity);
+    if (locationFilter?.type === "country") {
+      params.set("country", locationFilter.country);
+    } else if (locationFilter?.type === "city") {
+      params.set("city", locationFilter.city);
+    }
+    if (sortBy !== DEFAULT_MARKET_SORT) params.set("sort", sortBy);
     setSearchParams(params, { replace: true });
-  }, [category, query, locationCity, setSearchParams]);
-
-  const locationSelectOptions = useMemo(() => {
-    const opts: { value: string; label: string }[] = [
-      { value: ALL_LOCATIONS, label: t("market.allLocations") },
-    ];
-    const seen = new Set<string>();
-    if (me?.city && me.cityLabel) {
-      opts.push({ value: me.city, label: me.cityLabel });
-      seen.add(me.city);
-    }
-    for (const loc of locationOptions) {
-      if (seen.has(loc.city)) continue;
-      seen.add(loc.city);
-      opts.push({ value: loc.city, label: loc.label });
-    }
-    return opts;
-  }, [locationOptions, me?.city, me?.cityLabel, t]);
+  }, [category, query, locationFilter, sortBy, setSearchParams]);
 
   useEffect(() => {
     setBelowNavbar?.(
@@ -162,7 +209,7 @@ export function Market() {
         className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
         style={paperShadow}
       >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-3">
           <div className="min-w-0 flex-1">
             <UnifiedSearchBar
               value={query}
@@ -176,13 +223,30 @@ export function Market() {
               disableSubmitWhenEmpty={false}
             />
           </div>
-          <div className="min-w-0 w-full sm:w-48">
-            <Select
-              value={locationCity}
-              onValueChange={setLocationCity}
-              options={locationSelectOptions}
+          <div className="min-w-0 w-full shrink-0 sm:w-56">
+            <MarketLocationCombobox
+              value={locationFilter}
+              onChange={setLocationFilter}
+              presetCities={comboboxCities}
+              presetCountries={comboboxCountries}
               placeholder={t("market.location")}
-              aria-label={t("market.location")}
+              allLocationsLabel={t("market.allLocations")}
+              countriesSectionLabel={t("market.locationCountries")}
+              citiesSectionLabel={t("market.locationCities")}
+              ariaLabel={t("market.location")}
+            />
+          </div>
+          <div className="min-w-0 w-full shrink-0 sm:w-52">
+            <Select
+              value={sortBy}
+              onValueChange={(v) => setSortBy(v as MarketSortValue)}
+              options={MARKET_SORT_OPTIONS.map((opt) => ({
+                value: opt.value,
+                label: t(opt.labelKey),
+              }))}
+              className="min-w-0 w-full"
+              triggerClassName="h-11 min-h-11 max-h-11 max-md:min-h-[44px] md:h-11 md:min-h-11 md:max-h-11 min-w-0 w-full max-w-none"
+              aria-label={t("search.sortBy")}
             />
           </div>
         </div>

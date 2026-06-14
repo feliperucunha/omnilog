@@ -211,10 +211,11 @@ export function BoardGameCollectionImportPanel({
     <div className={cn("flex flex-col gap-3", isOnboarding && "gap-2.5", className)}>
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent
+          variant="compact"
           onClose={() => setConfirmOpen(false)}
           className="max-w-[min(100%,22rem)] border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
         >
-          <DialogHeader>
+          <DialogHeader className="text-left">
             <DialogTitle className="text-base text-[var(--color-lightest)]">{confirmTitle}</DialogTitle>
           </DialogHeader>
           <p className="text-sm leading-relaxed text-[var(--color-light)]">{confirmBody}</p>

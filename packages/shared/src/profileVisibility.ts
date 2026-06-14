@@ -20,6 +20,8 @@ export interface ProfileVisibility {
   showTvMetadata: boolean;
   /** Page count (books), player counts (board games). */
   showEnrichmentDetails: boolean;
+  /** Active market listings on the public profile. */
+  showMarketListings: boolean;
 }
 
 export const DEFAULT_PROFILE_VISIBILITY: ProfileVisibility = {
@@ -37,6 +39,7 @@ export const DEFAULT_PROFILE_VISIBILITY: ProfileVisibility = {
   showCollectionTags: true,
   showTvMetadata: true,
   showEnrichmentDetails: true,
+  showMarketListings: true,
 };
 
 const VISIBILITY_KEYS = Object.keys(DEFAULT_PROFILE_VISIBILITY) as (keyof ProfileVisibility)[];

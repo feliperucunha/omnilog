@@ -34,9 +34,19 @@ const DialogContent = React.forwardRef<
     overlayClassName?: string;
     /** When false, outside clicks / overlay won't call onClose (use while a nested dialog is open). */
     closeOnInteractOutside?: boolean;
+    /** Fullscreen on mobile (default) or centered card at all breakpoints (confirmations). */
+    variant?: "fullscreen" | "compact";
   }
 >(function DialogContent(
-  { className, children, onClose, overlayClassName, closeOnInteractOutside = true, ...props },
+  {
+    className,
+    children,
+    onClose,
+    overlayClassName,
+    closeOnInteractOutside = true,
+    variant = "fullscreen",
+    ...props
+  },
   ref
 ) {
   const { t } = useLocale();
@@ -57,11 +67,16 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={mergedRef}
       className={cn(
-        "fixed inset-0 z-50 grid w-full h-full min-h-[100dvh] max-h-[100dvh] translate-x-0 translate-y-0 gap-4 overflow-auto rounded-none border-0 bg-[var(--color-dark)] p-6 shadow-[var(--shadow-modal)] duration-200",
-        "max-md:pt-[max(1.5rem,env(safe-area-inset-top))] max-md:pb-[max(1.5rem,env(safe-area-inset-bottom))] max-md:pl-[max(1rem,env(safe-area-inset-left))] max-md:pr-[max(1rem,env(safe-area-inset-right))]",
-        "max-md:place-items-center max-md:content-center max-md:w-full",
+        "fixed z-50 grid gap-4 bg-[var(--color-dark)] shadow-[var(--shadow-modal)] duration-200",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-        "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:translate-x-[-50%] sm:translate-y-[-50%] sm:h-auto sm:min-h-0 sm:max-h-[90vh] sm:max-w-lg sm:rounded-lg sm:border sm:border-[var(--color-surface-border)] sm:place-items-stretch sm:content-normal",
+        variant === "compact"
+          ? "left-1/2 top-1/2 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 h-auto min-h-0 max-h-[min(90dvh,calc(100dvh-2rem))] overflow-auto rounded-lg border border-[var(--color-surface-border)] p-6"
+          : [
+              "inset-0 w-full h-full min-h-[100dvh] max-h-[100dvh] translate-x-0 translate-y-0 overflow-auto rounded-none border-0 p-6",
+              "max-md:pt-[max(1.5rem,env(safe-area-inset-top))] max-md:pb-[max(1.5rem,env(safe-area-inset-bottom))] max-md:pl-[max(1rem,env(safe-area-inset-left))] max-md:pr-[max(1rem,env(safe-area-inset-right))]",
+              "max-md:place-items-center max-md:content-center max-md:w-full",
+              "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:translate-x-[-50%] sm:translate-y-[-50%] sm:h-auto sm:min-h-0 sm:max-h-[90vh] sm:max-w-lg sm:rounded-lg sm:border sm:border-[var(--color-surface-border)] sm:place-items-stretch sm:content-normal",
+            ],
         className
       )}
       onEscapeKeyDown={closeOnInteractOutside ? onClose : (e) => e.preventDefault()}
@@ -91,7 +106,7 @@ const DialogContent = React.forwardRef<
           className={cn(
             "absolute right-3 top-3 z-10 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--color-light)] transition-colors",
             "hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]",
-            "hidden sm:inline-flex"
+            variant === "compact" ? "inline-flex" : "hidden sm:inline-flex"
           )}
           aria-label={t("common.close")}
         >

@@ -79,11 +79,19 @@ export {
 export type { OnboardingSpotlightId } from "./onboardingSpotlights.js";
 export {
   MARKET_MEDIA_TYPES,
+  MARKET_SORT_OPTIONS,
+  MARKET_SORT_VALUES,
+  DEFAULT_MARKET_SORT,
   isMarketMediaType,
+  isMarketSortValue,
   type MarketMediaType,
+  type MarketSortValue,
   type MarketListing,
   type MarketListingsResponse,
   type CreateMarketListingInput,
   type CitySuggestion,
+  type CountrySuggestion,
+  type MarketLocationFilter,
+  type MarketLocationsResponse,
   type MyMarketListedLogIdsResponse,
 } from "./market.js";

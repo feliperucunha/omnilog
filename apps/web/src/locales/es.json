@@ -104,6 +104,8 @@
     "searchPlaceholder": "Buscar anuncios…",
     "location": "Ubicación",
     "allLocations": "Todas las ubicaciones",
+    "locationCountries": "Países",
+    "locationCities": "Ciudades",
     "seller": "Vendedor",
     "listedOn": "Publicado el",
     "description": "Descripción",
@@ -136,6 +138,14 @@
     "deleteListing": "Eliminar anuncio",
     "deleteListingConfirm": "¿Seguro que quieres quitar este anuncio del Mercado?",
     "listingDeleted": "Anuncio eliminado"
+  },
+  "marketSort": {
+    "listedNewest": "Fecha de publicación (más reciente)",
+    "listedOldest": "Fecha de publicación (más antigua)",
+    "priceLowest": "Precio (menor a mayor)",
+    "priceHighest": "Precio (mayor a menor)",
+    "deals": "Ofertas primero",
+    "recentlyUpdated": "Actualizados recientemente"
   },
   "forgotPassword": {
     "title": "Restablecer contraseña",
@@ -255,6 +265,8 @@
     "profileVisibilityShowCollectionTags": "Tengo, quiero comprar, partidas jugadas",
     "profileVisibilityShowTvMetadata": "Cadenas y estado de la serie",
     "profileVisibilityShowEnrichmentDetails": "Páginas, número de jugadores",
+    "profileVisibilitySectionMarket": "Mercado",
+    "profileVisibilityShowMarketListings": "Anuncios en el mercado",
     "appNavigationTitle": "Categorías y pestañas",
     "appNavigationProOnlyIntro": "Muestra u oculta categorías en la barra lateral y en la búsqueda, y arrastra para reordenar. Pasa a Pro para personalizar.",
     "publicProfileUpgrade": "Ver planes",
@@ -373,7 +385,8 @@
   "publicProfile": {
     "title": "Perfil público",
     "titleWithName": "Log de {{name}}",
-    "pinnedHighlights": "Destacados ({{count}})"
+    "pinnedHighlights": "Destacados ({{count}})",
+    "marketSection": "En venta"
   },
   "social": {
     "follow": "Seguir",

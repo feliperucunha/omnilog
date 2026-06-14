@@ -757,19 +757,20 @@ export const BoardGameMatchesSection = forwardRef<
         }}
       >
         <DialogContent
+          variant="compact"
           className="z-[60] sm:max-w-sm"
           overlayClassName="z-[60]"
           onClose={() => {
             if (!deletingId) setDeleteConfirmMatchId(null);
           }}
         >
-          <DialogHeader>
+          <DialogHeader className="text-left">
             <DialogTitle className="text-[var(--color-lightest)]">
               {t("boardGameMatches.removeSession")}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-[var(--color-light)]">{t("boardGameMatches.deleteConfirm")}</p>
-          <div className="flex gap-2 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="ghost"

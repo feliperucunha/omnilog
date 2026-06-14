@@ -104,6 +104,8 @@
     "searchPlaceholder": "Search listings…",
     "location": "Location",
     "allLocations": "All locations",
+    "locationCountries": "Countries",
+    "locationCities": "Cities",
     "seller": "Seller",
     "listedOn": "Listed on",
     "description": "Description",
@@ -136,6 +138,14 @@
     "deleteListing": "Delete listing",
     "deleteListingConfirm": "Are you sure you want to remove this listing from the Market?",
     "listingDeleted": "Listing removed"
+  },
+  "marketSort": {
+    "listedNewest": "Date listed (newest)",
+    "listedOldest": "Date listed (oldest)",
+    "priceLowest": "Price (low to high)",
+    "priceHighest": "Price (high to low)",
+    "deals": "Deals first",
+    "recentlyUpdated": "Recently updated"
   },
   "forgotPassword": {
     "title": "Reset password",
@@ -276,6 +286,8 @@
     "profileVisibilityShowCollectionTags": "Own, want to buy, matches played",
     "profileVisibilityShowTvMetadata": "TV networks and show status",
     "profileVisibilityShowEnrichmentDetails": "Page count, player counts",
+    "profileVisibilitySectionMarket": "Market",
+    "profileVisibilityShowMarketListings": "Market listings",
     "appNavigationTitle": "Categories & tabs",
     "appNavigationProOnlyIntro": "Show or hide media categories in the sidebar and search, and drag to reorder them. Upgrade to Pro to customize.",
     "publicProfileUpgrade": "View plans",
@@ -394,7 +406,8 @@
   "publicProfile": {
     "title": "Public profile",
     "titleWithName": "{{name}}'s log",
-    "pinnedHighlights": "Highlights ({{count}})"
+    "pinnedHighlights": "Highlights ({{count}})",
+    "marketSection": "For sale"
   },
   "social": {
     "follow": "Follow",

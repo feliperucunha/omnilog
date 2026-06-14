@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { upstreamFetch } from "../lib/upstreamFetch.js";
-import type { CitySuggestion } from "@geeklogs/shared";
+import type { CitySuggestion, CountrySuggestion } from "@geeklogs/shared";
 
 export const geocodeRouter = Router();
 
@@ -88,5 +88,69 @@ geocodeRouter.get("/cities", async (req, res) => {
     res.json({ data });
   } catch {
     res.status(502).json({ error: "City search unavailable" });
+  }
+});
+
+const countriesQuerySchema = z.object({
+  q: z.string().min(2).max(128).trim(),
+});
+
+type NominatimCountryPlace = {
+  place_id: number;
+  display_name: string;
+  address?: {
+    country?: string;
+    country_code?: string;
+  };
+};
+
+function placeToCountrySuggestion(place: NominatimCountryPlace): CountrySuggestion | null {
+  const code = place.address?.country_code?.trim().toUpperCase();
+  const name = place.address?.country?.trim();
+  if (!code || code.length !== 2) return null;
+  return {
+    id: String(place.place_id),
+    label: name ?? code,
+    country: code,
+  };
+}
+
+geocodeRouter.get("/countries", async (req, res) => {
+  const parsed = countriesQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const q = parsed.data.q;
+  const url = new URL(`${NOMINATIM_BASE}/search`);
+  url.searchParams.set("q", q);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("limit", "6");
+  url.searchParams.set("featuretype", "country");
+
+  try {
+    const response = await upstreamFetch(url.toString(), {
+      provider: "default",
+      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+      retry: false,
+    });
+    if (!response.ok) {
+      res.status(502).json({ error: "Country search unavailable" });
+      return;
+    }
+    const raw = (await response.json()) as NominatimCountryPlace[];
+    const seen = new Set<string>();
+    const data: CountrySuggestion[] = [];
+    for (const place of raw) {
+      const suggestion = placeToCountrySuggestion(place);
+      if (!suggestion) continue;
+      if (seen.has(suggestion.country)) continue;
+      seen.add(suggestion.country);
+      data.push(suggestion);
+    }
+    res.json({ data });
+  } catch {
+    res.status(502).json({ error: "Country search unavailable" });
   }
 });
