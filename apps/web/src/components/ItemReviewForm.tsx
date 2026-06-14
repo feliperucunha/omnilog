@@ -33,6 +33,7 @@ import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/
 import {
   mediaTypeHasBoardGameOnlyFields,
   mediaTypeHasCollectionOwnership,
+  mediaTypeHasMarketTab,
   mediaTypeHasPurchaseAmount,
   spendFieldsIncludePurchase,
 } from "@/lib/mediaTypeFeatures";
@@ -50,6 +51,7 @@ import {
 } from "@/components/TvGranularReviewSection";
 import { GameLogFields } from "@/components/GameLogFields";
 import { ReadingProgressFields } from "@/components/ReadingProgressFields";
+import { MarketListingSection } from "@/components/MarketListingSection";
 import { dateInputToIso, isoToDateInput } from "@/lib/readingDates";
 import { cn } from "@/lib/utils";
 
@@ -143,7 +145,7 @@ export function ItemReviewForm({
   const [saleCurrency, setSaleCurrency] = useState(DEFAULT_PURCHASE_CURRENCY);
   const [saleAmountMinor, setSaleAmountMinor] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
-  const [boardMainTab, setBoardMainTab] = useState<"review" | "matches">("review");
+  const [itemMainTab, setItemMainTab] = useState<"review" | "matches" | "market">("review");
   const [searchParams] = useSearchParams();
   const boardMatchesRef = useRef<BoardGameMatchesSectionHandle>(null);
   const tvGranular = mediaType === "tv";
@@ -182,6 +184,7 @@ export function ItemReviewForm({
   const showGameLogFields = HAS_GAME_LOG_FIELDS.includes(mediaType);
   const showHoursToBeat = mediaType === "games";
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
+  const showMarketTab = mediaTypeHasMarketTab(mediaType);
   const showPurchaseAmount = mediaTypeHasPurchaseAmount(mediaType);
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
   /** Purchase when owned or sold (cost + sale for net balance). */
@@ -280,16 +283,20 @@ export function ItemReviewForm({
   }, [myLog?.id, tvGranular]);
 
   useEffect(() => {
+    if (searchParams.get("market") === "1" && showMarketTab) {
+      setItemMainTab("market");
+      return;
+    }
     if (!showBoardGameFields) {
-      setBoardMainTab("review");
+      setItemMainTab("review");
       return;
     }
     if (!myLog) {
-      setBoardMainTab("review");
+      setItemMainTab("review");
       return;
     }
-    setBoardMainTab(searchParams.get("matches") === "1" ? "matches" : "review");
-  }, [myLog?.id, showBoardGameFields, searchParams]);
+    setItemMainTab(searchParams.get("matches") === "1" ? "matches" : "review");
+  }, [myLog?.id, showBoardGameFields, showMarketTab, searchParams]);
 
   useEffect(() => {
     if (!myLog || !showBoardGameFields) return;
@@ -341,6 +348,32 @@ export function ItemReviewForm({
     episode,
   ]);
 
+  const ensureMarketLog = useCallback(async (): Promise<Log | null> => {
+    if (myLog) return myLog;
+    const created = await apiFetch<Log>("/logs", {
+      method: "POST",
+      body: JSON.stringify({
+        mediaType,
+        externalId,
+        title,
+        image: image ?? null,
+        grade: null,
+        review: null,
+        status: null,
+        own: true,
+        wantToBuy: false,
+        sold: false,
+      }),
+    });
+    setMyLog(created);
+    setOwn(true);
+    setWantToBuy(false);
+    setSold(false);
+    invalidateLogsAndItemsCache();
+    onSaved();
+    return created;
+  }, [myLog, mediaType, externalId, title, image, onSaved]);
+
   const ensureBoardGameLog = useCallback(async (): Promise<string> => {
     if (myLog?.id) return myLog.id;
     const genreList = (genres ?? []).slice(0, 20);
@@ -357,10 +390,7 @@ export function ItemReviewForm({
     };
     if (genreList.length > 0) createBody.genres = genreList;
     if (mechanicList.length > 0) createBody.mechanics = mechanicList;
-    if (
-      affinityContextDraft != null &&
-      Object.keys(affinityContextDraft).length > 0
-    ) {
+    if (affinityContextDraft != null && Object.keys(affinityContextDraft).length > 0) {
       createBody.affinityContext = affinityContextDraft;
     }
     const provider = meRef.current?.boardGameProvider;
@@ -634,7 +664,7 @@ export function ItemReviewForm({
       }
       return;
     }
-    if (showBoardGameFields && boardMainTab === "matches") {
+    if (showBoardGameFields && itemMainTab === "matches") {
       setSaving(true);
       try {
         await boardMatchesRef.current?.saveNewMatch();
@@ -643,12 +673,13 @@ export function ItemReviewForm({
       }
       return;
     }
+    if (itemMainTab === "market") return;
     await handleSubmit(e);
   };
 
   const saveButtonLabel = saving
     ? t("common.saving")
-    : showBoardGameFields && boardMainTab === "matches"
+    : showBoardGameFields && itemMainTab === "matches"
       ? t("boardGameMatches.saveMatch")
       : myLog
         ? t("common.update")
@@ -718,35 +749,63 @@ export function ItemReviewForm({
             ))}
           </motion.div>
         )}
-        {showBoardGameFields && (
+        {(showBoardGameFields || showMarketTab) && (
           <motion.div className="mb-3 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
             <button
               type="button"
-              onClick={() => setBoardMainTab("review")}
+              onClick={() => setItemMainTab("review")}
               className={cn(
                 "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                boardMainTab === "review"
+                itemMainTab === "review"
                   ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
                   : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
               )}
             >
               {t("boardGameMatches.tabReview")}
             </button>
-            <button
-              type="button"
-              onClick={() => setBoardMainTab("matches")}
-              className={cn(
-                "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                boardMainTab === "matches"
-                  ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
-                  : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-              )}
-            >
-              {t("boardGameMatches.tabMatches")}
-            </button>
+            {showBoardGameFields && (
+              <button
+                type="button"
+                onClick={() => setItemMainTab("matches")}
+                className={cn(
+                  "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  itemMainTab === "matches"
+                    ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+                    : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+                )}
+              >
+                {t("boardGameMatches.tabMatches")}
+              </button>
+            )}
+            {showMarketTab && (
+              <button
+                type="button"
+                onClick={() => setItemMainTab("market")}
+                className={cn(
+                  "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  itemMainTab === "market"
+                    ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+                    : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+                )}
+              >
+                {t("market.tabList")}
+              </button>
+            )}
           </motion.div>
         )}
-        {showBoardGameFields && boardMainTab === "matches" ? (
+        {showMarketTab && (
+          <div className={cn(itemMainTab !== "market" && "hidden")} aria-hidden={itemMainTab !== "market"}>
+            <MarketListingSection
+              mediaType={mediaType}
+              externalId={externalId}
+              title={title}
+              image={image}
+              myLog={myLog}
+              onEnsureLog={ensureMarketLog}
+            />
+          </div>
+        )}
+        {showBoardGameFields && itemMainTab === "matches" ? (
           <BoardGameMatchesSection
             ref={boardMatchesRef}
             embedded
@@ -759,7 +818,7 @@ export function ItemReviewForm({
             }}
             onMatchSaved={() => onSaved()}
           />
-        ) : (
+        ) : itemMainTab !== "market" ? (
         <>
           {tvGranular && (
             <div className={tvReviewTab === "show" ? "hidden" : undefined} aria-hidden={tvReviewTab === "show"}>
@@ -1026,7 +1085,8 @@ export function ItemReviewForm({
           </motion.div>
         </form>
         </>
-        )}
+        ) : null}
+        {itemMainTab !== "market" && (
         <motion.div whileTap={tapScale} transition={tapTransition} className="mt-4">
           <Button
             type="button"
@@ -1037,6 +1097,7 @@ export function ItemReviewForm({
             {saveButtonLabel}
           </Button>
         </motion.div>
+        )}
       </Card>
     </motion.div>
   );

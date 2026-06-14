@@ -9,6 +9,8 @@ import { isRegisterNewUsersAsBetaEnabled } from "../lib/featureFlags.js";
 import { sanitizeEmail, sanitizeText } from "../lib/sanitize.js";
 import { sendPasswordResetEmail, sendWelcomeEmail } from "../lib/email.js";
 import { setAuthCookie, clearAuthCookie } from "../lib/authCookie.js";
+import { authMiddleware } from "../middleware/auth.js";
+import type { AuthenticatedRequest } from "../middleware/auth.js";
 import type { AuthResponse } from "@geeklogs/shared";
 
 export const authRouter = Router();
@@ -44,7 +46,15 @@ const registerSchema = z.object({
   username: usernameSchema,
   email: z.string().email().max(255).trim(),
   password: passwordSchema,
-  country: z.string().max(2).optional(), // ISO 3166-1 alpha-2 e.g. BR; empty or omit = rest of world
+  city: z.string().min(1).max(128).trim(),
+  cityLabel: z.string().min(1).max(256).trim(),
+  country: z.string().max(2).optional(),
+  phone: z.string().max(32).optional(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: passwordSchema,
 });
 
 const loginSchema = z.object({
@@ -86,8 +96,14 @@ authRouter.post("/register", async (req, res) => {
     return;
   }
   const hashed = await bcrypt.hash(password, 10);
-  const country = parsed.data.country && parsed.data.country.trim().length === 2
-    ? String(parsed.data.country).toUpperCase().slice(0, 2)
+  const city = sanitizeText(parsed.data.city, 128) ?? parsed.data.city.slice(0, 128);
+  const cityLabel = sanitizeText(parsed.data.cityLabel, 256) ?? parsed.data.cityLabel.slice(0, 256);
+  const country =
+    parsed.data.country && parsed.data.country.trim().length === 2
+      ? String(parsed.data.country).toUpperCase().slice(0, 2)
+      : null;
+  const phone = parsed.data.phone?.trim()
+    ? sanitizeText(parsed.data.phone.trim(), 32) ?? parsed.data.phone.trim().slice(0, 32)
     : null;
   const useBetaTier = await isRegisterNewUsersAsBetaEnabled();
   const user = await prisma.user.create({
@@ -95,10 +111,21 @@ authRouter.post("/register", async (req, res) => {
       username,
       email,
       password: hashed,
+      city,
+      cityLabel,
       ...(country && { country }),
+      ...(phone && { phone }),
       tier: useBetaTier ? "beta" : "free",
     },
-    select: { id: true, username: true, email: true, onboarded: true },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      onboarded: true,
+      city: true,
+      cityLabel: true,
+      phone: true,
+    },
   });
   const token = jwt.sign(
     { userId: user.id, email: user.email },
@@ -107,7 +134,15 @@ authRouter.post("/register", async (req, res) => {
   );
   const response: AuthResponse = {
     token,
-    user: { id: user.id, username: user.username ?? undefined, email: user.email, onboarded: user.onboarded },
+    user: {
+      id: user.id,
+      username: user.username ?? undefined,
+      email: user.email,
+      onboarded: user.onboarded,
+      city: user.city,
+      cityLabel: user.cityLabel,
+      phone: user.phone,
+    },
   };
   setAuthCookie(res, token);
   res.status(201).json(response);
@@ -160,6 +195,29 @@ authRouter.post("/login", async (req, res) => {
 authRouter.post("/logout", (_req, res) => {
   clearAuthCookie(res);
   res.json({ message: "Logged out" });
+});
+
+authRouter.post("/change-password", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const parsed = changePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { id: true, password: true },
+  });
+  if (!user || !(await bcrypt.compare(parsed.data.currentPassword, user.password))) {
+    res.status(401).json({ error: "Current password is incorrect" });
+    return;
+  }
+  const hashed = await bcrypt.hash(parsed.data.newPassword, 10);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { password: hashed },
+  });
+  res.json({ ok: true });
 });
 
 authRouter.post("/forgot-password", async (req, res) => {

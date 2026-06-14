@@ -26,6 +26,7 @@ const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/dashboard": "nav.dashboard",
   "/statistics": "nav.statistics",
   "/search": "nav.search",
+  "/market": "nav.market",
   "/settings": "nav.settings",
   "/about": "nav.about",
   "/tiers": "nav.plans",

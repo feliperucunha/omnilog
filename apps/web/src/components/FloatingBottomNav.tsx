@@ -10,6 +10,7 @@ import {
   LogIn,
   UserPlus,
   CreditCard,
+  Store,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +32,7 @@ const AUTH_ITEMS: NavItem[] = [
   { to: "/dashboard", labelKey: "nav.dashboard", icon: Home },
   { to: "/statistics", labelKey: "nav.statistics", icon: BarChart3 },
   { to: "/", labelKey: "nav.search", icon: Search },
+  { to: "/market", labelKey: "nav.market", icon: Store },
   { to: "/settings", labelKey: "nav.settings", icon: Settings },
 ];
 

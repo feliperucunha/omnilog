@@ -45,6 +45,7 @@ import {
 import { BoardGameProviderSelector } from "@/components/BoardGameProviderSelector";
 import { AnimeMangaTitleLanguageSelector } from "@/components/AnimeMangaTitleLanguageSelector";
 import { MediaCategoryDragList } from "@/components/MediaCategoryDragList";
+import { UserSettingsSection } from "@/components/UserSettingsSection";
 
 type KeysStatus = { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
 
@@ -120,6 +121,9 @@ export function Settings() {
   /** Order of categories: visible types first (this order), then hidden. Determines order on home and search. */
   const [orderedMediaTypes, setOrderedMediaTypes] = useState<MediaType[]>(() => [...MEDIA_TYPES]);
   const [searchParams] = useSearchParams();
+  const [settingsTab, setSettingsTab] = useState<"app" | "user">(() =>
+    searchParams.get("tab") === "user" ? "user" : "app"
+  );
   const [generalOpen, setGeneralOpen] = useState(true);
   const [profileVisibilityOpen, setProfileVisibilityOpen] = useState(true);
   const [navigationOpen, setNavigationOpen] = useState(true);
@@ -160,6 +164,7 @@ export function Settings() {
 
   useEffect(() => {
     if (searchParams.get("open") === "api-keys") setAdvancedOpen(true);
+    if (searchParams.get("tab") === "user") setSettingsTab("user");
   }, [searchParams]);
 
   useEffect(() => {
@@ -549,6 +554,39 @@ export function Settings() {
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
     >
       <div className="flex flex-col gap-8">
+        <div className="flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
+          <button
+            type="button"
+            onClick={() => setSettingsTab("app")}
+            className={cn(
+              "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              settingsTab === "app"
+                ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+                : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+            )}
+          >
+            {t("settings.tabApp")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettingsTab("user")}
+            className={cn(
+              "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              settingsTab === "user"
+                ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+                : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+            )}
+          >
+            {t("settings.tabUser")}
+          </button>
+        </div>
+
+        {settingsTab === "user" ? (
+          <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-md)]">
+            <UserSettingsSection />
+          </Card>
+        ) : (
+        <>
         <SettingsCollapsibleSection
           title={t("settings.general")}
           open={generalOpen}
@@ -1213,6 +1251,8 @@ export function Settings() {
                   </section>
                 </div>
           </SettingsCollapsibleSection>
+        )}
+        </>
         )}
       </div>
     </motion.div>

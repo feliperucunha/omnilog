@@ -15,13 +15,14 @@ import { apiFetch, ApiValidationError } from "@/lib/api";
 import type { AuthResponse } from "@geeklogs/shared";
 import { modalContentVariants } from "@/lib/animations";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
+import { CityAutocomplete, type CityValue } from "@/components/CityAutocomplete";
 import { cn } from "@/lib/utils";
 
 function isValidPassword(p: string): boolean {
   return p.length >= 8 && /[a-zA-Z]/.test(p) && /\d/.test(p);
 }
 
-type FieldErrors = Partial<Record<"username" | "email" | "password" | "confirmPassword" | "country", string>>;
+type FieldErrors = Partial<Record<"username" | "email" | "password" | "confirmPassword" | "city" | "phone", string>>;
 
 export function Register() {
   const { t } = useLocale();
@@ -29,7 +30,8 @@ export function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [country, setCountry] = useState("");
+  const [cityValue, setCityValue] = useState<CityValue | null>(null);
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const { login } = useAuth();
@@ -55,6 +57,7 @@ export function Register() {
     else if (password.length < 4) errors.password = t("validation.passwordMinLength");
     else if (!isValidPassword(password)) errors.password = t("validation.passwordLettersAndNumbers");
     if (password !== confirmPassword) errors.confirmPassword = t("register.passwordsDoNotMatch");
+    if (!cityValue) errors.city = t("register.cityRequired");
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       showErrorToast(t, "E001");
@@ -69,7 +72,10 @@ export function Register() {
           username: username.trim(),
           email: email.trim(),
           password,
-          ...(country.trim().length === 2 && { country: country.trim().toUpperCase() }),
+          city: cityValue!.city,
+          cityLabel: cityValue!.cityLabel,
+          ...(cityValue!.countryCode && { country: cityValue!.countryCode }),
+          ...(phone.trim() && { phone: phone.trim() }),
         }),
       });
       await login(data.token, { ...data.user, onboarded: data.user.onboarded ?? false });
@@ -156,24 +162,30 @@ export function Register() {
                     </p>
                   )}
                 </div>
+                <CityAutocomplete
+                  label={t("register.city")}
+                  value={cityValue}
+                  onChange={(v) => {
+                    setCityValue(v);
+                    clearFieldError("city");
+                  }}
+                  placeholder={t("register.cityPlaceholder")}
+                  required
+                  error={fieldErrors.city}
+                />
                 <div className="space-y-2">
-                  <Label>{t("register.country")}</Label>
-                  <select
-                    className={cn(
-                      "flex h-10 w-full rounded-md border bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] ring-offset-[var(--color-darkest)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] disabled:cursor-not-allowed disabled:opacity-50",
-                      fieldErrors.country ? "border-red-500 focus:ring-red-500" : "border-[var(--color-mid)] focus:ring-[var(--color-mid)]"
-                    )}
-                    value={country}
-                    onChange={(e) => { setCountry(e.target.value); clearFieldError("country"); }}
-                    aria-label={t("register.country")}
-                    aria-invalid={!!fieldErrors.country}
-                  >
-                    <option value="">{t("register.countryRestOfWorld")}</option>
-                    <option value="BR">{t("register.countryBrazil")}</option>
-                  </select>
-                  {fieldErrors.country && (
-                    <p className="text-xs text-red-500" role="alert">{fieldErrors.country}</p>
-                  )}
+                  <Label>{t("register.phone")}</Label>
+                  <Input
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder={t("register.phonePlaceholder")}
+                    value={phone}
+                    onChange={(e) => { setPhone(e.target.value); clearFieldError("phone"); }}
+                    aria-describedby="register-phone-hint"
+                  />
+                  <p id="register-phone-hint" className="text-xs text-[var(--color-light)]">
+                    {t("register.phoneHint")}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>{t("register.password")}</Label>

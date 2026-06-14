@@ -10,6 +10,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeSync } from "@/components/ThemeSync";
 import { LocaleSync } from "@/components/LocaleSync";
 import { MeProvider } from "@/contexts/MeContext";
+import { MyMarketListingsProvider } from "@/contexts/MyMarketListingsContext";
 import { VisibleMediaTypesProvider } from "@/contexts/VisibleMediaTypesContext";
 import { LogCompleteProvider } from "@/contexts/LogCompleteContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -40,6 +41,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <AuthProvider>
               <AppVersionProvider>
                 <MeProvider>
+                  <MyMarketListingsProvider>
                   <VisibleMediaTypesProvider>
                     <LogCompleteProvider>
                       <CapacitorAndroidIntegration />
@@ -54,6 +56,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       <AppVersionModal />
                     </LogCompleteProvider>
                   </VisibleMediaTypesProvider>
+                  </MyMarketListingsProvider>
                 </MeProvider>
               </AppVersionProvider>
               <Toaster

@@ -482,6 +482,11 @@ export interface UpdateLogInput {
 export interface AuthRegisterInput {
   email: string;
   password: string;
+  username?: string;
+  city?: string;
+  cityLabel?: string;
+  country?: string;
+  phone?: string;
 }
 
 export interface AuthLoginInput {
@@ -491,5 +496,13 @@ export interface AuthLoginInput {
 
 export interface AuthResponse {
   token: string;
-  user: { id: string; username?: string; email: string; onboarded: boolean };
+  user: {
+    id: string;
+    username?: string;
+    email: string;
+    onboarded: boolean;
+    city?: string | null;
+    cityLabel?: string | null;
+    phone?: string | null;
+  };
 }

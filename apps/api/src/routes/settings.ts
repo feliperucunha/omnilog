@@ -10,7 +10,7 @@ import {
 } from "@geeklogs/shared";
 import { getProfileVisibilityFromUser } from "../lib/profileVisibility.js";
 import { prisma } from "../lib/prisma.js";
-import { sanitizeApiKey } from "../lib/sanitize.js";
+import { sanitizeApiKey, sanitizeText } from "../lib/sanitize.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { setSelectedBadges } from "../services/gamification.service.js";
@@ -359,6 +359,47 @@ settingsRouter.put("/profile-visibility", async (req: AuthenticatedRequest, res)
     data: { profileVisibility: JSON.stringify(merged) },
   });
   res.json(merged);
+});
+
+const userProfileSchema = z.object({
+  city: z.string().min(1).max(128).trim(),
+  cityLabel: z.string().min(1).max(256).trim(),
+  country: z.string().max(2).optional(),
+  phone: z.string().max(32).optional(),
+});
+
+settingsRouter.put("/user-profile", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const parsed = userProfileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const city = sanitizeText(parsed.data.city, 128) ?? parsed.data.city.slice(0, 128);
+  const cityLabel = sanitizeText(parsed.data.cityLabel, 256) ?? parsed.data.cityLabel.slice(0, 256);
+  const country =
+    parsed.data.country && parsed.data.country.trim().length === 2
+      ? String(parsed.data.country).toUpperCase().slice(0, 2)
+      : null;
+  const phone = parsed.data.phone?.trim()
+    ? sanitizeText(parsed.data.phone.trim(), 32) ?? parsed.data.phone.trim().slice(0, 32)
+    : null;
+  const updated = await prisma.user.update({
+    where: { id: req.user.userId },
+    data: {
+      city,
+      cityLabel,
+      ...(country ? { country } : { country: null }),
+      phone,
+    },
+    select: {
+      city: true,
+      cityLabel: true,
+      country: true,
+      phone: true,
+    },
+  });
+  res.json(updated);
 });
 
 /** Complete onboarding: set theme, visible media types, and onboarded = true. */

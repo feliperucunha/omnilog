@@ -1,0 +1,2 @@
+ALTER TABLE "MarketListing" ADD COLUMN "localDelivery" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "MarketListing" ADD COLUMN "shipsByMail" BOOLEAN NOT NULL DEFAULT false;

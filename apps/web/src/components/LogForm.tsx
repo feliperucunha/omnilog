@@ -56,9 +56,11 @@ import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/
 import {
   mediaTypeHasBoardGameOnlyFields,
   mediaTypeHasCollectionOwnership,
+  mediaTypeHasMarketTab,
   mediaTypeHasPurchaseAmount,
   spendFieldsIncludePurchase,
 } from "@/lib/mediaTypeFeatures";
+import { MarketListingSection } from "@/components/MarketListingSection";
 import { DEFAULT_PURCHASE_CURRENCY, normalizeCurrencyCode } from "@/lib/currencies";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
@@ -83,8 +85,8 @@ interface LogFormEditProps {
   log: Log;
   /** TV/Anime: total episodes (set episode to this when user selects completed status). */
   episodesCount?: number | null;
-  /** Board games: open Matches tab first (e.g. list + button). */
-  initialBoardGameTab?: "review" | "matches";
+  /** Board games / market: open a specific tab first (e.g. matches from list +). */
+  initialBoardGameTab?: "review" | "matches" | "market";
   /** Board games: after a match is saved/deleted, parent should refresh `log` (e.g. matchesPlayed). */
   onLogRefreshed?: (log: Log) => void;
   /** Games: platform names from item detail (console picker suggestions). */
@@ -144,7 +146,7 @@ export function LogForm(props: LogFormProps) {
   const cancellingRef = useRef(false);
   const drawerRequestCloseRef = useRef<(() => void) | null>(null);
 
-  const [boardMainTab, setBoardMainTab] = useState<"review" | "matches">("review");
+  const [itemMainTab, setItemMainTab] = useState<"review" | "matches" | "market">("review");
   const tvGranular = mediaType === "tv";
   const [tvReviewTab, setTvReviewTab] = useState<ReviewScope>("show");
   const [scopedReviews, setScopedReviews] = useState<ScopedReview[]>([]);
@@ -160,6 +162,7 @@ export function LogForm(props: LogFormProps) {
   const platformOptions =
     isEdit && "platforms" in props ? (props.platforms ?? null) : null;
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
+  const showMarketTab = mediaTypeHasMarketTab(mediaType);
   const showCollectionOwnership = mediaTypeHasCollectionOwnership(mediaType);
   const showHoursToBeat = mediaType === "games";
   const showPurchaseAmount = mediaTypeHasPurchaseAmount(mediaType);
@@ -167,7 +170,7 @@ export function LogForm(props: LogFormProps) {
   const showPurchaseAmountField =
     showPurchaseAmount && spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
   const showSaleAmountField = showPurchaseAmount && (!showCollectionOwnership || sold);
-  const showBoardGameTabs = isEdit && showBoardGameFields;
+  const showItemTabs = isEdit && (showBoardGameFields || showMarketTab);
   const showTvTabs = isEdit && tvGranular;
   const initialBoardGameTab = isEdit && "initialBoardGameTab" in props ? props.initialBoardGameTab : undefined;
   const onLogRefreshed = isEdit && "onLogRefreshed" in props ? props.onLogRefreshed : undefined;
@@ -252,9 +255,12 @@ export function LogForm(props: LogFormProps) {
   }, [isEdit, log?.id, log?.matchesPlayed, me?.defaultPurchaseCurrency, showBoardGameFields]);
 
   useEffect(() => {
-    if (!showBoardGameTabs) return;
-    setBoardMainTab(initialBoardGameTab ?? "review");
-  }, [showBoardGameTabs, log?.id, initialBoardGameTab]);
+    if (!showItemTabs) {
+      setItemMainTab("review");
+      return;
+    }
+    setItemMainTab(initialBoardGameTab ?? "review");
+  }, [showItemTabs, log?.id, initialBoardGameTab]);
 
   useEffect(() => {
     if (!showTvTabs || !log?.id) {
@@ -674,6 +680,7 @@ export function LogForm(props: LogFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (itemMainTab === "market") return;
     if (showTvTabs && (tvReviewTab === "season" || tvReviewTab === "episode") && log) {
       setLoading(true);
       try {
@@ -695,7 +702,7 @@ export function LogForm(props: LogFormProps) {
   const saveButtonLabel =
     loading || deleting
       ? t("common.saving")
-      : showBoardGameTabs && boardMainTab === "matches"
+      : showBoardGameFields && itemMainTab === "matches"
         ? t("boardGameMatches.saveMatch")
         : t("common.save");
 
@@ -754,33 +761,49 @@ export function LogForm(props: LogFormProps) {
     </motion.div>
   ) : null;
 
-  const boardGameTabBar =
-    showBoardGameTabs && log ? (
+  const itemTabBar =
+    showItemTabs && log ? (
       <div className="mb-3 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
         <button
           type="button"
-          onClick={() => setBoardMainTab("review")}
+          onClick={() => setItemMainTab("review")}
           className={cn(
             "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-            boardMainTab === "review"
+            itemMainTab === "review"
               ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
               : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
           )}
         >
           {t("boardGameMatches.tabReview")}
         </button>
-        <button
-          type="button"
-          onClick={() => setBoardMainTab("matches")}
-          className={cn(
-            "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-            boardMainTab === "matches"
-              ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
-              : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-          )}
-        >
-          {t("boardGameMatches.tabMatches")}
-        </button>
+        {showBoardGameFields && (
+          <button
+            type="button"
+            onClick={() => setItemMainTab("matches")}
+            className={cn(
+              "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              itemMainTab === "matches"
+                ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+                : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+            )}
+          >
+            {t("boardGameMatches.tabMatches")}
+          </button>
+        )}
+        {showMarketTab && (
+          <button
+            type="button"
+            onClick={() => setItemMainTab("market")}
+            className={cn(
+              "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              itemMainTab === "market"
+                ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
+                : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+            )}
+          >
+            {t("market.tabList")}
+          </button>
+        )}
       </div>
     ) : null;
 
@@ -804,8 +827,21 @@ export function LogForm(props: LogFormProps) {
         </div>
       </div>
       {tvTabBar}
-      {boardGameTabBar}
-      {showBoardGameTabs && boardMainTab === "matches" && log ? (
+      {itemTabBar}
+      {showMarketTab && log && (
+        <div className={cn(itemMainTab !== "market" && "hidden")} aria-hidden={itemMainTab !== "market"}>
+          <MarketListingSection
+            mediaType={mediaType}
+            externalId={log.externalId}
+            title={title}
+            image={image}
+            myLog={log}
+            onEnsureLog={async () => log}
+            onListed={onCancel}
+          />
+        </div>
+      )}
+      {showBoardGameFields && itemMainTab === "matches" && log ? (
         <BoardGameMatchesSection
           logId={log.id}
           onLogUpdated={(lg) => {
@@ -815,7 +851,7 @@ export function LogForm(props: LogFormProps) {
             props.onSaved(undefined, savedLog);
           }}
         />
-      ) : (
+      ) : itemMainTab !== "market" ? (
       <>
         {showTvTabs && log && (
           <div
@@ -1095,7 +1131,7 @@ export function LogForm(props: LogFormProps) {
             </div>
           </form>
       </>
-      )}
+      ) : null}
     </motion.div>
   );
 
@@ -1118,7 +1154,7 @@ export function LogForm(props: LogFormProps) {
             className="flex max-h-[85dvh] w-full max-w-lg flex-col p-4 sm:p-6"
           >
             <div className="mt-6">{formContent}</div>
-            {!(showBoardGameTabs && boardMainTab === "matches") && (
+            {!(showBoardGameFields && itemMainTab === "matches") && itemMainTab !== "market" && (
               <DrawerFooter>
                 <div className="flex w-full gap-3">
                   <Button
@@ -1151,7 +1187,7 @@ export function LogForm(props: LogFormProps) {
             className="flex flex-col gap-0 sm:max-h-[90vh]"
           >
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">{formContent}</div>
-            {!(showBoardGameTabs && boardMainTab === "matches") && (
+            {!(showBoardGameFields && itemMainTab === "matches") && itemMainTab !== "market" && (
               <DialogFooter className="mt-4">
                 <div className="flex w-full gap-3">
                   <Button

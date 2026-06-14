@@ -33,6 +33,9 @@ export interface MeResponse {
   /** Google Play base product id; use with Play Store subscription management URL. */
   googlePlayProductId?: string;
   country?: string; // ISO 3166-1 alpha-2 e.g. BR for pricing
+  city?: string;
+  cityLabel?: string;
+  phone?: string;
   /** Last ISO 4217 currency used when saving a purchase amount (default for spend fields). */
   defaultPurchaseCurrency?: string;
   logCount: number;

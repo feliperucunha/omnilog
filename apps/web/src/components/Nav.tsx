@@ -8,6 +8,7 @@ import {
   UserPlus,
   Info,
   CreditCard,
+  Store,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -88,6 +89,7 @@ export function Nav() {
     { to: dashboardNavPath, labelKey: "nav.dashboard", icon: <Home size={iconSize} /> },
     { to: "/statistics", labelKey: "nav.statistics", icon: <BarChart3 size={iconSize} /> },
     { to: searchNavPath, labelKey: "nav.search", icon: <Search size={iconSize} /> },
+    { to: "/market", labelKey: "nav.market", icon: <Store size={iconSize} /> },
     { to: "/settings", labelKey: "nav.settings", icon: <Settings size={iconSize} /> },
     { to: "/tiers", labelKey: "nav.plans", icon: <CreditCard size={iconSize} /> },
     { to: "/about", labelKey: "nav.about", icon: <Info size={iconSize} /> },

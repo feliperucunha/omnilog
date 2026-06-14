@@ -63,7 +63,7 @@ import {
 } from "@/components/ui/dialog";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
-import { mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
+import { mediaTypeHasCollectionOwnership, mediaTypeHasMarketTab } from "@/lib/mediaTypeFeatures";
 import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
@@ -190,7 +190,7 @@ export function MediaLogs({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingLog, setEditingLog] = useState<Log | null>(null);
-  const [boardGameEditTab, setBoardGameEditTab] = useState<"review" | "matches">("review");
+  const [logEditTab, setLogEditTab] = useState<"review" | "matches" | "market">("review");
   const [editingLogEpisodesCount, setEditingLogEpisodesCount] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>(() => initialFilters?.status ?? "");
@@ -600,7 +600,7 @@ export function MediaLogs({
 
   const handleSaved = (completion?: LogCompleteState, savedLog?: Log) => {
     setEditingLog(null);
-    setBoardGameEditTab("review");
+    setLogEditTab("review");
     if (savedLog) {
       const normalized = decodeLogForDisplay(savedLog);
       setLogs((prev) => {
@@ -1304,7 +1304,7 @@ export function MediaLogs({
                     onExpandReview={setExpandedReviewLogId}
                     onIncrement={handleIncrement}
                     onEdit={(lg, tab) => {
-                      setBoardGameEditTab(tab);
+                      setLogEditTab(tab);
                       setEditingLog(lg);
                     }}
                     t={t}
@@ -1355,7 +1355,11 @@ export function MediaLogs({
           mode="edit"
           log={editingLog}
           episodesCount={editingLogEpisodesCount}
-          initialBoardGameTab={editingLog.mediaType === "boardgames" ? boardGameEditTab : undefined}
+          initialBoardGameTab={
+            editingLog.mediaType === "boardgames" || mediaTypeHasMarketTab(editingLog.mediaType)
+              ? logEditTab
+              : undefined
+          }
           onLogRefreshed={(lg) => {
             const normalized = decodeLogForDisplay(lg);
             setEditingLog(normalized);
@@ -1364,7 +1368,7 @@ export function MediaLogs({
           onSaved={handleSaved}
           onCancel={() => {
             setEditingLog(null);
-            setBoardGameEditTab("review");
+            setLogEditTab("review");
           }}
           onDelete={editingLog ? (id) => handleDelete(id) : undefined}
         />
