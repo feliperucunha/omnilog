@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Settings, Info, LogOut, Loader2, CreditCard } from "lucide-react";
+import { Settings, Info, LogOut, Loader2, CreditCard, Store } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
@@ -226,6 +226,12 @@ export function Topbar() {
                 <Link to="/tiers" className="flex items-center gap-2">
                   <CreditCard className="size-4" />
                   {t("nav.plans")}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/my-listings" className="flex items-center gap-2">
+                  <Store className="size-4" />
+                  {t("nav.myListings")}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>

@@ -133,7 +133,7 @@ function MarketListingBody({
             <Link
               to={sellerProfilePath(listing)}
               onClick={onClose}
-              className="text-[var(--color-primary)] underline-offset-2 hover:underline"
+              className="text-blue-500 underline-offset-2 hover:text-blue-400 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
             >
               {sellerName(listing)}
             </Link>

@@ -15,10 +15,11 @@ from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RES = REPO_ROOT / "apps/android/android/app/src/main/res"
-# Same asset as splash + adaptive icon foreground (values/styles.xml, mipmap-anydpi-v26)
+# Same asset as splash + adaptive icon foreground (drawable/splash_icon.xml, mipmap-anydpi-v26)
 LOGO_SRC = REPO_ROOT / "apps/web/public/logo-dark.png"
 DRAWABLE_LOGO = RES / "drawable" / "logo_splash.png"
-# Match drawable/logo_splash_square.xml scale
+SPLASH_LOGO_PX = 432
+# Match adaptive icon foreground scale
 LOGO_SCALE = 0.65
 
 
@@ -35,15 +36,28 @@ def composite_icon(size: int, src: Path) -> Image.Image:
     return bg
 
 
+def composite_splash_logo(size: int, src: Path) -> Image.Image:
+    """Centered logo on transparent canvas for Android 12 splash (background is separate)."""
+    logo = Image.open(src).convert("RGBA")
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    lw, lh = logo.size
+    target = int(size * LOGO_SCALE)
+    ratio = min(target / lw, target / lh)
+    nw, nh = max(1, int(lw * ratio)), max(1, int(lh * ratio))
+    logo = logo.resize((nw, nh), Image.Resampling.LANCZOS)
+    x, y = (size - nw) // 2, (size - nh) // 2
+    canvas.alpha_composite(logo, (x, y))
+    return canvas
+
+
 def main() -> None:
     if not LOGO_SRC.is_file():
         raise SystemExit(f"Missing logo: {LOGO_SRC}")
 
     DRAWABLE_LOGO.parent.mkdir(parents=True, exist_ok=True)
-    import shutil
-
-    shutil.copyfile(LOGO_SRC, DRAWABLE_LOGO)
-    print(f"Copied {LOGO_SRC.name} -> {DRAWABLE_LOGO.relative_to(REPO_ROOT)}")
+    splash_img = composite_splash_logo(SPLASH_LOGO_PX, LOGO_SRC)
+    splash_img.save(DRAWABLE_LOGO, optimize=True)
+    print(f"Wrote splash logo -> {DRAWABLE_LOGO.relative_to(REPO_ROOT)} ({SPLASH_LOGO_PX}px)")
 
     legacy = {
         "mipmap-mdpi": 48,

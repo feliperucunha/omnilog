@@ -22,6 +22,7 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchAutoHide: false,
       launchShowDuration: 0,
+      backgroundColor: "#000000",
     },
     /** Android: WebView resizes with IME when edge-to-edge / status bar overlays. */
     Keyboard: {

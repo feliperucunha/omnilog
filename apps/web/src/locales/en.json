@@ -22,6 +22,7 @@
     "comics": "Comic Books",
     "search": "Search",
     "market": "Market",
+    "myListings": "My listings",
     "settings": "Settings",
     "plans": "Plans",
     "about": "About",
@@ -101,6 +102,7 @@
   },
   "market": {
     "title": "Local Market",
+    "myListingsTitle": "My listings",
     "searchPlaceholder": "Search listings…",
     "location": "Location",
     "allLocations": "All locations",
@@ -132,6 +134,7 @@
     "setCityHint": "Add your city in user settings to list items on the Market.",
     "userSettingsLink": "User settings",
     "noListings": "No listings found.",
+    "noMyListings": "You have no listings in this category.",
     "loadMore": "Load more",
     "logInToList": "to list items for sale.",
     "discountBadge": "{{percent}}% off",
@@ -1064,6 +1067,21 @@
     "notNow": "Not now",
     "openingStore": "Opening…",
     "openStoreFailed": "Couldn’t open the Play Store. Try again or search for Geeklogs in the Play Store app."
+  },
+  "mobileAppBanner": {
+    "ariaLabel": "Get the Geeklogs app",
+    "androidTitle": "Get the Android app",
+    "androidMessage": "Install Geeklogs from Google Play for a faster, app-like experience.",
+    "androidAction": "Download the app",
+    "openingStore": "Opening…",
+    "iosTitle": "Add Geeklogs to your home screen",
+    "iosMessage": "Install the web app as a shortcut for quick access from your iPhone.",
+    "iosAction": "Install",
+    "iosHelpTitle": "Add to Home Screen",
+    "iosHelpStep1": "Tap the Share button in Safari at the bottom of the screen",
+    "iosHelpStep2": "Scroll down and tap Add to Home Screen",
+    "iosHelpStep3": "Tap Add in the top-right corner",
+    "iosHelpDone": "Got it"
   },
   "coldStart": {
     "error": "Geeklogs couldn’t finish loading. Check that you’re online, then tap Try again. If you haven’t opened the app in a while, it may need a little extra time the first time.",

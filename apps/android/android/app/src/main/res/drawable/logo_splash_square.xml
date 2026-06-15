@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Logo scaled uniformly and centered so it stays proportional in adaptive icon and splash (no vertical stretch). -->
-<scale xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@drawable/logo_splash"
-    android:scaleGravity="center"
-    android:scaleWidth="65%"
-    android:scaleHeight="65%"
-    android:level="10000" />

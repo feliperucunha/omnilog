@@ -22,6 +22,7 @@
     "comics": "Quadrinhos",
     "search": "Buscar",
     "market": "Mercado",
+    "myListings": "Meus anúncios",
     "settings": "Configurações",
     "plans": "Planos",
     "about": "Sobre",
@@ -101,6 +102,7 @@
   },
   "market": {
     "title": "Mercado Local",
+    "myListingsTitle": "Meus anúncios",
     "searchPlaceholder": "Buscar anúncios…",
     "location": "Localização",
     "allLocations": "Todas as localizações",
@@ -132,6 +134,7 @@
     "setCityHint": "Adicione sua cidade nas configurações de usuário para anunciar no Mercado.",
     "userSettingsLink": "Configurações de usuário",
     "noListings": "Nenhum anúncio encontrado.",
+    "noMyListings": "Você não tem anúncios nesta categoria.",
     "loadMore": "Carregar mais",
     "logInToList": "para anunciar itens.",
     "discountBadge": "−{{percent}}%",
@@ -1064,6 +1067,21 @@
     "notNow": "Agora não",
     "openingStore": "Abrindo…",
     "openStoreFailed": "Não foi possível abrir a Play Store. Tente de novo ou busque Geeklogs no app da Play Store."
+  },
+  "mobileAppBanner": {
+    "ariaLabel": "Baixar o app Geeklogs",
+    "androidTitle": "Baixe o app para Android",
+    "androidMessage": "Instale o Geeklogs na Google Play para uma experiência mais rápida, como um app.",
+    "androidAction": "Baixar o app",
+    "openingStore": "Abrindo…",
+    "iosTitle": "Adicione o Geeklogs à tela inicial",
+    "iosMessage": "Instale o site como atalho para abrir rápido no seu iPhone.",
+    "iosAction": "Instalar",
+    "iosHelpTitle": "Adicionar à Tela de Início",
+    "iosHelpStep1": "Toque no botão Compartilhar no Safari, na parte inferior da tela",
+    "iosHelpStep2": "Role para baixo e toque em Adicionar à Tela de Início",
+    "iosHelpStep3": "Toque em Adicionar no canto superior direito",
+    "iosHelpDone": "Entendi"
   },
   "coldStart": {
     "error": "O Geeklogs não conseguiu terminar de carregar. Confira se você está online e toque em Tentar novamente. Se faz tempo que você não abre o app, a primeira vez pode demorar um pouco mais.",

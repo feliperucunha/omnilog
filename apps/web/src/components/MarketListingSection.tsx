@@ -28,6 +28,10 @@ type MarketListingSectionProps = {
   myLog: Log | null;
   onEnsureLog: () => Promise<Log | null>;
   onListed?: () => void;
+  prefilledListing?: MarketListing | null;
+  stayOnPage?: boolean;
+  onSaved?: (listing: MarketListing) => void;
+  onDeleted?: (listingId: string) => void;
 };
 
 function FieldSkeleton({ className }: { className?: string }) {
@@ -47,6 +51,10 @@ export function MarketListingSection({
   myLog,
   onEnsureLog,
   onListed,
+  prefilledListing,
+  stayOnPage = false,
+  onSaved,
+  onDeleted,
 }: MarketListingSectionProps) {
   const { t } = useLocale();
   const { me, refetch: refetchMe } = useMe();
@@ -104,6 +112,11 @@ export function MarketListingSection({
   }, [me?.phone]);
 
   useEffect(() => {
+    if (prefilledListing) {
+      applyListingToForm(prefilledListing);
+      setLoadingExisting(false);
+      return;
+    }
     if (!myLog?.id) {
       setExisting(null);
       setLoadingExisting(false);
@@ -145,7 +158,7 @@ export function MarketListingSection({
     return () => {
       cancelled = true;
     };
-  }, [myLog?.id, listedIdsReady, listedLogIds, existing?.logId, markUnlisted]);
+  }, [myLog?.id, listedIdsReady, listedLogIds, existing?.logId, markUnlisted, prefilledListing]);
 
   const needsPhone = contactWhatsapp && !me?.phone && !phone.trim();
   const needsCity = !me?.city || !me?.cityLabel;
@@ -206,7 +219,9 @@ export function MarketListingSection({
       invalidateApiCache("/me");
       await refetchMe();
       toast.success(t("market.listingSaved"));
-      if (onListed) {
+      if (stayOnPage) {
+        onSaved?.(res.data);
+      } else if (onListed) {
         onListed();
       } else {
         navigate(buildDefaultLogsListPath(mediaType));
@@ -354,6 +369,7 @@ export function MarketListingSection({
           onDeleted={() => {
             if (myLog?.id) markUnlisted(myLog.id);
             resetListingForm();
+            onDeleted?.(existing.id);
           }}
         />
       )}

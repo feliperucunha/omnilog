@@ -269,6 +269,44 @@ const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(48).optional(),
 });
 
+const myListQuerySchema = z.object({
+  mediaType: z.enum(MARKET_MEDIA_TYPES).optional(),
+  q: z.string().max(128).optional(),
+  sort: z.string().optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(48).optional(),
+});
+
+async function fetchMarketListingsPage(args: {
+  filters: Prisma.MarketListingWhereInput;
+  sort: MarketSortValue;
+  cursor?: string;
+  limit: number;
+}): Promise<MarketListingsResponse> {
+  const order = effectiveMarketSort(args.sort);
+  const decodedCursor = decodeListingCursor(args.cursor, order);
+  const where: Prisma.MarketListingWhereInput = decodedCursor
+    ? { AND: [args.filters, listingCursorWhere(order, decodedCursor)] }
+    : args.filters;
+
+  const rows = await prisma.marketListing.findMany({
+    where,
+    include: { user: { select: sellerSelect } },
+    orderBy: listingOrderBy(order),
+    take: args.limit + 1,
+  });
+
+  const hasMore = rows.length > args.limit;
+  const page = hasMore ? rows.slice(0, args.limit) : rows;
+  const last = page[page.length - 1];
+  const nextCursor = hasMore && last ? encodeListingCursor(order, last) : null;
+
+  return {
+    data: page.map(serializeListing),
+    nextCursor,
+  };
+}
+
 marketRouter.get("/listings", async (req, res) => {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) {
@@ -279,7 +317,6 @@ marketRouter.get("/listings", async (req, res) => {
   const limit = parsed.data.limit ?? PAGE_SIZE;
   const sort: MarketSortValue =
     parsed.data.sort && isMarketSortValue(parsed.data.sort) ? parsed.data.sort : "listed_desc";
-  const order = effectiveMarketSort(sort);
 
   const filters: Prisma.MarketListingWhereInput = { active: true };
 
@@ -298,27 +335,7 @@ marketRouter.get("/listings", async (req, res) => {
     ];
   }
 
-  const decodedCursor = decodeListingCursor(cursor, order);
-  const where: Prisma.MarketListingWhereInput = decodedCursor
-    ? { AND: [filters, listingCursorWhere(order, decodedCursor)] }
-    : filters;
-
-  const rows = await prisma.marketListing.findMany({
-    where,
-    include: { user: { select: sellerSelect } },
-    orderBy: listingOrderBy(order),
-    take: limit + 1,
-  });
-
-  const hasMore = rows.length > limit;
-  const page = hasMore ? rows.slice(0, limit) : rows;
-  const last = page[page.length - 1];
-  const nextCursor = hasMore && last ? encodeListingCursor(order, last) : null;
-
-  const body: MarketListingsResponse = {
-    data: page.map(serializeListing),
-    nextCursor,
-  };
+  const body = await fetchMarketListingsPage({ filters, sort, cursor, limit });
   res.json(body);
 });
 
@@ -371,6 +388,35 @@ marketRouter.get("/my/log-ids", async (req: AuthenticatedRequest, res) => {
     select: { logId: true },
   });
   res.json({ data: rows.map((r) => r.logId) });
+});
+
+marketRouter.get("/my/listings", async (req: AuthenticatedRequest, res) => {
+  if (!req.user) return;
+  const parsed = myListQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const { mediaType, q, cursor } = parsed.data;
+  const limit = parsed.data.limit ?? PAGE_SIZE;
+  const sort: MarketSortValue =
+    parsed.data.sort && isMarketSortValue(parsed.data.sort) ? parsed.data.sort : "listed_desc";
+
+  const filters: Prisma.MarketListingWhereInput = {
+    active: true,
+    userId: req.user.userId,
+  };
+  if (mediaType) filters.mediaType = mediaType;
+  if (q && q.trim()) {
+    const term = q.trim();
+    filters.OR = [
+      { title: { contains: term, mode: "insensitive" } },
+      { description: { contains: term, mode: "insensitive" } },
+    ];
+  }
+
+  const body = await fetchMarketListingsPage({ filters, sort, cursor, limit });
+  res.json(body);
 });
 
 const createListingSchema = z.object({

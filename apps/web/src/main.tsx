@@ -19,6 +19,7 @@ import { ColdStartLoader } from "@/components/ColdStartLoader";
 import { AuthSigningOverlay } from "@/components/AuthSigningOverlay";
 import { AppVersionModal } from "@/components/AppVersionModal";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
+import { MobileAppInstallBanner } from "@/components/MobileAppInstallBanner";
 import { AppVersionProvider } from "@/contexts/AppVersionContext";
 import App from "./App";
 import { CapacitorAndroidIntegration } from "@/components/CapacitorAndroidIntegration";
@@ -53,6 +54,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       <ApiWakePing />
                       <App />
                       <CookieConsentBanner />
+                      <MobileAppInstallBanner />
                       <AppVersionModal />
                     </LogCompleteProvider>
                   </VisibleMediaTypesProvider>

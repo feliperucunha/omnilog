@@ -13,6 +13,7 @@ export function getMainNavTransitionKey(pathname: string): string {
   if (pathname.startsWith("/dashboard")) return "nav-dashboard";
   if (pathname.startsWith("/statistics")) return "nav-statistics";
   if (pathname.startsWith("/market")) return "nav-market";
+  if (pathname.startsWith("/my-listings")) return "nav-my-listings";
   if (pathname.startsWith("/settings")) return "nav-settings";
   if (pathname.startsWith("/tiers")) return "nav-tiers";
   if (isItemDetailPath(pathname)) return "nav-item";

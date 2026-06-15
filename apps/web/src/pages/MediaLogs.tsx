@@ -1231,10 +1231,10 @@ export function MediaLogs({
       >
         {listRefreshing && logs.length > 0 && (
           <div
-            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-xl bg-[var(--color-dark)]/75 backdrop-blur-[2px]"
+            className="sticky top-0 z-20 flex items-center justify-center gap-2 border-b border-[var(--color-surface-border)] bg-[var(--color-dark)]/95 py-3 backdrop-blur-md"
             role="status"
           >
-            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-lightest)]" aria-hidden />
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--color-lightest)]" aria-hidden />
             <p className="text-sm font-medium text-[var(--color-lightest)]">
               {t("mediaLogs.updatingList")}
             </p>

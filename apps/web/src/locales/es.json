@@ -22,6 +22,7 @@
     "comics": "Cómics",
     "search": "Buscar",
     "market": "Mercado",
+    "myListings": "Mis anuncios",
     "settings": "Ajustes",
     "plans": "Planes",
     "about": "Acerca de",
@@ -101,6 +102,7 @@
   },
   "market": {
     "title": "Mercado Local",
+    "myListingsTitle": "Mis anuncios",
     "searchPlaceholder": "Buscar anuncios…",
     "location": "Ubicación",
     "allLocations": "Todas las ubicaciones",
@@ -132,6 +134,7 @@
     "setCityHint": "Añade tu ciudad en ajustes de usuario para publicar en el Mercado.",
     "userSettingsLink": "Ajustes de usuario",
     "noListings": "No se encontraron anuncios.",
+    "noMyListings": "No tienes anuncios en esta categoría.",
     "loadMore": "Cargar más",
     "logInToList": "para publicar ítems.",
     "discountBadge": "{{percent}}% dto.",
@@ -1044,6 +1047,21 @@
     "notNow": "Ahora no",
     "openingStore": "Abriendo…",
     "openStoreFailed": "No se pudo abrir Play Store. Inténtalo de nuevo o busca Geeklogs en la app de Play Store."
+  },
+  "mobileAppBanner": {
+    "ariaLabel": "Obtener la app Geeklogs",
+    "androidTitle": "Obtén la app de Android",
+    "androidMessage": "Instala Geeklogs desde Google Play para una experiencia más rápida, como una app.",
+    "androidAction": "Descargar la app",
+    "openingStore": "Abriendo…",
+    "iosTitle": "Añade Geeklogs a tu pantalla de inicio",
+    "iosMessage": "Instala la web como acceso directo para abrirla rápido en tu iPhone.",
+    "iosAction": "Instalar",
+    "iosHelpTitle": "Añadir a pantalla de inicio",
+    "iosHelpStep1": "Toca el botón Compartir en Safari, en la parte inferior de la pantalla",
+    "iosHelpStep2": "Desplázate hacia abajo y toca Añadir a pantalla de inicio",
+    "iosHelpStep3": "Toca Añadir en la esquina superior derecha",
+    "iosHelpDone": "Entendido"
   },
   "coldStart": {
     "error": "Geeklogs no pudo terminar de cargar. Comprueba que tienes internet y pulsa Reintentar. Si hace tiempo que no abres la app, la primera vez puede tardar un poco más.",

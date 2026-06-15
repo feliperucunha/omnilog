@@ -56,6 +56,7 @@ const lazyWithChunkRecovery = <T extends ComponentType<unknown>>(
 const Statistics = lazyWithChunkRecovery(() => import("@/pages/Statistics").then((m) => ({ default: m.Statistics })));
 const Search = lazyWithChunkRecovery(() => import("@/pages/Search").then((m) => ({ default: m.Search })));
 const Market = lazyWithChunkRecovery(() => import("@/pages/Market").then((m) => ({ default: m.Market })));
+const MyListings = lazyWithChunkRecovery(() => import("@/pages/MyListings").then((m) => ({ default: m.MyListings })));
 const ItemPage = lazyWithChunkRecovery(() => import("@/pages/ItemPage").then((m) => ({ default: m.ItemPage })));
 const Settings = lazyWithChunkRecovery(() => import("@/pages/Settings").then((m) => ({ default: m.Settings })));
 const About = lazyWithChunkRecovery(() => import("@/pages/About").then((m) => ({ default: m.About })));
@@ -125,6 +126,7 @@ export default function App() {
               <Route path="statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
               <Route path="search" element={<Search />} />
               <Route path="market" element={<Market />} />
+              <Route path="my-listings" element={<ProtectedRoute><MyListings /></ProtectedRoute>} />
               <Route path="about" element={<About />} />
               <Route path="faq" element={<FAQ />} />
               <Route path="privacy" element={<Privacy />} />
