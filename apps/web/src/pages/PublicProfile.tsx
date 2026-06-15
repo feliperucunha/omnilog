@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { apiFetch, apiFetchPublic } from "@/lib/api";
 import { PublicProfileSkeleton } from "@/components/skeletons";
+import {
+  BoardGameRecentStatsWidget,
+  type RecentBoardGameStatEntry,
+} from "@/components/BoardGameRecentStatsWidget";
 import { MarketListingCard } from "@/components/MarketListingCard";
 import { MarketListingDrawer } from "@/components/MarketListingDrawer";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -91,6 +95,8 @@ export function PublicProfile() {
   const [pinnedHighlightsOpen, setPinnedHighlightsOpen] = useState(false);
   const [milestoneBadgesOpen, setMilestoneBadgesOpen] = useState(false);
   const [marketListings, setMarketListings] = useState<MarketListing[]>([]);
+  const [boardGameMatches, setBoardGameMatches] = useState<RecentBoardGameStatEntry[]>([]);
+  const [boardGameMatchesLoading, setBoardGameMatchesLoading] = useState(false);
   const [drawerListing, setDrawerListing] = useState<MarketListing | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isOwnProfile = !!me?.user?.id && !!profile?.id && me.user.id === profile.id;
@@ -151,6 +157,21 @@ export function PublicProfile() {
       .then((res) => setMarketListings(res.data ?? []))
       .catch(() => setMarketListings([]));
   }, [userId, profile?.id]);
+
+  useEffect(() => {
+    if (!userId || !profile || !profile.visibleMediaTypes.includes("boardgames")) {
+      setBoardGameMatches([]);
+      return;
+    }
+    setBoardGameMatchesLoading(true);
+    const tz = new Date().getTimezoneOffset();
+    apiFetchPublic<{ data: RecentBoardGameStatEntry[] }>(
+      `/users/${userId}/board-games/matches?period=month&sort=recent&timezoneOffsetMinutes=${tz}`
+    )
+      .then((res) => setBoardGameMatches(res.data ?? []))
+      .catch(() => setBoardGameMatches([]))
+      .finally(() => setBoardGameMatchesLoading(false));
+  }, [userId, profile?.id, profile?.visibleMediaTypes]);
 
   const handleFollowClick = useCallback(async () => {
     if (!profile?.id || followLoading) return;
@@ -458,6 +479,24 @@ export function PublicProfile() {
               </motion.div>
             ))}
           </motion.div>
+        </section>
+      )}
+
+      {(boardGameMatchesLoading || boardGameMatches.length > 0) &&
+        (profile?.visibleMediaTypes.includes("boardgames") ?? false) && (
+        <section
+          aria-label={t("publicProfile.boardGamesMatchesSection")}
+          className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
+        >
+          <h2 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
+            <OverflowMarquee>{t("publicProfile.boardGamesMatchesSection")}</OverflowMarquee>
+          </h2>
+          <BoardGameRecentStatsWidget
+            games={boardGameMatches}
+            loading={boardGameMatchesLoading}
+            t={t}
+            locale={locale}
+          />
         </section>
       )}
 

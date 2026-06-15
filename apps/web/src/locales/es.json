@@ -267,6 +267,8 @@
     "profileVisibilityShowEnrichmentDetails": "Páginas, número de jugadores",
     "profileVisibilitySectionMarket": "Mercado",
     "profileVisibilityShowMarketListings": "Anuncios en el mercado",
+    "profileVisibilitySectionBoardGames": "Juegos de mesa",
+    "profileVisibilityShowTaggedBoardGameMatches": "Partidas en las que otros me etiquetaron",
     "appNavigationTitle": "Categorías y pestañas",
     "appNavigationProOnlyIntro": "Muestra u oculta categorías en la barra lateral y en la búsqueda, y arrastra para reordenar. Pasa a Pro para personalizar.",
     "publicProfileUpgrade": "Ver planes",
@@ -386,7 +388,8 @@
     "title": "Perfil público",
     "titleWithName": "Log de {{name}}",
     "pinnedHighlights": "Destacados ({{count}})",
-    "marketSection": "En venta"
+    "marketSection": "En venta",
+    "boardGamesMatchesSection": "Partidas jugadas"
   },
   "social": {
     "follow": "Seguir",
@@ -711,10 +714,10 @@
     "suggestionsAppMembers": "En Geeklogs",
     "suggestionsSavedNames": "Nombres guardados",
     "useTypedAsCustom": "Usar “{{name}}” como nombre personalizado (se guardará para la próxima vez)",
-    "scoreTrendHigherTitle": "Más puntos que en la última sesión",
-    "scoreTrendLowerTitle": "Menos puntos que en la última sesión",
-    "scoreTrendHigherAria": "Puntuación más alta que en la sesión anterior de este juego",
-    "scoreTrendLowerAria": "Puntuación más baja que en la sesión anterior de este juego"
+    "scoreTrendHigherTitle": "Más puntos que en tu última partida",
+    "scoreTrendLowerTitle": "Menos puntos que en tu última partida",
+    "scoreTrendHigherAria": "Puntuación más alta que la última vez que jugaste este juego",
+    "scoreTrendLowerAria": "Puntuación más baja que la última vez que jugaste este juego"
   },
   "tvReviews": {
     "tabShow": "Serie",

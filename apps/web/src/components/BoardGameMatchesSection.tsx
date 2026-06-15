@@ -7,8 +7,13 @@ import {
   useRef,
   useState,
 } from "react";
-import type { BoardGameMatch, BoardGameMatchPlayer, Log } from "@geeklogs/shared";
-import { DEFAULT_BOARD_GAME_SESSION_DURATION_HOURS, type BoardGameSessionDurationHours } from "@geeklogs/shared";
+import type { BoardGameMatch, Log } from "@geeklogs/shared";
+import {
+  DEFAULT_BOARD_GAME_SESSION_DURATION_HOURS,
+  boardGameScoreTrend,
+  priorRecordedScoreForPlayerInSessions,
+  type BoardGameSessionDurationHours,
+} from "@geeklogs/shared";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,8 +34,6 @@ import { useMe } from "@/contexts/MeContext";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
   Calendar,
   ChevronDown,
   Clock,
@@ -43,6 +46,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { boardGameSessionDurationLabel, boardGameSessionDurationOptions } from "@/lib/boardGameSessionDuration";
+import { BoardGameScoreWithTrend } from "@/components/BoardGameScoreWithTrend";
 
 type PlayerRow = { name: string; score: string; winner: boolean; appUserId?: string | null };
 
@@ -56,7 +60,7 @@ function buildDefaultPlayers(meUser: MeUser | undefined): PlayerRow[] {
   ];
 }
 
-/** Oldest session first — used to find each match’s immediate predecessor in time. */
+/** Oldest session first — used to compare scores across prior plays of this game. */
 function sortBoardGameMatchesChronologicalAsc(list: BoardGameMatch[]): BoardGameMatch[] {
   return [...list].sort((a, b) => {
     const ta = Date.parse(a.playedAt);
@@ -67,42 +71,6 @@ function sortBoardGameMatchesChronologicalAsc(list: BoardGameMatch[]): BoardGame
     if (Number.isFinite(ca) && Number.isFinite(cb) && ca !== cb) return ca - cb;
     return a.id.localeCompare(b.id);
   });
-}
-
-function getChronologicalPreviousMatch(chronAsc: BoardGameMatch[], match: BoardGameMatch): BoardGameMatch | null {
-  const idx = chronAsc.findIndex((m) => m.id === match.id);
-  if (idx <= 0) return null;
-  return chronAsc[idx - 1] ?? null;
-}
-
-function boardGamePlayerIdentityKey(p: BoardGameMatchPlayer): string {
-  const id = p.appUserId?.trim();
-  if (id) return `id:${id}`;
-  return `n:${p.name.trim().toLowerCase()}`;
-}
-
-function findPreviousSessionScore(previousMatch: BoardGameMatch, player: BoardGameMatchPlayer): number | null {
-  const key = boardGamePlayerIdentityKey(player);
-  const prev = previousMatch.players.find((q) => boardGamePlayerIdentityKey(q) === key);
-  const s = prev?.score;
-  if (s == null || typeof s !== "number" || !Number.isFinite(s)) return null;
-  return s;
-}
-
-type ScoreTrendVsPrevious = "higher" | "lower";
-
-function scoreTrendVsPreviousSession(
-  player: BoardGameMatchPlayer,
-  previousMatch: BoardGameMatch | null
-): ScoreTrendVsPrevious | null {
-  if (!previousMatch) return null;
-  const cur = player.score;
-  if (cur == null || typeof cur !== "number" || !Number.isFinite(cur)) return null;
-  const prevScore = findPreviousSessionScore(previousMatch, player);
-  if (prevScore == null) return null;
-  if (cur > prevScore) return "higher";
-  if (cur < prevScore) return "lower";
-  return null;
 }
 
 function todayDateInput(): string {
@@ -737,7 +705,7 @@ export const BoardGameMatchesSection = forwardRef<
                 >
                   <MatchHistoryCard
                     match={m}
-                    previousMatch={getChronologicalPreviousMatch(matchesChronologicalAsc, m)}
+                    matchesChronologicalAsc={matchesChronologicalAsc}
                     formatPlayed={formatPlayed}
                     deleting={deletingId === m.id}
                     onDelete={() => setDeleteConfirmMatchId(m.id)}
@@ -805,15 +773,14 @@ export const BoardGameMatchesSection = forwardRef<
 
 function MatchHistoryCard({
   match,
-  previousMatch,
+  matchesChronologicalAsc,
   formatPlayed,
   deleting,
   onDelete,
   t,
 }: {
   match: BoardGameMatch;
-  /** Chronologically earlier session for this log (same game), if any. */
-  previousMatch: BoardGameMatch | null;
+  matchesChronologicalAsc: BoardGameMatch[];
   formatPlayed: (iso: string) => string;
   deleting: boolean;
   onDelete: () => void;
@@ -821,6 +788,7 @@ function MatchHistoryCard({
 }) {
   const [open, setOpen] = useState(false);
   const winners = match.players.filter((p) => p.winner).map((p) => p.name);
+  const sessionIndex = matchesChronologicalAsc.findIndex((m) => m.id === match.id);
 
   return (
     <article className="overflow-hidden rounded-2xl border border-[var(--color-mid)]/25 bg-gradient-to-br from-[var(--color-dark)] via-[var(--color-dark)] to-[var(--color-darkest)] shadow-[var(--shadow-md)] ring-1 ring-white/[0.04]">
@@ -867,7 +835,12 @@ function MatchHistoryCard({
         <div className="space-y-4 border-t border-[var(--color-mid)]/20 px-4 pb-4 pt-3 sm:px-5">
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {match.players.map((p, i) => {
-              const scoreTrend = scoreTrendVsPreviousSession(p, previousMatch);
+              const priorScore = priorRecordedScoreForPlayerInSessions(
+                matchesChronologicalAsc,
+                sessionIndex,
+                p
+              );
+              const scoreTrend = boardGameScoreTrend(p.score, priorScore);
               return (
                 <li
                   key={i}
@@ -887,29 +860,8 @@ function MatchHistoryCard({
                       <div className="truncate font-medium text-[var(--color-lightest)]">{p.name}</div>
                     </div>
                     {p.score != null && (
-                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-sm tabular-nums text-[var(--color-light)]">
-                        <span>
-                          {p.score}{" "}
-                          <span className="text-xs font-normal opacity-80">{t("boardGameMatches.points")}</span>
-                        </span>
-                        {scoreTrend === "higher" && (
-                          <span
-                            className="inline-flex shrink-0"
-                            title={t("boardGameMatches.scoreTrendHigherTitle")}
-                            aria-label={t("boardGameMatches.scoreTrendHigherAria")}
-                          >
-                            <ArrowUpRight className="h-4 w-4 text-emerald-400/95" strokeWidth={2.25} aria-hidden />
-                          </span>
-                        )}
-                        {scoreTrend === "lower" && (
-                          <span
-                            className="inline-flex shrink-0"
-                            title={t("boardGameMatches.scoreTrendLowerTitle")}
-                            aria-label={t("boardGameMatches.scoreTrendLowerAria")}
-                          >
-                            <ArrowDownRight className="h-4 w-4 text-rose-400/95" strokeWidth={2.25} aria-hidden />
-                          </span>
-                        )}
+                      <div className="mt-0.5 text-sm tabular-nums text-[var(--color-light)]">
+                        <BoardGameScoreWithTrend score={p.score} trend={scoreTrend} t={t} />
                       </div>
                     )}
                   </div>

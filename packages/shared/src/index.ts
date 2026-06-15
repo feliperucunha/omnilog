@@ -35,6 +35,13 @@ export type {
 } from "./types.js";
 export { APP_VERSION } from "./version.js";
 export {
+  boardGamePlayerIdentityKey,
+  boardGameScoreTrend,
+  priorRecordedScoreForPlayerInSessions,
+  type BoardGameScorePlayerRef,
+  type BoardGameScoreTrend,
+} from "./boardGameScoreTrend.js";
+export {
   ANIME_MANGA_TITLE_LANGUAGES,
   DEFAULT_ANIME_MANGA_TITLE_LANGUAGE,
   pickAnimeMangaTitle,

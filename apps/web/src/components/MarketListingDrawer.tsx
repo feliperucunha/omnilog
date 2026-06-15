@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Mail, X } from "lucide-react";
 import { WhatsAppIcon } from "@/components/WhatsAppIcon";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,11 @@ function formatListingDate(iso: string, locale: string): string {
 
 function sellerName(listing: MarketListing): string {
   return listing.seller.username?.trim() || listing.seller.email.split("@")[0] || "—";
+}
+
+function sellerProfilePath(listing: MarketListing): string {
+  const handle = listing.seller.username?.trim() || listing.seller.id;
+  return `/${handle}`;
 }
 
 function whatsappHref(phone: string): string {
@@ -123,7 +129,15 @@ function MarketListingBody({
       <dl className="grid gap-2 text-sm">
         <div>
           <dt className="text-[var(--color-light)]">{t("market.seller")}</dt>
-          <dd className="text-[var(--color-lightest)]">{sellerName(listing)}</dd>
+          <dd>
+            <Link
+              to={sellerProfilePath(listing)}
+              onClick={onClose}
+              className="text-[var(--color-primary)] underline-offset-2 hover:underline"
+            >
+              {sellerName(listing)}
+            </Link>
+          </dd>
         </div>
         <div>
           <dt className="text-[var(--color-light)]">{t("market.listedOn")}</dt>

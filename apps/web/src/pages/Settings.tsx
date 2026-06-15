@@ -789,6 +789,38 @@ export function Settings() {
                 </motion.div>
               ))}
               <p className="pb-2 pt-4 text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
+                {t("settings.profileVisibilitySectionBoardGames")}
+              </p>
+              {(
+                [
+                  [
+                    "showTaggedBoardGameMatches",
+                    "settings.profileVisibilityShowTaggedBoardGameMatches",
+                  ],
+                ] as const
+              ).map(([key, labelKey]) => (
+                <motion.div
+                  key={key}
+                  className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                >
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium text-[var(--color-lightest)]">
+                      {t(labelKey)}
+                    </span>
+                  </div>
+                  <div className="shrink-0 pt-0.5">
+                    <Switch
+                      checked={profileVisibility[key]}
+                      disabled={
+                        visibilitySaving || !me || !profileVisibility.showPublicProfile
+                      }
+                      onCheckedChange={(v) => void handleProfileVisibilityChange(key, v)}
+                      aria-label={t(labelKey)}
+                    />
+                  </div>
+                </motion.div>
+              ))}
+              <p className="pb-2 pt-4 text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
                 {t("settings.profileVisibilitySectionLogs")}
               </p>
               {(

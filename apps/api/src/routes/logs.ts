@@ -265,6 +265,7 @@ import {
 import { stringifyLogAffinityContext, logAffinityContextSchema } from "../lib/logAffinityContext.js";
 import { hoursFromCompletedLogForStats, rollupHoursFromCompletedLogs } from "../lib/completedLogHours.js";
 import { attachBoardGameSessionHours } from "../lib/boardGameSessionHours.js";
+import { syncTaggedPlayersBoardGameLogs } from "../lib/boardGameTaggedPlayerSync.js";
 import {
   countBoardGameWinsForStats,
   gamePlatformStatsForUser,
@@ -921,9 +922,17 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       lifetimeNetByCurrency,
     };
     const highlightWhere = freeMonthWhere ?? undefined;
+    const taggedPlayedAtWhere = freeMonthRange
+      ? { playedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+      : undefined;
+    const boardGameWinsOpts = taggedPlayedAtWhere ? { taggedPlayedAtWhere } : undefined;
     if (!statsMediaType) {
       summaryPayload.totalPagesRead = await sumAllPagesReadForStats(userId, highlightWhere);
-      summaryPayload.boardGamesWon = await countBoardGameWinsForStats(userId, highlightWhere);
+      summaryPayload.boardGamesWon = await countBoardGameWinsForStats(
+        userId,
+        highlightWhere,
+        boardGameWinsOpts
+      );
     } else {
       if (isReadingMediaType(statsMediaType)) {
         summaryPayload.totalPagesRead = await sumPagesReadForStats(
@@ -933,7 +942,11 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
         );
       }
       if (statsMediaType === "boardgames") {
-        summaryPayload.boardGamesWon = await countBoardGameWinsForStats(userId, highlightWhere);
+        summaryPayload.boardGamesWon = await countBoardGameWinsForStats(
+          userId,
+          highlightWhere,
+          boardGameWinsOpts
+        );
       }
     }
     res.json({
@@ -1981,7 +1994,18 @@ logsRouter.post("/:id/board-game-matches", async (req: AuthenticatedRequest, res
   const logId = req.params.id;
   const log = await prisma.log.findFirst({
     where: { id: logId, userId },
-    select: { id: true, mediaType: true, matchesPlayed: true, status: true },
+    select: {
+      id: true,
+      mediaType: true,
+      matchesPlayed: true,
+      status: true,
+      externalId: true,
+      title: true,
+      image: true,
+      boardGameSource: true,
+      genres: true,
+      mechanics: true,
+    },
   });
   if (!log) {
     res.status(404).json({ error: "Log not found" });
@@ -2034,7 +2058,7 @@ logsRouter.post("/:id/board-game-matches", async (req: AuthenticatedRequest, res
   try {
     const now = new Date();
     const bumpToPlayed = log.status !== "played";
-    const [match, updatedLog] = await prisma.$transaction(async (tx) => {
+    const [match, updatedLog, createdTaggedLogUserIds] = await prisma.$transaction(async (tx) => {
       for (const pl of playersPayload) {
         if (pl.appUserId) continue;
         const rawLabel = pl.name.trim();
@@ -2077,8 +2101,29 @@ logsRouter.post("/:id/board-game-matches", async (req: AuthenticatedRequest, res
             : {}),
         },
       });
-      return [m, ul] as const;
+      const createdTaggedLogUserIds = await syncTaggedPlayersBoardGameLogs(tx, {
+        hostUserId: userId,
+        hostLog: {
+          externalId: log.externalId,
+          title: log.title,
+          image: log.image,
+          boardGameSource: log.boardGameSource,
+          genres: log.genres,
+          mechanics: log.mechanics,
+        },
+        playersPayload,
+        playedAt,
+        durationHours,
+        playersJson,
+        notes,
+      });
+      return [m, ul, createdTaggedLogUserIds] as const;
     });
+    for (const taggedUserId of createdTaggedLogUserIds) {
+      handleLogCreated(taggedUserId).catch((err) => {
+        console.error("Gamification (tagged player log):", err);
+      });
+    }
     res.status(201).json({
       match: serializeBoardGameMatchRow(match),
       log: serializeLog(updatedLog),

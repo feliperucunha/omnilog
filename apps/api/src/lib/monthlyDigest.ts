@@ -6,6 +6,7 @@ import { prisma } from "./prisma.js";
 import { logSpendStatsDateWhereHalfOpen } from "./purchaseFields.js";
 import { rollupHoursFromCompletedLogs, type CompletedLogForHours } from "./completedLogHours.js";
 import { attachBoardGameSessionHours } from "./boardGameSessionHours.js";
+import { buildBoardGameMatchStatsWhere } from "./statsCategoryMetrics.js";
 import { isSmtpConfigured, sendMonthlyDigestEmail } from "./email.js";
 import { APP_SETTING_KEYS, getAppSettingValue, upsertAppSettingValue } from "./appSettings.js";
 import {
@@ -95,7 +96,7 @@ export type UserDigestStats = {
   logsWithPositiveHours: number;
   /** Totals per ISO 4217 currency code (minor units summed). */
   spendByCurrency: Record<string, number>;
-  /** BoardGameMatch rows with playedAt in the digest window (user’s logs only). */
+  /** BoardGameMatch rows with playedAt in the digest window (own logs + tagged on others' logs). */
   boardGameSessionsLogged: number;
   /** Logs with mediaType boardgames and completedAt in the window. */
   boardGamesCompleted: number;
@@ -152,10 +153,9 @@ export async function computeUserDigestStats(userId: string, period: DigestPerio
       select: { purchaseAmountMinor: true, purchaseCurrency: true },
     }),
     prisma.boardGameMatch.count({
-      where: {
-        playedAt: { gte: start, lt: endExclusive },
-        log: { userId },
-      },
+      where: buildBoardGameMatchStatsWhere(userId, {
+        playedAtWhere: { playedAt: { gte: start, lt: endExclusive } },
+      }),
     }),
     prisma.log.count({
       where: {

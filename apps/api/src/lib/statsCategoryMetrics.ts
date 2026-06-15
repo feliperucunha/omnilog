@@ -1,4 +1,5 @@
 import type { BoardGameMatchPlayer, BoardGameProvider, MediaType } from "@geeklogs/shared";
+import { boardGameScoreTrend } from "@geeklogs/shared";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
 const READING_MEDIA_TYPES = ["books", "manga", "comics"] as const;
@@ -45,6 +46,53 @@ function userScoreFromMatch(players: BoardGameMatchPlayer[], userId: string): nu
   return score;
 }
 
+function taggedPlayerJsonContains(userId: string): string {
+  return `"appUserId":"${userId}"`;
+}
+
+function userTaggedInMatch(players: BoardGameMatchPlayer[], userId: string): boolean {
+  return players.some((p) => p.appUserId === userId);
+}
+
+export function buildBoardGameMatchStatsWhere(
+  userId: string,
+  opts: {
+    playedAtWhere?: Prisma.BoardGameMatchWhereInput;
+    logWhere?: Prisma.LogWhereInput;
+    taggedPlayedAtWhere?: Prisma.BoardGameMatchWhereInput;
+    includeTaggedMatches?: boolean;
+  } = {}
+): Prisma.BoardGameMatchWhereInput {
+  const ownLogFilter: Prisma.LogWhereInput = {
+    userId,
+    mediaType: "boardgames",
+    ...(opts.logWhere ?? {}),
+  };
+
+  const ownBranch: Prisma.BoardGameMatchWhereInput = {
+    log: ownLogFilter,
+    ...(opts.playedAtWhere ?? {}),
+  };
+
+  if (opts.includeTaggedMatches === false) {
+    return ownBranch;
+  }
+
+  const taggedParts: Prisma.BoardGameMatchWhereInput[] = [
+    { players: { contains: taggedPlayerJsonContains(userId) } },
+    { log: { mediaType: "boardgames", NOT: { userId } } },
+  ];
+  const taggedPlayedAt = opts.taggedPlayedAtWhere ?? opts.playedAtWhere;
+  if (taggedPlayedAt) taggedParts.push(taggedPlayedAt);
+
+  const branches: Prisma.BoardGameMatchWhereInput[] = [
+    ownBranch,
+    { AND: taggedParts },
+  ];
+
+  return { OR: branches };
+}
+
 export type RecentBoardGameStatEntry = {
   logId: string;
   externalId: string;
@@ -55,6 +103,7 @@ export type RecentBoardGameStatEntry = {
   wins: number;
   lastPlayedAt: string;
   lastScore: number | null;
+  lastScoreTrend: "higher" | "lower" | null;
 };
 
 export type BoardGameMatchStatsSort = "recent" | "mostPlayed" | "leastPlayed";
@@ -63,12 +112,13 @@ export async function recentBoardGamesForStats(
   userId: string,
   playedAtWhere?: Prisma.BoardGameMatchWhereInput,
   sort: BoardGameMatchStatsSort = "recent",
-  limit = 24
+  limit = 24,
+  opts?: { includeTaggedMatches?: boolean }
 ): Promise<RecentBoardGameStatEntry[]> {
-  const base: Prisma.BoardGameMatchWhereInput = {
-    log: { userId, mediaType: "boardgames" },
-  };
-  const where = playedAtWhere ? { AND: [base, playedAtWhere] } : base;
+  const where = buildBoardGameMatchStatsWhere(userId, {
+    playedAtWhere,
+    includeTaggedMatches: opts?.includeTaggedMatches,
+  });
   const rows = await prisma.boardGameMatch.findMany({
     where,
     select: {
@@ -77,6 +127,7 @@ export async function recentBoardGamesForStats(
       log: {
         select: {
           id: true,
+          userId: true,
           externalId: true,
           title: true,
           image: true,
@@ -93,28 +144,66 @@ export async function recentBoardGamesForStats(
     wins: number;
     lastPlayedAt: Date;
     lastScore: number | null;
+    lastScoreTrend: "higher" | "lower" | null;
   };
-  const byLog = new Map<string, Acc>();
 
+  const sessionRows = new Map<string, (typeof rows)[number]>();
   for (const row of rows) {
-    const logId = row.log.id;
     const players = parseBoardGamePlayersJson(row.players);
-    let acc = byLog.get(logId);
+    const isOwnLog = row.log.userId === userId;
+    if (!isOwnLog && !userTaggedInMatch(players, userId)) continue;
+    const sessionKey = `${row.log.externalId}:${row.playedAt.getTime()}`;
+    const existing = sessionRows.get(sessionKey);
+    if (!existing) {
+      sessionRows.set(sessionKey, row);
+      continue;
+    }
+    if (isOwnLog && existing.log.userId !== userId) {
+      sessionRows.set(sessionKey, row);
+    }
+  }
+
+  const byExternalId = new Map<string, Acc>();
+
+  for (const row of sessionRows.values()) {
+    const externalId = row.log.externalId;
+    const players = parseBoardGamePlayersJson(row.players);
+    let acc = byExternalId.get(externalId);
     if (!acc) {
       acc = {
         log: row.log,
         matchCount: 0,
         wins: 0,
         lastPlayedAt: row.playedAt,
-        lastScore: userScoreFromMatch(players, userId),
+        lastScore: null,
+        lastScoreTrend: null,
       };
-      byLog.set(logId, acc);
+      byExternalId.set(externalId, acc);
     }
     acc.matchCount += 1;
     if (matchCountsAsWinForUser(players, userId)) acc.wins += 1;
+    if (row.playedAt.getTime() > acc.lastPlayedAt.getTime()) {
+      acc.lastPlayedAt = row.playedAt;
+    }
+    if (row.log.userId === userId) {
+      acc.log = row.log;
+    }
   }
 
-  const sorted = [...byLog.values()].sort((a, b) => {
+  for (const [externalId, acc] of byExternalId) {
+    const scoredSessions = [...sessionRows.values()]
+      .filter((row) => row.log.externalId === externalId)
+      .map((row) => ({
+        playedAt: row.playedAt,
+        score: userScoreFromMatch(parseBoardGamePlayersJson(row.players), userId),
+      }))
+      .filter((row): row is { playedAt: Date; score: number } => row.score != null)
+      .sort((a, b) => b.playedAt.getTime() - a.playedAt.getTime());
+    acc.lastScore = scoredSessions[0]?.score ?? null;
+    acc.lastScoreTrend = boardGameScoreTrend(scoredSessions[0]?.score, scoredSessions[1]?.score);
+  }
+
+  const sorted = [...byExternalId.values()].sort((a, b) => {
     if (sort === "mostPlayed") {
       if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
       return b.lastPlayedAt.getTime() - a.lastPlayedAt.getTime();
@@ -137,6 +226,7 @@ export async function recentBoardGamesForStats(
       wins: entry.wins,
       lastPlayedAt: entry.lastPlayedAt.toISOString(),
       lastScore: entry.lastScore,
+      lastScoreTrend: entry.lastScoreTrend,
     }));
 }
 
@@ -172,17 +262,30 @@ export async function sumPagesReadForStats(
 
 export async function countBoardGameWinsForStats(
   userId: string,
-  logWhere?: Prisma.LogWhereInput
+  logWhere?: Prisma.LogWhereInput,
+  opts?: {
+    taggedPlayedAtWhere?: Prisma.BoardGameMatchWhereInput;
+    includeTaggedMatches?: boolean;
+  }
 ): Promise<number> {
-  const base: Prisma.LogWhereInput = { userId, mediaType: "boardgames" };
-  const where = logWhere ? { AND: [base, logWhere] } : base;
-  const matches = await prisma.boardGameMatch.findMany({
-    where: { log: where },
-    select: { players: true },
+  const where = buildBoardGameMatchStatsWhere(userId, {
+    logWhere,
+    taggedPlayedAtWhere: opts?.taggedPlayedAtWhere,
+    includeTaggedMatches: opts?.includeTaggedMatches,
   });
+  const matches = await prisma.boardGameMatch.findMany({
+    where,
+    select: { players: true, playedAt: true, log: { select: { userId: true, externalId: true } } },
+  });
+  const seenSessions = new Set<string>();
   let wins = 0;
   for (const row of matches) {
     const players = parseBoardGamePlayersJson(row.players);
+    const isOwnLog = row.log.userId === userId;
+    if (!isOwnLog && !userTaggedInMatch(players, userId)) continue;
+    const sessionKey = `${row.log.externalId}:${row.playedAt.getTime()}`;
+    if (seenSessions.has(sessionKey)) continue;
+    seenSessions.add(sessionKey);
     if (matchCountsAsWinForUser(players, userId)) wins += 1;
   }
   return wins;

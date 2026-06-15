@@ -21,6 +21,7 @@ import {
 import { attachBoardGameSessionHours } from "../lib/boardGameSessionHours.js";
 import { hoursFromCompletedLogForStats } from "../lib/completedLogHours.js";
 import { marketSellerSelect, serializeMarketListing } from "../lib/marketListing.js";
+import { recentBoardGamesForStats } from "../lib/statsCategoryMetrics.js";
 
 /** Public (no auth) read-only profile and logs for sharing. */
 
@@ -173,6 +174,38 @@ usersRouter.get("/:identifier/market/listings", async (req: Request<{ identifier
     take: 48,
   });
   res.json({ data: rows.map(serializeMarketListing) });
+});
+
+/** GET /users/:identifier/board-games/matches — public board game match stats for profile. */
+usersRouter.get("/:identifier/board-games/matches", async (req: Request<{ identifier: string }>, res: Response) => {
+  const { identifier } = req.params;
+  const ctx = await requirePublicUser(identifier);
+  if (!ctx) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (!ctx.visibleMediaTypes.includes("boardgames")) {
+    res.json({ data: [], period: "month", sort: "recent" });
+    return;
+  }
+  const periodRaw = typeof req.query.period === "string" ? req.query.period.trim() : "month";
+  const period = periodRaw === "year" ? "year" : "month";
+  const tzRaw = req.query.timezoneOffsetMinutes;
+  const tzOffsetMinutes =
+    typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
+      ? parseInt(tzRaw, 10)
+      : 0;
+  const range = purchaseLogCreatedAtRange(period, tzOffsetMinutes);
+  const playedAtWhere = range
+    ? { playedAt: { gte: range.gte, lte: range.lte } }
+    : undefined;
+  const sortRaw = typeof req.query.sort === "string" ? req.query.sort.trim() : "recent";
+  const sort =
+    sortRaw === "mostPlayed" ? "mostPlayed" : sortRaw === "leastPlayed" ? "leastPlayed" : "recent";
+  const data = await recentBoardGamesForStats(ctx.user.id, playedAtWhere, sort, 24, {
+    includeTaggedMatches: ctx.visibility.showTaggedBoardGameMatches,
+  });
+  res.json({ data, period, sort });
 });
 
 /** GET /users/:identifier/logs/stats?group=category|month|year - Public stats. No auth. */

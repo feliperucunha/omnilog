@@ -334,6 +334,7 @@ const profileVisibilitySchema = z.object({
   showTvMetadata: z.boolean(),
   showEnrichmentDetails: z.boolean(),
   showMarketListings: z.boolean(),
+  showTaggedBoardGameMatches: z.boolean(),
 });
 
 /** GET /settings/profile-visibility — what visitors see on the public profile. */

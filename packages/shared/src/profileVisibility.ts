@@ -22,6 +22,8 @@ export interface ProfileVisibility {
   showEnrichmentDetails: boolean;
   /** Active market listings on the public profile. */
   showMarketListings: boolean;
+  /** Board game sessions logged by others where this user is tagged as a player. */
+  showTaggedBoardGameMatches: boolean;
 }
 
 export const DEFAULT_PROFILE_VISIBILITY: ProfileVisibility = {
@@ -40,6 +42,7 @@ export const DEFAULT_PROFILE_VISIBILITY: ProfileVisibility = {
   showTvMetadata: true,
   showEnrichmentDetails: true,
   showMarketListings: true,
+  showTaggedBoardGameMatches: false,
 };
 
 const VISIBILITY_KEYS = Object.keys(DEFAULT_PROFILE_VISIBILITY) as (keyof ProfileVisibility)[];

@@ -288,6 +288,8 @@
     "profileVisibilityShowEnrichmentDetails": "Page count, player counts",
     "profileVisibilitySectionMarket": "Market",
     "profileVisibilityShowMarketListings": "Market listings",
+    "profileVisibilitySectionBoardGames": "Board games",
+    "profileVisibilityShowTaggedBoardGameMatches": "Matches others tagged me in",
     "appNavigationTitle": "Categories & tabs",
     "appNavigationProOnlyIntro": "Show or hide media categories in the sidebar and search, and drag to reorder them. Upgrade to Pro to customize.",
     "publicProfileUpgrade": "View plans",
@@ -407,7 +409,8 @@
     "title": "Public profile",
     "titleWithName": "{{name}}'s log",
     "pinnedHighlights": "Highlights ({{count}})",
-    "marketSection": "For sale"
+    "marketSection": "For sale",
+    "boardGamesMatchesSection": "Matches played"
   },
   "social": {
     "follow": "Follow",
@@ -731,10 +734,10 @@
     "suggestionsAppMembers": "On Geeklogs",
     "suggestionsSavedNames": "Your saved names",
     "useTypedAsCustom": "Use “{{name}}” as a custom name (saved for next time)",
-    "scoreTrendHigherTitle": "More points than last session",
-    "scoreTrendLowerTitle": "Fewer points than last session",
-    "scoreTrendHigherAria": "Scored higher than in the previous session for this game",
-    "scoreTrendLowerAria": "Scored lower than in the previous session for this game"
+    "scoreTrendHigherTitle": "More points than your last play",
+    "scoreTrendLowerTitle": "Fewer points than your last play",
+    "scoreTrendHigherAria": "Scored higher than the last time you played this game",
+    "scoreTrendLowerAria": "Scored lower than the last time you played this game"
   },
   "tvReviews": {
     "tabShow": "Series",

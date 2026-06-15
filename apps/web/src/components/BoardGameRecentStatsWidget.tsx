@@ -8,7 +8,8 @@ import { tapScale, tapTransition } from "@/lib/animations";
 import { itemDetailPath } from "@/lib/itemRoutes";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
 import type { TFunction } from "@/contexts/LocaleContext";
-import type { BoardGameProvider } from "@geeklogs/shared";
+import type { BoardGameProvider, BoardGameScoreTrend } from "@geeklogs/shared";
+import { BoardGameScoreWithTrend } from "@/components/BoardGameScoreWithTrend";
 import { cn } from "@/lib/utils";
 
 export type RecentBoardGameStatEntry = {
@@ -21,6 +22,7 @@ export type RecentBoardGameStatEntry = {
   wins: number;
   lastPlayedAt: string;
   lastScore: number | null;
+  lastScoreTrend?: BoardGameScoreTrend | null;
 };
 
 function formatLastPlayedLabel(iso: string, locale: string, t: TFunction): string {
@@ -135,8 +137,14 @@ export function BoardGameRecentStatsWidget({
                 </span>
                 {game.lastScore != null && (
                   <span className="inline-flex items-center gap-1 text-xs tabular-nums text-[var(--color-lightest)]">
-                    <Trophy className="h-3 w-3 text-amber-400/90" aria-hidden />
-                    {game.lastScore}
+                    <Trophy className="h-3 w-3 shrink-0 text-amber-400/90" aria-hidden />
+                    <BoardGameScoreWithTrend
+                      score={game.lastScore}
+                      trend={game.lastScoreTrend ?? null}
+                      t={t}
+                      showPointsLabel={false}
+                      className="inline-flex items-center gap-1"
+                    />
                   </span>
                 )}
                 {game.lastScore == null && game.wins > 0 && (
