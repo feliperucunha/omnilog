@@ -15,12 +15,13 @@ from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RES = REPO_ROOT / "apps/android/android/app/src/main/res"
-# Same asset as splash + adaptive icon foreground (drawable/splash_icon.xml, mipmap-anydpi-v26)
+# Same asset as splash + adaptive icon foreground (drawable/logo_splash.png, mipmap-anydpi-v26)
 LOGO_SRC = REPO_ROOT / "apps/web/public/logo-dark.png"
 DRAWABLE_LOGO = RES / "drawable" / "logo_splash.png"
 SPLASH_LOGO_PX = 432
 # Match adaptive icon foreground scale
 LOGO_SCALE = 0.65
+FOREGROUND_LOGO_SCALE = 0.58
 
 
 def composite_icon(size: int, src: Path) -> Image.Image:
@@ -34,6 +35,19 @@ def composite_icon(size: int, src: Path) -> Image.Image:
     x, y = (size - nw) // 2, (size - nh) // 2
     bg.alpha_composite(logo, (x, y))
     return bg
+
+
+def composite_foreground(size: int, src: Path) -> Image.Image:
+    logo = Image.open(src).convert("RGBA")
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    lw, lh = logo.size
+    target = int(size * FOREGROUND_LOGO_SCALE)
+    ratio = min(target / lw, target / lh)
+    nw, nh = max(1, int(lw * ratio)), max(1, int(lh * ratio))
+    logo = logo.resize((nw, nh), Image.Resampling.LANCZOS)
+    x, y = (size - nw) // 2, (size - nh) // 2
+    canvas.alpha_composite(logo, (x, y))
+    return canvas
 
 
 def composite_splash_logo(size: int, src: Path) -> Image.Image:
@@ -83,7 +97,7 @@ def main() -> None:
 
     for folder, px in foreground.items():
         out_dir = RES / folder
-        img = composite_icon(px, LOGO_SRC)
+        img = composite_foreground(px, LOGO_SRC)
         img.save(out_dir / "ic_launcher_foreground.png", optimize=True)
 
     print("Updated mipmap ic_launcher / ic_launcher_round / ic_launcher_foreground.")
