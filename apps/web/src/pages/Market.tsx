@@ -20,7 +20,6 @@ import {
 import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { MarketListingCard } from "@/components/MarketListingCard";
-import { MarketListingDrawer } from "@/components/MarketListingDrawer";
 import {
   MarketLocationCombobox,
   buildPresetCountries,
@@ -64,8 +63,6 @@ export function Market() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [drawerListing, setDrawerListing] = useState<MarketListing | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const locationInitialized = useRef(false);
   const skipSortResetOnCategoryChange = useRef(
     Boolean(initialSort && isMarketSortValue(initialSort))
@@ -198,11 +195,6 @@ export function Market() {
     return () => setBelowNavbar?.(null);
   }, [category, t, setBelowNavbar]);
 
-  const handleOpenListing = (listing: MarketListing) => {
-    setDrawerListing(listing);
-    setDrawerOpen(true);
-  };
-
   return (
     <div className="flex w-full min-w-0 flex-col gap-4">
       <Card
@@ -282,7 +274,6 @@ export function Market() {
                 listing={listing}
                 t={t}
                 locale={locale}
-                onOpen={handleOpenListing}
               />
             </motion.div>
           ))}
@@ -312,17 +303,6 @@ export function Market() {
         </div>
       )}
 
-      <MarketListingDrawer
-        listing={drawerListing}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        t={t}
-        locale={locale}
-        onDeleted={(listingId) => {
-          setListings((prev) => prev.filter((l) => l.id !== listingId));
-          setDrawerListing(null);
-        }}
-      />
     </div>
   );
 }

@@ -140,7 +140,17 @@
     "discountBadge": "{{percent}}% dto.",
     "deleteListing": "Eliminar anuncio",
     "deleteListingConfirm": "¿Seguro que quieres quitar este anuncio del Mercado?",
-    "listingDeleted": "Anuncio eliminado"
+    "listingDeleted": "Anuncio eliminado",
+    "shareListing": "Compartir enlace",
+    "editListing": "Editar anuncio",
+    "listingNotFound": "Este anuncio ya no está disponible.",
+    "backToMarket": "Volver al Mercado",
+    "shareStore": "Compartir tienda",
+    "userStoreTitle": "Tienda de {{name}}",
+    "viewAllListings": "Ver todo",
+    "viewSellerProfile": "Ver perfil",
+    "noStoreListings": "No hay anuncios en esta categoría.",
+    "storeNotFound": "Esta tienda no está disponible."
   },
   "marketSort": {
     "listedNewest": "Fecha de publicación (más reciente)",

@@ -56,6 +56,7 @@ const lazyWithChunkRecovery = <T extends ComponentType<unknown>>(
 const Statistics = lazyWithChunkRecovery(() => import("@/pages/Statistics").then((m) => ({ default: m.Statistics })));
 const Search = lazyWithChunkRecovery(() => import("@/pages/Search").then((m) => ({ default: m.Search })));
 const Market = lazyWithChunkRecovery(() => import("@/pages/Market").then((m) => ({ default: m.Market })));
+const MarketListingPage = lazyWithChunkRecovery(() => import("@/pages/MarketListingPage").then((m) => ({ default: m.MarketListingPage })));
 const MyListings = lazyWithChunkRecovery(() => import("@/pages/MyListings").then((m) => ({ default: m.MyListings })));
 const ItemPage = lazyWithChunkRecovery(() => import("@/pages/ItemPage").then((m) => ({ default: m.ItemPage })));
 const Settings = lazyWithChunkRecovery(() => import("@/pages/Settings").then((m) => ({ default: m.Settings })));
@@ -64,6 +65,7 @@ const Tiers = lazyWithChunkRecovery(() => import("@/pages/Tiers").then((m) => ({
 const FAQ = lazyWithChunkRecovery(() => import("@/pages/FAQ").then((m) => ({ default: m.FAQ })));
 const Privacy = lazyWithChunkRecovery(() => import("@/pages/Privacy").then((m) => ({ default: m.Privacy })));
 const Terms = lazyWithChunkRecovery(() => import("@/pages/Terms").then((m) => ({ default: m.Terms })));
+const UserStorePage = lazyWithChunkRecovery(() => import("@/pages/UserStorePage").then((m) => ({ default: m.UserStorePage })));
 
 function LazyRouteFallback() {
   return (
@@ -125,6 +127,7 @@ export default function App() {
               <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
               <Route path="search" element={<Search />} />
+              <Route path="market/listing/:listingId" element={<MarketListingPage />} />
               <Route path="market" element={<Market />} />
               <Route path="my-listings" element={<ProtectedRoute><MyListings /></ProtectedRoute>} />
               <Route path="about" element={<About />} />
@@ -146,6 +149,14 @@ export default function App() {
           </Route>
           <Route path="/:userId" element={<PublicProfileLayout />}>
             <Route index element={<PublicProfile />} />
+            <Route
+              path="store"
+              element={
+                <Suspense fallback={<LazyRouteFallback />}>
+                  <UserStorePage />
+                </Suspense>
+              }
+            />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

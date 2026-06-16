@@ -11,11 +11,11 @@ import {
   type RecentBoardGameStatEntry,
 } from "@/components/BoardGameRecentStatsWidget";
 import { MarketListingCard } from "@/components/MarketListingCard";
-import { MarketListingDrawer } from "@/components/MarketListingDrawer";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
-import { MEDIA_TYPES, type MediaType, type MarketListing, toMediaType } from "@geeklogs/shared";
+import { MEDIA_TYPES, type MediaType, type MarketListing, type MarketListingsResponse, toMediaType } from "@geeklogs/shared";
+import { userStorePath } from "@/lib/userStoreRoutes";
 import {
   MediaLogs,
   type CollectionListFilter,
@@ -61,6 +61,8 @@ const RESERVED_PATHS = new Set([
   "manga",
   "comics",
   "api",
+  "store",
+  "my-listings",
 ]);
 
 interface ProfileBadge {
@@ -97,8 +99,6 @@ export function PublicProfile() {
   const [marketListings, setMarketListings] = useState<MarketListing[]>([]);
   const [boardGameMatches, setBoardGameMatches] = useState<RecentBoardGameStatEntry[]>([]);
   const [boardGameMatchesLoading, setBoardGameMatchesLoading] = useState(false);
-  const [drawerListing, setDrawerListing] = useState<MarketListing | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const isOwnProfile = !!me?.user?.id && !!profile?.id && me.user.id === profile.id;
 
   const visibleTypes = profile?.visibleMediaTypes ?? [];
@@ -153,7 +153,7 @@ export function PublicProfile() {
 
   useEffect(() => {
     if (!userId || !profile) return;
-    apiFetchPublic<{ data: MarketListing[] }>(`/users/${userId}/market/listings`)
+    apiFetchPublic<MarketListingsResponse>(`/users/${userId}/market/listings?limit=6`)
       .then((res) => setMarketListings(res.data ?? []))
       .catch(() => setMarketListings([]));
   }, [userId, profile?.id]);
@@ -454,9 +454,17 @@ export function PublicProfile() {
           aria-label={t("publicProfile.marketSection")}
           className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
         >
-          <h2 className="min-w-0 text-lg font-semibold text-[var(--color-lightest)]">
-            <OverflowMarquee>{t("publicProfile.marketSection")}</OverflowMarquee>
-          </h2>
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <h2 className="min-w-0 flex-1 text-lg font-semibold text-[var(--color-lightest)]">
+              <OverflowMarquee>{t("publicProfile.marketSection")}</OverflowMarquee>
+            </h2>
+            <Link
+              to={userStorePath(profile?.username?.trim() || profile?.id || userId || "")}
+              className="shrink-0 text-sm text-blue-500 hover:underline dark:text-blue-400"
+            >
+              {t("market.viewAllListings")}
+            </Link>
+          </div>
           <motion.div
             {...listStaggerParentProps}
             className={cn(LOG_LIST_CARD_GRID_DENSE)}
@@ -471,10 +479,6 @@ export function PublicProfile() {
                   listing={listing}
                   t={t}
                   locale={locale}
-                  onOpen={(row) => {
-                    setDrawerListing(row);
-                    setDrawerOpen(true);
-                  }}
                 />
               </motion.div>
             ))}
@@ -534,21 +538,6 @@ export function PublicProfile() {
         </section>
       )}
       </div>
-      <MarketListingDrawer
-        listing={drawerListing}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        t={t}
-        locale={locale}
-        onDeleted={
-          isOwnProfile
-            ? (listingId) => {
-                setMarketListings((prev) => prev.filter((l) => l.id !== listingId));
-                setDrawerListing(null);
-              }
-            : undefined
-        }
-      />
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
-import { LOG_STATUS_OPTIONS, MEDIA_TYPES, SPEND_TRACKED_MEDIA_TYPES } from "@geeklogs/shared";
+import { z } from "zod";
+import { LOG_STATUS_OPTIONS, MARKET_MEDIA_TYPES, MEDIA_TYPES, SPEND_TRACKED_MEDIA_TYPES } from "@geeklogs/shared";
 import type { MediaType } from "@geeklogs/shared";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
@@ -20,7 +21,12 @@ import {
 } from "../lib/profileVisibility.js";
 import { attachBoardGameSessionHours } from "../lib/boardGameSessionHours.js";
 import { hoursFromCompletedLogForStats } from "../lib/completedLogHours.js";
-import { marketSellerSelect, serializeMarketListing } from "../lib/marketListing.js";
+import {
+  buildMarketListingSearchFilter,
+  fetchMarketListingsPage,
+  MARKET_LISTINGS_PAGE_SIZE,
+  resolveMarketSort,
+} from "../lib/marketListingPagination.js";
 import { recentBoardGamesForStats } from "../lib/statsCategoryMetrics.js";
 
 /** Public (no auth) read-only profile and logs for sharing. */
@@ -155,25 +161,47 @@ async function requirePublicUser(identifier: string) {
   return { user, visibility, visibleMediaTypes: parseVisibleMediaTypes(user) };
 }
 
-/** GET /users/:identifier/market/listings — public active market listings for profile. */
+/** GET /users/:identifier/market/listings — public active market listings for profile / store. */
+const userStoreListQuerySchema = z.object({
+  mediaType: z.enum(MARKET_MEDIA_TYPES).optional(),
+  q: z.string().max(128).optional(),
+  sort: z.string().optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(48).optional(),
+});
+
 usersRouter.get("/:identifier/market/listings", async (req: Request<{ identifier: string }>, res: Response) => {
   const { identifier } = req.params;
+  const parsed = userStoreListQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
   const ctx = await requirePublicUser(identifier);
   if (!ctx) {
     res.status(404).json({ error: "User not found" });
     return;
   }
   if (!ctx.visibility.showMarketListings) {
-    res.json({ data: [] });
+    res.json({ data: [], nextCursor: null });
     return;
   }
-  const rows = await prisma.marketListing.findMany({
-    where: { userId: ctx.user.id, active: true },
-    include: { user: { select: marketSellerSelect } },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: 48,
-  });
-  res.json({ data: rows.map(serializeMarketListing) });
+  const { mediaType, q, cursor } = parsed.data;
+  const limit = parsed.data.limit ?? MARKET_LISTINGS_PAGE_SIZE;
+  const sort = resolveMarketSort(parsed.data.sort);
+
+  const filters: Prisma.MarketListingWhereInput = {
+    active: true,
+    userId: ctx.user.id,
+  };
+  if (mediaType) filters.mediaType = mediaType;
+  const searchFilter = buildMarketListingSearchFilter(q);
+  if (searchFilter) {
+    Object.assign(filters, searchFilter);
+  }
+
+  const body = await fetchMarketListingsPage({ filters, sort, cursor, limit });
+  res.json(body);
 });
 
 /** GET /users/:identifier/board-games/matches — public board game match stats for profile. */

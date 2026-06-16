@@ -140,7 +140,17 @@
     "discountBadge": "{{percent}}% off",
     "deleteListing": "Delete listing",
     "deleteListingConfirm": "Are you sure you want to remove this listing from the Market?",
-    "listingDeleted": "Listing removed"
+    "listingDeleted": "Listing removed",
+    "shareListing": "Share link",
+    "editListing": "Edit listing",
+    "listingNotFound": "This listing is no longer available.",
+    "backToMarket": "Back to Market",
+    "shareStore": "Share store",
+    "userStoreTitle": "{{name}}'s store",
+    "viewAllListings": "View all",
+    "viewSellerProfile": "View profile",
+    "noStoreListings": "No listings in this category.",
+    "storeNotFound": "This store is not available."
   },
   "marketSort": {
     "listedNewest": "Date listed (newest)",

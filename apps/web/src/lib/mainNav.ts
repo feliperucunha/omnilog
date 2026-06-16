@@ -12,6 +12,7 @@ export function getMainNavTransitionKey(pathname: string): string {
   if (pathname === "/" || pathname === "/search") return "nav-search";
   if (pathname.startsWith("/dashboard")) return "nav-dashboard";
   if (pathname.startsWith("/statistics")) return "nav-statistics";
+  if (pathname.startsWith("/market/listing/")) return "nav-market-listing";
   if (pathname.startsWith("/market")) return "nav-market";
   if (pathname.startsWith("/my-listings")) return "nav-my-listings";
   if (pathname.startsWith("/settings")) return "nav-settings";

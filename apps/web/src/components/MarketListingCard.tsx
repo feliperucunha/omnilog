@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { Link } from "react-router-dom";
 import { Mail } from "lucide-react";
 import { WhatsAppIcon } from "@/components/WhatsAppIcon";
 import { Card } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import { OverflowMarquee } from "@/components/OverflowMarquee";
 import type { MarketListing } from "@geeklogs/shared";
 import { minorToAmountString } from "@/lib/moneyInput";
 import { marketListingDiscountPercent, marketListingHasDiscount } from "@/lib/marketListingDiscount";
+import { marketListingPath } from "@/lib/marketListingRoutes";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "@/contexts/LocaleContext";
 
@@ -41,12 +43,10 @@ export function MarketListingCard({
   listing,
   t,
   locale,
-  onOpen,
 }: {
   listing: MarketListing;
   t: TFunction;
   locale: string;
-  onOpen: (listing: MarketListing) => void;
 }) {
   const price = `${minorToAmountString(listing.priceMinor, listing.priceCurrency)} ${listing.priceCurrency}`;
   const discountPercent = marketListingDiscountPercent(listing);
@@ -65,9 +65,8 @@ export function MarketListingCard({
       className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-0"
       style={cardShadow}
     >
-      <button
-        type="button"
-        onClick={() => onOpen(listing)}
+      <Link
+        to={marketListingPath(listing.id)}
         className="relative block w-full shrink-0 overflow-hidden aspect-[2/3] text-left"
       >
         <ItemImage
@@ -80,15 +79,14 @@ export function MarketListingCard({
             {t("market.discountBadge", { percent: String(discountPercent) })}
           </span>
         )}
-      </button>
+      </Link>
       <div className="flex min-h-0 flex-1 flex-col gap-1 p-2">
-        <button
-          type="button"
-          onClick={() => onOpen(listing)}
+        <Link
+          to={marketListingPath(listing.id)}
           className="block min-w-0 text-left font-semibold text-[var(--color-lightest)] hover:underline"
         >
           <OverflowMarquee className="text-xs leading-snug">{listing.title}</OverflowMarquee>
-        </button>
+        </Link>
         <p className="truncate text-[10px] text-[var(--color-light)]">
           {t("market.seller")}: {sellerName(listing)}
         </p>
