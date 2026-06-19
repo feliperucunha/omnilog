@@ -677,6 +677,16 @@ export function ItemReviewForm({
     await handleSubmit(e);
   };
 
+  const handleSaveMatchAndShowBanner = async () => {
+    if (!showBoardGameFields || itemMainTab !== "matches") return;
+    setSaving(true);
+    try {
+      await boardMatchesRef.current?.saveNewMatchAndShowBanner();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveButtonLabel = saving
     ? t("common.saving")
     : showBoardGameFields && itemMainTab === "matches"
@@ -1088,14 +1098,36 @@ export function ItemReviewForm({
         ) : null}
         {itemMainTab !== "market" && (
         <motion.div whileTap={tapScale} transition={tapTransition} className="mt-4">
-          <Button
-            type="button"
-            className="w-full"
-            disabled={saving}
-            onClick={(e) => void handlePrimarySave(e)}
-          >
-            {saveButtonLabel}
-          </Button>
+          {showBoardGameFields && itemMainTab === "matches" ? (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                className="w-full sm:flex-1"
+                disabled={saving}
+                onClick={(e) => void handlePrimarySave(e)}
+              >
+                {saveButtonLabel}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:flex-1"
+                disabled={saving}
+                onClick={() => void handleSaveMatchAndShowBanner()}
+              >
+                {saving ? t("common.saving") : t("boardGameMatches.saveMatchAndShowBanner")}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              className="w-full"
+              disabled={saving}
+              onClick={(e) => void handlePrimarySave(e)}
+            >
+              {saveButtonLabel}
+            </Button>
+          )}
         </motion.div>
         )}
       </Card>

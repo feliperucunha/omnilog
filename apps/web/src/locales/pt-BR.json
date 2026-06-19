@@ -735,6 +735,7 @@
     "addAnother": "Adicionar outra",
     "addAnotherSaved": "Partida contabilizada",
     "saveMatch": "Salvar partida",
+    "saveMatchAndShowBanner": "Salvar e mostrar banner",
     "noMatchesYet": "Nenhuma partida registrada ainda.",
     "winners": "Vencedores",
     "removeSession": "Remover sessão",
@@ -847,6 +848,11 @@
     "reading": "Lendo",
     "favorites": "Favoritos",
     "pending": "Pendente"
+  },
+  "boardGameMatchComplete": {
+    "sessionLogged": "Partida registrada",
+    "loggedWith": "Registrado com {{app}}",
+    "shareTitle": "{{title}} — partida de board game"
   },
   "logComplete": {
     "logged": "Registrado",

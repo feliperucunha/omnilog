@@ -47,6 +47,8 @@ import {
 import { cn } from "@/lib/utils";
 import { boardGameSessionDurationLabel, boardGameSessionDurationOptions } from "@/lib/boardGameSessionDuration";
 import { BoardGameScoreWithTrend } from "@/components/BoardGameScoreWithTrend";
+import { useBoardGameMatchComplete } from "@/contexts/BoardGameMatchCompleteContext";
+import { boardGameMatchCompleteStateFromSave } from "@/lib/boardGameMatchComplete";
 
 type PlayerRow = { name: string; score: string; winner: boolean; appUserId?: string | null };
 
@@ -321,6 +323,7 @@ function MatchPlayerNameField({
 
 export type BoardGameMatchesSectionHandle = {
   saveNewMatch: () => Promise<boolean>;
+  saveNewMatchAndShowBanner: () => Promise<boolean>;
 };
 
 export const BoardGameMatchesSection = forwardRef<
@@ -339,6 +342,7 @@ export const BoardGameMatchesSection = forwardRef<
 >(function BoardGameMatchesSection({ logId, onLogUpdated, onEnsureLog, embedded = false, onMatchSaved }, ref) {
   const { t, locale } = useLocale();
   const { me } = useMe();
+  const { showBoardGameMatchComplete } = useBoardGameMatchComplete();
   const meUser = me?.user;
   const [matches, setMatches] = useState<BoardGameMatch[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -397,7 +401,7 @@ export const BoardGameMatchesSection = forwardRef<
       durationHours: BoardGameSessionDurationHours,
       playersPayload: Array<{ name: string; score: number | null; winner: boolean; appUserId?: string }>,
       matchNotes: string | null,
-      options?: { resetAfter?: boolean },
+      options?: { resetAfter?: boolean; showBanner?: boolean },
     ): Promise<boolean> => {
       setSaving(true);
       try {
@@ -428,6 +432,9 @@ export const BoardGameMatchesSection = forwardRef<
         setMatches((prev) => [res.match, ...prev]);
         if (options?.resetAfter) resetForm();
         onMatchSaved?.(res.log);
+        if (options?.showBanner) {
+          showBoardGameMatchComplete(boardGameMatchCompleteStateFromSave(res.log, res.match));
+        }
         toast.success(t("boardGameMatches.saved"));
         return true;
       } catch (err) {
@@ -437,14 +444,14 @@ export const BoardGameMatchesSection = forwardRef<
         setSaving(false);
       }
     },
-    [logId, onEnsureLog, onLogUpdated, onMatchSaved, resetForm, t],
+    [logId, onEnsureLog, onLogUpdated, onMatchSaved, resetForm, showBoardGameMatchComplete, t],
   );
 
-  const handleSaveNew = useCallback(async (): Promise<boolean> => {
+  const validateAndBuildPlayers = useCallback(() => {
     const iso = dateInputToIso(playedDate);
     if (!iso) {
       toast.error(t("boardGameMatches.invalidDate"));
-      return false;
+      return null;
     }
     const trimmed = players.map((p) => ({
       name: p.name.trim(),
@@ -455,18 +462,24 @@ export const BoardGameMatchesSection = forwardRef<
     const withNames = trimmed.filter((p) => p.name.length > 0);
     if (withNames.length === 0) {
       toast.error(t("boardGameMatches.needPlayerName"));
-      return false;
+      return null;
     }
     for (const p of withNames) {
       if (p.score != null && !Number.isFinite(p.score)) {
         toast.error(t("boardGameMatches.invalidScore"));
-        return false;
+        return null;
       }
     }
+    return { iso, withNames };
+  }, [playedDate, players, t]);
+
+  const handleSaveNew = useCallback(async (): Promise<boolean> => {
+    const validated = validateAndBuildPlayers();
+    if (!validated) return false;
     return submitNewMatch(
-      iso,
+      validated.iso,
       sessionDurationHours,
-      withNames.map((p) => ({
+      validated.withNames.map((p) => ({
         name: p.name,
         score: p.score,
         winner: p.winner,
@@ -475,9 +488,30 @@ export const BoardGameMatchesSection = forwardRef<
       notes.trim() || null,
       { resetAfter: true },
     );
-  }, [notes, playedDate, players, sessionDurationHours, submitNewMatch, t]);
+  }, [notes, sessionDurationHours, submitNewMatch, validateAndBuildPlayers]);
 
-  useImperativeHandle(ref, () => ({ saveNewMatch: handleSaveNew }), [handleSaveNew]);
+  const handleSaveNewAndShowBanner = useCallback(async (): Promise<boolean> => {
+    const validated = validateAndBuildPlayers();
+    if (!validated) return false;
+    return submitNewMatch(
+      validated.iso,
+      sessionDurationHours,
+      validated.withNames.map((p) => ({
+        name: p.name,
+        score: p.score,
+        winner: p.winner,
+        appUserId: p.appUserId,
+      })),
+      notes.trim() || null,
+      { resetAfter: true, showBanner: true },
+    );
+  }, [notes, sessionDurationHours, submitNewMatch, validateAndBuildPlayers]);
+
+  useImperativeHandle(
+    ref,
+    () => ({ saveNewMatch: handleSaveNew, saveNewMatchAndShowBanner: handleSaveNewAndShowBanner }),
+    [handleSaveNew, handleSaveNewAndShowBanner],
+  );
 
   const performDeleteMatch = useCallback(
     async (matchId: string) => {
@@ -661,15 +695,27 @@ export const BoardGameMatchesSection = forwardRef<
           </div>
 
           {!embedded && (
-            <Button
-              type="button"
-              className="w-full"
-              disabled={saving}
-              onClick={() => void handleSaveNew()}
-            >
-              {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden /> : <Dice5 className="mr-2 h-5 w-5 opacity-90" aria-hidden />}
-              {saving ? t("common.saving") : t("boardGameMatches.saveMatch")}
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                className="w-full sm:flex-1"
+                disabled={saving}
+                onClick={() => void handleSaveNew()}
+              >
+                {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden /> : <Dice5 className="mr-2 h-5 w-5 opacity-90" aria-hidden />}
+                {saving ? t("common.saving") : t("boardGameMatches.saveMatch")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:flex-1"
+                disabled={saving}
+                onClick={() => void handleSaveNewAndShowBanner()}
+              >
+                {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden /> : <Dice5 className="mr-2 h-5 w-5 opacity-90" aria-hidden />}
+                {saving ? t("common.saving") : t("boardGameMatches.saveMatchAndShowBanner")}
+              </Button>
+            </div>
           )}
       </div>
 

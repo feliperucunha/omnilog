@@ -13,6 +13,7 @@ import { MeProvider } from "@/contexts/MeContext";
 import { MyMarketListingsProvider } from "@/contexts/MyMarketListingsContext";
 import { VisibleMediaTypesProvider } from "@/contexts/VisibleMediaTypesContext";
 import { LogCompleteProvider } from "@/contexts/LogCompleteContext";
+import { BoardGameMatchCompleteProvider } from "@/contexts/BoardGameMatchCompleteContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ApiWakePing } from "@/components/ApiWakePing";
 import { ColdStartLoader } from "@/components/ColdStartLoader";
@@ -45,6 +46,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <MyMarketListingsProvider>
                   <VisibleMediaTypesProvider>
                     <LogCompleteProvider>
+                      <BoardGameMatchCompleteProvider>
                       <CapacitorAndroidIntegration />
                       <LogsPageCacheInit />
                       <ThemeSync />
@@ -56,6 +58,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       <CookieConsentBanner />
                       <MobileAppInstallBanner />
                       <AppVersionModal />
+                      </BoardGameMatchCompleteProvider>
                     </LogCompleteProvider>
                   </VisibleMediaTypesProvider>
                   </MyMarketListingsProvider>

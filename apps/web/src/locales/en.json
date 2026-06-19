@@ -735,6 +735,7 @@
     "addAnother": "Add another",
     "addAnotherSaved": "Play logged",
     "saveMatch": "Save match",
+    "saveMatchAndShowBanner": "Save and show banner",
     "noMatchesYet": "No matches logged yet.",
     "winners": "Winners",
     "removeSession": "Remove session",
@@ -847,6 +848,11 @@
     "reading": "Reading",
     "favorites": "Favorites",
     "pending": "Pending"
+  },
+  "boardGameMatchComplete": {
+    "sessionLogged": "Session logged",
+    "loggedWith": "Logged with {{app}}",
+    "shareTitle": "{{title}} — board game session"
   },
   "logComplete": {
     "logged": "Logged",
