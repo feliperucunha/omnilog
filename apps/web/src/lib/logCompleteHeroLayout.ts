@@ -257,12 +257,15 @@ function shareHeroHeightForLayout(
   return Math.round(cardW * (3 / 2));
 }
 
-export function buildLogCompleteShareLayout(opts: {
-  heroLayout: LogCompleteHeroLayout;
-  compactShareLayout: boolean;
-  prioritizeText: boolean;
-  natural?: ImageNaturalSize | null;
-}): LogCompleteShareLayoutMetrics {
+function buildShareLayoutMetrics(
+  opts: {
+    heroLayout: LogCompleteHeroLayout;
+    compactShareLayout: boolean;
+    prioritizeText: boolean;
+    natural?: ImageNaturalSize | null;
+  },
+  bodyReserve: number
+): LogCompleteShareLayoutMetrics {
   const key = opts.compactShareLayout ? "compact" : "wide";
   const { cardW, refSceneW } = SHARE_CARD[key];
   const maxH = SHARE_HERO_MAX[key][opts.heroLayout];
@@ -270,9 +273,32 @@ export function buildLogCompleteShareLayout(opts: {
   heroH = Math.max(1, heroH);
   const textShrink = logCompleteShareHeroShrinkForText(heroH, opts.prioritizeText, opts.heroLayout);
   heroH = Math.max(1, heroH - textShrink);
-  const cardMaxH = heroH + SHARE_BODY_RESERVE;
+  const cardMaxH = heroH + bodyReserve;
   const sceneH = cardMaxH + 96;
   return { cardW, refSceneW, heroH, cardMaxH, sceneH };
+}
+
+export function buildLogCompleteShareLayout(opts: {
+  heroLayout: LogCompleteHeroLayout;
+  compactShareLayout: boolean;
+  prioritizeText: boolean;
+  natural?: ImageNaturalSize | null;
+}): LogCompleteShareLayoutMetrics {
+  return buildShareLayoutMetrics(opts, SHARE_BODY_RESERVE);
+}
+
+/** Share PNG for board game match banner — same phone card proportions as log complete. */
+export function buildBoardGameMatchShareLayout(opts: {
+  heroLayout: LogCompleteHeroLayout;
+  compactShareLayout: boolean;
+  prioritizeText: boolean;
+  natural?: ImageNaturalSize | null;
+  playerCount: number;
+  hasGrade: boolean;
+}): LogCompleteShareLayoutMetrics {
+  const players = Math.min(Math.max(1, opts.playerCount), 8);
+  const bodyReserve = 140 + (opts.hasGrade ? 26 : 0) + players * 38;
+  return buildShareLayoutMetrics(opts, bodyReserve);
 }
 
 /** Share PNG hero fit — same as Android modal (fill portrait/square, contain landscape). */

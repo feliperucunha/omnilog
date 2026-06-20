@@ -11,10 +11,13 @@ import { Logo, getLogoSrc } from "@/components/Logo";
 import { getHeroImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
 import { isBggBoardGameImageContext } from "@/lib/boardGameImageFit";
 import {
+  buildBoardGameMatchShareLayout,
   logCompleteAndroidHeroImgClass,
   logCompleteHeroFrameStyle,
   logCompleteHeroWrapperClass,
   logCompletePrioritizeTextSpace,
+  logCompleteShareHeroObjectFit,
+  logCompleteShareTextLimits,
   logCompleteUsesContainBackdrop,
   resolveLogCompleteHeroLayout,
   type ImageNaturalSize,
@@ -60,6 +63,29 @@ const USE_NATIVE_LAYOUT_ON_WEB = false;
 const SHARE_EXPORT_SCENE_WIDTH_PX = 1080;
 const SHARE_CAPTURE_PIXEL_RATIO = 2;
 
+function shareTrophyIcon(size: number): React.ReactNode {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#fbbf24"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+      <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+      <path d="M4 22h16" />
+      <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+      <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+      <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+    </svg>
+  );
+}
+
 const NATIVE_DARK = {
   cardBg: "#1c1c1c",
   text: "#f0f0f0",
@@ -99,6 +125,9 @@ export function BoardGameMatchCompleteModal({ state, onClose }: BoardGameMatchCo
   const [shareInProgress, setShareInProgress] = useState(false);
   const [heroNaturalSize, setHeroNaturalSize] = useState<ImageNaturalSize | null>(null);
   const [cachedHeroDataUrl, setCachedHeroDataUrl] = useState<string | null>(null);
+  const [compactShareLayout, setCompactShareLayout] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 640px)").matches : true
+  );
 
   const heroImageUrl = getHeroImageUrl(image) ?? image;
   const assumeLandscapeBoardGame = isBggBoardGameImageContext(
@@ -134,36 +163,45 @@ export function BoardGameMatchCompleteModal({ state, onClose }: BoardGameMatchCo
     : formatPlayed(match.playedAt);
 
   useEffect(() => {
-    if (!heroImageUrl) {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 640px)");
+    const update = () => setCompactShareLayout(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    setHeroNaturalSize(null);
+  }, [heroImageUrl]);
+
+  useEffect(() => {
+    if (!heroImageUrl || !nativeUi) {
       setCachedHeroDataUrl(null);
       return;
     }
     let cancelled = false;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.referrerPolicy = "no-referrer";
-    img.onload = () => {
-      if (cancelled) return;
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0);
-        setCachedHeroDataUrl(canvas.toDataURL("image/png"));
-      } catch {
-        setCachedHeroDataUrl(heroImageUrl);
-      }
-    };
-    img.onerror = () => {
-      if (!cancelled) setCachedHeroDataUrl(heroImageUrl);
-    };
-    img.src = heroImageUrl;
+    fetch(heroImageUrl, { mode: "cors" })
+      .then((res) => (res.ok ? res.blob() : Promise.reject(new Error("Fetch failed"))))
+      .then((blob) => {
+        if (cancelled) return Promise.reject(new Error("cancelled"));
+        return new Promise<string | null>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : null);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      })
+      .then((dataUrl) => {
+        if (!cancelled && dataUrl) setCachedHeroDataUrl(dataUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setCachedHeroDataUrl(null);
+      });
     return () => {
       cancelled = true;
     };
-  }, [heroImageUrl]);
+  }, [heroImageUrl, nativeUi]);
 
   const closeButton = (
     <button
@@ -386,18 +424,51 @@ export function BoardGameMatchCompleteModal({ state, onClose }: BoardGameMatchCo
     </>
   );
 
-  const shareSceneW = SHARE_EXPORT_SCENE_WIDTH_PX;
-  const shareSceneH = Math.round(shareSceneW * 1.35);
-  const shareCardW = Math.round(shareSceneW * 0.88);
-  const shareHeroH = Math.round(shareCardW * 0.42);
-  const sharePad = Math.round(shareSceneW * 0.04);
+  const shareTextLimits = logCompleteShareTextLimits("", title);
+  const shareBase = buildBoardGameMatchShareLayout({
+    heroLayout,
+    compactShareLayout,
+    prioritizeText,
+    natural: heroNaturalSize,
+    playerCount: match.players.length,
+    hasGrade: grade != null,
+  });
+  const shareHeroObjectFit = logCompleteShareHeroObjectFit(heroLayout);
+  const shareLayoutScale = SHARE_EXPORT_SCENE_WIDTH_PX / shareBase.refSceneW;
+  const sz = (n: number) => Math.max(1, Math.round(n * shareLayoutScale));
+  const shareSceneWidth = SHARE_EXPORT_SCENE_WIDTH_PX;
+  const shareSceneHeight = sz(shareBase.sceneH);
+  const shareCardWidth = sz(shareBase.cardW);
+  const shareCardMaxHeight = sz(shareBase.cardMaxH);
+  const shareHeroHeight = sz(shareBase.heroH);
+  const shareOuterPad = sz(20);
+  const shareCardRadius = sz(20);
+  const shareBlurBgLight = Math.min(48, sz(4));
+  const shareBlurBgDark = Math.min(56, sz(10));
+  const sharePlayers = match.players.slice(0, 8);
 
   const shareCard = (
     <div
-      style={{ position: "absolute", left: -9999, top: 0, width: shareSceneW, height: shareSceneH, pointerEvents: "none" }}
+      style={{
+        position: "absolute",
+        left: -9999,
+        top: 0,
+        width: shareSceneWidth,
+        height: shareSceneHeight,
+        pointerEvents: "none",
+      }}
       aria-hidden
     >
-      <div ref={shareCardRef} style={{ position: "relative", width: shareSceneW, height: shareSceneH, overflow: "hidden" }}>
+      <div
+        ref={shareCardRef}
+        data-share-scene
+        style={{
+          position: "relative",
+          width: shareSceneWidth,
+          height: shareSceneHeight,
+          overflow: "hidden",
+        }}
+      >
         {cachedHeroDataUrl && (
           <img
             src={cachedHeroDataUrl}
@@ -409,19 +480,48 @@ export function BoardGameMatchCompleteModal({ state, onClose }: BoardGameMatchCo
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              filter: isLight ? "blur(4px)" : "blur(10px)",
+              objectPosition: "center",
+              filter: isLight ? `blur(${shareBlurBgLight}px)` : `blur(${shareBlurBgDark}px)`,
+              WebkitFilter: isLight ? `blur(${shareBlurBgLight}px)` : `blur(${shareBlurBgDark}px)`,
               transform: "scale(1.25)",
             }}
           />
         )}
-        <div style={{ position: "absolute", inset: 0, backgroundColor: nativeColors.overlay }} aria-hidden />
-        <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", padding: sharePad }}>
+        {!cachedHeroDataUrl && (
           <div
             style={{
-              width: shareCardW,
-              maxHeight: shareSceneH - sharePad * 2,
+              position: "absolute",
+              inset: 0,
+              background: `linear-gradient(135deg, ${nativeColors.textMuted}33 0%, ${nativeColors.cardBg} 50%, ${nativeColors.textMuted}22 100%)`,
+            }}
+            aria-hidden
+          />
+        )}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: nativeColors.overlay,
+          }}
+          aria-hidden
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+            padding: shareOuterPad,
+          }}
+        >
+          <div
+            style={{
+              position: "relative",
+              width: shareCardWidth,
+              maxWidth: shareCardWidth,
+              maxHeight: shareCardMaxHeight,
               overflow: "hidden",
-              borderRadius: 20,
+              borderRadius: shareCardRadius,
               border: `1px solid ${nativeColors.border}`,
               backgroundColor: nativeColors.cardBg,
               color: nativeColors.text,
@@ -429,29 +529,93 @@ export function BoardGameMatchCompleteModal({ state, onClose }: BoardGameMatchCo
               flexDirection: "column",
             }}
           >
-            <div style={{ position: "relative", width: "100%", height: shareHeroH, flexShrink: 0, overflow: "hidden" }}>
+            <div style={{ position: "relative", width: "100%", height: shareHeroHeight, flexShrink: 0, overflow: "hidden" }}>
               {cachedHeroDataUrl ? (
-                <img src={cachedHeroDataUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                useContainBackdrop ? (
+                  <>
+                    <img
+                      src={cachedHeroDataUrl}
+                      alt=""
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        objectPosition: "center",
+                        transform: "scale(1.12)",
+                        filter: isLight ? `blur(${Math.min(shareHeroHeight * 0.05, 28)}px)` : `blur(${Math.min(shareHeroHeight * 0.06, 36)}px)`,
+                        WebkitFilter: isLight ? `blur(${Math.min(shareHeroHeight * 0.05, 28)}px)` : `blur(${Math.min(shareHeroHeight * 0.06, 36)}px)`,
+                        opacity: 0.68,
+                        display: "block",
+                      }}
+                    />
+                    <img
+                      src={cachedHeroDataUrl}
+                      alt=""
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        zIndex: 1,
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        objectPosition: "center",
+                        display: "block",
+                      }}
+                    />
+                  </>
+                ) : (
+                  <img
+                    src={cachedHeroDataUrl}
+                    alt=""
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: shareHeroObjectFit,
+                      objectPosition: "center",
+                      display: "block",
+                    }}
+                  />
+                )
               ) : (
-                <div style={{ width: "100%", height: "100%", background: nativeColors.border }} />
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    background: `linear-gradient(135deg, ${nativeColors.textMuted}33 0%, ${nativeColors.cardBg} 50%, ${nativeColors.textMuted}22 100%)`,
+                  }}
+                />
               )}
               <div
                 style={{
                   position: "absolute",
                   inset: 0,
-                  background: "linear-gradient(to top, #1c1c1c 0%, transparent 50%)",
+                  zIndex: 2,
+                  background: `linear-gradient(to top, ${nativeColors.cardBg} 0%, transparent 40%)`,
                 }}
               />
             </div>
-            <div style={{ padding: sharePad, flex: 1, overflow: "hidden" }}>
+            <div
+              style={{
+                display: "flex",
+                flex: 1,
+                flexDirection: "column",
+                minHeight: 0,
+                overflowY: "hidden",
+                overflowX: "hidden",
+                padding: `${sz(8)}px ${sz(12)}px ${sz(6)}px`,
+              }}
+            >
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  gap: 8,
-                  marginBottom: 8,
-                  fontSize: 10,
+                  gap: sz(6),
+                  marginBottom: sz(6),
+                  fontSize: sz(9),
                   color: nativeColors.textMuted,
                 }}
               >
@@ -462,12 +626,12 @@ export function BoardGameMatchCompleteModal({ state, onClose }: BoardGameMatchCo
                   <span
                     style={{
                       flexShrink: 0,
-                      fontSize: 9,
+                      fontSize: sz(8),
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.04em",
-                      padding: "3px 8px",
-                      borderRadius: 999,
+                      padding: `${sz(2)}px ${sz(6)}px`,
+                      borderRadius: 9999,
                       backgroundColor: `${nativeColors.textMuted}22`,
                       border: `1px solid ${nativeColors.border}`,
                       color: nativeColors.text,
@@ -478,41 +642,132 @@ export function BoardGameMatchCompleteModal({ state, onClose }: BoardGameMatchCo
                 )}
                 <span style={{ flexShrink: 0 }}>{boardGameSessionDurationLabel(durationHours, t)}</span>
               </div>
-              <h1 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, lineHeight: 1.25, color: nativeColors.text }}>
+              <h1
+                style={{
+                  marginBottom: sz(6),
+                  fontSize: sz(16),
+                  fontWeight: 700,
+                  lineHeight: 1.25,
+                  color: nativeColors.text,
+                  display: "-webkit-box",
+                  WebkitLineClamp: shareTextLimits.titleLineClamp,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  overflowWrap: "anywhere",
+                }}
+              >
                 {title}
               </h1>
               {grade != null && stars != null && (
-                <div style={{ marginBottom: 8, color: "#fbbf24", fontSize: 16 }}>
-                  {"★".repeat(Math.round(stars)) + "☆".repeat(5 - Math.round(stars))}
+                <div style={{ marginBottom: sz(8), color: "#fbbf24", fontSize: sz(18), letterSpacing: "0.05em" }}>
+                  {(() => {
+                    const n = Math.max(0, Math.min(5, Math.round(stars)));
+                    return "★".repeat(n) + "☆".repeat(5 - n);
+                  })()}
                 </div>
               )}
-              {match.players.slice(0, 6).map((p, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: 10,
-                    marginBottom: 3,
-                    color: p.winner ? "#fbbf24" : nativeColors.textMuted,
-                  }}
-                >
-                  <span>{p.name}</span>
-                  <span>{p.score != null ? `${p.score} ${t("boardGameMatches.points")}` : ""}</span>
-                </div>
-              ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: sz(6) }}>
+                {sharePlayers.map((p, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: sz(8),
+                      padding: `${sz(7)}px ${sz(10)}px`,
+                      borderRadius: sz(8),
+                      border: p.winner ? "1px solid rgba(251, 191, 36, 0.35)" : `1px solid ${nativeColors.textMuted}26`,
+                      background: p.winner
+                        ? "linear-gradient(to right, rgba(245, 158, 11, 0.12), transparent)"
+                        : `${nativeColors.textMuted}0D`,
+                    }}
+                  >
+                    <span
+                      style={{
+                        minWidth: 0,
+                        flex: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        fontSize: sz(11),
+                        fontWeight: 500,
+                        lineHeight: 1.3,
+                        color: nativeColors.text,
+                      }}
+                    >
+                      {p.name}
+                    </span>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexShrink: 0,
+                        alignItems: "center",
+                        gap: sz(6),
+                      }}
+                    >
+                      {p.score != null && (
+                        <span
+                          style={{
+                            fontSize: sz(10),
+                            lineHeight: 1.3,
+                            color: nativeColors.textMuted,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {p.score} {t("boardGameMatches.points")}
+                        </span>
+                      )}
+                      {p.winner && shareTrophyIcon(sz(14))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
             <div
               style={{
-                padding: `${sharePad * 0.6}px ${sharePad}px`,
-                borderTop: `1px solid ${nativeColors.border}`,
+                flexShrink: 0,
+                flexGrow: 0,
+                width: "100%",
+                boxSizing: "border-box",
+                padding: compactShareLayout
+                  ? `${sz(8)}px ${sz(12)}px ${sz(10)}px`
+                  : `${sz(10)}px ${sz(12)}px ${sz(12)}px`,
+                borderTop: `1px solid ${nativeColors.textMuted}4D`,
                 display: "flex",
-                alignItems: "center",
-                gap: 8,
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "flex-start",
+                columnGap: compactShareLayout ? sz(6) : sz(8),
+                rowGap: sz(4),
               }}
             >
-              <img src={getLogoSrc(theme.colorScheme)} alt="" style={{ height: 18, width: "auto", opacity: 0.9 }} />
-              <span style={{ fontSize: 10, color: nativeColors.textMuted }}>
+              <img
+                src={getLogoSrc(theme.colorScheme)}
+                alt=""
+                aria-hidden
+                style={{
+                  display: "block",
+                  height: compactShareLayout ? sz(14) : sz(20),
+                  width: "auto",
+                  flexShrink: 0,
+                  objectFit: "contain",
+                  opacity: 0.9,
+                }}
+              />
+              <span
+                style={{
+                  flex: "1 1 0",
+                  minWidth: 0,
+                  fontSize: compactShareLayout ? sz(9) : sz(11),
+                  fontWeight: 500,
+                  lineHeight: 1.35,
+                  color: nativeColors.textMuted,
+                  whiteSpace: "normal",
+                  overflowWrap: "break-word",
+                  wordBreak: "break-word",
+                }}
+              >
                 {t("boardGameMatchComplete.loggedWith", { app: t("app.name") })}
               </span>
             </div>
