@@ -1,15 +1,15 @@
-import { Fragment, useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, ChevronDown, Plus } from "lucide-react";
 import {
-  COMPLETED_STATUSES,
-  IN_PROGRESS_STATUSES,
   compareScopeGenerality,
   groupItemReviewsByUser,
+  partialItemReviews,
   pickPrimaryScopedReview,
+  pickShowItemReview,
   type ItemDetail,
   type ItemPageData,
   type ItemReview,
@@ -19,6 +19,12 @@ import {
 } from "@geeklogs/shared";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { getStatusLabel } from "@/lib/statusLabel";
+import {
+  logStatusBorderClass,
+  logStatusSoftBadgeClass,
+  mediaTypeUsesEpisodeStatusColors,
+  seriesAirStatusSoftBadgeClass,
+} from "@/lib/logStatusColors";
 import { apiFetch, invalidateApiCache, invalidateLogsAndItemsCache } from "@/lib/api";
 import { loadWithSWR } from "@/lib/logsPageCache";
 import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
@@ -221,7 +227,18 @@ function ItemDetailsBlock({
         {hasStatus && (
           <div>
             <span className="text-[var(--color-light)]">{t("itemPage.status")}: </span>
-            <span className="text-[var(--color-lightest)] font-medium">{item.status}</span>
+            {mediaType === "tv" ? (
+              <span
+                className={cn(
+                  "inline-block rounded-md px-2 py-0.5 text-xs font-medium",
+                  seriesAirStatusSoftBadgeClass(item.status)
+                )}
+              >
+                {item.status}
+              </span>
+            ) : (
+              <span className="text-[var(--color-lightest)] font-medium">{item.status}</span>
+            )}
           </div>
         )}
         {hasRuntime && (
@@ -471,6 +488,138 @@ function reviewScopeLabel(
   return t("tvReviews.scopeShow");
 }
 
+function reviewStatusBorderClass(r: ItemReview): string {
+  return logStatusBorderClass(r.status ?? r.listType ?? null);
+}
+
+function ItemReviewAuthorRow({
+  r,
+  mediaType,
+  t,
+}: {
+  r: ItemReview;
+  mediaType: MediaType;
+  t: (key: string, vars?: Record<string, string>) => string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <OverflowMarquee
+        className={`text-base font-semibold ${r.isAdmin ? "admin-username-fire" : r.isPro ? "pro-username-shine" : "text-[var(--color-lightest)]"}`}
+      >
+        {r.reviewerUsername ?? r.userEmail}
+      </OverflowMarquee>
+      {(r.reviewerBadges?.length
+        ? r.reviewerBadges
+        : r.reviewerLevelIcon
+          ? [{ icon: r.reviewerLevelIcon, level: r.reviewerLevel ?? 1, label: r.reviewerLevelLabel ?? "" }]
+          : []
+      ).map((badge) => (
+        <LevelBadge
+          key={`${badge.level}-${badge.icon}`}
+          icon={MEDIA_BADGE_ICONS[mediaType]}
+          level={badge.level}
+          title={badge.label || undefined}
+          popupDetail={{
+            user: r.reviewerUsername ?? r.userEmail ?? "—",
+            categoryLabel: t(`nav.${mediaType}`),
+            label: badge.label ?? undefined,
+            count: r.reviewerReviewsInCategory,
+            kind: "reviews",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ItemReviewMetaRow({
+  r,
+  locale,
+  t,
+  mediaType,
+  scopedReviewsDisplay,
+  showScopeBadge = true,
+}: {
+  r: ItemReview;
+  locale: string;
+  t: (key: string, vars?: Record<string, string>) => string;
+  mediaType: MediaType;
+  scopedReviewsDisplay: boolean;
+  showScopeBadge?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {r.grade != null && <StarRating value={gradeToStars(r.grade)} readOnly size="md" />}
+        <time className="text-xs text-[var(--color-light)]" dateTime={r.createdAt}>
+          {new Date(r.createdAt).toLocaleDateString(locale, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })}
+        </time>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {(r.status ?? r.listType) && (
+          <span
+            className={cn(
+              "rounded-md px-2 py-1 text-xs",
+              mediaTypeUsesEpisodeStatusColors(mediaType)
+                ? logStatusSoftBadgeClass(r.status ?? r.listType ?? null)
+                : "bg-[var(--color-darkest)] text-[var(--color-light)]"
+            )}
+          >
+            {getStatusLabel(t, r.status ?? r.listType ?? null, mediaType)}
+          </span>
+        )}
+        {showScopeBadge && scopedReviewsDisplay && (r.reviewScope ?? "show") !== "show" && (
+          <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+            {reviewScopeLabel(t, r)}
+          </span>
+        )}
+        {showScopeBadge && !scopedReviewsDisplay && (r.season != null || r.episode != null) && (
+          <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+            S{r.season ?? "?"} · E{r.episode ?? "?"}
+          </span>
+        )}
+        {showScopeBadge && (r.chapter != null || r.volume != null) && (
+          <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
+            Ch.{r.chapter ?? "?"} · Vol.{r.volume ?? "?"}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type ReactionPayload = {
+  likesCount: number;
+  dislikesCount: number;
+  userReaction: "like" | "dislike" | null;
+};
+
+function ItemReviewReactionButtons({
+  r,
+  token,
+  onReactionChange,
+}: {
+  r: ItemReview;
+  token: string | null;
+  onReactionChange: (reviewId: string, reactionLogId: string, payload: ReactionPayload) => void;
+}) {
+  const reactionLogId = r.reactionLogId ?? r.id;
+  return (
+    <ReactionButtons
+      logId={reactionLogId}
+      likesCount={r.likesCount ?? 0}
+      dislikesCount={r.dislikesCount ?? 0}
+      userReaction={r.userReaction ?? null}
+      disabled={!token}
+      onReactionChange={(payload) => onReactionChange(r.id, reactionLogId, payload)}
+    />
+  );
+}
+
 interface ReviewsResponse {
   reviews: ItemReview[];
   meanGrade: number | null;
@@ -601,7 +750,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
     setExpandedReviewUsers(new Set());
   }, [reviewsPage, reviewsSort, id, mediaType]);
 
-  const scopedReviewsDisplay = mediaType === "tv";
+  const scopedReviewsDisplay = mediaType === "tv" || mediaType === "anime";
   const pageReviews = data?.reviews ?? [];
 
   const reviewDisplayGroups = useMemo(() => {
@@ -617,7 +766,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
       groups.push({ userId, reviews: list });
     }
     const primaries = groups
-      .map((g) => pickPrimaryScopedReview(g.reviews))
+      .map((g) => pickShowItemReview(g.reviews) ?? pickPrimaryScopedReview(g.reviews))
       .filter((p): p is ItemReview => p != null);
     const sortedPrimaries = sortReviewsByKey(primaries, reviewsSort);
     return sortedPrimaries.map((primary) => {
@@ -625,6 +774,29 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
       return match ?? { userId: primary.userId ?? primary.id, reviews: [primary] };
     });
   }, [pageReviews, scopedReviewsDisplay, reviewsSort]);
+
+  const handleReviewReactionChange = useCallback(
+    (reviewId: string, reactionLogId: string, payload: ReactionPayload) => {
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              reviews: prev.reviews.map((rev) =>
+                rev.id === reviewId || rev.reactionLogId === reactionLogId
+                  ? {
+                      ...rev,
+                      likesCount: payload.likesCount,
+                      dislikesCount: payload.dislikesCount,
+                      userReaction: payload.userReaction,
+                    }
+                  : rev
+              ),
+            }
+          : prev
+      );
+    },
+    []
+  );
 
   const affinityContextDraft = useMemo((): LogAffinityContext | undefined => {
     const it = data?.item;
@@ -909,165 +1081,109 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
               <motion.div {...listStaggerParentProps}>
                 <div className="flex flex-col gap-4">
                   {reviewDisplayGroups.map((group) => {
-                    const primary = pickPrimaryScopedReview(group.reviews) ?? group.reviews[0]!;
+                    const showRev = pickShowItemReview(group.reviews);
+                    const partials = sortUserScopedReviews(partialItemReviews(group.reviews));
                     const expanded = expandedReviewUsers.has(group.userId);
-                    const visible = expanded ? sortUserScopedReviews(group.reviews) : [primary];
-                    const extraCount = group.reviews.length - 1;
+                    const threadPartials = showRev ? partials : partials.slice(1);
+                    const mainReview = showRev ?? partials[0] ?? group.reviews[0]!;
+                    const extraCount = threadPartials.length;
+                    const listBorderClass = reviewStatusBorderClass(mainReview);
+                    const mainReactionReview = showRev ?? mainReview;
+
                     return (
-                      <Fragment key={group.userId}>
-                        {visible.map((r, cardIndex) => {
-                    const isDropped = r.status === "dropped";
-                    const isInProgress = r.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(r.status);
-                    const isCompleted = r.status != null && (COMPLETED_STATUSES as readonly string[]).includes(r.status);
-                    const listBorderClass =
-                      r.status == null
-                        ? "border border-[var(--color-surface-border)]"
-                        : isDropped
-                          ? "border border-red-500"
-                          : isInProgress
-                            ? "border border-amber-400"
-                            : isCompleted
-                              ? "border border-emerald-600"
-                              : "border border-[var(--color-mid)]";
-                    return (
-                    <motion.div key={r.id} variants={listStaggerItemVariants} className={listStaggerItemClassName}>
-                      <Card
-                        className={`overflow-hidden bg-[var(--color-dark)] p-0 ${listBorderClass}`}
-                        style={paperShadow}
+                      <motion.div
+                        key={group.userId}
+                        variants={listStaggerItemVariants}
+                        className={listStaggerItemClassName}
                       >
-                        <div className="flex flex-col gap-4 p-4 sm:p-5">
-                          {/* Author + all level badges */}
-                          <div className="flex min-w-0 flex-wrap items-center gap-2">
-                            <OverflowMarquee
-                              className={`text-base font-semibold ${r.isAdmin ? "admin-username-fire" : r.isPro ? "pro-username-shine" : "text-[var(--color-lightest)]"}`}
-                            >
-                              {r.reviewerUsername ?? r.userEmail}
-                            </OverflowMarquee>
-                            {(r.reviewerBadges?.length
-                              ? r.reviewerBadges
-                              : r.reviewerLevelIcon
-                                ? [{ icon: r.reviewerLevelIcon, level: r.reviewerLevel ?? 1, label: r.reviewerLevelLabel ?? "" }]
-                                : []
-                            ).map((badge) => (
-                              <LevelBadge
-                                key={`${badge.level}-${badge.icon}`}
-                                icon={MEDIA_BADGE_ICONS[mediaType]}
-                                level={badge.level}
-                                title={badge.label || undefined}
-                                popupDetail={{
-                                  user: r.reviewerUsername ?? r.userEmail ?? "—",
-                                  categoryLabel: t(`nav.${mediaType}`),
-                                  label: badge.label ?? undefined,
-                                  count: r.reviewerReviewsInCategory,
-                                  kind: "reviews",
-                                }}
+                        <Card
+                          className={cn("overflow-hidden bg-[var(--color-dark)] p-0", listBorderClass)}
+                          style={paperShadow}
+                        >
+                          <div className="flex flex-col gap-4 p-4 sm:p-5">
+                            <ItemReviewAuthorRow r={mainReview} mediaType={mediaType} t={t} />
+
+                            <div className="flex flex-col gap-4 border-b border-[var(--color-surface-border)]/60 pb-4">
+                              <ItemReviewMetaRow
+                                r={mainReview}
+                                locale={locale}
+                                t={t}
+                                mediaType={mediaType}
+                                scopedReviewsDisplay={scopedReviewsDisplay}
+                                showScopeBadge={!showRev}
                               />
-                            ))}
-                          </div>
-
-                          {/* Rating + date; on mobile status/episode badges go on next line */}
-                          <div className="flex flex-col gap-2 border-b border-[var(--color-surface-border)]/60 pb-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                              {r.grade != null && (
-                                <StarRating value={gradeToStars(r.grade)} readOnly size="md" />
-                              )}
-                              <time
-                                className="text-xs text-[var(--color-light)]"
-                                dateTime={r.createdAt}
-                              >
-                                {new Date(r.createdAt).toLocaleDateString(locale, {
-                                  year: "numeric",
-                                  month: "short",
-                                  day: "numeric",
-                                })}
-                              </time>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              {(r.status ?? r.listType) && (
-                                <span className="rounded-md bg-[var(--color-darkest)] px-2 py-1 text-xs text-[var(--color-light)]">
-                                  {getStatusLabel(t, r.status ?? r.listType ?? null, mediaType)}
-                                </span>
-                              )}
-                              {scopedReviewsDisplay && (r.reviewScope ?? "show") !== "show" && (
-                                <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
-                                  {reviewScopeLabel(t, r)}
-                                </span>
-                              )}
-                              {!scopedReviewsDisplay && (r.season != null || r.episode != null) && (
-                                <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
-                                  S{r.season ?? "?"} · E{r.episode ?? "?"}
-                                </span>
-                              )}
-                              {(r.chapter != null || r.volume != null) && (
-                                <span className="rounded-md bg-[var(--color-darkest)]/80 px-2 py-1 text-xs text-[var(--color-light)]">
-                                  Ch.{r.chapter ?? "?"} · Vol.{r.volume ?? "?"}
-                                </span>
+                              {mainReview.review && (
+                                <p className="max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)]">
+                                  {mainReview.review}
+                                </p>
                               )}
                             </div>
-                          </div>
 
-                          {/* Review body */}
-                          {r.review && (
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)] max-w-none">
-                              {r.review}
-                            </p>
-                          )}
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <ItemReviewReactionButtons
+                                r={mainReactionReview}
+                                token={token}
+                                onReactionChange={handleReviewReactionChange}
+                              />
+                              {extraCount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedReviewUsers((prev) => {
+                                      const next = new Set(prev);
+                                      if (expanded) next.delete(group.userId);
+                                      else next.add(group.userId);
+                                      return next;
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1 rounded-md border border-[var(--color-mid)]/40 px-2 py-1 text-xs text-[var(--color-light)] transition-colors hover:border-[var(--color-mid)] hover:text-[var(--color-lightest)]"
+                                  aria-expanded={expanded}
+                                >
+                                  {!expanded && <Plus className="h-3.5 w-3.5" aria-hidden />}
+                                  {expanded
+                                    ? t("tvReviews.hideAllReviews")
+                                    : extraCount === 1
+                                      ? t("tvReviews.showAllReviews_one")
+                                      : t("tvReviews.showAllReviews_other", {
+                                          count: String(extraCount),
+                                        })}
+                                </button>
+                              )}
+                            </div>
 
-                          <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-                            <ReactionButtons
-                              logId={r.reactionLogId ?? r.id}
-                              likesCount={r.likesCount ?? 0}
-                              dislikesCount={r.dislikesCount ?? 0}
-                              userReaction={r.userReaction ?? null}
-                              disabled={!token}
-                              onReactionChange={(payload) => {
-                                const reactionLogId = r.reactionLogId ?? r.id;
-                                setData((prev) =>
-                                  prev
-                                    ? {
-                                        ...prev,
-                                        reviews: prev.reviews.map((rev) =>
-                                          rev.id === r.id || rev.reactionLogId === reactionLogId
-                                            ? {
-                                                ...rev,
-                                                likesCount: payload.likesCount,
-                                                dislikesCount: payload.dislikesCount,
-                                                userReaction: payload.userReaction,
-                                              }
-                                            : rev
-                                        ),
-                                      }
-                                    : prev
-                                );
-                              }}
-                            />
-                            {cardIndex === 0 && extraCount > 0 && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setExpandedReviewUsers((prev) => {
-                                    const next = new Set(prev);
-                                    if (expanded) next.delete(group.userId);
-                                    else next.add(group.userId);
-                                    return next;
-                                  })
-                                }
-                                className="inline-flex items-center gap-1 rounded-md border border-[var(--color-mid)]/40 px-2 py-1 text-xs text-[var(--color-light)] transition-colors hover:border-[var(--color-mid)] hover:text-[var(--color-lightest)]"
-                                aria-expanded={expanded}
-                              >
-                                {!expanded && <Plus className="h-3.5 w-3.5" aria-hidden />}
-                                {expanded
-                                  ? t("tvReviews.hideAllReviews")
-                                  : t("tvReviews.showAllReviews", { count: String(extraCount) })}
-                              </button>
+                            {expanded && threadPartials.length > 0 && (
+                              <div className="flex flex-col gap-4 border-t border-[var(--color-surface-border)]/40 pt-4">
+                                {threadPartials.map((partial) => (
+                                  <div
+                                    key={partial.id}
+                                    className="relative ml-1 border-l-2 border-[var(--color-mid)]/40 pl-4"
+                                  >
+                                    <div className="flex flex-col gap-3">
+                                      <ItemReviewMetaRow
+                                        r={partial}
+                                        locale={locale}
+                                        t={t}
+                                        mediaType={mediaType}
+                                        scopedReviewsDisplay={scopedReviewsDisplay}
+                                      />
+                                      {partial.review && (
+                                        <p className="max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)]">
+                                          {partial.review}
+                                        </p>
+                                      )}
+                                      <ItemReviewReactionButtons
+                                        r={partial}
+                                        token={token}
+                                        onReactionChange={handleReviewReactionChange}
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             )}
                           </div>
-                        </div>
-                      </Card>
-                    </motion.div>
-                  );
-                        })}
-                      </Fragment>
+                        </Card>
+                      </motion.div>
                     );
                   })}
                 </div>

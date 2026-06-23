@@ -761,7 +761,8 @@
     "scopeShow": "Série",
     "scopeSeason": "Temporada {{n}}",
     "scopeEpisode": "T{{season}} · E{{episode}}",
-    "showAllReviews": "Ver mais {{count}} resenhas",
+    "showAllReviews_one": "Ver mais 1 resenha",
+    "showAllReviews_other": "Ver mais {{count}} resenhas",
     "hideAllReviews": "Ver menos"
   },
   "itemPage": {
@@ -821,6 +822,14 @@
     "sold": "Vendido",
     "matchesPlayed": "Partidas jogadas",
     "rating": "Avaliação",
+    "saveEpisodeSeasonReview": "Salvar resenha do episódio/temporada",
+    "saveEpisodeSeasonReviewShort": "Episódio/temporada",
+    "saveShowReview": "Salvar resenha da série",
+    "saveShowReviewShort": "Resenha da série",
+    "updateShowReview": "Atualizar resenha da série",
+    "updateShowReviewShort": "Resenha da série",
+    "savedReviews": "Resenhas salvas",
+    "savedReviewShow": "Resenha da série",
     "reviewPlaceholder": "Seus pensamentos..."
   },
   "readingProgress": {

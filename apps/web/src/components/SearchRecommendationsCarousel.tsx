@@ -9,8 +9,8 @@ import {
 } from "react";
 import { motion } from "framer-motion";
 import type { BoardGameProvider, Log, MediaType, SearchResult } from "@geeklogs/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
+import { logStatusBadgeClass, logStatusBorderClass } from "@/lib/logStatusColors";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
@@ -113,31 +113,8 @@ export function SearchRecommendationsCarousel({
     const userLog = token ? logsByExternalId.get(item.id) : undefined;
     const status = userLog?.status ?? userLog?.listType;
     const display = userLog ? getLogCardDisplay(userLog) : null;
-    const isDropped = status === "dropped";
-    const isInProgress =
-      status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-    const isCompleted =
-      status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
-    const listBorderClass =
-      status == null
-        ? "border border-[var(--color-surface-border)]"
-        : isDropped
-          ? "border border-red-500"
-          : isInProgress
-            ? "border border-amber-400"
-            : isCompleted
-              ? "border border-emerald-600"
-              : "border border-[var(--color-mid)]";
-    const badgeClass =
-      status == null
-        ? ""
-        : isDropped
-          ? "bg-red-500/95 text-white"
-          : isInProgress
-            ? "bg-amber-400 text-[var(--color-darkest)]"
-            : isCompleted
-              ? "bg-emerald-600 text-white"
-              : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
+    const listBorderClass = logStatusBorderClass(status);
+    const badgeClass = logStatusBadgeClass(status);
 
     return (
       <div key={reactKey} className={`shrink-0 ${widthClass}`}>

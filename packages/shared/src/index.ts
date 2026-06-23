@@ -5,6 +5,10 @@ export {
   seasonEpisodeFromScoped,
   scopedKeysForScope,
   pickPrimaryScopedReview,
+  pickShowItemReview,
+  partialItemReviews,
+  partialReviewKey,
+  findEpisodePartialReview,
   groupItemReviewsByUser,
   compareScopeGenerality,
 } from "./scopedReview.js";

@@ -90,3 +90,35 @@ export function groupItemReviewsByUser(reviews: ItemReview[]): Map<string, ItemR
 export function compareScopeGenerality(a: ReviewScope, b: ReviewScope): number {
   return SCOPE_RANK[a] - SCOPE_RANK[b];
 }
+
+export function partialReviewKey(season: number, episode: number): string {
+  return `${season}:${episode}`;
+}
+
+/** Episode-level partial review for the given season and episode numbers. */
+export function findEpisodePartialReview(
+  reviews: ScopedReview[],
+  season: number,
+  episode: number
+): ScopedReview | undefined {
+  return reviews.find(
+    (r) =>
+      r.scope === "episode" &&
+      (r.season ?? 0) === season &&
+      (r.episode ?? 0) === episode
+  );
+}
+
+export function pickShowItemReview<T extends Pick<ItemReview, "reviewScope" | "createdAt">>(
+  reviews: T[]
+): T | null {
+  const showReviews = reviews.filter((r) => (r.reviewScope ?? "show") === "show");
+  if (showReviews.length === 0) return null;
+  return [...showReviews].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )[0]!;
+}
+
+export function partialItemReviews<T extends Pick<ItemReview, "reviewScope">>(reviews: T[]): T[] {
+  return reviews.filter((r) => (r.reviewScope ?? "show") !== "show");
+}

@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import type { BoardGameProvider, Log, MediaType, SearchResult } from "@geeklogs/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
 import { BookPagesBadge } from "@/components/BookPagesBadge";
 import { GenreBadges } from "@/components/GenreBadges";
 import { ItemImage } from "@/components/ItemImage";
@@ -22,6 +21,7 @@ import {
 import type { LogViewMode } from "@/lib/logViewPreference";
 import { gradeToStars } from "@/lib/gradeStars";
 import { getStatusLabel } from "@/lib/statusLabel";
+import { logStatusBadgeClass, logStatusBorderClass } from "@/lib/logStatusColors";
 import type { TFunction } from "@/contexts/LocaleContext";
 import { cn } from "@/lib/utils";
 
@@ -48,29 +48,8 @@ export function SearchResultCard({
 }: SearchResultCardProps) {
   const status = userLog?.status ?? userLog?.listType;
   const display = userLog ? getLogCardDisplay(userLog) : null;
-  const isDropped = status === "dropped";
-  const isInProgress = status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-  const isCompleted = status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
-  const listBorderClass =
-    status == null
-      ? "border border-[var(--color-surface-border)]"
-      : isDropped
-        ? "border border-red-500"
-        : isInProgress
-          ? "border border-amber-400"
-          : isCompleted
-            ? "border border-emerald-600"
-            : "border border-[var(--color-mid)]";
-  const badgeClass =
-    status == null
-      ? ""
-      : isDropped
-        ? "bg-red-500/95 text-white"
-        : isInProgress
-          ? "bg-amber-400 text-[var(--color-darkest)]"
-          : isCompleted
-            ? "bg-emerald-600 text-white"
-            : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
+  const listBorderClass = logStatusBorderClass(status);
+  const badgeClass = logStatusBadgeClass(status);
 
   const metaParts: string[] = [item.year ?? "", item.subtitle ?? ""].filter(Boolean);
   if (mediaType === "games" && item.timeToBeatHours != null && item.timeToBeatHours > 0) {

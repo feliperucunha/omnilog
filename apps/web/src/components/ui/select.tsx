@@ -114,6 +114,7 @@ export interface SelectOption {
   value: string;
   label: string;
   disabled?: boolean;
+  className?: string;
 }
 
 export interface SelectProps {
@@ -194,6 +195,7 @@ export function Select({
               key={opt.value === "" ? "__empty" : opt.value}
               value={opt.value === "" ? "__empty" : opt.value}
               disabled={opt.disabled === true}
+              className={opt.className}
             >
               {opt.label}
             </SelectItem>

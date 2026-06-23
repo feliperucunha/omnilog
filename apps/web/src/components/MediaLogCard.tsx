@@ -11,6 +11,7 @@ import { StarRating } from "@/components/StarRating";
 import type { LogViewMode } from "@/lib/logViewPreference";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { formatLogScopeLabel, getLogCardDisplay } from "@/lib/logDisplay";
+import { logStatusBadgeClass, logStatusBorderClass, getSeriesAirState } from "@/lib/logStatusColors";
 import { gradeToStars } from "@/lib/gradeStars";
 import {
   LOG_CARD_ACTION_COLUMN,
@@ -37,7 +38,7 @@ import { itemDetailPath } from "@/lib/itemRoutes";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { tapScale, tapTransition } from "@/lib/animations";
 import type { MediaType, Log } from "@geeklogs/shared";
-import { COMPLETED_STATUSES, IN_PROGRESS_STATUSES } from "@geeklogs/shared";
+import { COMPLETED_STATUSES } from "@geeklogs/shared";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "@/contexts/LocaleContext";
 
@@ -51,9 +52,6 @@ const SCORE_SOURCE_LABELS: Partial<Record<MediaType, string>> = {
   games: "RAWG",
 };
 
-const TV_ENDED_STATUSES = new Set(["ended", "canceled", "cancelled"]);
-const TV_ONGOING_STATUSES = new Set(["returning series", "in production", "pilot", "planned"]);
-
 const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
 const CHAPTER_TYPES: MediaType[] = ["manga", "comics"];
 const VOLUME_TYPES: MediaType[] = ["books", "boardgames"];
@@ -62,14 +60,6 @@ const REVIEW_PREVIEW_LENGTH = 120;
 
 const DENSE_INCREMENT_BUTTON =
   "flex h-8 min-w-8 items-center justify-center gap-0.5 rounded-lg border-0 bg-[var(--color-darkest)] px-1.5 shadow-[var(--shadow-sm)] transition-[transform,box-shadow] hover:scale-[1.04] hover:shadow-[var(--shadow-md)] active:scale-[0.98] disabled:scale-100 disabled:opacity-50 [@media(hover:hover)]:hover:bg-[var(--btn-gradient-start)]";
-
-function getTvAirState(status: string | null | undefined): "ongoing" | "ended" | null {
-  if (!status) return null;
-  const s = status.trim().toLowerCase();
-  if (TV_ENDED_STATUSES.has(s)) return "ended";
-  if (TV_ONGOING_STATUSES.has(s)) return "ongoing";
-  return null;
-}
 
 function getProgress(log: Log): { field: "episode" | "chapter" | "volume"; value: number; labelKey: string } {
   if (EPISODE_TYPES.includes(log.mediaType))
@@ -86,25 +76,11 @@ function showIncrementForLog(log: Log, mediaType: MediaType, hasProgressButton: 
 }
 
 function listBorderClass(log: Log): string {
-  const isDropped = log.status === "dropped";
-  const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
-  const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);
-  if (log.status == null) return "border border-[var(--color-surface-border)]";
-  if (isDropped) return "border border-red-500";
-  if (isInProgress) return "border border-amber-400";
-  if (isCompleted) return "border border-emerald-600";
-  return "border border-[var(--color-mid)]";
+  return logStatusBorderClass(log.status);
 }
 
 function statusBadgeClass(log: Log): string {
-  const isDropped = log.status === "dropped";
-  const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
-  const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);
-  if (log.status == null) return "";
-  if (isDropped) return "bg-red-500/95 text-white";
-  if (isInProgress) return "bg-amber-400 text-[var(--color-darkest)]";
-  if (isCompleted) return "bg-emerald-600 text-white";
-  return "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
+  return logStatusBadgeClass(log.status);
 }
 
 export type MediaLogCardProps = {
@@ -228,7 +204,7 @@ function LogMetaRow({
         <span className={cn(badgeSize, "border-0 bg-[var(--color-mid)]/30")}>{log.networks[0]}</span>
       )}
       {log.mediaType === "tv" && (() => {
-        const air = getTvAirState(log.tvStatus);
+        const air = getSeriesAirState(log.tvStatus);
         if (air === "ongoing") {
           return (
             <span className={cn(tvBadgeSize, "border border-amber-400/30 bg-amber-500/20 text-amber-200")}>

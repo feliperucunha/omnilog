@@ -761,7 +761,8 @@
     "scopeShow": "Series",
     "scopeSeason": "Season {{n}}",
     "scopeEpisode": "S{{season}} · E{{episode}}",
-    "showAllReviews": "Show {{count}} more reviews",
+    "showAllReviews_one": "Show 1 more review",
+    "showAllReviews_other": "Show {{count}} more reviews",
     "hideAllReviews": "Show fewer"
   },
   "itemPage": {
@@ -821,6 +822,14 @@
     "sold": "Sold",
     "matchesPlayed": "Matches played",
     "rating": "Rating",
+    "saveEpisodeSeasonReview": "Save episode/season review",
+    "saveEpisodeSeasonReviewShort": "Episode/season review",
+    "saveShowReview": "Save show review",
+    "saveShowReviewShort": "Show review",
+    "updateShowReview": "Update show review",
+    "updateShowReviewShort": "Show review",
+    "savedReviews": "Saved reviews",
+    "savedReviewShow": "Show review",
     "reviewPlaceholder": "Your thoughts..."
   },
   "readingProgress": {

@@ -53,8 +53,8 @@ import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
 import { tierHasProFeatures } from "@/lib/userTier";
+import { logStatusBadgeClass, logStatusBorderClass } from "@/lib/logStatusColors";
 import {
-  COMPLETED_STATUSES,
   IN_PROGRESS_STATUSES,
   LOG_STATUS_OPTIONS,
   SPEND_TRACKED_MEDIA_TYPES,
@@ -2380,31 +2380,8 @@ export function Statistics() {
                 >
                   {recent.map((log) => {
                     const status = log.status ?? undefined;
-                    const isDropped = status === "dropped";
-                    const isInProgress =
-                      status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(status);
-                    const isCompleted =
-                      status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
-                    const listBorderClass =
-                      status == null
-                        ? "border border-[var(--color-surface-border)]"
-                        : isDropped
-                          ? "border border-red-500"
-                          : isInProgress
-                            ? "border border-amber-400"
-                            : isCompleted
-                              ? "border border-emerald-600"
-                              : "border border-[var(--color-mid)]";
-                    const badgeClass =
-                      status == null
-                        ? ""
-                        : isDropped
-                          ? "bg-red-500/95 text-white"
-                          : isInProgress
-                            ? "bg-amber-400 text-[var(--color-darkest)]"
-                            : isCompleted
-                              ? "bg-emerald-600 text-white"
-                              : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
+                    const listBorderClass = logStatusBorderClass(status);
+                    const badgeClass = logStatusBadgeClass(status);
                     const duration =
                       log.startedAt && log.completedAt
                         ? formatTimeToFinish(log.startedAt, log.completedAt)

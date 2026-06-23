@@ -15,14 +15,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { NumberCombobox } from "@/components/ui/number-combobox";
-import type { MediaType, Log, ReviewScope, ScopedReview } from "@geeklogs/shared";
+import type { MediaType, Log, ScopedReview } from "@geeklogs/shared";
 import { BoardGameMatchesSection } from "@/components/BoardGameMatchesSection";
 import {
-  TvGranularReviewSection,
-  emptyTvReviewDraft,
-  saveScopedReviewTab,
-  type TvReviewTabDraft,
-} from "@/components/TvGranularReviewSection";
+  canSavePartialReview,
+  resolvePartialReviewTarget,
+  reviewDraftForSeasonEpisodeChange,
+  savePartialScopedReview,
+  showReviewDraftFromLog,
+} from "@/lib/partialTvReview";
+import { ReviewPartialSaveButtons } from "@/components/ReviewPartialSaveButtons";
+import { SavedTvReviewsSection } from "@/components/SavedTvReviewsSection";
 import { GameLogFields } from "@/components/GameLogFields";
 import { ReadingProgressFields } from "@/components/ReadingProgressFields";
 import { dateInputToIso, isoToDateInput } from "@/lib/readingDates";
@@ -30,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
+import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { useProgressOptions } from "@/hooks/useProgressOptions";
 import { trackProductEvent } from "@/lib/productAnalytics";
 import { triggerImpact } from "@/lib/capacitorHaptics";
@@ -145,13 +149,10 @@ export function LogForm(props: LogFormProps) {
   const isMobile = useIsMobile();
   const cancellingRef = useRef(false);
   const drawerRequestCloseRef = useRef<(() => void) | null>(null);
+  const prevSeasonEpisodeRef = useRef<{ season: number | ""; episode: number | "" } | null>(null);
 
   const [itemMainTab, setItemMainTab] = useState<"review" | "matches" | "market">("review");
-  const tvGranular = mediaType === "tv";
-  const [tvReviewTab, setTvReviewTab] = useState<ReviewScope>("show");
   const [scopedReviews, setScopedReviews] = useState<ScopedReview[]>([]);
-  const [seasonDraft, setSeasonDraft] = useState<TvReviewTabDraft>(() => emptyTvReviewDraft());
-  const [episodeDraft, setEpisodeDraft] = useState<TvReviewTabDraft>(() => emptyTvReviewDraft());
 
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
@@ -171,7 +172,7 @@ export function LogForm(props: LogFormProps) {
     showPurchaseAmount && spendFieldsIncludePurchase(showCollectionOwnership, own, sold);
   const showSaleAmountField = showPurchaseAmount && (!showCollectionOwnership || sold);
   const showItemTabs = isEdit && (showBoardGameFields || showMarketTab);
-  const showTvTabs = isEdit && tvGranular;
+  const hasPartialReviews = isEdit && showSeasonEpisode;
   const initialBoardGameTab = isEdit && "initialBoardGameTab" in props ? props.initialBoardGameTab : undefined;
   const onLogRefreshed = isEdit && "onLogRefreshed" in props ? props.onLogRefreshed : undefined;
   const progressExternalId = isEdit ? log?.externalId : (props as LogFormCreateProps).externalId;
@@ -220,8 +221,14 @@ export function LogForm(props: LogFormProps) {
 
   useEffect(() => {
     if (isEdit && log) {
-      setStars(log.grade != null ? gradeToStars(log.grade) : null);
-      setReview(log.review ?? "");
+      if (hasPartialReviews) {
+        const draft = showReviewDraftFromLog(log);
+        setStars(draft.stars);
+        setReview(draft.review);
+      } else {
+        setStars(log.grade != null ? gradeToStars(log.grade) : null);
+        setReview(log.review ?? "");
+      }
       setStatus(log.status ?? log.listType ?? null);
       setSeason(log.season ?? "");
       setEpisode(log.episode ?? "");
@@ -252,7 +259,7 @@ export function LogForm(props: LogFormProps) {
       );
       setSaleAmountMinor(log.saleAmountMinor ?? null);
     }
-  }, [isEdit, log?.id, log?.matchesPlayed, me?.defaultPurchaseCurrency, showBoardGameFields]);
+  }, [isEdit, log?.id, log?.matchesPlayed, me?.defaultPurchaseCurrency, showBoardGameFields, hasPartialReviews]);
 
   useEffect(() => {
     if (!showItemTabs) {
@@ -263,24 +270,53 @@ export function LogForm(props: LogFormProps) {
   }, [showItemTabs, log?.id, initialBoardGameTab]);
 
   useEffect(() => {
-    if (!showTvTabs || !log?.id) {
+    if (!hasPartialReviews || !log?.id) {
       setScopedReviews([]);
       return;
     }
     apiFetch<{ data: ScopedReview[] }>(`/logs/${log.id}/scoped-reviews`)
       .then((res) => setScopedReviews(res.data ?? []))
       .catch(() => setScopedReviews([]));
-  }, [showTvTabs, log?.id]);
+  }, [hasPartialReviews, log?.id]);
 
   useEffect(() => {
-    if (!showTvTabs) {
-      setTvReviewTab("show");
-      return;
-    }
-    setTvReviewTab("show");
-    setSeasonDraft(emptyTvReviewDraft());
-    setEpisodeDraft(emptyTvReviewDraft());
-  }, [showTvTabs, log?.id]);
+    prevSeasonEpisodeRef.current = null;
+  }, [log?.id, mediaType]);
+
+  useEffect(() => {
+    if (!hasPartialReviews) return;
+    const prev = prevSeasonEpisodeRef.current;
+    prevSeasonEpisodeRef.current = { season, episode };
+    if (prev === null) return;
+    if (prev.season === season && prev.episode === episode) return;
+    const draft = reviewDraftForSeasonEpisodeChange(
+      mediaType,
+      season,
+      episode,
+      showSeasonField,
+      log ?? null
+    );
+    setStars(draft.stars);
+    setReview(draft.review);
+  }, [season, episode, hasPartialReviews, mediaType, showSeasonField, log]);
+
+  const resetReviewDraft = useCallback(
+    (source: Log | null | undefined = log) => {
+      if (!hasPartialReviews || !source) {
+        setStars(null);
+        setReview("");
+        return;
+      }
+      const draft = showReviewDraftFromLog(source);
+      setStars(draft.stars);
+      setReview(draft.review);
+    },
+    [hasPartialReviews, log]
+  );
+
+  const clearReviewDraft = useCallback(() => {
+    resetReviewDraft(log);
+  }, [resetReviewDraft, log]);
 
   const title = isEdit ? log!.title : props.title;
   const image = isEdit ? (log!.image ?? null) : (props as LogFormCreateProps).image;
@@ -531,6 +567,7 @@ export function LogForm(props: LogFormProps) {
           void refetchMe();
         }
         const savedLog = logFromApiResponse(updated);
+        if (hasPartialReviews) resetReviewDraft(savedLog);
         if (statusChanged) {
           const completion: LogCompleteState = {
             image,
@@ -567,7 +604,7 @@ export function LogForm(props: LogFormProps) {
             title: (props as LogFormCreateProps).title,
             image: image ?? null,
             grade,
-            review,
+            review: review.trim() || null,
             status: status ?? null,
             ...(showReadingProgress && {
               pagesRead: toNum(pagesRead),
@@ -662,6 +699,10 @@ export function LogForm(props: LogFormProps) {
     image,
     props,
     showSeasonEpisode,
+    showSeasonField,
+    hasPartialReviews,
+    resetReviewDraft,
+    clearReviewDraft,
     showReadingProgress,
     showGameLogFields,
     gamePlatform,
@@ -678,24 +719,29 @@ export function LogForm(props: LogFormProps) {
     onCancel,
   ]);
 
+  const handlePartialSave = async () => {
+    if (!log || !canSavePartialReview(mediaType, season, episode, showSeasonField)) return;
+    const target = resolvePartialReviewTarget(mediaType, season, episode, showSeasonField);
+    if (!target) return;
+    setLoading(true);
+    try {
+      await savePartialScopedReview(log.id, target, stars, review);
+      const res = await apiFetch<{ data: ScopedReview[] }>(`/logs/${log.id}/scoped-reviews`);
+      setScopedReviews(res.data ?? []);
+      clearReviewDraft();
+      toast.success(t("toast.reviewSaved"));
+      invalidateLogsAndItemsCache();
+      props.onSaved(undefined, log);
+    } catch (err) {
+      showErrorToast(t, "E012", { originalError: err });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (itemMainTab === "market") return;
-    if (showTvTabs && (tvReviewTab === "season" || tvReviewTab === "episode") && log) {
-      setLoading(true);
-      try {
-        const draft = tvReviewTab === "season" ? seasonDraft : episodeDraft;
-        await saveScopedReviewTab(log.id, tvReviewTab, draft);
-        toast.success(t("toast.reviewSaved"));
-        invalidateLogsAndItemsCache();
-        props.onSaved(undefined, log);
-      } catch (err) {
-        showErrorToast(t, "E012", { originalError: err });
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
     await performSave();
   };
 
@@ -705,6 +751,8 @@ export function LogForm(props: LogFormProps) {
       : showBoardGameFields && itemMainTab === "matches"
         ? t("boardGameMatches.saveMatch")
         : t("common.save");
+
+  const showReviewPartialFooter = hasPartialReviews && itemMainTab === "review";
 
   const handleDrawerBeforeDismiss = useCallback(async (): Promise<boolean> => {
     if (cancellingRef.current) return true;
@@ -740,26 +788,6 @@ export function LogForm(props: LogFormProps) {
     cancellingRef.current = true;
     onCancel();
   }, [onCancel]);
-
-  const tvTabBar = showTvTabs ? (
-    <motion.div className="mb-3 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
-      {(["show", "season", "episode"] as const).map((tab) => (
-        <button
-          key={tab}
-          type="button"
-          onClick={() => setTvReviewTab(tab)}
-          className={cn(
-            "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-            tvReviewTab === tab
-              ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
-              : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-          )}
-        >
-          {t(`tvReviews.tab${tab === "show" ? "Show" : tab === "season" ? "Season" : "Episode"}`)}
-        </button>
-      ))}
-    </motion.div>
-  ) : null;
 
   const itemTabBar =
     showItemTabs && log ? (
@@ -809,7 +837,7 @@ export function LogForm(props: LogFormProps) {
 
   const formContent = (
     <motion.div initial="initial" animate="animate" variants={modalContentVariants}>
-      <div className="mb-4 flex min-w-0 gap-4">
+      <div className="mb-4 flex min-w-0 items-center gap-4">
         <ItemImage
           src={image}
           className="h-20 w-14 shrink-0 rounded"
@@ -826,7 +854,6 @@ export function LogForm(props: LogFormProps) {
           {title}
         </div>
       </div>
-      {tvTabBar}
       {itemTabBar}
       {showMarketTab && log && (
         <div className={cn(itemMainTab !== "market" && "hidden")} aria-hidden={itemMainTab !== "market"}>
@@ -853,31 +880,7 @@ export function LogForm(props: LogFormProps) {
         />
       ) : itemMainTab !== "market" ? (
       <>
-        {showTvTabs && log && (
-          <div
-            className={tvReviewTab === "show" ? "hidden" : undefined}
-            aria-hidden={tvReviewTab === "show"}
-          >
-            <TvGranularReviewSection
-              mediaType={mediaType}
-              progressOptions={progressOptions}
-              progressOptionsLoading={progressOptionsLoading}
-              showSeasonField={showSeasonField}
-              scopedReviews={scopedReviews}
-              activeTab={tvReviewTab}
-              seasonDraft={seasonDraft}
-              onSeasonDraftChange={setSeasonDraft}
-              episodeDraft={episodeDraft}
-              onEpisodeDraftChange={setEpisodeDraft}
-            />
-          </div>
-        )}
-      <form
-        id="log-form"
-        onSubmit={handleSubmit}
-        className={showTvTabs && tvReviewTab !== "show" ? "hidden" : undefined}
-        aria-hidden={showTvTabs && tvReviewTab !== "show"}
-      >
+      <form id="log-form" onSubmit={handleSubmit}>
             <div className="flex flex-col gap-4">
               {isEdit && (
                 <>
@@ -1092,13 +1095,29 @@ export function LogForm(props: LogFormProps) {
                   className="w-full max-w-full sm:max-w-md"
                 />
               )}
+              {hasPartialReviews && log && (
+                <SavedTvReviewsSection
+                  log={log}
+                  scopedReviews={scopedReviews}
+                  mediaType={mediaType}
+                  showSeasonField={showSeasonField}
+                  disabled={loading || deleting}
+                  t={t}
+                  onLogUpdated={(updated) => {
+                    const decoded = decodeLogForDisplay(updated);
+                    onLogRefreshed?.(decoded);
+                    resetReviewDraft(decoded);
+                  }}
+                  onScopedReviewsChange={setScopedReviews}
+                />
+              )}
               <div>
                 <Label className="mb-1 block text-sm font-medium text-[var(--color-lightest)]">
                   {t("itemReviewForm.rating")}
                 </Label>
                 <StarRating
                   value={stars}
-                  onChange={(s) => setStars(s)}
+                  onChange={setStars}
                   size="xl"
                   fullWidth
                   showGradeText={false}
@@ -1156,24 +1175,61 @@ export function LogForm(props: LogFormProps) {
             <div className="mt-6">{formContent}</div>
             {!(showBoardGameFields && itemMainTab === "matches") && itemMainTab !== "market" && (
               <DrawerFooter>
-                <div className="flex w-full gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={handleDrawerCancel}
-                    disabled={loading || deleting}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                  <Button
-                    type="button"
-                    className="flex-1"
-                    disabled={loading || deleting}
-                    onClick={() => void handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-                  >
-                    {saveButtonLabel}
-                  </Button>
+                <div
+                  className={
+                    showReviewPartialFooter
+                      ? "flex w-full flex-col gap-2 sm:flex-row sm:gap-3"
+                      : "flex w-full gap-3"
+                  }
+                >
+                  {showReviewPartialFooter ? (
+                    <>
+                      <ReviewPartialSaveButtons
+                        saving={loading || deleting}
+                        isUpdate={isEdit}
+                        partialDisabled={
+                          !canSavePartialReview(mediaType, season, episode, showSeasonField)
+                        }
+                        onPartialSave={() => void handlePartialSave()}
+                        onPrimarySave={() =>
+                          void handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+                        }
+                        t={t}
+                        className="order-1 sm:order-2 sm:min-w-0 sm:flex-[2]"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="order-2 w-full sm:order-1 sm:flex-1"
+                        onClick={handleDrawerCancel}
+                        disabled={loading || deleting}
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={handleDrawerCancel}
+                        disabled={loading || deleting}
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                      <Button
+                        type="button"
+                        className="flex-1"
+                        disabled={loading || deleting}
+                        onClick={() =>
+                          void handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+                        }
+                      >
+                        {saveButtonLabel}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </DrawerFooter>
             )}
@@ -1189,24 +1245,61 @@ export function LogForm(props: LogFormProps) {
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">{formContent}</div>
             {!(showBoardGameFields && itemMainTab === "matches") && itemMainTab !== "market" && (
               <DialogFooter className="mt-4">
-                <div className="flex w-full gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={handleDialogCancel}
-                    disabled={loading || deleting}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                  <Button
-                    type="button"
-                    className="flex-1"
-                    disabled={loading || deleting}
-                    onClick={() => void handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-                  >
-                    {saveButtonLabel}
-                  </Button>
+                <div
+                  className={
+                    showReviewPartialFooter
+                      ? "flex w-full flex-col gap-2 sm:flex-row sm:gap-3"
+                      : "flex w-full gap-3"
+                  }
+                >
+                  {showReviewPartialFooter ? (
+                    <>
+                      <ReviewPartialSaveButtons
+                        saving={loading || deleting}
+                        isUpdate={isEdit}
+                        partialDisabled={
+                          !canSavePartialReview(mediaType, season, episode, showSeasonField)
+                        }
+                        onPartialSave={() => void handlePartialSave()}
+                        onPrimarySave={() =>
+                          void handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+                        }
+                        t={t}
+                        className="order-1 sm:order-2 sm:min-w-0 sm:flex-[2]"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="order-2 w-full sm:order-1 sm:flex-1"
+                        onClick={handleDialogCancel}
+                        disabled={loading || deleting}
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={handleDialogCancel}
+                        disabled={loading || deleting}
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                      <Button
+                        type="button"
+                        className="flex-1"
+                        disabled={loading || deleting}
+                        onClick={() =>
+                          void handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+                        }
+                      >
+                        {saveButtonLabel}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </DialogFooter>
             )}

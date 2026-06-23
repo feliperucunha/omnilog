@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { NumberCombobox } from "@/components/ui/number-combobox";
-import type { LogAffinityContext, MediaType, Log, ReviewScope, ScopedReview } from "@geeklogs/shared";
+import type { LogAffinityContext, MediaType, Log, ScopedReview } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { apiFetch, invalidateLogsAndItemsCache, LOG_LIMIT_REACHED_CODE } from "@/lib/api";
@@ -44,11 +44,14 @@ import {
   type BoardGameMatchesSectionHandle,
 } from "@/components/BoardGameMatchesSection";
 import {
-  TvGranularReviewSection,
-  emptyTvReviewDraft,
-  saveScopedReviewTab,
-  type TvReviewTabDraft,
-} from "@/components/TvGranularReviewSection";
+  canSavePartialReview,
+  resolvePartialReviewTarget,
+  reviewDraftForSeasonEpisodeChange,
+  savePartialScopedReview,
+  showReviewDraftFromLog,
+} from "@/lib/partialTvReview";
+import { ReviewPartialSaveButtons } from "@/components/ReviewPartialSaveButtons";
+import { SavedTvReviewsSection } from "@/components/SavedTvReviewsSection";
 import { GameLogFields } from "@/components/GameLogFields";
 import { ReadingProgressFields } from "@/components/ReadingProgressFields";
 import { MarketListingSection } from "@/components/MarketListingSection";
@@ -148,11 +151,8 @@ export function ItemReviewForm({
   const [itemMainTab, setItemMainTab] = useState<"review" | "matches" | "market">("review");
   const [searchParams] = useSearchParams();
   const boardMatchesRef = useRef<BoardGameMatchesSectionHandle>(null);
-  const tvGranular = mediaType === "tv";
-  const [tvReviewTab, setTvReviewTab] = useState<ReviewScope>("show");
+  const prevSeasonEpisodeRef = useRef<{ season: number | ""; episode: number | "" } | null>(null);
   const [scopedReviews, setScopedReviews] = useState<ScopedReview[]>([]);
-  const [seasonDraft, setSeasonDraft] = useState<TvReviewTabDraft>(() => emptyTvReviewDraft());
-  const [episodeDraft, setEpisodeDraft] = useState<TvReviewTabDraft>(() => emptyTvReviewDraft());
 
   /** When the log has no saved currency for a field, use account default (not only when state is still USD). */
   useEffect(() => {
@@ -178,6 +178,7 @@ export function ItemReviewForm({
 
   const statusOptions = LOG_STATUS_OPTIONS[mediaType];
   const showSeasonEpisode = HAS_SEASON_EPISODE.includes(mediaType);
+  const hasPartialReviews = showSeasonEpisode;
   const showSeasonField = HAS_SEASON_FIELD.includes(mediaType);
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
   const showReadingProgress = HAS_READING_PROGRESS.includes(mediaType);
@@ -204,8 +205,14 @@ export function ItemReviewForm({
         const log = logs[0] != null ? decodeLogForDisplay(logs[0]) : null;
         setMyLog(log);
         if (log) {
-          setStars(log.grade != null ? gradeToStars(log.grade) : null);
-          setReview(log.review ?? "");
+          if (HAS_SEASON_EPISODE.includes(mediaType)) {
+            const draft = showReviewDraftFromLog(log);
+            setStars(draft.stars);
+            setReview(draft.review);
+          } else {
+            setStars(log.grade != null ? gradeToStars(log.grade) : null);
+            setReview(log.review ?? "");
+          }
           setStatus(log.status ?? log.listType ?? null);
           setSeason(log.season ?? "");
           setEpisode(log.episode ?? "");
@@ -273,14 +280,49 @@ export function ItemReviewForm({
   }, [mediaType, externalId]);
 
   useEffect(() => {
-    if (!myLog?.id || !tvGranular) {
+    if (!myLog?.id || !hasPartialReviews) {
       setScopedReviews([]);
       return;
     }
     apiFetch<{ data: ScopedReview[] }>(`/logs/${myLog.id}/scoped-reviews`)
       .then((res) => setScopedReviews(res.data ?? []))
       .catch(() => setScopedReviews([]));
-  }, [myLog?.id, tvGranular]);
+  }, [myLog?.id, hasPartialReviews]);
+
+  useEffect(() => {
+    prevSeasonEpisodeRef.current = null;
+  }, [myLog?.id, mediaType]);
+
+  useEffect(() => {
+    if (!hasPartialReviews) return;
+    const prev = prevSeasonEpisodeRef.current;
+    prevSeasonEpisodeRef.current = { season, episode };
+    if (prev === null) return;
+    if (prev.season === season && prev.episode === episode) return;
+    const draft = reviewDraftForSeasonEpisodeChange(
+      mediaType,
+      season,
+      episode,
+      showSeasonField,
+      myLog
+    );
+    setStars(draft.stars);
+    setReview(draft.review);
+  }, [season, episode, hasPartialReviews, mediaType, showSeasonField, myLog]);
+
+  const resetReviewDraft = useCallback(
+    (log: Log | null | undefined = myLog) => {
+      if (!hasPartialReviews || !log) {
+        setStars(null);
+        setReview("");
+        return;
+      }
+      const draft = showReviewDraftFromLog(log);
+      setStars(draft.stars);
+      setReview(draft.review);
+    },
+    [hasPartialReviews, myLog]
+  );
 
   useEffect(() => {
     if (searchParams.get("market") === "1" && showMarketTab) {
@@ -347,6 +389,10 @@ export function ItemReviewForm({
     season,
     episode,
   ]);
+
+  const clearReviewDraft = useCallback(() => {
+    resetReviewDraft(myLog);
+  }, [resetReviewDraft, myLog]);
 
   const ensureMarketLog = useCallback(async (): Promise<Log | null> => {
     if (myLog) return myLog;
@@ -560,6 +606,7 @@ export function ItemReviewForm({
           { method: "PATCH", body: JSON.stringify(payload) }
         );
         setMyLog(updated);
+        if (hasPartialReviews) resetReviewDraft(updated);
         toast.success(t("toast.reviewUpdated"));
         invalidateLogsAndItemsCache();
         if (
@@ -599,6 +646,7 @@ export function ItemReviewForm({
           { method: "POST", body: JSON.stringify(createBody) }
         );
         setMyLog(created);
+        if (hasPartialReviews) resetReviewDraft(created);
         toast.success(t("toast.reviewSaved"));
         invalidateLogsAndItemsCache();
         if (
@@ -633,37 +681,29 @@ export function ItemReviewForm({
     }
   };
 
+  const handlePartialSave = async () => {
+    if (!canSavePartialReview(mediaType, season, episode, showSeasonField)) return;
+    const target = resolvePartialReviewTarget(mediaType, season, episode, showSeasonField);
+    if (!target) return;
+    setSaving(true);
+    try {
+      const logId = await ensureTvLog();
+      await savePartialScopedReview(logId, target, stars, review);
+      const res = await apiFetch<{ data: ScopedReview[] }>(`/logs/${logId}/scoped-reviews`);
+      setScopedReviews(res.data ?? []);
+      clearReviewDraft();
+      toast.success(t("toast.reviewSaved"));
+      invalidateLogsAndItemsCache();
+      onSaved();
+    } catch (err) {
+      showErrorToast(t, "E012", { originalError: err });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handlePrimarySave = async (e?: FormEvent) => {
     e?.preventDefault();
-    if (tvGranular && (tvReviewTab === "season" || tvReviewTab === "episode")) {
-      setSaving(true);
-      try {
-        const logId = await ensureTvLog();
-        const draft = tvReviewTab === "season" ? seasonDraft : episodeDraft;
-        await saveScopedReviewTab(logId, tvReviewTab, draft);
-        const res = await apiFetch<{ data: ScopedReview[] }>(`/logs/${logId}/scoped-reviews`);
-        setScopedReviews(res.data ?? []);
-        toast.success(t("toast.reviewSaved"));
-        invalidateLogsAndItemsCache();
-        onSaved();
-        onSavedComplete?.({
-          image,
-          title,
-          grade: gradeForPayload(stars),
-          status: status ?? undefined,
-          mediaType,
-          id: externalId,
-          review: review.trim() || null,
-          ...(showCollectionOwnership && { own, wantToBuy, sold }),
-          ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
-        });
-      } catch (err) {
-        showErrorToast(t, "E012", { originalError: err });
-      } finally {
-        setSaving(false);
-      }
-      return;
-    }
     if (showBoardGameFields && itemMainTab === "matches") {
       setSaving(true);
       try {
@@ -740,25 +780,6 @@ export function ItemReviewForm({
             )}
           </div>
         )}
-        {tvGranular && (
-          <motion.div className="mb-3 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
-            {(["show", "season", "episode"] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setTvReviewTab(tab)}
-                className={cn(
-                  "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  tvReviewTab === tab
-                    ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
-                    : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-                )}
-              >
-                {t(`tvReviews.tab${tab === "show" ? "Show" : tab === "season" ? "Season" : "Episode"}`)}
-              </button>
-            ))}
-          </motion.div>
-        )}
         {(showBoardGameFields || showMarketTab) && (
           <motion.div className="mb-3 flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
             <button
@@ -830,27 +851,7 @@ export function ItemReviewForm({
           />
         ) : itemMainTab !== "market" ? (
         <>
-          {tvGranular && (
-            <div className={tvReviewTab === "show" ? "hidden" : undefined} aria-hidden={tvReviewTab === "show"}>
-              <TvGranularReviewSection
-                mediaType={mediaType}
-                progressOptions={progressOptions}
-                progressOptionsLoading={progressOptionsLoading}
-                showSeasonField={showSeasonField}
-                scopedReviews={scopedReviews}
-                activeTab={tvReviewTab}
-                seasonDraft={seasonDraft}
-                onSeasonDraftChange={setSeasonDraft}
-                episodeDraft={episodeDraft}
-                onEpisodeDraftChange={setEpisodeDraft}
-              />
-            </div>
-          )}
-        <form
-          onSubmit={(e) => void handlePrimarySave(e)}
-          className={tvGranular && tvReviewTab !== "show" ? "hidden" : undefined}
-          aria-hidden={tvGranular && tvReviewTab !== "show"}
-        >
+        <form onSubmit={(e) => void handlePrimarySave(e)}>
           <motion.div className="flex flex-col gap-4">
             <div>
               <Label className="mb-2 block text-sm font-medium text-[var(--color-lightest)]">
@@ -1069,13 +1070,31 @@ export function ItemReviewForm({
               />
             )}
 
+            {hasPartialReviews && myLog && (
+              <SavedTvReviewsSection
+                log={myLog}
+                scopedReviews={scopedReviews}
+                mediaType={mediaType}
+                showSeasonField={showSeasonField}
+                disabled={saving}
+                t={t}
+                onLogUpdated={(log) => {
+                  const decoded = decodeLogForDisplay(log);
+                  setMyLog(decoded);
+                  resetReviewDraft(decoded);
+                  onSaved();
+                }}
+                onScopedReviewsChange={setScopedReviews}
+              />
+            )}
+
             <div className="w-full min-w-0 max-w-full">
               <Label className="mb-2 block text-sm font-medium text-[var(--color-lightest)]">
                 {t("itemReviewForm.rating")}
               </Label>
               <StarRating
                 value={stars}
-                onChange={(s) => setStars(s)}
+                onChange={setStars}
                 size="xl"
                 fullWidth
                 showGradeText={false}
@@ -1118,6 +1137,15 @@ export function ItemReviewForm({
                 {saving ? t("common.saving") : t("boardGameMatches.saveMatchAndShowBanner")}
               </Button>
             </div>
+          ) : hasPartialReviews && itemMainTab === "review" ? (
+            <ReviewPartialSaveButtons
+              saving={saving}
+              isUpdate={!!myLog}
+              partialDisabled={!canSavePartialReview(mediaType, season, episode, showSeasonField)}
+              onPartialSave={() => void handlePartialSave()}
+              onPrimarySave={() => void handlePrimarySave()}
+              t={t}
+            />
           ) : (
             <Button
               type="button"

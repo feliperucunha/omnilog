@@ -8,6 +8,12 @@ import type { MediaType, Log } from "@geeklogs/shared";
 import { LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import {
+  logStatusSelectTriggerClass,
+  logStatusSoftBadgeClass,
+  mediaTypeUsesEpisodeStatusColors,
+} from "@/lib/logStatusColors";
+import { cn } from "@/lib/utils";
+import {
   apiFetch,
   apiFetchCached,
   apiFetchSWR,
@@ -62,7 +68,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
-import { cn } from "@/lib/utils";
 import { mediaTypeHasCollectionOwnership, mediaTypeHasMarketTab } from "@/lib/mediaTypeFeatures";
 import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
@@ -661,6 +666,30 @@ export function MediaLogs({
     ];
   }, [t, statusCounts]);
 
+  const colorizeTvStatuses = mediaTypeUsesEpisodeStatusColors(mediaType);
+  const statusFilterSelectOptions = useMemo(
+    () => [
+      {
+        value: "",
+        label:
+          statusCounts != null
+            ? `${t("mediaLogs.filterAll")} (${statusCounts.total})`
+            : t("mediaLogs.filterAll"),
+      },
+      ...LOG_STATUS_OPTIONS[mediaType].map((s) => ({
+        value: s,
+        label:
+          statusCounts != null
+            ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})`
+            : getStatusLabel(t, s, mediaType),
+        className: colorizeTvStatuses
+          ? cn("rounded-sm", logStatusSoftBadgeClass(s))
+          : undefined,
+      })),
+    ],
+    [colorizeTvStatuses, mediaType, statusCounts, t]
+  );
+
   const genreSelectOptions = useMemo(() => {
     const base = t("mediaLogs.filterAllGenres");
     const rows = statusCounts?.byGenre ?? [];
@@ -798,8 +827,6 @@ export function MediaLogs({
     );
   }
 
-  const statusOptions = LOG_STATUS_OPTIONS[mediaType];
-
   return (
     <div className={`relative min-h-full min-w-0 overflow-hidden pb-24 md:pb-20 ${embedded ? "" : ""}`}>
       {!readOnly && (
@@ -923,16 +950,15 @@ export function MediaLogs({
               <Select
                 value={statusFilter}
                 onValueChange={setStatusFilter}
-                options={[
-                  { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
-                  ...statusOptions.map((s) => ({
-                    value: s,
-                    label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
-                  })),
-                ]}
+                options={statusFilterSelectOptions}
                 aria-label={t("itemReviewForm.status")}
                 className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
-                triggerClassName="w-full min-w-0 max-w-none"
+                triggerClassName={cn(
+                  "w-full min-w-0 max-w-none",
+                  colorizeTvStatuses && statusFilter
+                    ? logStatusSelectTriggerClass(statusFilter)
+                    : undefined
+                )}
               />
               {showCollectionOwnershipFilters && (
                 <Select
@@ -1111,16 +1137,15 @@ export function MediaLogs({
             <Select
               value={statusFilter}
               onValueChange={setStatusFilter}
-              options={[
-                { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
-                ...statusOptions.map((s) => ({
-                  value: s,
-                  label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
-                })),
-              ]}
+              options={statusFilterSelectOptions}
               aria-label={t("itemReviewForm.status")}
               className="min-w-0 w-full"
-              triggerClassName="w-full max-w-none min-w-0"
+              triggerClassName={cn(
+                "w-full max-w-none min-w-0",
+                colorizeTvStatuses && statusFilter
+                  ? logStatusSelectTriggerClass(statusFilter)
+                  : undefined
+              )}
             />
             {showCollectionOwnershipFilters && (
               <Select
@@ -1165,16 +1190,15 @@ export function MediaLogs({
         <Select
           value={statusFilter}
           onValueChange={setStatusFilter}
-          options={[
-            { value: "", label: statusCounts != null ? `${t("mediaLogs.filterAll")} (${statusCounts.total})` : t("mediaLogs.filterAll") },
-            ...statusOptions.map((s) => ({
-              value: s,
-              label: statusCounts != null ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})` : getStatusLabel(t, s, mediaType),
-            })),
-          ]}
+          options={statusFilterSelectOptions}
           aria-label={t("itemReviewForm.status")}
           className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
-          triggerClassName="w-full min-w-0 max-w-none"
+          triggerClassName={cn(
+            "w-full min-w-0 max-w-none",
+            colorizeTvStatuses && statusFilter
+              ? logStatusSelectTriggerClass(statusFilter)
+              : undefined
+          )}
         />
         {showCollectionOwnershipFilters && (
           <Select

@@ -32,8 +32,6 @@ import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  COMPLETED_STATUSES,
-  IN_PROGRESS_STATUSES,
   MEDIA_TYPES,
   SPEND_TRACKED_MEDIA_TYPES,
   type MediaType,
@@ -58,6 +56,7 @@ import { gradeToStars } from "@/lib/gradeStars";
 import { formatLogScopeLabel, getLogCardDisplay } from "@/lib/logDisplay";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { getStatusLabel } from "@/lib/statusLabel";
+import { logStatusBadgeClass, logStatusBorderClass } from "@/lib/logStatusColors";
 import { tapScale, tapTransition } from "@/lib/animations";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
 import { itemDetailPath } from "@/lib/itemRoutes";
@@ -755,29 +754,8 @@ export function Dashboard() {
                 {feed.map(({ log, user: feedUser }) => {
                   const display = getLogCardDisplay(log);
                   const scopeLabel = formatLogScopeLabel(t, display);
-                  const isDropped = log.status === "dropped";
-                  const isInProgress = log.status != null && (IN_PROGRESS_STATUSES as readonly string[]).includes(log.status);
-                  const isCompleted = log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status);
-                  const listBorderClass =
-                    log.status == null
-                      ? "border border-[var(--color-surface-border)]"
-                      : isDropped
-                        ? "border border-red-500"
-                        : isInProgress
-                          ? "border border-amber-400"
-                          : isCompleted
-                            ? "border border-emerald-600"
-                            : "border border-[var(--color-mid)]";
-                  const badgeClass =
-                    log.status == null
-                      ? ""
-                      : isDropped
-                        ? "bg-red-500/95 text-white"
-                        : isInProgress
-                          ? "bg-amber-400 text-[var(--color-darkest)]"
-                          : isCompleted
-                            ? "bg-emerald-600 text-white"
-                            : "bg-[var(--color-mid)]/90 text-[var(--color-lightest)]";
+                  const listBorderClass = logStatusBorderClass(log.status);
+                  const badgeClass = logStatusBadgeClass(log.status);
                   const isExpanded = expandedReviewLogId === log.id;
                   return (
                   <motion.li
