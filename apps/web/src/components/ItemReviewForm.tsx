@@ -45,6 +45,7 @@ import {
 } from "@/components/BoardGameMatchesSection";
 import {
   canSavePartialReview,
+  partialReviewSaveKind,
   resolvePartialReviewTarget,
   reviewDraftForSeasonEpisodeChange,
   savePartialScopedReview,
@@ -862,8 +863,16 @@ export function ItemReviewForm({
                 onValueChange={(v) => {
                   const next = v || null;
                   setStatus(next);
-                  if (showBoardGameFields && !myLog) {
-                    setMatchesPlayed(next === "played" ? 1 : next === "plan to play" ? 0 : matchesPlayed);
+                  if (showBoardGameFields) {
+                    if (next === "played") {
+                      setMatchesPlayed((prev) => {
+                        if (!myLog) return 1;
+                        if (prev === "" || prev === 0) return 1;
+                        return prev;
+                      });
+                    } else if (!myLog && next === "plan to play") {
+                      setMatchesPlayed(0);
+                    }
                   }
                   if (next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && episodesCount != null && episodesCount > 0) {
                     setEpisode(episodesCount);
@@ -1141,7 +1150,7 @@ export function ItemReviewForm({
             <ReviewPartialSaveButtons
               saving={saving}
               isUpdate={!!myLog}
-              partialDisabled={!canSavePartialReview(mediaType, season, episode, showSeasonField)}
+              partialSaveKind={partialReviewSaveKind(mediaType, season, episode, showSeasonField)}
               onPartialSave={() => void handlePartialSave()}
               onPrimarySave={() => void handlePrimarySave()}
               t={t}

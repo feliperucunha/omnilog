@@ -15,6 +15,8 @@ const COLD_START_PROGRESS_DURATION_MS = 12_000;
 const MAX_TOTAL_WAIT_MS = 180_000;
 /** Show “server may be sleeping” hint after this many ms. */
 const SERVER_SLEEPING_HINT_MS = 15_000;
+/** Delay after progress stalls at 99% before showing Try again. */
+const STUCK_AT_99_TRY_AGAIN_MS = 500;
 /** Native: brief branded splash before revealing the in-app loader (API may still be loading). */
 const NATIVE_MIN_SPLASH_MS = 500;
 const NATIVE_LOADER_SLIDE_MS = 550;
@@ -46,6 +48,7 @@ function ColdStartProgressBlock({
   state,
   stillWaiting,
   elapsedMs,
+  showTryAgain,
   onTryAgain,
   t,
 }: {
@@ -54,6 +57,7 @@ function ColdStartProgressBlock({
   state: LoaderState;
   stillWaiting: boolean;
   elapsedMs: number;
+  showTryAgain: boolean;
   onTryAgain: () => void;
   t: (key: string) => string;
 }) {
@@ -76,7 +80,7 @@ function ColdStartProgressBlock({
           {t("coldStart.serverSleepingHint")}
         </p>
       )}
-      {stillWaiting && elapsedMs >= 25_000 && elapsedMs < MAX_TOTAL_WAIT_MS && (
+      {stillWaiting && showTryAgain && elapsedMs < MAX_TOTAL_WAIT_MS && (
         <Button onClick={onTryAgain} variant="outline" size="sm" className="mt-4">
           {t("common.tryAgain")}
         </Button>
@@ -97,6 +101,18 @@ export function ColdStartLoader() {
   const rafRef = useRef<number>(0);
   const [splashHidden, setSplashHidden] = useState(!native);
   const [loaderRevealed, setLoaderRevealed] = useState(!native);
+  const [showTryAgain, setShowTryAgain] = useState(false);
+
+  const stillWaiting = state === "loading" || (state === "success" && initializing);
+
+  useEffect(() => {
+    if (!stillWaiting || progress < 99) {
+      setShowTryAgain(false);
+      return;
+    }
+    const id = setTimeout(() => setShowTryAgain(true), STUCK_AT_99_TRY_AGAIN_MS);
+    return () => clearTimeout(id);
+  }, [stillWaiting, progress]);
 
   useEffect(() => {
     if (!native) return;
@@ -135,7 +151,6 @@ export function ColdStartLoader() {
     return () => cancelAnimationFrame(rafRef.current);
   }, [state]);
 
-  const stillWaiting = state === "loading" || (state === "success" && initializing);
   useEffect(() => {
     if (!stillWaiting) return;
     const intervalId = setInterval(() => {
@@ -174,6 +189,7 @@ export function ColdStartLoader() {
       state={state}
       stillWaiting={stillWaiting}
       elapsedMs={elapsedMs}
+      showTryAgain={showTryAgain}
       onTryAgain={handleTryAgain}
       t={t}
     />

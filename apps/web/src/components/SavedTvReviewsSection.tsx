@@ -8,8 +8,10 @@ import { apiFetch, invalidateLogsAndItemsCache } from "@/lib/api";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import {
   deletePartialScopedReview,
-  listEpisodePartialReviews,
+  deleteTargetFromScopedReview,
+  listScopedPartialReviews,
   partialReviewLabel,
+  partialReviewRowKey,
 } from "@/lib/partialTvReview";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +39,7 @@ export function SavedTvReviewsSection({
   const [open, setOpen] = useState(false);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
 
-  const partials = listEpisodePartialReviews(scopedReviews);
+  const partials = listScopedPartialReviews(scopedReviews);
   const hasShowReview = log.grade != null || (log.review != null && log.review.trim() !== "");
   const totalCount = partials.length + (hasShowReview ? 1 : 0);
 
@@ -63,12 +65,10 @@ export function SavedTvReviewsSection({
   };
 
   const handleDeletePartial = async (review: ScopedReview) => {
-    const season = review.season ?? 0;
-    const episode = review.episode ?? 0;
-    const key = `ep:${season}:${episode}`;
+    const key = partialReviewRowKey(review);
     setDeletingKey(key);
     try {
-      await deletePartialScopedReview(log.id, { season, episode });
+      await deletePartialScopedReview(log.id, deleteTargetFromScopedReview(review));
       await refreshScopedReviews();
       invalidateLogsAndItemsCache();
     } finally {
@@ -110,7 +110,7 @@ export function SavedTvReviewsSection({
             />
           )}
           {partials.map((partial) => {
-            const key = `ep:${partial.season ?? 0}:${partial.episode ?? 0}`;
+            const key = partialReviewRowKey(partial);
             return (
               <SavedReviewRow
                 key={partial.id}

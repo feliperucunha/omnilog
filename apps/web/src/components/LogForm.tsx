@@ -19,6 +19,7 @@ import type { MediaType, Log, ScopedReview } from "@geeklogs/shared";
 import { BoardGameMatchesSection } from "@/components/BoardGameMatchesSection";
 import {
   canSavePartialReview,
+  partialReviewSaveKind,
   resolvePartialReviewTarget,
   reviewDraftForSeasonEpisodeChange,
   savePartialScopedReview,
@@ -893,8 +894,16 @@ export function LogForm(props: LogFormProps) {
                       onValueChange={(v) => {
                         const next = v || null;
                         setStatus(next);
-                        if (showBoardGameFields && !isEdit) {
-                          setMatchesPlayed(next === "played" ? 1 : next === "plan to play" ? 0 : matchesPlayed);
+                        if (showBoardGameFields) {
+                          if (next === "played") {
+                            setMatchesPlayed((prev) => {
+                              if (!isEdit) return 1;
+                              if (prev === "" || prev === 0) return 1;
+                              return prev;
+                            });
+                          } else if (!isEdit && next === "plan to play") {
+                            setMatchesPlayed(0);
+                          }
                         }
                         if (isEdit && next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && "episodesCount" in props && props.episodesCount != null && props.episodesCount > 0) {
                           setEpisode(props.episodesCount);
@@ -1187,9 +1196,7 @@ export function LogForm(props: LogFormProps) {
                       <ReviewPartialSaveButtons
                         saving={loading || deleting}
                         isUpdate={isEdit}
-                        partialDisabled={
-                          !canSavePartialReview(mediaType, season, episode, showSeasonField)
-                        }
+                        partialSaveKind={partialReviewSaveKind(mediaType, season, episode, showSeasonField)}
                         onPartialSave={() => void handlePartialSave()}
                         onPrimarySave={() =>
                           void handleSubmit({ preventDefault: () => {} } as React.FormEvent)
@@ -1257,9 +1264,7 @@ export function LogForm(props: LogFormProps) {
                       <ReviewPartialSaveButtons
                         saving={loading || deleting}
                         isUpdate={isEdit}
-                        partialDisabled={
-                          !canSavePartialReview(mediaType, season, episode, showSeasonField)
-                        }
+                        partialSaveKind={partialReviewSaveKind(mediaType, season, episode, showSeasonField)}
                         onPartialSave={() => void handlePartialSave()}
                         onPrimarySave={() =>
                           void handleSubmit({ preventDefault: () => {} } as React.FormEvent)

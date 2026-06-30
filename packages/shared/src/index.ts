@@ -9,6 +9,7 @@ export {
   partialItemReviews,
   partialReviewKey,
   findEpisodePartialReview,
+  findSeasonPartialReview,
   groupItemReviewsByUser,
   compareScopeGenerality,
 } from "./scopedReview.js";

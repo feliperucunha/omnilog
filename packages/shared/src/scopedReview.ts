@@ -109,6 +109,14 @@ export function findEpisodePartialReview(
   );
 }
 
+/** Season-level partial review for the given season number. */
+export function findSeasonPartialReview(
+  reviews: ScopedReview[],
+  season: number
+): ScopedReview | undefined {
+  return reviews.find((r) => r.scope === "season" && (r.season ?? 0) === season);
+}
+
 export function pickShowItemReview<T extends Pick<ItemReview, "reviewScope" | "createdAt">>(
   reviews: T[]
 ): T | null {

@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
+import type { PartialReviewSaveKind } from "@/lib/partialTvReview";
 import { cn } from "@/lib/utils";
 
 type ReviewPartialSaveButtonsProps = {
   saving: boolean;
   isUpdate?: boolean;
-  partialDisabled?: boolean;
+  partialSaveKind?: PartialReviewSaveKind | null;
   onPartialSave: () => void;
   onPrimarySave: () => void;
   t: (key: string) => string;
@@ -14,7 +15,7 @@ type ReviewPartialSaveButtonsProps = {
 export function ReviewPartialSaveButtons({
   saving,
   isUpdate = false,
-  partialDisabled = false,
+  partialSaveKind = null,
   onPartialSave,
   onPrimarySave,
   t,
@@ -29,6 +30,38 @@ export function ReviewPartialSaveButtons({
       ? t("itemReviewForm.updateShowReview")
       : t("itemReviewForm.saveShowReview");
 
+  const primaryButton = (
+    <Button
+      type="button"
+      size="sm"
+      className={cn(compactBtn, partialSaveKind ? "sm:flex-1" : "w-full")}
+      disabled={saving}
+      onClick={() => void onPrimarySave()}
+    >
+      <span className="sm:hidden">
+        {saving
+          ? t("common.saving")
+          : isUpdate
+            ? t("itemReviewForm.updateShowReviewShort")
+            : t("itemReviewForm.saveShowReviewShort")}
+      </span>
+      <span className="hidden sm:inline">{showLabel}</span>
+    </Button>
+  );
+
+  if (!partialSaveKind) {
+    return <div className={cn("min-w-0", className)}>{primaryButton}</div>;
+  }
+
+  const partialShortKey =
+    partialSaveKind === "season"
+      ? "itemReviewForm.saveSeasonReviewShort"
+      : "itemReviewForm.saveEpisodeReviewShort";
+  const partialLongKey =
+    partialSaveKind === "season"
+      ? "itemReviewForm.saveSeasonReview"
+      : "itemReviewForm.saveEpisodeReview";
+
   return (
     <div
       className={cn(
@@ -41,28 +74,13 @@ export function ReviewPartialSaveButtons({
         variant="outline"
         size="sm"
         className={cn(compactBtn, "sm:flex-1")}
-        disabled={saving || partialDisabled}
+        disabled={saving}
         onClick={() => void onPartialSave()}
       >
-        <span className="sm:hidden">{t("itemReviewForm.saveEpisodeSeasonReviewShort")}</span>
-        <span className="hidden sm:inline">{t("itemReviewForm.saveEpisodeSeasonReview")}</span>
+        <span className="sm:hidden">{t(partialShortKey)}</span>
+        <span className="hidden sm:inline">{t(partialLongKey)}</span>
       </Button>
-      <Button
-        type="button"
-        size="sm"
-        className={cn(compactBtn, "sm:flex-1")}
-        disabled={saving}
-        onClick={() => void onPrimarySave()}
-      >
-        <span className="sm:hidden">
-          {saving
-            ? t("common.saving")
-            : isUpdate
-              ? t("itemReviewForm.updateShowReviewShort")
-              : t("itemReviewForm.saveShowReviewShort")}
-        </span>
-        <span className="hidden sm:inline">{showLabel}</span>
-      </Button>
+      {primaryButton}
     </div>
   );
 }
