@@ -228,6 +228,7 @@ model Log {
   /// User sold / no longer has the item; optional sale proceeds in saleAmountMinor + saleCurrency
   sold           Boolean?
   matchesPlayed  Int?     // boardgames only: number of matches/sessions played
+  averageWeight  Float?   // boardgames only: BGG / Ludopedia complexity (1–5)
   genres         String?  // JSON array of genre names (for stats and badges)
   mechanics       String?  // JSON array of board-game mechanic names (BGG / Ludopedia); optional
   affinityContext String?  // JSON: recommendation snapshot (board stats, book subjects, manga themes, …)
@@ -344,6 +345,7 @@ model ItemDetailCache {
   pagesCount Int?                   // books only: representative page count (median across editions)
   playersMin Int?                   // boardgames only: min players from BGG / Ludopedia
   playersMax Int?                   // boardgames only: max players from BGG / Ludopedia
+  averageWeight Float?              // boardgames only: BGG / Ludopedia complexity (1–5)
   fetchedAt  DateTime @default(now()) @updatedAt
 
   @@id([mediaType, externalId])

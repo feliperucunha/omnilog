@@ -12,6 +12,8 @@ export type LogListSortForGenre =
   | "gradeDesc"
   | "matchesPlayedAsc"
   | "matchesPlayedDesc"
+  | "weightAsc"
+  | "weightDesc"
   | "timeToBeatAsc"
   | "timeToBeatDesc";
 
@@ -20,6 +22,7 @@ export interface SlimLogSortRow {
   genres: string | null;
   updatedAt: Date;
   matchesPlayed: number | null;
+  averageWeight: number | null;
   hoursToBeat: number | null;
   grade: number | null;
 }
@@ -90,6 +93,18 @@ export function compareSlimLogsForSort(a: SlimLogSortRow, b: SlimLogSortRow, sor
       if (va !== vb) return va - vb;
       return cmpUpdated(a, b, "desc");
     }
+    case "weightDesc": {
+      const va = a.averageWeight ?? -1;
+      const vb = b.averageWeight ?? -1;
+      if (vb !== va) return vb - va;
+      return cmpUpdated(a, b, "desc");
+    }
+    case "weightAsc": {
+      const va = a.averageWeight ?? Number.POSITIVE_INFINITY;
+      const vb = b.averageWeight ?? Number.POSITIVE_INFINITY;
+      if (va !== vb) return va - vb;
+      return cmpUpdated(a, b, "desc");
+    }
     case "timeToBeatDesc": {
       const va = a.hoursToBeat ?? -1;
       const vb = b.hoursToBeat ?? -1;
@@ -139,6 +154,7 @@ async function fetchSlimLogsMatchingGenre(
         genres: true,
         updatedAt: true,
         matchesPlayed: true,
+        averageWeight: true,
         hoursToBeat: true,
         grade: true,
       },
@@ -147,7 +163,7 @@ async function fetchSlimLogsMatchingGenre(
   }
 
   return prisma.$queryRaw<SlimLogSortRow[]>`
-    SELECT l.id, l.genres, l."updatedAt", l."matchesPlayed", l."hoursToBeat", l.grade
+    SELECT l.id, l.genres, l."updatedAt", l."matchesPlayed", l."averageWeight", l."hoursToBeat", l.grade
     FROM "Log" l
     WHERE l."userId" = ${userId}
       AND l."mediaType" = ${mediaType}

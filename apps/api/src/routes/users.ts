@@ -15,6 +15,7 @@ import {
 } from "../lib/purchaseFields.js";
 import { sanitizeText, SEARCH_QUERY_MAX_LENGTH } from "../lib/sanitize.js";
 import { computeGenreFacets, fetchLogsWithGenreFilter, LOG_GENRE_FILTER_MAX_LENGTH } from "../lib/logGenreList.js";
+import { ensureBoardGameWeightsForSort, isBoardGameWeightSort, resortLogsByWeight } from "../lib/backfillBoardGameWeight.js";
 import {
   applyProfileVisibilityToPublicLog,
   getProfileVisibilityFromUser,
@@ -373,7 +374,7 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
   const status = req.query.status as string | undefined;
   const sortParam = req.query.sort as string;
   const validSorts = ["dateAsc", "dateDesc", "gradeAsc", "gradeDesc"] as const;
-  const boardgameSorts = ["matchesPlayedAsc", "matchesPlayedDesc"] as const;
+  const boardgameSorts = ["matchesPlayedAsc", "matchesPlayedDesc", "weightAsc", "weightDesc"] as const;
   const gameSorts = ["timeToBeatAsc", "timeToBeatDesc"] as const;
   let sort = validSorts.includes(sortParam as (typeof validSorts)[number]) ? sortParam : "dateDesc";
   if (mediaType === "boardgames" && boardgameSorts.includes(sortParam as (typeof boardgameSorts)[number])) sort = sortParam;
@@ -463,7 +464,11 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
       ? [{ matchesPlayed: "desc" }, { updatedAt: "desc" }]
       : sort === "matchesPlayedAsc"
         ? [{ matchesPlayed: "asc" }, { updatedAt: "desc" }]
-        : sort === "timeToBeatDesc"
+        : sort === "weightDesc"
+          ? [{ averageWeight: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }]
+          : sort === "weightAsc"
+            ? [{ averageWeight: { sort: "asc", nulls: "last" } }, { updatedAt: "desc" }]
+            : sort === "timeToBeatDesc"
           ? [{ hoursToBeat: "desc" }, { updatedAt: "desc" }]
           : sort === "timeToBeatAsc"
             ? [{ hoursToBeat: "asc" }, { updatedAt: "desc" }]
@@ -474,6 +479,10 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
                 : sort === "dateDesc"
                   ? { updatedAt: "desc" }
                   : { updatedAt: "asc" };
+
+  if (isBoardGameWeightSort(sort)) {
+    await ensureBoardGameWeightsForSort(prisma, user.id, mediaType);
+  }
 
   if (genreFilter) {
     if (usePagination && takeSize != null) {
@@ -486,11 +495,9 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
         usePagination: true,
       });
       if (!Array.isArray(result)) {
-        const enriched = redactPublicLogs(
-          await attachItemEnrichment(prisma, result.data),
-          visibility
-        );
-        res.json({ data: enriched, nextCursor: result.nextCursor });
+        let enriched = await attachItemEnrichment(prisma, result.data);
+        if (isBoardGameWeightSort(sort)) enriched = resortLogsByWeight(enriched, sort);
+        res.json({ data: redactPublicLogs(enriched, visibility), nextCursor: result.nextCursor });
         return;
       }
     }
@@ -503,8 +510,9 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
       usePagination: false,
     });
     const list = Array.isArray(data) ? data : data.data;
-    const enriched = redactPublicLogs(await attachItemEnrichment(prisma, list), visibility);
-    res.json(enriched);
+    let enriched = await attachItemEnrichment(prisma, list);
+    if (isBoardGameWeightSort(sort)) enriched = resortLogsByWeight(enriched, sort);
+    res.json(redactPublicLogs(enriched, visibility));
     return;
   }
 
@@ -519,8 +527,9 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
     const hasMore = logs.length > takeSize;
     const data = (hasMore ? logs.slice(0, takeSize) : logs).map(serializeLog);
     const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null;
-    const enriched = redactPublicLogs(await attachItemEnrichment(prisma, data), visibility);
-    res.json({ data: enriched, nextCursor });
+    let enriched = await attachItemEnrichment(prisma, data);
+    if (isBoardGameWeightSort(sort)) enriched = resortLogsByWeight(enriched, sort);
+    res.json({ data: redactPublicLogs(enriched, visibility), nextCursor });
     return;
   }
 
@@ -528,9 +537,7 @@ usersRouter.get("/:identifier/logs", async (req: Request<{ identifier: string }>
     where,
     orderBy,
   });
-  const enriched = redactPublicLogs(
-    await attachItemEnrichment(prisma, logs.map(serializeLog)),
-    visibility
-  );
-  res.json(enriched);
+  let enriched = await attachItemEnrichment(prisma, logs.map(serializeLog));
+  if (isBoardGameWeightSort(sort)) enriched = resortLogsByWeight(enriched, sort);
+  res.json(redactPublicLogs(enriched, visibility));
 });

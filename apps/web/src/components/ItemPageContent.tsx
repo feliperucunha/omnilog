@@ -18,6 +18,7 @@ import {
   type ReviewScope,
 } from "@geeklogs/shared";
 import { ReactionButtons } from "@/components/ReactionButtons";
+import { formatBoardGameWeight } from "@/lib/boardGameWeight";
 import { getStatusLabel } from "@/lib/statusLabel";
 import {
   logStatusBorderClass,
@@ -76,6 +77,9 @@ function ItemDetailsBlock({
   const hasTagline = item.tagline && item.tagline.length > 0;
   const hasGenres = item.genres && item.genres.length > 0;
   const hasScore = item.score != null && item.score > 0;
+  const hasWeight =
+    mediaType === "boardgames" && item.averageWeight != null && item.averageWeight > 0;
+  const weightDisplay = hasWeight ? formatBoardGameWeight(item.averageWeight) : null;
   const hasContentRating = item.contentRating && item.contentRating.length > 0;
   const hasEpisodes = item.episodesCount != null && item.episodesCount > 0;
   const hasSeasons = item.seasonsCount != null && item.seasonsCount > 0;
@@ -115,6 +119,7 @@ function ItemDetailsBlock({
     hasTagline ||
     hasGenres ||
     hasScore ||
+    hasWeight ||
     hasContentRating ||
     hasEpisodes ||
     hasSeasons ||
@@ -211,6 +216,11 @@ function ItemDetailsBlock({
             {scoreDisplay}/10
           </span>
         )}
+        {hasWeight && weightDisplay && (
+          <span className="inline-flex items-center rounded-md bg-black/75 px-2.5 py-1 text-sm font-semibold text-yellow-300">
+            {weightDisplay}
+          </span>
+        )}
         {hasContentRating && (
           <span className="rounded border border-[var(--color-mid)] px-2 py-0.5 text-xs text-[var(--color-light)]">
             {item.contentRating}
@@ -283,6 +293,12 @@ function ItemDetailsBlock({
                 ? `${Math.floor(item.playingTimeMinutes! / 60)} h ${item.playingTimeMinutes! % 60} min`
                 : `${item.playingTimeMinutes} min`}
             </span>
+          </div>
+        )}
+        {hasWeight && weightDisplay && (
+          <div>
+            <span className="text-[var(--color-light)]">{t("itemPage.weight")}: </span>
+            <span className="text-[var(--color-lightest)] font-medium">{weightDisplay}</span>
           </div>
         )}
         {hasAuthors && (
@@ -946,6 +962,14 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
               {t("itemPage.back")}
             </Button>
           </div>
+          {mediaType === "boardgames" && item.averageWeight != null && item.averageWeight > 0 && (
+            <span
+              className="absolute right-2 top-2 z-10 rounded bg-black/75 px-2 py-1 text-sm font-semibold text-yellow-300 backdrop-blur-sm sm:right-3 sm:top-3"
+              title={t("itemPage.weight")}
+            >
+              {formatBoardGameWeight(item.averageWeight)}
+            </span>
+          )}
           {/* Title and meta: always light text on dark scrim (readable in both themes) */}
           <div className="absolute bottom-0 left-0 right-0 z-10 flex min-w-0 flex-col gap-1.5 p-4 pb-6 sm:p-6 sm:pb-8 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
             <div className="min-w-0">

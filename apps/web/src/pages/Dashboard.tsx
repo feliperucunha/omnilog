@@ -122,6 +122,8 @@ const VALID_LOGS_SORTS: MediaLogsSort[] = [
   "gradeDesc",
   "matchesPlayedAsc",
   "matchesPlayedDesc",
+  "weightAsc",
+  "weightDesc",
   "timeToBeatAsc",
   "timeToBeatDesc",
 ];

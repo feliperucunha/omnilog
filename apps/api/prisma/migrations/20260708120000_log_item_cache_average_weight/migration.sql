@@ -1,0 +1,2 @@
+ALTER TABLE "Log" ADD COLUMN "averageWeight" DOUBLE PRECISION;
+ALTER TABLE "ItemDetailCache" ADD COLUMN "averageWeight" DOUBLE PRECISION;

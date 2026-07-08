@@ -6,6 +6,7 @@
 import { decodeHtmlEntities, type SearchResult, type ItemDetail, SEARCH_RESULTS_PAGE_SIZE } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
+import { parseBoardGameWeightValue } from "../lib/boardGameWeight.js";
 
 const BASE = "https://ludopedia.com.br/api/v1";
 
@@ -322,6 +323,38 @@ export async function fetchLudopediaColecaoObjectIds(
  * Doc: id_jogo, nm_jogo, thumb, ano_publicacao, qt_jogadores_min/max, vl_tempo_jogo,
  * idade_minima, categorias (Jogo_categorias[]), mecanicas (Jogo_mecanicas[]).
  */
+function ludopediaExtractAverageWeight(
+  raw: Record<string, unknown>,
+  plainDescription: string | null
+): number | null {
+  const candidates = [
+    raw.vl_complexidade,
+    raw.complexidade,
+    raw.nr_complexidade,
+    raw.vl_nivel_complexidade,
+    (raw.jogo as Record<string, unknown> | undefined)?.vl_complexidade,
+    (raw.jogo as Record<string, unknown> | undefined)?.complexidade,
+  ];
+  for (const c of candidates) {
+    const w = parseBoardGameWeightValue(c);
+    if (w != null) return w;
+  }
+  const textSources = [plainDescription];
+  const rawDesc = raw.descricao;
+  if (typeof rawDesc === "string" && rawDesc.trim()) {
+    textSources.push(rawDesc.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+  }
+  for (const text of textSources) {
+    if (!text) continue;
+    const m = text.match(/complexidade\s*:?\s*(\d+(?:[.,]\d+)?)/i);
+    if (m) {
+      const w = parseBoardGameWeightValue(m[1]);
+      if (w != null) return w;
+    }
+  }
+  return null;
+}
+
 function mapJogoToItemDetail(raw: {
   id_jogo?: number | string;
   nm_jogo?: string;
@@ -356,6 +389,10 @@ function mapJogoToItemDetail(raw: {
   const descriptionRaw =
     typeof raw.descricao === "string" ? raw.descricao.replace(/<[^>]+>/g, "").trim().slice(0, 2000) || null : null;
   const description = descriptionRaw ? decodeHtmlEntities(descriptionRaw) : null;
+  const averageWeight = ludopediaExtractAverageWeight(
+    raw as Record<string, unknown>,
+    description
+  );
   const thumb = raw.thumb?.trim() || null;
   const full = raw.url_imagem?.trim() || null;
   const playersMin = raw.qt_jogadores_min ?? raw.qt_min_jogadores;
@@ -377,6 +414,7 @@ function mapJogoToItemDetail(raw: {
     categories: categories.length > 0 ? categories : null,
     mechanics: mechanics.length > 0 ? mechanics : null,
     genres,
+    averageWeight,
   };
 }
 

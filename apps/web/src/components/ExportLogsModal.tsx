@@ -11,6 +11,7 @@ import { useIsMobile } from "@/hooks/useMediaQuery";
 import { MEDIA_TYPES, LOG_STATUS_OPTIONS, type MediaType } from "@geeklogs/shared";
 import { mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
 import { getStatusLabel } from "@/lib/statusLabel";
+import { buildExportLogsSortOptions } from "@/lib/mediaLogsSortOptions";
 import type { CollectionListFilter, MediaLogsSort } from "@/pages/MediaLogs";
 
 export type ExportCategory = MediaType | "all";
@@ -32,30 +33,6 @@ interface ExportLogsModalProps {
   onExport: (opts: ExportLogsOptions) => void;
   onCancel: () => void;
 }
-
-const sortOptionsFor = (
-  category: ExportCategory,
-  t: (key: string) => string
-): { value: MediaLogsSort; label: string }[] => {
-  const base: { value: MediaLogsSort; label: string }[] = [
-    { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
-    { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
-    { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
-    { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
-  ];
-  if (category === "boardgames") {
-    base.push(
-      { value: "matchesPlayedDesc", label: t("mediaLogs.sortByMatchesPlayedDesc") },
-      { value: "matchesPlayedAsc", label: t("mediaLogs.sortByMatchesPlayedAsc") }
-    );
-  } else if (category === "games") {
-    base.push(
-      { value: "timeToBeatDesc", label: t("mediaLogs.sortByTimeToBeatDesc") },
-      { value: "timeToBeatAsc", label: t("mediaLogs.sortByTimeToBeatAsc") }
-    );
-  }
-  return base;
-};
 
 export function ExportLogsModal({
   defaultMediaType,
@@ -103,7 +80,7 @@ export function ExportLogsModal({
     [t]
   );
 
-  const sortOptions = useMemo(() => sortOptionsFor(category, t), [category, t]);
+  const sortOptions = useMemo(() => buildExportLogsSortOptions(category, t), [category, t]);
 
   const handleCategoryChange = useCallback(
     (next: string) => {
@@ -111,7 +88,7 @@ export function ExportLogsModal({
       setCategory(value);
       setStatus("");
       setCollection("");
-      const allowed = sortOptionsFor(value, t).map((o) => o.value);
+      const allowed = buildExportLogsSortOptions(value, t).map((o) => o.value);
       if (!allowed.includes(sort)) setSort("dateDesc");
     },
     [sort, t]

@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { ReactNode } from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { ChevronDown } from "lucide-react";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
@@ -112,9 +113,18 @@ SelectItem.displayName = SelectPrimitive.Item.displayName;
 
 export interface SelectOption {
   value: string;
-  label: string;
+  label: ReactNode;
+  /** Used for trigger aria-label / title when `label` is not plain text. */
+  accessibleLabel?: string;
   disabled?: boolean;
   className?: string;
+}
+
+function optionAccessibleLabel(opt: SelectOption | undefined): string | undefined {
+  if (!opt) return undefined;
+  if (opt.accessibleLabel) return opt.accessibleLabel;
+  if (typeof opt.label === "string") return opt.label;
+  return undefined;
 }
 
 export interface SelectProps {
@@ -153,7 +163,8 @@ export function Select({
 }: SelectProps) {
   const rootValue = value === "" || value == null ? "__empty" : value;
   const selectedOption = options.find((opt) => (opt.value === "" ? "__empty" : opt.value) === rootValue);
-  const valueSummary = selectedOption?.label ?? placeholder;
+  const valueSummary = optionAccessibleLabel(selectedOption) ?? placeholder;
+  const triggerDisplay = selectedOption?.label ?? placeholder;
   const triggerAccessibleName = triggerAriaLabel ?? (ariaLabel ? `${ariaLabel}, ${valueSummary}` : valueSummary);
 
   const scrollViewportClass =
@@ -180,13 +191,16 @@ export function Select({
           aria-label={triggerAccessibleName}
           title={
             triggerTitle ??
-            (triggerLabel != null ? undefined : typeof valueSummary === "string" ? valueSummary : undefined)
+            (triggerLabel != null
+              ? undefined
+              : optionAccessibleLabel(selectedOption) ??
+                (typeof triggerDisplay === "string" ? triggerDisplay : undefined))
           }
         >
           {triggerLabel != null ? (
             <OverflowMarquee className="text-left">{triggerLabel}</OverflowMarquee>
           ) : (
-            <OverflowMarquee className="text-left">{valueSummary}</OverflowMarquee>
+            <OverflowMarquee className="text-left">{triggerDisplay}</OverflowMarquee>
           )}
         </SelectTrigger>
         <SelectContent viewportClassName={scrollViewportClass} scrollHint={contentScrollable === true}>

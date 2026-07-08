@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { MediaType, Log } from "@geeklogs/shared";
 import { LOG_STATUS_OPTIONS } from "@geeklogs/shared";
+import { buildMediaLogsSortOptions } from "@/lib/mediaLogsSortOptions";
 import { getStatusLabel } from "@/lib/statusLabel";
 import {
   logStatusSelectTriggerClass,
@@ -102,6 +103,8 @@ export type MediaLogsSort =
   | "gradeDesc"
   | "matchesPlayedAsc"
   | "matchesPlayedDesc"
+  | "weightAsc"
+  | "weightDesc"
   | "timeToBeatAsc"
   | "timeToBeatDesc";
 
@@ -478,7 +481,14 @@ export function MediaLogs({
       setCollectionFilter("");
     }
     if (mediaType !== "boardgames") {
-      setSortBy((prev) => (prev === "matchesPlayedAsc" || prev === "matchesPlayedDesc" ? "dateDesc" : prev));
+      setSortBy((prev) =>
+        prev === "matchesPlayedAsc" ||
+        prev === "matchesPlayedDesc" ||
+        prev === "weightAsc" ||
+        prev === "weightDesc"
+          ? "dateDesc"
+          : prev
+      );
     }
     if (mediaType !== "games") {
       setSortBy((prev) => (prev === "timeToBeatAsc" || prev === "timeToBeatDesc" ? "dateDesc" : prev));
@@ -504,9 +514,13 @@ export function MediaLogs({
       setLogs(cached.list.map(decodeLogForDisplay));
       setNextCursor(cached.cursor);
       setLoading(false);
-      void apiFetchSWR<LogsResponse>(path, { ttlMs: HEAVY_PAGE_TTL_MS }).finally(() =>
-        setListRefreshing(false)
-      );
+      void apiFetchSWR<LogsResponse>(path, {
+        ttlMs: HEAVY_PAGE_TTL_MS,
+        onUpdate: (data) => {
+          applyLogsResponse(data as LogsResponse, true);
+          setError(null);
+        },
+      }).finally(() => setListRefreshing(false));
       return;
     }
 
@@ -525,6 +539,7 @@ export function MediaLogs({
     publicUserId,
     genreFilter,
     buildLogsPath,
+    applyLogsResponse,
   ]);
 
   /** When embedded, start with Load more again when category or filters change. */
@@ -703,6 +718,11 @@ export function MediaLogs({
       ...rows.map((g) => ({ value: g.name, label: `${g.name} (${g.count})` })),
     ];
   }, [t, statusCounts?.byGenre]);
+
+  const sortSelectOptions = useMemo(
+    () => buildMediaLogsSortOptions(mediaType, t),
+    [mediaType, t]
+  );
 
   useEffect(() => {
     if (!genreFilter || !statusCounts?.byGenre?.length) return;
@@ -987,14 +1007,7 @@ export function MediaLogs({
               <Select
                 value={sortBy}
                 onValueChange={(v) => setSortBy(v as typeof sortBy)}
-                options={[
-                  { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
-                  { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
-                  { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
-                  { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
-                  ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
-                  ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
-                ]}
+                options={sortSelectOptions}
                 aria-label={t("mediaLogs.sortLabel")}
                 className="min-w-0 w-[14rem] max-w-[min(100%,24rem)] shrink-0"
                 triggerClassName="w-full min-w-0 max-w-none"
@@ -1176,14 +1189,7 @@ export function MediaLogs({
             <Select
               value={sortBy}
               onValueChange={(v) => setSortBy(v as typeof sortBy)}
-              options={[
-                { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
-                { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
-                { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
-                { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
-                ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
-                ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
-              ]}
+              options={sortSelectOptions}
               aria-label={t("mediaLogs.sortLabel")}
               className="min-w-0 w-full"
               triggerClassName="w-full max-w-none min-w-0"
@@ -1227,14 +1233,7 @@ export function MediaLogs({
         <Select
           value={sortBy}
           onValueChange={(v) => setSortBy(v as typeof sortBy)}
-          options={[
-            { value: "dateDesc", label: t("mediaLogs.sortByDateDesc") },
-            { value: "dateAsc", label: t("mediaLogs.sortByDateAsc") },
-            { value: "gradeAsc", label: t("mediaLogs.sortByGradeAsc") },
-            { value: "gradeDesc", label: t("mediaLogs.sortByGradeDesc") },
-            ...(mediaType === "boardgames" ? [{ value: "matchesPlayedAsc" as const, label: t("mediaLogs.sortByMatchesPlayedAsc") }, { value: "matchesPlayedDesc" as const, label: t("mediaLogs.sortByMatchesPlayedDesc") }] : []),
-            ...(mediaType === "games" ? [{ value: "timeToBeatAsc" as const, label: t("mediaLogs.sortByTimeToBeatAsc") }, { value: "timeToBeatDesc" as const, label: t("mediaLogs.sortByTimeToBeatDesc") }] : []),
-          ]}
+          options={sortSelectOptions}
           aria-label={t("mediaLogs.sortLabel")}
           className="min-w-0 w-[14rem] max-w-[min(100%,24rem)] shrink-0"
           triggerClassName="w-full min-w-0 max-w-none"
@@ -1260,13 +1259,11 @@ export function MediaLogs({
       >
         {listRefreshing && logs.length > 0 && (
           <div
-            className="sticky top-0 z-20 flex items-center justify-center gap-2 border-b border-[var(--color-surface-border)] bg-[var(--color-dark)]/95 py-3 backdrop-blur-md"
+            className="sticky top-0 z-20 flex items-center justify-center border-b border-[var(--color-surface-border)] bg-[var(--color-dark)]/95 py-3 backdrop-blur-md"
             role="status"
           >
             <Loader2 className="h-5 w-5 animate-spin text-[var(--color-lightest)]" aria-hidden />
-            <p className="text-sm font-medium text-[var(--color-lightest)]">
-              {t("mediaLogs.updatingList")}
-            </p>
+            <span className="sr-only">{t("mediaLogs.updatingList")}</span>
           </div>
         )}
 

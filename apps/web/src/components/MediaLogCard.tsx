@@ -36,6 +36,7 @@ import {
 } from "@/lib/logCardLayout";
 import { itemDetailPath } from "@/lib/itemRoutes";
 import { getStatusLabel } from "@/lib/statusLabel";
+import { formatBoardGameWeight } from "@/lib/boardGameWeight";
 import { tapScale, tapTransition } from "@/lib/animations";
 import type { MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES } from "@geeklogs/shared";
@@ -113,6 +114,11 @@ function LogImageOverlays({
 }) {
   const sourceLabel = SCORE_SOURCE_LABELS[log.mediaType];
   const showScore = sourceLabel != null && typeof log.apiScore === "number" && log.apiScore > 0;
+  const weightLabel =
+    log.mediaType === "boardgames" && log.averageWeight != null && log.averageWeight > 0
+      ? formatBoardGameWeight(log.averageWeight)
+      : null;
+  const showWeight = weightLabel != null;
   const badge = statusBadgeClass(log);
   const pos = compact
     ? "top-1 right-1 text-[8px] sm:text-[9px]"
@@ -131,6 +137,17 @@ function LogImageOverlays({
           title={`${sourceLabel} ${log.apiScore!.toFixed(1)} / 10`}
         >
           {sourceLabel} {log.apiScore!.toFixed(1)}
+        </span>
+      )}
+      {!showScore && showWeight && (
+        <span
+          className={cn(
+            "absolute z-10 rounded bg-black/75 px-1 py-0.5 font-semibold text-yellow-300 backdrop-blur-sm whitespace-nowrap",
+            pos
+          )}
+          title={weightLabel!}
+        >
+          {weightLabel}
         </span>
       )}
       {log.status && (

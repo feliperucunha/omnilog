@@ -21,6 +21,7 @@ export interface ItemEnrichment {
   pagesCount: number | null;
   playersMin: number | null;
   playersMax: number | null;
+  averageWeight: number | null;
 }
 
 const EMPTY: ItemEnrichment = {
@@ -30,6 +31,7 @@ const EMPTY: ItemEnrichment = {
   pagesCount: null,
   playersMin: null,
   playersMax: null,
+  averageWeight: null,
 };
 
 export type EnrichmentInput = {
@@ -63,6 +65,7 @@ type CacheRow = {
   pagesCount: number | null;
   playersMin: number | null;
   playersMax: number | null;
+  averageWeight: number | null;
   fetchedAt: Date;
 };
 
@@ -85,6 +88,7 @@ async function readCacheRows(
       pagesCount: true,
       playersMin: true,
       playersMax: true,
+      averageWeight: true,
       fetchedAt: true,
     },
   });
@@ -106,6 +110,10 @@ function rowToEnrichment(row: CacheRow): ItemEnrichment {
     pagesCount: row.mediaType === "books" && typeof row.pagesCount === "number" && row.pagesCount > 0 ? row.pagesCount : null,
     playersMin: row.mediaType === "boardgames" && typeof row.playersMin === "number" && row.playersMin > 0 ? row.playersMin : null,
     playersMax: row.mediaType === "boardgames" && typeof row.playersMax === "number" && row.playersMax > 0 ? row.playersMax : null,
+    averageWeight:
+      row.mediaType === "boardgames" && typeof row.averageWeight === "number" && row.averageWeight > 0
+        ? row.averageWeight
+        : null,
   };
 }
 
@@ -157,6 +165,10 @@ async function fetchAndUpsertOne(
   const pagesCount = item != null && isBook && typeof item.pagesCount === "number" && item.pagesCount > 0 ? Math.round(item.pagesCount) : null;
   const playersMin = item != null && isBoardgame && typeof item.playersMin === "number" && item.playersMin > 0 ? item.playersMin : null;
   const playersMax = item != null && isBoardgame && typeof item.playersMax === "number" && item.playersMax > 0 ? item.playersMax : null;
+  const averageWeight =
+    item != null && isBoardgame && typeof item.averageWeight === "number" && item.averageWeight > 0
+      ? item.averageWeight
+      : null;
   try {
     await prisma.itemDetailCache.upsert({
       where: { mediaType_externalId: { mediaType: input.mediaType, externalId: input.externalId } },
@@ -169,6 +181,7 @@ async function fetchAndUpsertOne(
         pagesCount,
         playersMin,
         playersMax,
+        averageWeight,
       },
       update: {
         score,
@@ -177,6 +190,7 @@ async function fetchAndUpsertOne(
         pagesCount,
         playersMin,
         playersMax,
+        averageWeight,
       },
     });
   } catch {
@@ -189,6 +203,7 @@ async function fetchAndUpsertOne(
     pagesCount,
     playersMin,
     playersMax,
+    averageWeight,
   };
 }
 
@@ -199,7 +214,8 @@ function isTombstoneRow(row: CacheRow): boolean {
     (row.status == null || row.status.trim() === "") &&
     row.pagesCount == null &&
     row.playersMin == null &&
-    row.playersMax == null
+    row.playersMax == null &&
+    row.averageWeight == null
   );
 }
 
@@ -217,6 +233,8 @@ type SerializedLogLike = {
   mediaType: string;
   externalId: string;
   boardGameSource?: string | null;
+  averageWeight?: number | null;
+  affinityContext?: { boardgames?: { averageWeight?: number | null } | null } | null;
 };
 
 export type WithItemEnrichment<T extends SerializedLogLike> = T & {
@@ -226,6 +244,7 @@ export type WithItemEnrichment<T extends SerializedLogLike> = T & {
   pagesCount?: number | null;
   playersMin?: number | null;
   playersMax?: number | null;
+  averageWeight?: number | null;
 };
 
 export async function attachItemEnrichment<T extends SerializedLogLike>(
@@ -261,6 +280,14 @@ export async function attachItemEnrichment<T extends SerializedLogLike>(
     } else if (log.mediaType === "boardgames") {
       out.playersMin = e.playersMin;
       out.playersMax = e.playersMax;
+      const stored =
+        typeof log.averageWeight === "number" && log.averageWeight > 0 ? log.averageWeight : null;
+      const affinity =
+        typeof log.affinityContext?.boardgames?.averageWeight === "number" &&
+        log.affinityContext.boardgames.averageWeight > 0
+          ? log.affinityContext.boardgames.averageWeight
+          : null;
+      out.averageWeight = stored ?? affinity ?? e.averageWeight;
     }
     return out;
   });

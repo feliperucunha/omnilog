@@ -214,7 +214,7 @@ export function PublicProfile() {
 
   const VALID_SORTS: MediaLogsSort[] = [
     "dateAsc", "dateDesc", "gradeAsc", "gradeDesc",
-    "matchesPlayedAsc", "matchesPlayedDesc", "timeToBeatAsc", "timeToBeatDesc",
+    "matchesPlayedAsc", "matchesPlayedDesc", "weightAsc", "weightDesc", "timeToBeatAsc", "timeToBeatDesc",
   ];
   const searchParamsKey = searchParams.toString();
   const initialFilters = useMemo(() => {

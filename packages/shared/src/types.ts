@@ -363,6 +363,8 @@ export interface Log {
   playersMin?: number | null;
   /** Boardgames only: max players from BGG / Ludopedia, lazily enriched server-side. */
   playersMax?: number | null;
+  /** Boardgames only: BGG / Ludopedia complexity (1–5). */
+  averageWeight?: number | null;
   /** Snapshot for personalized recommendations (optional). */
   affinityContext?: LogAffinityContext | null;
   createdAt: string;

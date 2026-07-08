@@ -262,8 +262,18 @@ import {
   LOG_GENRE_FILTER_MAX_LENGTH,
   logHasGenreExact,
 } from "../lib/logGenreList.js";
-import { stringifyLogAffinityContext, logAffinityContextSchema } from "../lib/logAffinityContext.js";
+import { stringifyLogAffinityContext, logAffinityContextSchema, parseLogAffinityContextJson } from "../lib/logAffinityContext.js";
+import { boardGameAverageWeightFromAffinity } from "../lib/boardGameWeight.js";
+import { ensureBoardGameWeightsForSort, isBoardGameWeightSort, resortLogsByWeight } from "../lib/backfillBoardGameWeight.js";
 import { hoursFromCompletedLogForStats, rollupHoursFromCompletedLogs } from "../lib/completedLogHours.js";
+
+async function enrichListLogsForClient(
+  logs: ReturnType<typeof serializeLog>[],
+  sort: string
+) {
+  const enriched = await enrichLogsForClient(prisma, logs);
+  return isBoardGameWeightSort(sort) ? resortLogsByWeight(enriched, sort) : enriched;
+}
 import { attachBoardGameSessionHours } from "../lib/boardGameSessionHours.js";
 import { syncTaggedPlayersBoardGameLogs } from "../lib/boardGameTaggedPlayerSync.js";
 import {
@@ -371,7 +381,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const status = req.query.status as string | undefined;
   const sortParam = req.query.sort as string;
   const validSorts = ["dateAsc", "dateDesc", "gradeAsc", "gradeDesc"] as const;
-  const boardgameSorts = ["matchesPlayedAsc", "matchesPlayedDesc"] as const;
+  const boardgameSorts = ["matchesPlayedAsc", "matchesPlayedDesc", "weightAsc", "weightDesc"] as const;
   const gameSorts = ["timeToBeatAsc", "timeToBeatDesc"] as const;
   let sort = validSorts.includes(sortParam as (typeof validSorts)[number]) ? sortParam : "dateDesc";
   if (mediaType === "boardgames" && boardgameSorts.includes(sortParam as (typeof boardgameSorts)[number])) sort = sortParam;
@@ -531,7 +541,11 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       ? [{ matchesPlayed: "desc" }, { updatedAt: "desc" }]
       : sort === "matchesPlayedAsc"
         ? [{ matchesPlayed: "asc" }, { updatedAt: "desc" }]
-        : sort === "timeToBeatDesc"
+        : sort === "weightDesc"
+          ? [{ averageWeight: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }]
+          : sort === "weightAsc"
+            ? [{ averageWeight: { sort: "asc", nulls: "last" } }, { updatedAt: "desc" }]
+            : sort === "timeToBeatDesc"
           ? [{ hoursToBeat: "desc" }, { updatedAt: "desc" }]
           : sort === "timeToBeatAsc"
             ? [{ hoursToBeat: "asc" }, { updatedAt: "desc" }]
@@ -542,6 +556,10 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
                 : sort === "dateDesc"
                   ? { updatedAt: "desc" }
                   : { updatedAt: "asc" };
+
+  if (isBoardGameWeightSort(sort)) {
+    await ensureBoardGameWeightsForSort(prisma, userId, mediaType);
+  }
 
   if (genreFilter) {
     if (usePagination && takeSize != null) {
@@ -554,9 +572,9 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
         usePagination: true,
       });
       if (Array.isArray(result)) {
-        res.json(await enrichLogsForClient(prisma, result));
+        res.json(await enrichListLogsForClient(result, sort));
       } else {
-        const enriched = await enrichLogsForClient(prisma, result.data);
+        const enriched = await enrichListLogsForClient(result.data, sort);
         res.json({ data: enriched, nextCursor: result.nextCursor });
       }
       return;
@@ -570,9 +588,9 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       usePagination: false,
     });
     if (Array.isArray(data)) {
-      res.json(await enrichLogsForClient(prisma, data));
+      res.json(await enrichListLogsForClient(data, sort));
     } else {
-      const enriched = await enrichLogsForClient(prisma, data.data);
+      const enriched = await enrichListLogsForClient(data.data, sort);
       res.json({ data: enriched, nextCursor: data.nextCursor });
     }
     return;
@@ -589,7 +607,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     const hasMore = logs.length > takeSize;
     const data = (hasMore ? logs.slice(0, takeSize) : logs).map(serializeLog);
     const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null;
-    const enriched = await enrichLogsForClient(prisma, data);
+    const enriched = await enrichListLogsForClient(data, sort);
     res.json({ data: enriched, nextCursor });
     return;
   }
@@ -598,7 +616,7 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     where,
     orderBy,
   });
-  const enriched = await enrichLogsForClient(prisma, logs.map(serializeLog));
+  const enriched = await enrichListLogsForClient(logs.map(serializeLog), sort);
   res.json(enriched);
 });
 
@@ -1298,7 +1316,7 @@ const EXPORT_COLUMNS_BY_MEDIA: Record<MediaType, readonly string[]> = {
     "purchaseAmountMinor", "purchaseCurrency", "saleAmountMinor", "saleCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
   ],
   boardgames: [
-    "externalId", "title", "grade", "status", "own", "wantToBuy", "sold", "matchesPlayed",
+    "externalId", "title", "grade", "status", "own", "wantToBuy", "sold", "matchesPlayed", "averageWeight",
     "purchaseAmountMinor", "purchaseCurrency", "saleAmountMinor", "saleCurrency", "startedAt", "completedAt", "review", "createdAt", "updatedAt",
   ],
 };
@@ -1324,9 +1342,11 @@ function getExportValue(
     wantToBuy: boolean | null;
     sold: boolean | null;
     matchesPlayed: number | null;
+    averageWeight: number | null;
     review: string | null;
     createdAt: Date;
     updatedAt: Date;
+    affinityContext?: string | null;
     purchaseAmountMinor?: number | null;
     purchaseCurrency?: string | null;
     saleAmountMinor?: number | null;
@@ -1354,6 +1374,11 @@ function getExportValue(
     case "wantToBuy": return log.wantToBuy == null ? null : log.wantToBuy ? "true" : "false";
     case "sold": return log.sold == null ? null : log.sold ? "true" : "false";
     case "matchesPlayed": return log.matchesPlayed;
+    case "averageWeight":
+      return (
+        log.averageWeight ??
+        boardGameAverageWeightFromAffinity(parseLogAffinityContextJson(log.affinityContext ?? null))
+      );
     case "review": return log.review;
     case "createdAt": return log.createdAt.toISOString();
     case "updatedAt": return log.updatedAt.toISOString();
@@ -1389,7 +1414,7 @@ logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
 
   const sortParam = typeof req.query.sort === "string" ? req.query.sort : "";
   const validSorts = ["dateAsc", "dateDesc", "gradeAsc", "gradeDesc"] as const;
-  const boardgameSorts = ["matchesPlayedAsc", "matchesPlayedDesc"] as const;
+  const boardgameSorts = ["matchesPlayedAsc", "matchesPlayedDesc", "weightAsc", "weightDesc"] as const;
   const gameSorts = ["timeToBeatAsc", "timeToBeatDesc"] as const;
   let sort: string = validSorts.includes(sortParam as (typeof validSorts)[number])
     ? sortParam
@@ -1434,7 +1459,11 @@ logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
       ? [{ matchesPlayed: "desc" }, { updatedAt: "desc" }]
       : sort === "matchesPlayedAsc"
         ? [{ matchesPlayed: "asc" }, { updatedAt: "desc" }]
-        : sort === "timeToBeatDesc"
+        : sort === "weightDesc"
+          ? [{ averageWeight: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }]
+          : sort === "weightAsc"
+            ? [{ averageWeight: { sort: "asc", nulls: "last" } }, { updatedAt: "desc" }]
+            : sort === "timeToBeatDesc"
           ? [{ hoursToBeat: "desc" }, { updatedAt: "desc" }]
           : sort === "timeToBeatAsc"
             ? [{ hoursToBeat: "asc" }, { updatedAt: "desc" }]
@@ -1519,6 +1548,10 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       : null;
   const affinityStored =
     affinityInput === undefined ? undefined : stringifyLogAffinityContext(affinityInput);
+  const averageWeightStored =
+    mediaTypeRaw === "boardgames" && affinityInput !== undefined
+      ? boardGameAverageWeightFromAffinity(affinityInput)
+      : undefined;
   const mediaType = mediaTypeRaw as MediaType;
   if (!validateStatus(mediaType, status)) {
     res.status(400).json({ error: { status: ["Invalid status for this media type"] } });
@@ -1674,6 +1707,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
         wantToBuy?: boolean | null;
         sold?: boolean | null;
         matchesPlayed?: number | null;
+        averageWeight?: number | null;
         purchaseAmountMinor?: number | null;
         purchaseCurrency?: string | null;
         saleAmountMinor?: number | null;
@@ -1699,7 +1733,15 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       if (image !== undefined) updateData.image = sanitizedImage ?? null;
       if (genresJson !== undefined) updateData.genres = genresJson;
       if (mechanicsJson !== undefined) updateData.mechanics = mechanicsJson;
-      if (affinityStored !== undefined) updateData.affinityContext = affinityStored;
+      if (affinityStored !== undefined) {
+        updateData.affinityContext = affinityStored;
+        if (mediaType === "boardgames") {
+          updateData.averageWeight =
+            affinityInput !== undefined
+              ? boardGameAverageWeightFromAffinity(affinityInput)
+              : boardGameAverageWeightFromAffinity(parseLogAffinityContextJson(affinityStored));
+        }
+      }
       if (ownershipNext != null && isSpendTrackedMediaType(mediaType)) {
         updateData.own = ownershipNext.own;
         updateData.wantToBuy = ownershipNext.wantToBuy;
@@ -1811,6 +1853,10 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
             ownershipNext != null && isSpendTrackedMediaType(mediaType) ? ownershipNext.wantToBuy : null,
           sold: ownershipNext != null && isSpendTrackedMediaType(mediaType) ? ownershipNext.sold : null,
           matchesPlayed: mediaType === "boardgames" ? (bodyMatchesPlayed ?? null) : null,
+          averageWeight:
+            mediaType === "boardgames"
+              ? averageWeightStored ?? boardGameAverageWeightFromAffinity(affinityInput ?? null)
+              : null,
           purchaseAmountMinor: purchaseResolved.purchaseAmountMinor,
           purchaseCurrency: purchaseResolved.purchaseCurrency,
           saleAmountMinor: saleResolved.saleAmountMinor,
@@ -2213,6 +2259,7 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
     wantToBuy?: boolean | null;
     sold?: boolean | null;
     matchesPlayed?: number | null;
+    averageWeight?: number | null;
     purchaseAmountMinor?: number | null;
     purchaseCurrency?: string | null;
     saleAmountMinor?: number | null;
@@ -2263,13 +2310,16 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
         ? JSON.stringify(parsed.data.mechanics.slice(0, 20))
         : null;
   }
+  const logMediaType = log.mediaType as MediaType;
   if (parsed.data.affinityContext !== undefined) {
     data.affinityContext =
       parsed.data.affinityContext == null
         ? null
         : stringifyLogAffinityContext(parsed.data.affinityContext);
+    if (logMediaType === "boardgames") {
+      data.averageWeight = boardGameAverageWeightFromAffinity(parsed.data.affinityContext);
+    }
   }
-  const logMediaType = log.mediaType as MediaType;
   const ownPatch = reconcileSpendTrackedOwnership(
     logMediaType,
     {
