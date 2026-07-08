@@ -30,6 +30,7 @@ import {
   buildLogsListPathFromFilters,
   readCachedLogsListResponse,
   upsertLogInClientCaches,
+  removeLogFromClientCaches,
 } from "@/lib/logsPageCache";
 import { LogForm } from "@/components/LogForm";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
@@ -590,8 +591,10 @@ export function MediaLogs({
     setDeletingId(id);
     try {
       await apiFetch(`/logs/${id}`, { method: "DELETE" });
-      invalidateLogsAndItemsCache();
+      skipLogsInvalidatedRefetchRef.current = true;
       setLogs((prev) => prev.filter((l) => l.id !== id));
+      removeLogFromClientCaches(id);
+      invalidateLogsAndItemsCache();
       setEditingLog(null);
       fetchStatusCounts();
       toast.success(t("toast.logDeleted"));
@@ -607,12 +610,14 @@ export function MediaLogs({
     setEditingLog(null);
     setLogEditTab("review");
     if (savedLog) {
+      skipLogsInvalidatedRefetchRef.current = true;
       const normalized = decodeLogForDisplay(savedLog);
       setLogs((prev) => {
         const idx = prev.findIndex((l) => l.id === normalized.id);
         if (idx >= 0) return prev.map((l) => (l.id === normalized.id ? normalized : l));
         return [normalized, ...prev];
       });
+      upsertLogInClientCaches(normalized);
     } else {
       invalidateLogsAndItemsCache();
       fetchLogs();

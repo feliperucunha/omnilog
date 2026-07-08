@@ -559,14 +559,6 @@ export function LogForm(props: LogFormProps) {
         );
         toast.success(t("toast.logUpdated"));
         triggerImpact("medium");
-        invalidateLogsAndItemsCache();
-        if (
-          showPurchaseAmount &&
-          ((spendFieldsIncludePurchase(showCollectionOwnership, own, sold) && purchaseAmountMinor != null) ||
-            ((!showCollectionOwnership || sold) && saleAmountMinor != null))
-        ) {
-          void refetchMe();
-        }
         const savedLog = logFromApiResponse(updated);
         if (hasPartialReviews) resetReviewDraft(savedLog);
         if (statusChanged) {
@@ -589,6 +581,14 @@ export function LogForm(props: LogFormProps) {
           props.onSaved(completion, savedLog);
         } else {
           props.onSaved(undefined, savedLog);
+        }
+        invalidateLogsAndItemsCache();
+        if (
+          showPurchaseAmount &&
+          ((spendFieldsIncludePurchase(showCollectionOwnership, own, sold) && purchaseAmountMinor != null) ||
+            ((!showCollectionOwnership || sold) && saleAmountMinor != null))
+        ) {
+          void refetchMe();
         }
         return true;
       }
@@ -645,14 +645,6 @@ export function LogForm(props: LogFormProps) {
       );
       toast.success(t("toast.logSaved"));
       triggerImpact("medium");
-      invalidateLogsAndItemsCache();
-      if (
-        showPurchaseAmount &&
-        ((spendFieldsIncludePurchase(showCollectionOwnership, own, sold) && purchaseAmountMinor != null) ||
-          ((!showCollectionOwnership || sold) && saleAmountMinor != null))
-      ) {
-        void refetchMe();
-      }
       if (wasFirstLog) trackProductEvent("first_log_created");
       const completion: LogCompleteState = {
         image,
@@ -666,6 +658,14 @@ export function LogForm(props: LogFormProps) {
         ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
       };
       props.onSaved(completion, logFromApiResponse(created));
+      invalidateLogsAndItemsCache();
+      if (
+        showPurchaseAmount &&
+        ((spendFieldsIncludePurchase(showCollectionOwnership, own, sold) && purchaseAmountMinor != null) ||
+          ((!showCollectionOwnership || sold) && saleAmountMinor != null))
+      ) {
+        void refetchMe();
+      }
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
@@ -731,8 +731,8 @@ export function LogForm(props: LogFormProps) {
       setScopedReviews(res.data ?? []);
       clearReviewDraft();
       toast.success(t("toast.reviewSaved"));
-      invalidateLogsAndItemsCache();
       props.onSaved(undefined, log);
+      invalidateLogsAndItemsCache();
     } catch (err) {
       showErrorToast(t, "E012", { originalError: err });
     } finally {

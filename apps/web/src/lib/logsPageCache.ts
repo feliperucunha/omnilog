@@ -125,6 +125,28 @@ export function upsertLogInClientCaches(log: Log): void {
   );
 }
 
+function removeLogFromListPayload(
+  raw: LogsListCachePayload,
+  logId: string
+): LogsListCachePayload | undefined {
+  if (Array.isArray(raw)) {
+    if (!raw.some((l) => l.id === logId)) return undefined;
+    return raw.filter((l) => l.id !== logId);
+  }
+  if (raw.data?.some((l) => l.id === logId)) {
+    return { ...raw, data: raw.data.filter((l) => l.id !== logId) };
+  }
+  return undefined;
+}
+
+export function removeLogFromClientCaches(logId: string): void {
+  updateCachedEntriesMatching(
+    "GET /logs?",
+    (data) => removeLogFromListPayload(data as LogsListCachePayload, logId),
+    HEAVY_PAGE_TTL_MS
+  );
+}
+
 export function buildLogsListPathFromFilters(
   mediaType: MediaType,
   filters: {
