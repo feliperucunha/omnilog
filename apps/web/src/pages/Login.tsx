@@ -82,7 +82,7 @@ export function Login() {
         navigate(from, { replace: true });
         return;
       }
-      navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
+      navigate(data.user.onboarded ? "/search" : "/onboarding", { replace: true });
     },
     [login, navigate, searchParams, t]
   );

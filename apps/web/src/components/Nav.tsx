@@ -101,7 +101,7 @@ export function Nav() {
         className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-[var(--color-mid)]/30 bg-[var(--color-dark)] md:flex"
       >
         <Link
-          to="/"
+          to={token ? "/search" : "/"}
           className="flex h-14 min-w-0 items-center gap-3 border-b border-[var(--color-mid)]/30 px-4 text-[var(--color-lightest)] no-underline"
         >
           <Logo alt={t("app.name")} className="h-10 w-auto flex-shrink-0 md:h-10" />

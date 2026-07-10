@@ -422,6 +422,9 @@ const STORAGE_KEY_BOARD_GAME_MATCHES = "geeklogs.statistics.boardGameMatchesColl
 const STORAGE_KEY_GAME_PLATFORMS = "geeklogs.statistics.gamePlatformsCollapsed";
 const STORAGE_KEY_CALENDAR = "geeklogs.statistics.calendarCollapsed";
 const STORAGE_KEY_CHARTS = "geeklogs.statistics.chartsCollapsed";
+const STORAGE_KEY_GAME_WEIGHT = "geeklogs.statistics.gameWeightCollapsed";
+const STORAGE_KEY_PAGES_OVER_TIME = "geeklogs.statistics.pagesOverTimeCollapsed";
+const STORAGE_KEY_EPISODES_OVER_TIME = "geeklogs.statistics.episodesOverTimeCollapsed";
 
 type StatsGroup = "category" | "month" | "year";
 type GenreGraphMode = "genre" | "statusOverTime" | "byCategory";
@@ -594,6 +597,17 @@ export function Statistics() {
   const [categoryOverTimeGroup, setCategoryOverTimeGroup] = useState<StatusOverTimeGroup>("month");
   const [categoryOverTimeStats, setCategoryOverTimeStats] = useState<CategoryOverTimeEntry[]>([]);
   const [categoryOverTimeLoading, setCategoryOverTimeLoading] = useState(true);
+  const [boardGameWeightStats, setBoardGameWeightStats] = useState<StatsEntry[]>([]);
+  const [boardGameWeightLoading, setBoardGameWeightLoading] = useState(true);
+  const [boardGameWeightScope, setBoardGameWeightScope] = useState<
+    "all" | "planToPlay" | "played" | "inCollection" | "wantToBuy"
+  >("all");
+  const [pagesOverTimeGroup, setPagesOverTimeGroup] = useState<StatusOverTimeGroup>("month");
+  const [pagesOverTimeStats, setPagesOverTimeStats] = useState<StatsEntry[]>([]);
+  const [pagesOverTimeLoading, setPagesOverTimeLoading] = useState(true);
+  const [episodesOverTimeGroup, setEpisodesOverTimeGroup] = useState<StatusOverTimeGroup>("month");
+  const [episodesOverTimeStats, setEpisodesOverTimeStats] = useState<StatsEntry[]>([]);
+  const [episodesOverTimeLoading, setEpisodesOverTimeLoading] = useState(true);
   const [statsCollapsed, setStatsCollapsedState] = useState(false);
   const [recentLogsCollapsed, setRecentLogsCollapsedState] = useState(false);
   const [summaryCollapsed, setSummaryCollapsedState] = useState(false);
@@ -602,6 +616,9 @@ export function Statistics() {
   const [gamePlatformsCollapsed, setGamePlatformsCollapsedState] = useState(false);
   const [calendarCollapsed, setCalendarCollapsedState] = useState(false);
   const [chartsCollapsed, setChartsCollapsedState] = useState(false);
+  const [gameWeightCollapsed, setGameWeightCollapsedState] = useState(false);
+  const [pagesOverTimeCollapsed, setPagesOverTimeCollapsedState] = useState(false);
+  const [episodesOverTimeCollapsed, setEpisodesOverTimeCollapsedState] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
   const [recapPickerOpen, setRecapPickerOpen] = useState(false);
   const [recapView, setRecapView] = useState<{ title: string; logs: Log[] } | null>(null);
@@ -631,6 +648,10 @@ export function Statistics() {
     title: string;
     mediaType?: MediaType;
   } | null>(null);
+  const [weightBinActivity, setWeightBinActivity] = useState<{
+    weightBin: string;
+    title: string;
+  } | null>(null);
   const [logsPeriodActivityLogs, setLogsPeriodActivityLogs] = useState<Log[]>([]);
   const [logsPeriodActivityLoading, setLogsPeriodActivityLoading] = useState(false);
 
@@ -648,7 +669,10 @@ export function Statistics() {
       storage.getItem(STORAGE_KEY_GAME_PLATFORMS),
       storage.getItem(STORAGE_KEY_CALENDAR),
       storage.getItem(STORAGE_KEY_CHARTS),
-    ]).then(([statsVal, recentVal, summaryVal, purchaseVal, boardGameMatchesVal, gamePlatformsVal, calendarVal, chartsVal]) => {
+      storage.getItem(STORAGE_KEY_GAME_WEIGHT),
+      storage.getItem(STORAGE_KEY_PAGES_OVER_TIME),
+      storage.getItem(STORAGE_KEY_EPISODES_OVER_TIME),
+    ]).then(([statsVal, recentVal, summaryVal, purchaseVal, boardGameMatchesVal, gamePlatformsVal, calendarVal, chartsVal, gameWeightVal, pagesOverTimeVal, episodesOverTimeVal]) => {
       if (cancelled) return;
       if (statsVal === "true") setStatsCollapsedState(true);
       if (recentVal === "true") setRecentLogsCollapsedState(true);
@@ -658,6 +682,9 @@ export function Statistics() {
       if (gamePlatformsVal === "true") setGamePlatformsCollapsedState(true);
       if (calendarVal === "true") setCalendarCollapsedState(true);
       if (chartsVal === "true") setChartsCollapsedState(true);
+      if (gameWeightVal === "true") setGameWeightCollapsedState(true);
+      if (pagesOverTimeVal === "true") setPagesOverTimeCollapsedState(true);
+      if (episodesOverTimeVal === "true") setEpisodesOverTimeCollapsedState(true);
     });
     return () => {
       cancelled = true;
@@ -702,6 +729,21 @@ export function Statistics() {
   const setChartsCollapsed = useCallback((value: boolean) => {
     setChartsCollapsedState(value);
     void storage.setItem(STORAGE_KEY_CHARTS, String(value));
+  }, []);
+
+  const setGameWeightCollapsed = useCallback((value: boolean) => {
+    setGameWeightCollapsedState(value);
+    void storage.setItem(STORAGE_KEY_GAME_WEIGHT, String(value));
+  }, []);
+
+  const setPagesOverTimeCollapsed = useCallback((value: boolean) => {
+    setPagesOverTimeCollapsedState(value);
+    void storage.setItem(STORAGE_KEY_PAGES_OVER_TIME, String(value));
+  }, []);
+
+  const setEpisodesOverTimeCollapsed = useCallback((value: boolean) => {
+    setEpisodesOverTimeCollapsedState(value);
+    void storage.setItem(STORAGE_KEY_EPISODES_OVER_TIME, String(value));
   }, []);
 
   const collapsibleSectionBtnClass =
@@ -794,6 +836,43 @@ export function Statistics() {
     [tzOffsetMinutes, statsMediaQuery]
   );
 
+  const fetchBoardGameWeightStats = useCallback(async () => {
+    const path = `/logs/stats?group=boardGameWeight&weightScope=${boardGameWeightScope}${statsMediaQuery()}`;
+    setBoardGameWeightLoading(true);
+    try {
+      const res = await apiFetch<{ data: StatsEntry[] }>(path);
+      setBoardGameWeightStats(res.data ?? []);
+    } catch {
+      setBoardGameWeightStats([]);
+    } finally {
+      setBoardGameWeightLoading(false);
+    }
+  }, [boardGameWeightScope, statsMediaQuery]);
+
+  const fetchPagesOverTimeStats = useCallback(
+    async (group: "pagesReadByMonth" | "pagesReadByYear") => {
+      const path = `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
+      await loadWithSWR<{ data: StatsEntry[] }>(
+        path,
+        (res) => setPagesOverTimeStats(res.data ?? []),
+        { setLoading: setPagesOverTimeLoading, onError: () => setPagesOverTimeStats([]) }
+      );
+    },
+    [tzOffsetMinutes, statsMediaQuery]
+  );
+
+  const fetchEpisodesOverTimeStats = useCallback(
+    async (group: "episodesByMonth" | "episodesByYear") => {
+      const path = `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
+      await loadWithSWR<{ data: StatsEntry[] }>(
+        path,
+        (res) => setEpisodesOverTimeStats(res.data ?? []),
+        { setLoading: setEpisodesOverTimeLoading, onError: () => setEpisodesOverTimeStats([]) }
+      );
+    },
+    [tzOffsetMinutes, statsMediaQuery]
+  );
+
   type PurchaseSpendingResponse = {
     data: Record<string, Record<string, number>>;
     saleData?: Record<string, Record<string, number>>;
@@ -865,6 +944,46 @@ export function Statistics() {
   }, [isPro, genreGraphMode, categoryOverTimeGroup, fetchCategoryOverTimeStats]);
 
   useEffect(() => {
+    if (categoryFilter !== "all" && categoryFilter !== "boardgames") {
+      setBoardGameWeightStats([]);
+      setBoardGameWeightLoading(false);
+      return;
+    }
+    void fetchBoardGameWeightStats();
+  }, [categoryFilter, fetchBoardGameWeightStats]);
+
+  useEffect(() => {
+    const isReading =
+      categoryFilter === "all" ||
+      categoryFilter === "books" ||
+      categoryFilter === "manga" ||
+      categoryFilter === "comics";
+    if (!isReading) {
+      setPagesOverTimeStats([]);
+      setPagesOverTimeLoading(false);
+      return;
+    }
+    const apiGroup =
+      !isPro ? "pagesReadByMonth" : pagesOverTimeGroup === "year" ? "pagesReadByYear" : "pagesReadByMonth";
+    void fetchPagesOverTimeStats(apiGroup);
+  }, [isPro, categoryFilter, pagesOverTimeGroup, fetchPagesOverTimeStats]);
+
+  useEffect(() => {
+    if (categoryFilter !== "all" && categoryFilter !== "tv") {
+      setEpisodesOverTimeStats([]);
+      setEpisodesOverTimeLoading(false);
+      return;
+    }
+    const apiGroup =
+      !isPro
+        ? "episodesByMonth"
+        : episodesOverTimeGroup === "year"
+          ? "episodesByYear"
+          : "episodesByMonth";
+    void fetchEpisodesOverTimeStats(apiGroup);
+  }, [isPro, categoryFilter, episodesOverTimeGroup, fetchEpisodesOverTimeStats]);
+
+  useEffect(() => {
     if (!isPro && purchasePeriod !== "month") setPurchasePeriod("month");
   }, [isPro, purchasePeriod]);
 
@@ -883,6 +1002,14 @@ export function Statistics() {
   useEffect(() => {
     if (!isPro && categoryOverTimeGroup !== "month") setCategoryOverTimeGroup("month");
   }, [isPro, categoryOverTimeGroup]);
+
+  useEffect(() => {
+    if (!isPro && pagesOverTimeGroup !== "month") setPagesOverTimeGroup("month");
+  }, [isPro, pagesOverTimeGroup]);
+
+  useEffect(() => {
+    if (!isPro && episodesOverTimeGroup !== "month") setEpisodesOverTimeGroup("month");
+  }, [isPro, episodesOverTimeGroup]);
 
   useEffect(() => {
     void fetchPurchaseSpending();
@@ -929,15 +1056,23 @@ export function Statistics() {
       title: string,
       mediaType?: MediaType
     ) => {
+      setWeightBinActivity(null);
       setLogsPeriodActivity({ period, granularity, title, mediaType });
     },
     []
   );
 
+  const openWeightBinActivity = useCallback((weightBin: string, title: string) => {
+    setLogsPeriodActivity(null);
+    setWeightBinActivity({ weightBin, title });
+  }, []);
+
   useEffect(() => {
     if (!logsPeriodActivity) {
-      setLogsPeriodActivityLogs([]);
-      setLogsPeriodActivityLoading(false);
+      if (!weightBinActivity) {
+        setLogsPeriodActivityLogs([]);
+        setLogsPeriodActivityLoading(false);
+      }
       return;
     }
     let cancelled = false;
@@ -962,7 +1097,34 @@ export function Statistics() {
     return () => {
       cancelled = true;
     };
-  }, [logsPeriodActivity, categoryFilter, tzOffsetMinutes]);
+  }, [logsPeriodActivity, categoryFilter, tzOffsetMinutes, weightBinActivity]);
+
+  useEffect(() => {
+    if (!weightBinActivity) {
+      if (!logsPeriodActivity) {
+        setLogsPeriodActivityLogs([]);
+        setLogsPeriodActivityLoading(false);
+      }
+      return;
+    }
+    let cancelled = false;
+    setLogsPeriodActivityLoading(true);
+    setLogsPeriodActivityLogs([]);
+    const path = `/logs/by-weight?weightBin=${encodeURIComponent(weightBinActivity.weightBin)}&weightScope=${boardGameWeightScope}`;
+    void apiFetch<{ data: Log[] }>(path)
+      .then((res) => {
+        if (!cancelled) setLogsPeriodActivityLogs((res.data ?? []).map(decodeLogForDisplay));
+      })
+      .catch(() => {
+        if (!cancelled) setLogsPeriodActivityLogs([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLogsPeriodActivityLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [weightBinActivity, boardGameWeightScope, logsPeriodActivity]);
 
   const fetchLogs = useCallback(() => {
     const mediaQ = statsMediaQuery();
@@ -1190,6 +1352,28 @@ export function Statistics() {
         !isPro ? "categoryByMonth" : categoryOverTimeGroup === "year" ? "categoryByYear" : "categoryByMonth";
       void fetchCategoryOverTimeStats(apiGroup);
     }
+    if (categoryFilter === "all" || categoryFilter === "boardgames") {
+      void fetchBoardGameWeightStats();
+    }
+    if (
+      categoryFilter === "all" ||
+      categoryFilter === "books" ||
+      categoryFilter === "manga" ||
+      categoryFilter === "comics"
+    ) {
+      const apiGroup =
+        !isPro ? "pagesReadByMonth" : pagesOverTimeGroup === "year" ? "pagesReadByYear" : "pagesReadByMonth";
+      void fetchPagesOverTimeStats(apiGroup);
+    }
+    if (categoryFilter === "all" || categoryFilter === "tv") {
+      const apiGroup =
+        !isPro
+          ? "episodesByMonth"
+          : episodesOverTimeGroup === "year"
+            ? "episodesByYear"
+            : "episodesByMonth";
+      void fetchEpisodesOverTimeStats(apiGroup);
+    }
     fetchLogs();
   }, [
     fetchStats,
@@ -1199,10 +1383,16 @@ export function Statistics() {
     fetchPurchaseSpending,
     genreGraphMode,
     isPro,
+    categoryFilter,
     statusOverTimeGroup,
     categoryOverTimeGroup,
+    pagesOverTimeGroup,
+    episodesOverTimeGroup,
     fetchStatusOverTimeStats,
     fetchCategoryOverTimeStats,
+    fetchBoardGameWeightStats,
+    fetchPagesOverTimeStats,
+    fetchEpisodesOverTimeStats,
     fetchLogs,
   ]);
 
@@ -1239,6 +1429,12 @@ export function Statistics() {
     statusOverTimeStats.length > 0 ? Math.max(...statusOverTimeStats.map((s) => s.hours), 1) : 1;
   const maxCategoryOverTimeCount =
     categoryOverTimeStats.length > 0 ? Math.max(...categoryOverTimeStats.map((s) => s.hours), 1) : 1;
+  const maxBoardGameWeightCount =
+    boardGameWeightStats.length > 0 ? Math.max(...boardGameWeightStats.map((s) => s.hours), 1) : 1;
+  const maxPagesOverTimeCount =
+    pagesOverTimeStats.length > 0 ? Math.max(...pagesOverTimeStats.map((s) => s.hours), 1) : 1;
+  const maxEpisodesOverTimeCount =
+    episodesOverTimeStats.length > 0 ? Math.max(...episodesOverTimeStats.map((s) => s.hours), 1) : 1;
   const categoryOverTimeByPeriod = categoryOverTimeStats.reduce<Record<string, CategoryOverTimeEntry[]>>(
     (acc, entry) => {
       if (!acc[entry.period]) acc[entry.period] = [];
@@ -1297,6 +1493,9 @@ export function Statistics() {
   const showBoardGamesRecentWidget = isAllCategories || categoryFilter === "boardgames";
   const showGamePlatformsWidget = isAllCategories || categoryFilter === "games";
   const showTimeConsumedWidget = isAllCategories;
+  const showBoardGameWeightChart = isAllCategories || categoryFilter === "boardgames";
+  const showPagesOverTimeChart = isReadingCategory;
+  const showEpisodesOverTimeChart = isAllCategories || categoryFilter === "tv";
 
   const chartModeOptions = useMemo(
     () => [
@@ -1680,6 +1879,345 @@ export function Statistics() {
                   loading={gamePlatformStatsLoading}
                   t={t}
                 />
+              </Card>
+            </section>
+          )}
+        </div>
+      )}
+
+      {showBoardGameWeightChart && visibleTypesOrderReady && (
+        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setGameWeightCollapsed(!gameWeightCollapsed)}
+            className={collapsibleSectionBtnClass}
+            aria-expanded={!gameWeightCollapsed}
+          >
+            {gameWeightCollapsed ? (
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            ) : (
+              <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+            )}
+            <span>{t("statistics.byGameWeight")}</span>
+          </button>
+          {!gameWeightCollapsed && (
+            <section aria-label={t("statistics.byGameWeight")} className="min-w-0 w-full">
+              <Card
+                className="flex min-h-0 min-w-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
+                style={paperShadow}
+              >
+                <Select
+                  value={boardGameWeightScope}
+                  onValueChange={(v) =>
+                    setBoardGameWeightScope(
+                      v as "all" | "planToPlay" | "played" | "inCollection" | "wantToBuy"
+                    )
+                  }
+                  options={[
+                    { value: "all", label: t("statistics.weightFilterAll") },
+                    { value: "planToPlay", label: t("status.planToPlay") },
+                    { value: "played", label: t("status.played") },
+                    { value: "inCollection", label: t("statistics.weightFilterInCollection") },
+                    { value: "wantToBuy", label: t("itemReviewForm.wantToBuy") },
+                  ]}
+                  aria-label={t("statistics.weightFilterLabel")}
+                  className="w-full min-w-0 sm:max-w-[220px]"
+                  triggerClassName="w-full min-w-0"
+                />
+                <div className="min-h-[12.5rem] min-w-0">
+                  {boardGameWeightLoading && boardGameWeightStats.length === 0 ? (
+                    <StatisticsBarsSkeleton rows={6} />
+                  ) : boardGameWeightStats.every((s) => (s.count ?? s.hours) === 0) ? (
+                    <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
+                      {t("statistics.noGameWeightYet")}
+                    </p>
+                  ) : (
+                    <div
+                      className={cn(
+                        "flex min-w-0 flex-col gap-2 overflow-hidden",
+                        boardGameWeightLoading && "opacity-60"
+                      )}
+                    >
+                      {boardGameWeightStats.map(({ period, hours, count }) => {
+                        const itemCount = count ?? hours;
+                        const weightTitle = t("statistics.weightBinActivityTitle", {
+                          weight: period,
+                        });
+                        const rowClass = cn(
+                          statBarGridClass,
+                          "w-full rounded-lg px-0 py-1.5 text-left max-md:min-h-[44px]"
+                        );
+                        const rowBody = (
+                          <>
+                            <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center leading-tight">
+                              <OverflowMarquee className={statBarMarqueeClass}>
+                                {t("statistics.weightBinLabel", { weight: period })}
+                              </OverflowMarquee>
+                            </div>
+                            <div className={statBarTrackClass}>
+                              <div
+                                className={statBarFillClass}
+                                style={{
+                                  width:
+                                    itemCount > 0
+                                      ? `${Math.max(5, (hours / maxBoardGameWeightCount) * 100)}%`
+                                      : "0%",
+                                }}
+                              />
+                            </div>
+                            <span className={statBarValueClass}>
+                              {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
+                            </span>
+                          </>
+                        );
+                        if (itemCount <= 0) {
+                          return (
+                            <div key={period} className={rowClass}>
+                              {rowBody}
+                            </div>
+                          );
+                        }
+                        return (
+                          <button
+                            key={period}
+                            type="button"
+                            className={cn(
+                              rowClass,
+                              "transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+                            )}
+                            onClick={() => openWeightBinActivity(period, weightTitle)}
+                            aria-label={weightTitle}
+                          >
+                            {rowBody}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </section>
+          )}
+        </div>
+      )}
+
+      {showPagesOverTimeChart && visibleTypesOrderReady && (
+        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setPagesOverTimeCollapsed(!pagesOverTimeCollapsed)}
+            className={collapsibleSectionBtnClass}
+            aria-expanded={!pagesOverTimeCollapsed}
+          >
+            {pagesOverTimeCollapsed ? (
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            ) : (
+              <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+            )}
+            <span>{t("statistics.pagesOverTime")}</span>
+          </button>
+          {!pagesOverTimeCollapsed && (
+            <section aria-label={t("statistics.pagesOverTime")} className="min-w-0 w-full">
+              <Card
+                className="flex min-h-0 min-w-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
+                style={paperShadow}
+              >
+                {isPro && (
+                  <Select
+                    value={pagesOverTimeGroup}
+                    onValueChange={(v) => setPagesOverTimeGroup(v as StatusOverTimeGroup)}
+                    options={[
+                      { value: "month", label: t("dashboard.byMonth") },
+                      { value: "year", label: t("dashboard.byYear") },
+                    ]}
+                    aria-label={t("statistics.timeGranularityLabel")}
+                    className="w-full min-w-0 sm:max-w-[220px]"
+                    triggerClassName="w-full min-w-0"
+                  />
+                )}
+                <div className="min-h-[12.5rem] min-w-0">
+                  {pagesOverTimeLoading ? (
+                    <StatisticsBarsSkeleton rows={6} />
+                  ) : pagesOverTimeStats.length === 0 ? (
+                    <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
+                      {t("statistics.noPagesOverTimeYet")}
+                    </p>
+                  ) : (
+                    <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
+                      {pagesOverTimeStats.map(({ period, hours, count }) => {
+                        const itemCount = count ?? 0;
+                        const timeLabel = formatStatsTimeAxisLabel(
+                          period,
+                          pagesOverTimeGroup === "year" ? "year" : "month",
+                          locale
+                        );
+                        const activityTitle = t("statistics.activityInPeriod", { period: timeLabel });
+                        const periodBody = (
+                          <>
+                            <StatsTimeSectionDivider label={timeLabel} />
+                            <div className={statBarGridClass}>
+                              <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
+                                {itemCount > 0 && (
+                                  <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
+                                    {t(
+                                      itemCount === 1
+                                        ? "statistics.statItemsCount_one"
+                                        : "statistics.statItemsCount_other",
+                                      { count: String(itemCount) }
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                              <div className={statBarTrackClass}>
+                                <div
+                                  className={statBarFillClass}
+                                  style={{
+                                    width: `${Math.max(5, (hours / maxPagesOverTimeCount) * 100)}%`,
+                                  }}
+                                />
+                              </div>
+                              <span className={statBarValueClass}>
+                                {t("statistics.pagesCount", { count: String(Math.round(hours)) })}
+                              </span>
+                            </div>
+                          </>
+                        );
+                        return (
+                          <div key={period} className="flex min-w-0 flex-col gap-2">
+                            {itemCount > 0 ? (
+                              <button
+                                type="button"
+                                className={cn(logsPeriodActivityBtnClass, "flex-col items-stretch gap-2")}
+                                onClick={() =>
+                                  openLogsPeriodActivity(period, pagesOverTimeGroup, activityTitle)
+                                }
+                                aria-label={activityTitle}
+                              >
+                                {periodBody}
+                              </button>
+                            ) : (
+                              periodBody
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </section>
+          )}
+        </div>
+      )}
+
+      {showEpisodesOverTimeChart && visibleTypesOrderReady && (
+        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setEpisodesOverTimeCollapsed(!episodesOverTimeCollapsed)}
+            className={collapsibleSectionBtnClass}
+            aria-expanded={!episodesOverTimeCollapsed}
+          >
+            {episodesOverTimeCollapsed ? (
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            ) : (
+              <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+            )}
+            <span>{t("statistics.episodesOverTime")}</span>
+          </button>
+          {!episodesOverTimeCollapsed && (
+            <section aria-label={t("statistics.episodesOverTime")} className="min-w-0 w-full">
+              <Card
+                className="flex min-h-0 min-w-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
+                style={paperShadow}
+              >
+                {isPro && (
+                  <Select
+                    value={episodesOverTimeGroup}
+                    onValueChange={(v) => setEpisodesOverTimeGroup(v as StatusOverTimeGroup)}
+                    options={[
+                      { value: "month", label: t("dashboard.byMonth") },
+                      { value: "year", label: t("dashboard.byYear") },
+                    ]}
+                    aria-label={t("statistics.timeGranularityLabel")}
+                    className="w-full min-w-0 sm:max-w-[220px]"
+                    triggerClassName="w-full min-w-0"
+                  />
+                )}
+                <div className="min-h-[12.5rem] min-w-0">
+                  {episodesOverTimeLoading ? (
+                    <StatisticsBarsSkeleton rows={6} />
+                  ) : episodesOverTimeStats.length === 0 ? (
+                    <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
+                      {t("statistics.noEpisodesOverTimeYet")}
+                    </p>
+                  ) : (
+                    <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
+                      {episodesOverTimeStats.map(({ period, hours, count }) => {
+                        const itemCount = count ?? 0;
+                        const timeLabel = formatStatsTimeAxisLabel(
+                          period,
+                          episodesOverTimeGroup === "year" ? "year" : "month",
+                          locale
+                        );
+                        const activityTitle = t("statistics.activityInPeriod", { period: timeLabel });
+                        const periodBody = (
+                          <>
+                            <StatsTimeSectionDivider label={timeLabel} />
+                            <div className={statBarGridClass}>
+                              <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
+                                {itemCount > 0 && (
+                                  <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
+                                    {t(
+                                      itemCount === 1
+                                        ? "statistics.statItemsCount_one"
+                                        : "statistics.statItemsCount_other",
+                                      { count: String(itemCount) }
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                              <div className={statBarTrackClass}>
+                                <div
+                                  className={statBarFillClass}
+                                  style={{
+                                    width: `${Math.max(5, (hours / maxEpisodesOverTimeCount) * 100)}%`,
+                                  }}
+                                />
+                              </div>
+                              <span className={statBarValueClass}>
+                                {t("statistics.episodesCount", { count: String(Math.round(hours)) })}
+                              </span>
+                            </div>
+                          </>
+                        );
+                        return (
+                          <div key={period} className="flex min-w-0 flex-col gap-2">
+                            {itemCount > 0 ? (
+                              <button
+                                type="button"
+                                className={cn(logsPeriodActivityBtnClass, "flex-col items-stretch gap-2")}
+                                onClick={() =>
+                                  openLogsPeriodActivity(
+                                    period,
+                                    episodesOverTimeGroup,
+                                    activityTitle,
+                                    categoryFilter === "all" ? "tv" : undefined
+                                  )
+                                }
+                                aria-label={activityTitle}
+                              >
+                                {periodBody}
+                              </button>
+                            ) : (
+                              periodBody
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </Card>
             </section>
           )}
@@ -2464,9 +3002,12 @@ export function Statistics() {
       </div>
       </div>
       <LogActivitySheet
-        open={logsPeriodActivity != null}
-        onClose={() => setLogsPeriodActivity(null)}
-        title={logsPeriodActivity?.title ?? ""}
+        open={logsPeriodActivity != null || weightBinActivity != null}
+        onClose={() => {
+          setLogsPeriodActivity(null);
+          setWeightBinActivity(null);
+        }}
+        title={logsPeriodActivity?.title ?? weightBinActivity?.title ?? ""}
         logs={logsPeriodActivityLogs}
         loading={logsPeriodActivityLoading}
       />

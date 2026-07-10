@@ -7,6 +7,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { clearAuthSession } from "@/lib/storage";
 import { isCapacitorNative } from "@/lib/androidOverlayBack";
+import { getUnauthenticatedEntryPath } from "@/lib/unauthenticatedEntry";
 import { cn } from "@/lib/utils";
 
 /** Visual progress reaches ~99% over this duration (decoupled from max wait so the bar feels responsive). */
@@ -168,7 +169,7 @@ export function ColdStartLoader() {
   const handleSignIn = (): void => {
     void clearAuthSession().then(() => {
       window.dispatchEvent(new CustomEvent("auth:logout"));
-      window.location.assign("/login");
+      window.location.assign(getUnauthenticatedEntryPath());
     });
   };
 

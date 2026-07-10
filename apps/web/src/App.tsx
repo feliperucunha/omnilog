@@ -12,6 +12,9 @@ import { Onboarding } from "@/pages/Onboarding";
 import { Dashboard } from "@/pages/Dashboard";
 import { PublicProfile } from "@/pages/PublicProfile";
 import { PublicProfileLayout } from "@/layouts/PublicProfileLayout";
+import { Landing } from "@/pages/Landing";
+import { isCapacitorNative } from "@/lib/androidOverlayBack";
+import { getUnauthenticatedEntryPath } from "@/lib/unauthenticatedEntry";
 const CHUNK_RELOAD_ONCE_KEY = "geeklogs_chunk_reload_once";
 
 const isChunkLoadError = (error: unknown): boolean => {
@@ -79,9 +82,16 @@ function LazyRouteFallback() {
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { token, initializing } = useAuth();
   if (initializing) return null;
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token) return <Navigate to={getUnauthenticatedEntryPath()} replace />;
   return <>{children}</>;
 };
+
+function HomeEntry() {
+  const { token, initializing } = useAuth();
+  if (initializing) return null;
+  if (!isCapacitorNative() && !token) return <Landing />;
+  return <Navigate to="/search" replace />;
+}
 
 const RequireOnboarded = ({ children }: { children: React.ReactNode }) => {
   const { token, user, initializing } = useAuth();
@@ -115,7 +125,8 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/" element={<AppLayout />}>
+          <Route path="/" element={<HomeEntry />} />
+          <Route element={<AppLayout />}>
             <Route
               element={
                 <Suspense fallback={<LazyRouteFallback />}>
@@ -123,7 +134,6 @@ export default function App() {
                 </Suspense>
               }
             >
-              <Route index element={<Search />} />
               <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
               <Route path="search" element={<Search />} />

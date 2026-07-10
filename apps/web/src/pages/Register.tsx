@@ -80,7 +80,7 @@ export function Register() {
       });
       await login(data.token, { ...data.user, onboarded: data.user.onboarded ?? false });
       toast.success(t("toast.accountCreated"));
-      navigate(data.user.onboarded ? "/" : "/onboarding", { replace: true });
+      navigate(data.user.onboarded ? "/search" : "/onboarding", { replace: true });
     } catch (err) {
       if (err instanceof ApiValidationError) {
         const mapped: FieldErrors = {};

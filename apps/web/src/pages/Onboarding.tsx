@@ -89,9 +89,9 @@ export function OnboardingForm({ layout = "page", previewMode, onPreviewDismiss 
   const navigateAfterDone = useCallback(() => {
     if (previewMode) {
       onPreviewDismiss?.();
-      if (!onPreviewDismiss) navigate("/", { replace: true });
+      if (!onPreviewDismiss) navigate("/search", { replace: true });
     } else {
-      navigate("/", { replace: true });
+      navigate("/search", { replace: true });
     }
   }, [previewMode, onPreviewDismiss, navigate]);
 
@@ -476,7 +476,7 @@ export function Onboarding() {
 
   const allowPreview = (FORCE_ONBOARDING_UI || previewByUrl) && user.onboarded === true;
   if (user.onboarded === true && !allowPreview) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/search" replace />;
   }
 
   return <OnboardingForm layout="page" previewMode={allowPreview} />;

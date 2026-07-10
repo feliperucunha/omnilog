@@ -17,6 +17,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
+import { getUnauthenticatedEntryPath } from "@/lib/unauthenticatedEntry";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
@@ -89,7 +90,7 @@ export function Topbar() {
     try {
       await logout();
       toast.success(t("toast.loggedOut"));
-      navigate("/login", { replace: true });
+      navigate(getUnauthenticatedEntryPath(), { replace: true });
     } catch {
       setSigningOut(false);
     }
@@ -107,9 +108,9 @@ export function Topbar() {
         {/* Mobile: logo + title (or app name when no title) */}
         <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
           <Link
-            to="/"
+            to={token ? "/search" : "/"}
             className="flex shrink-0 items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
-            aria-label={t("nav.search")}
+            aria-label={token ? t("nav.search") : t("app.name")}
           >
             <Logo alt={t("app.name")} className="h-9 w-auto flex-shrink-0 sm:h-11" />
           </Link>

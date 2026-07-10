@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
-    if (signingOut && location.pathname === "/login") {
+    if (signingOut && (location.pathname === "/login" || location.pathname === "/")) {
       setSigningOut(false);
     }
   }, [location.pathname, signingOut]);

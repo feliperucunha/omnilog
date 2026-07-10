@@ -277,11 +277,18 @@ async function enrichListLogsForClient(
 import { attachBoardGameSessionHours } from "../lib/boardGameSessionHours.js";
 import { syncTaggedPlayersBoardGameLogs } from "../lib/boardGameTaggedPlayerSync.js";
 import {
+  boardGameWeightHistogramEntries,
+  boardGameWeightScopeWhere,
+  binBoardGameWeight,
   countBoardGameWinsForStats,
   gamePlatformStatsForUser,
   isReadingMediaType,
+  parseBoardGameWeightBin,
+  parseBoardGameWeightScope,
+  READING_MEDIA_TYPES,
   recentBoardGamesForStats,
   sumAllPagesReadForStats,
+  sumMetricByPeriod,
   sumPagesReadForStats,
 } from "../lib/statsCategoryMetrics.js";
 import { tierHasProFeatures, tierHasUnlimitedLogs } from "../lib/userTier.js";
@@ -710,7 +717,7 @@ logsRouter.delete("/:id/reaction", async (req: AuthenticatedRequest, res) => {
   res.status(204).end();
 });
 
-/** GET /logs/stats?group=summary|category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear&mediaType=optional - summary = account totals; category/month/year rows include { hours, count }; genre uses unique log counts per genre name */
+/** GET /logs/stats?group=summary|category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear|boardGameWeight|pagesReadByMonth|pagesReadByYear|episodesByMonth|episodesByYear&mediaType=optional - summary = account totals; category/month/year rows include { hours, count }; genre uses unique log counts per genre name */
 logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const statsMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
@@ -727,33 +734,27 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const freeMonthWhere = fullStatsAccess ? undefined : freeTierStatisticsMonthWhere(tzOffsetMinutes);
   const freeMonthRange = fullStatsAccess ? undefined : freeTierStatisticsMonthRange(tzOffsetMinutes);
 
-  const groupParam = req.query.group as string;
-  const group =
-    groupParam === "summary"
-      ? "summary"
-      : groupParam === "year"
-        ? "year"
-        : groupParam === "genre"
-          ? "genre"
-          : groupParam === "category"
-            ? "category"
-            : groupParam === "completedByYear"
-              ? "completedByYear"
-              : groupParam === "completedByMonth"
-                ? "completedByMonth"
-                : groupParam === "categoryByYear"
-                  ? "categoryByYear"
-                  : groupParam === "categoryByMonth"
-                    ? "categoryByMonth"
-                    : groupParam === "purchaseSpending"
-                      ? "purchaseSpending"
-                      : groupParam === "gamePlatforms"
-                        ? "gamePlatforms"
-                        : groupParam === "recentBoardGames"
-                          ? "recentBoardGames"
-                          : groupParam === "month"
-                            ? "month"
-                            : "month";
+  const STATS_GROUPS = new Set([
+    "summary",
+    "year",
+    "genre",
+    "category",
+    "completedByYear",
+    "completedByMonth",
+    "categoryByYear",
+    "categoryByMonth",
+    "purchaseSpending",
+    "gamePlatforms",
+    "recentBoardGames",
+    "boardGameWeight",
+    "pagesReadByMonth",
+    "pagesReadByYear",
+    "episodesByMonth",
+    "episodesByYear",
+    "month",
+  ]);
+  const groupParam = typeof req.query.group === "string" ? req.query.group : "month";
+  const group = STATS_GROUPS.has(groupParam) ? groupParam : "month";
 
   if (group === "purchaseSpending") {
     const periodRaw = typeof req.query.period === "string" ? req.query.period.trim() : "month";
@@ -1096,6 +1097,91 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
+  if (group === "boardGameWeight") {
+    if (statsMediaType != null && statsMediaType !== "boardgames") {
+      res.json({ group, data: [] });
+      return;
+    }
+    const weightScope = parseBoardGameWeightScope(req.query.weightScope);
+    const scopeWhere = boardGameWeightScopeWhere(weightScope);
+    await ensureBoardGameWeightsForSort(prisma, userId, "boardgames");
+    let weightBase: Prisma.LogWhereInput = applyStatsMediaFilter(
+      {
+        userId,
+        mediaType: "boardgames",
+        averageWeight: { gt: 0 },
+      },
+      statsMediaType ?? "boardgames"
+    );
+    if (scopeWhere) weightBase = mergeLogWhere(weightBase, scopeWhere);
+    const logs = await prisma.log.findMany({
+      where: weightBase,
+      select: { averageWeight: true },
+    });
+    const weights = logs.map((log) => log.averageWeight);
+    res.json({ group, data: boardGameWeightHistogramEntries(weights) });
+    return;
+  }
+
+  if (group === "pagesReadByMonth" || group === "pagesReadByYear") {
+    if (statsMediaType != null && !isReadingMediaType(statsMediaType)) {
+      res.json({ group, data: [] });
+      return;
+    }
+    const readingTypes = statsMediaType
+      ? [statsMediaType]
+      : [...READING_MEDIA_TYPES];
+    const pagesBase: Prisma.LogWhereInput = {
+      userId,
+      mediaType: { in: readingTypes },
+      pagesRead: { gt: 0 },
+      completedAt: freeMonthRange
+        ? { gte: freeMonthRange.gte, lte: freeMonthRange.lte }
+        : { not: null },
+    };
+    const logs = await prisma.log.findMany({
+      where: pagesBase,
+      select: { completedAt: true, pagesRead: true },
+    });
+    const granularity = group === "pagesReadByYear" ? "year" : "month";
+    const entries = sumMetricByPeriod(
+      logs
+        .filter((l): l is { completedAt: Date; pagesRead: number } => l.completedAt != null && l.pagesRead != null)
+        .map((l) => ({ at: l.completedAt, value: l.pagesRead })),
+      granularity
+    );
+    res.json({ group, data: entries });
+    return;
+  }
+
+  if (group === "episodesByMonth" || group === "episodesByYear") {
+    if (statsMediaType != null && statsMediaType !== "tv") {
+      res.json({ group, data: [] });
+      return;
+    }
+    const episodesBase: Prisma.LogWhereInput = {
+      userId,
+      mediaType: "tv",
+      episode: { gt: 0 },
+      completedAt: freeMonthRange
+        ? { gte: freeMonthRange.gte, lte: freeMonthRange.lte }
+        : { not: null },
+    };
+    const logs = await prisma.log.findMany({
+      where: episodesBase,
+      select: { completedAt: true, episode: true },
+    });
+    const granularity = group === "episodesByYear" ? "year" : "month";
+    const entries = sumMetricByPeriod(
+      logs
+        .filter((l): l is { completedAt: Date; episode: number } => l.completedAt != null && l.episode != null)
+        .map((l) => ({ at: l.completedAt, value: l.episode })),
+      granularity
+    );
+    res.json({ group, data: entries });
+    return;
+  }
+
   const hoursRollupWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
     freeMonthRange
       ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
@@ -1182,6 +1268,32 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
     orderBy: [{ completedAt: "desc" }, { startedAt: "desc" }, { updatedAt: "desc" }],
   });
   const enriched = await enrichLogsForClient(prisma, logs.map(serializeLog));
+  res.json({ data: enriched });
+});
+
+/** GET /logs/by-weight?weightBin=2.5&weightScope=all|planToPlay|played|inCollection|wantToBuy */
+logsRouter.get("/by-weight", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const weightBin = parseBoardGameWeightBin(req.query.weightBin);
+  if (weightBin == null) {
+    res.status(400).json({ error: "Invalid weightBin; use a value from 0.5 to 5 in 0.5 steps" });
+    return;
+  }
+  const weightScope = parseBoardGameWeightScope(req.query.weightScope);
+  const scopeWhere = boardGameWeightScopeWhere(weightScope);
+  await ensureBoardGameWeightsForSort(prisma, userId, "boardgames");
+  let where: Prisma.LogWhereInput = {
+    userId,
+    mediaType: "boardgames",
+    averageWeight: { gt: 0 },
+  };
+  if (scopeWhere) where = mergeLogWhere(where, scopeWhere);
+  const logs = await prisma.log.findMany({
+    where,
+    orderBy: [{ title: "asc" }, { updatedAt: "desc" }],
+  });
+  const matched = logs.filter((log) => binBoardGameWeight(log.averageWeight ?? 0) === weightBin);
+  const enriched = await enrichLogsForClient(prisma, matched.map(serializeLog));
   res.json({ data: enriched });
 });
 

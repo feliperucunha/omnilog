@@ -62,6 +62,7 @@ import {
 
 import { clearAuthSession, getItemSync } from "./storage.js";
 import { isPublicAuthPath } from "./authSession.js";
+import { getUnauthenticatedEntryPath } from "./unauthenticatedEntry.js";
 
 /** Sentinel for cookie-based sessions (no token in storage). */
 const COOKIE_SESSION = "cookie";
@@ -100,7 +101,7 @@ async function handleSessionExpired(): Promise<void> {
     if (typeof window !== "undefined") {
       const path = window.location.pathname;
       if (!isPublicAuthPath(path)) {
-        window.location.assign("/login");
+        window.location.assign(getUnauthenticatedEntryPath());
       }
     }
   })().finally(() => {

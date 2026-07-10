@@ -320,4 +320,106 @@ export function isReadingMediaType(mt: MediaType | undefined): boolean {
   return mt != null && (READING_MEDIA_TYPES as readonly string[]).includes(mt);
 }
 
+export type StatsBarEntry = { period: string; hours: number; count: number };
+
+export const BOARD_GAME_WEIGHT_SCOPES = [
+  "all",
+  "planToPlay",
+  "played",
+  "inCollection",
+  "wantToBuy",
+] as const;
+
+export type BoardGameWeightScope = (typeof BOARD_GAME_WEIGHT_SCOPES)[number];
+
+export function parseBoardGameWeightScope(raw: unknown): BoardGameWeightScope {
+  if (typeof raw === "string" && (BOARD_GAME_WEIGHT_SCOPES as readonly string[]).includes(raw)) {
+    return raw as BoardGameWeightScope;
+  }
+  return "all";
+}
+
+export function boardGameWeightScopeWhere(scope: BoardGameWeightScope): Prisma.LogWhereInput | undefined {
+  switch (scope) {
+    case "planToPlay":
+      return { status: "plan to play" };
+    case "played":
+      return { status: "played" };
+    case "inCollection":
+      return { own: true };
+    case "wantToBuy":
+      return { wantToBuy: true };
+    default:
+      return undefined;
+  }
+}
+
+const WEIGHT_BINS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5] as const;
+
+export function binBoardGameWeight(weight: number): number | null {
+  if (!Number.isFinite(weight) || weight <= 0) return null;
+  const rounded = Math.round(weight * 2) / 2;
+  const clamped = Math.min(5, Math.max(0.5, rounded));
+  return clamped;
+}
+
+export function parseBoardGameWeightBin(raw: unknown): number | null {
+  if (typeof raw !== "string" && typeof raw !== "number") return null;
+  const n = typeof raw === "number" ? raw : parseFloat(String(raw).trim());
+  if (!Number.isFinite(n)) return null;
+  return binBoardGameWeight(n);
+}
+
+export function formatWeightBinLabel(bin: number): string {
+  return Number.isInteger(bin) ? String(bin) : bin.toFixed(1);
+}
+
+export function boardGameWeightHistogramEntries(
+  weights: Array<number | null | undefined>
+): StatsBarEntry[] {
+  const counts = new Map<number, number>();
+  for (const bin of WEIGHT_BINS) counts.set(bin, 0);
+  let any = false;
+  for (const w of weights) {
+    if (w == null) continue;
+    const bin = binBoardGameWeight(w);
+    if (bin == null) continue;
+    any = true;
+    counts.set(bin, (counts.get(bin) ?? 0) + 1);
+  }
+  if (!any) return [];
+  return WEIGHT_BINS.map((bin) => {
+    const count = counts.get(bin) ?? 0;
+    return { period: formatWeightBinLabel(bin), hours: count, count };
+  });
+}
+
+function periodKeyFromDate(d: Date, granularity: "month" | "year"): string {
+  return granularity === "year"
+    ? `${d.getUTCFullYear()}`
+    : `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function sumMetricByPeriod(
+  rows: Array<{ at: Date; value: number }>,
+  granularity: "month" | "year"
+): StatsBarEntry[] {
+  const byPeriod: Record<string, { sum: number; count: number }> = {};
+  for (const row of rows) {
+    if (!Number.isFinite(row.value) || row.value <= 0) continue;
+    const key = periodKeyFromDate(row.at, granularity);
+    const cur = byPeriod[key] ?? { sum: 0, count: 0 };
+    cur.sum += row.value;
+    cur.count += 1;
+    byPeriod[key] = cur;
+  }
+  return Object.entries(byPeriod)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([period, { sum, count }]) => ({
+      period,
+      hours: Math.round(sum),
+      count,
+    }));
+}
+
 export { READING_MEDIA_TYPES };

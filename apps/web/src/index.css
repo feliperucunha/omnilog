@@ -454,3 +454,90 @@ body {
     animation: none;
   }
 }
+
+.landing-hero-mesh {
+  background:
+    radial-gradient(ellipse 80% 60% at 70% 20%, color-mix(in srgb, var(--btn-gradient-start) 28%, transparent), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 15% 70%, color-mix(in srgb, var(--btn-gradient-end) 18%, transparent), transparent 50%),
+    radial-gradient(ellipse 40% 35% at 90% 80%, color-mix(in srgb, var(--color-mid) 35%, transparent), transparent 45%),
+    var(--color-darkest);
+}
+
+.landing-section-glow {
+  background: radial-gradient(
+    ellipse 70% 80% at 10% 50%,
+    color-mix(in srgb, var(--btn-gradient-start) 12%, transparent),
+    transparent 60%
+  );
+}
+
+.landing-media-marquee {
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+
+.landing-media-marquee-track {
+  will-change: transform;
+}
+
+.landing-media-marquee-track--static {
+  flex-wrap: wrap;
+  width: auto;
+  max-width: 100%;
+  justify-content: flex-start;
+  row-gap: 0.75rem;
+  padding-inline: 1.25rem;
+}
+
+.landing-media-marquee-track--static > ul:last-child {
+  display: none;
+}
+
+.landing-media-marquee-track--static > ul {
+  flex-wrap: wrap;
+  padding-right: 0;
+  row-gap: 0.75rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-hero-mesh {
+    animation: landing-mesh-shift 18s ease-in-out infinite alternate;
+  }
+  .landing-hero-float {
+    animation: landing-panel-float 12s ease-in-out infinite;
+  }
+  .landing-hero-float-delayed {
+    animation: landing-panel-float 14s ease-in-out infinite;
+    animation-delay: -4s;
+  }
+  .landing-media-marquee-track:not(.landing-media-marquee-track--static) {
+    animation: landing-media-marquee 42s linear infinite;
+  }
+}
+
+@keyframes landing-mesh-shift {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes landing-panel-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -10px;
+  }
+}
+
+@keyframes landing-media-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
