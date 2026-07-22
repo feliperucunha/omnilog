@@ -163,16 +163,18 @@ export function Dashboard() {
     const ownQ = params.get("own") === "true";
     const wtbQ = params.get("wantToBuy") === "true";
     const genre = params.get("genre") ?? "";
+    const players = params.get("players") ?? "";
     let collection: CollectionListFilter = "";
     if (ownQ) collection = "owned";
     else if (wtbQ) collection = "wantToBuy";
-    if (!status && sort === "dateDesc" && !q && !collection && !genre) return undefined;
+    if (!status && sort === "dateDesc" && !q && !collection && !genre && !players) return undefined;
     return {
       status,
       sort,
       search: q,
       collection,
       genre,
+      players,
     };
   }, [searchParamsKey]);
   const categoryParam = searchParams.get("category");
@@ -213,6 +215,7 @@ export function Dashboard() {
     search: "",
     collection: "",
     genre: "",
+    players: "",
   });
 
   /** Load collapsed prefs from persistent storage (Android/Capacitor). */
@@ -442,6 +445,8 @@ export function Dashboard() {
           else if (f.collection === "wantToBuy") next.set("wantToBuy", "true");
           if (f.genre.trim()) next.set("genre", f.genre.trim());
           else next.delete("genre");
+          if (f.players.trim()) next.set("players", f.players.trim());
+          else next.delete("players");
           next.delete("purchased");
           next.delete("purchaseDate");
           if (next.toString() === prev.toString()) return prev;

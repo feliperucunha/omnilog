@@ -499,6 +499,37 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     LOG_GENRE_FILTER_MAX_LENGTH
   );
 
+  const playersFilterRaw =
+    mediaType === "boardgames" && typeof req.query.players === "string"
+      ? req.query.players.trim()
+      : "";
+  if (playersFilterRaw) {
+    const selectedCounts = playersFilterRaw
+      .split(",")
+      .map((s) => parseInt(s, 10))
+      .filter((n) => !Number.isNaN(n) && n >= 1);
+    if (selectedCounts.length > 0) {
+      const cacheConditions: Prisma.ItemDetailCacheWhereInput[] = selectedCounts.map((count) => {
+        if (count >= 6) return { playersMax: { gte: 6 } };
+        return { playersMin: { lte: count }, playersMax: { gte: count } };
+      });
+      const matchingItems = await prisma.itemDetailCache.findMany({
+        where: { mediaType: "boardgames", OR: cacheConditions },
+        select: { externalId: true },
+      });
+      const matchingExternalIds = [...new Set(matchingItems.map((i) => i.externalId))];
+      if (matchingExternalIds.length === 0) {
+        if (usePagination) {
+          res.json({ data: [], nextCursor: null });
+        } else {
+          res.json([]);
+        }
+        return;
+      }
+      where.externalId = { in: matchingExternalIds };
+    }
+  }
+
   if (statisticsMonthWhereFree) {
     where = mergeLogWhere(where, statisticsMonthWhereFree);
   }

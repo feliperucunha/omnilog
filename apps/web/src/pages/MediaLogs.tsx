@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { AlertTriangle, Download, Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { MediaType, Log } from "@geeklogs/shared";
@@ -69,6 +69,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+} from "@/components/ui/dropdown-menu";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { mediaTypeHasCollectionOwnership, mediaTypeHasMarketTab } from "@/lib/mediaTypeFeatures";
 import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
@@ -118,6 +123,82 @@ export interface SharedFilters {
   collection: CollectionListFilter;
   /** Exact genre name from log metadata; empty = all genres. */
   genre: string;
+  /** Comma-separated player counts (boardgames only): e.g. "1,3,5". */
+  players: string;
+}
+
+const PLAYER_OPTIONS = [
+  { value: "1", label: "1" },
+  { value: "2", label: "2" },
+  { value: "3", label: "3" },
+  { value: "4", label: "4" },
+  { value: "5", label: "5" },
+  { value: "6", label: "6+" },
+];
+
+interface PlayersFilterDropdownProps {
+  value: string;
+  onChange: (value: string) => void;
+  labelAll: string;
+  ariaLabel: string;
+  className?: string;
+}
+
+function PlayersFilterDropdown({ value, onChange, labelAll, ariaLabel, className }: PlayersFilterDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const selected = value ? value.split(",").filter(Boolean) : [];
+  const triggerLabel = selected.length === 0 ? labelAll : `${labelAll} (${selected.length})`;
+
+  const toggle = (num: string) => {
+    const next = selected.includes(num)
+      ? selected.filter((n) => n !== num)
+      : [...selected, num];
+    onChange(next.sort().join(","));
+  };
+
+  return (
+    <div className={cn("flex min-h-0 min-w-0 flex-col", "max-md:h-full max-md:self-stretch", "md:h-auto md:self-auto", className)}>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "flex w-full items-center justify-between gap-2 rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] transition-colors [touch-action:manipulation]",
+            "max-md:h-full max-md:min-h-[44px]",
+            "md:h-9 md:min-h-9 md:max-h-9 md:py-1",
+            "focus:outline-none"
+          )}
+          aria-label={ariaLabel}
+        >
+          <OverflowMarquee className="text-left">{triggerLabel}</OverflowMarquee>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[10rem] p-2">
+        {PLAYER_OPTIONS.map((opt) => {
+          const checked = selected.includes(opt.value);
+          return (
+            <label
+              key={opt.value}
+              className={cn(
+                "flex min-h-[44px] w-full cursor-pointer select-none items-center gap-3 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors [touch-action:manipulation]",
+                "hover:bg-[var(--color-mid)]/40"
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => toggle(opt.value)}
+                className="m-0"
+              />
+              <span className="min-w-0 flex-1">{opt.label}</span>
+            </label>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+    </div>
+  );
 }
 
 interface MediaLogsProps {
@@ -184,6 +265,7 @@ export function MediaLogs({
         search: initialFilters?.search,
         collection: initialFilters?.collection,
         genre: initialFilters?.genre,
+        players: initialFilters?.players,
       },
       showCollectionOwnershipFilters
     );
@@ -214,6 +296,7 @@ export function MediaLogs({
     () => initialFilters?.collection ?? ""
   );
   const [genreFilter, setGenreFilter] = useState(() => (initialFilters?.genre ?? "").trim());
+  const [playersFilter, setPlayersFilter] = useState(() => (initialFilters?.players ?? "").trim());
   const [sortBy, setSortBy] = useState<MediaLogsSort>(() => (initialFilters?.sort as MediaLogsSort) ?? DEFAULT_SORT);
   const [showCustomEntry, setShowCustomEntry] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -244,6 +327,7 @@ export function MediaLogs({
       const q = categorySearchQuery.trim();
       if (q) params.q = q;
       if (genreFilter) params.genre = genreFilter;
+      if (playersFilter) params.players = playersFilter;
       if (cursor) params.cursor = cursor;
       return buildLogsListPath(params);
     },
@@ -254,6 +338,7 @@ export function MediaLogs({
       collectionFilter,
       categorySearchQuery,
       genreFilter,
+      playersFilter,
       showCollectionOwnershipFilters,
     ]
   );
@@ -270,8 +355,9 @@ export function MediaLogs({
       search: categorySearchQuery,
       collection: collectionFilter,
       genre: genreFilter,
+      players: playersFilter,
     });
-  }, [embedded, statusFilter, sortBy, categorySearchQuery, collectionFilter, genreFilter]);
+  }, [embedded, statusFilter, sortBy, categorySearchQuery, collectionFilter, genreFilter, playersFilter]);
 
   useEffect(() => {
     if (initialFiltersSyncKey == null) return;
@@ -281,6 +367,7 @@ export function MediaLogs({
     setCategorySearchDraft(initialFilters?.search ?? "");
     setCollectionFilter((initialFilters?.collection as CollectionListFilter) ?? "");
     setGenreFilter((initialFilters?.genre ?? "").trim());
+    setPlayersFilter((initialFilters?.players ?? "").trim());
   }, [initialFiltersSyncKey, initialFilters]);
 
   useEffect(() => {
@@ -354,6 +441,7 @@ export function MediaLogs({
       const q = categorySearchQuery.trim();
       if (q) params.set("q", q);
       if (genreFilter) params.set("genre", genreFilter);
+      if (playersFilter) params.set("players", playersFilter);
       if (!reset && nextCursor) params.set("cursor", nextCursor);
       const path = publicUserId
         ? `/users/${publicUserId}/logs?${params.toString()}`
@@ -431,6 +519,7 @@ export function MediaLogs({
       showCollectionOwnershipFilters,
       categorySearchQuery,
       genreFilter,
+      playersFilter,
       applyLogsResponse,
       buildLogsPath,
     ]
@@ -477,6 +566,7 @@ export function MediaLogs({
     setCategorySearchQuery("");
     setCategorySearchDraft("");
     setGenreFilter("");
+    setPlayersFilter("");
     if (!mediaTypeHasCollectionOwnership(mediaType)) {
       setCollectionFilter("");
     }
@@ -538,6 +628,7 @@ export function MediaLogs({
     categorySearchQuery,
     publicUserId,
     genreFilter,
+    playersFilter,
     buildLogsPath,
     applyLogsResponse,
   ]);
@@ -545,7 +636,7 @@ export function MediaLogs({
   /** When embedded, start with Load more again when category or filters change. */
   useEffect(() => {
     if (embedded) setInfiniteScrollEnabled(false);
-  }, [embedded, mediaType, statusFilter, collectionFilter, sortBy, categorySearchQuery, genreFilter]);
+  }, [embedded, mediaType, statusFilter, collectionFilter, sortBy, categorySearchQuery, genreFilter, playersFilter]);
 
   useEffect(() => {
     fetchStatusCounts();
@@ -1004,6 +1095,15 @@ export function MediaLogs({
                 className="min-w-0 w-[12rem] max-w-[min(100%,20rem)] shrink-0"
                 triggerClassName="w-full min-w-0 max-w-none"
               />
+              {mediaType === "boardgames" && (
+                <PlayersFilterDropdown
+                  value={playersFilter}
+                  onChange={setPlayersFilter}
+                  labelAll={t("mediaLogs.filterPlayers")}
+                  ariaLabel={t("mediaLogs.filterPlayers")}
+                  className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
+                />
+              )}
               <Select
                 value={sortBy}
                 onValueChange={(v) => setSortBy(v as typeof sortBy)}
@@ -1176,7 +1276,12 @@ export function MediaLogs({
               />
             )}
           </div>
-          <div className="grid w-full min-w-0 grid-cols-2 gap-2">
+          <div
+            className={cn(
+              "grid w-full min-w-0 gap-2",
+              mediaType === "boardgames" ? "grid-cols-3" : "grid-cols-2"
+            )}
+          >
             <Select
               value={genreFilter}
               onValueChange={setGenreFilter}
@@ -1186,6 +1291,15 @@ export function MediaLogs({
               className="min-w-0 w-full"
               triggerClassName="w-full max-w-none min-w-0"
             />
+            {mediaType === "boardgames" && (
+              <PlayersFilterDropdown
+                value={playersFilter}
+                onChange={setPlayersFilter}
+                labelAll={t("mediaLogs.filterPlayers")}
+                ariaLabel={t("mediaLogs.filterPlayers")}
+                className="w-full"
+              />
+            )}
             <Select
               value={sortBy}
               onValueChange={(v) => setSortBy(v as typeof sortBy)}
@@ -1230,6 +1344,15 @@ export function MediaLogs({
           className="min-w-0 w-[12rem] max-w-[min(100%,20rem)] shrink-0"
           triggerClassName="w-full min-w-0 max-w-none"
         />
+        {mediaType === "boardgames" && (
+          <PlayersFilterDropdown
+            value={playersFilter}
+            onChange={setPlayersFilter}
+            labelAll={t("mediaLogs.filterPlayers")}
+            ariaLabel={t("mediaLogs.filterPlayers")}
+            className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
+          />
+        )}
         <Select
           value={sortBy}
           onValueChange={(v) => setSortBy(v as typeof sortBy)}

@@ -58,6 +58,7 @@ export type LogsListFilters = {
   own?: boolean;
   wantToBuy?: boolean;
   genre?: string;
+  players?: string;
   limit?: number;
   cursor?: string;
 };
@@ -73,6 +74,7 @@ export function buildLogsListPath(filters: LogsListFilters): string {
   if (filters.wantToBuy) params.set("wantToBuy", "true");
   if (filters.q?.trim()) params.set("q", filters.q.trim());
   if (filters.genre?.trim()) params.set("genre", filters.genre.trim());
+  if (filters.players?.trim()) params.set("players", filters.players.trim());
   if (filters.cursor) params.set("cursor", filters.cursor);
   return `/logs?${params.toString()}`;
 }
@@ -89,6 +91,7 @@ export function buildLogsListPathFromSearchParams(
     own: searchParams.get("own") === "true",
     wantToBuy: searchParams.get("wantToBuy") === "true",
     genre: searchParams.get("genre") ?? "",
+    players: searchParams.get("players") ?? "",
   });
 }
 
@@ -155,6 +158,7 @@ export function buildLogsListPathFromFilters(
     search?: string;
     collection?: "" | "owned" | "wantToBuy";
     genre?: string;
+    players?: string;
   },
   showCollectionOwnership: boolean
 ): string {
@@ -166,6 +170,7 @@ export function buildLogsListPathFromFilters(
     own: showCollectionOwnership && filters.collection === "owned",
     wantToBuy: showCollectionOwnership && filters.collection === "wantToBuy",
     genre: filters.genre ?? "",
+    players: filters.players ?? "",
   });
 }
 
