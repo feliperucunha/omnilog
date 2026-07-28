@@ -21,21 +21,18 @@ export type RecentBoardGameStatEntry = {
   matchCount: number;
   wins: number;
   lastPlayedAt: string;
+  daysSinceLastPlayed?: number;
   lastScore: number | null;
   lastScoreTrend?: BoardGameScoreTrend | null;
 };
 
-function formatLastPlayedLabel(iso: string, locale: string, t: TFunction): string {
+function formatLastPlayedLabel(iso: string, daysSince: number | undefined, t: TFunction): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const played = new Date(d);
-  played.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((today.getTime() - played.getTime()) / 86_400_000);
-  if (diffDays === 0) return t("boardGameMatches.today");
+  const diffDays = daysSince ?? Math.round((Date.now() - d.getTime()) / 86_400_000);
+  if (diffDays <= 0) return t("boardGameMatches.today");
   if (diffDays === 1) return t("statistics.lastPlayedYesterday");
-  return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
+  return t("mediaLogs.daysAgo", { count: String(diffDays) });
 }
 
 function BoardGameRecentStatsSkeleton({ rows = 5 }: { rows?: number }) {
@@ -88,7 +85,7 @@ export function BoardGameRecentStatsWidget({
       {games.map((game) => {
         const winRate =
           game.matchCount > 0 ? Math.round((game.wins / game.matchCount) * 100) : 0;
-        const lastPlayed = formatLastPlayedLabel(game.lastPlayedAt, locale, t);
+        const lastPlayed = formatLastPlayedLabel(game.lastPlayedAt, game.daysSinceLastPlayed, t);
         return (
           <motion.li
             key={game.logId}
@@ -132,7 +129,10 @@ export function BoardGameRecentStatsWidget({
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1 text-right">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
+                <span
+                  className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]"
+                  title={new Date(game.lastPlayedAt).toLocaleDateString(locale)}
+                >
                   {t("statistics.recentBoardGamesLastPlayed", { when: lastPlayed })}
                 </span>
                 {game.lastScore != null && (

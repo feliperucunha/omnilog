@@ -715,7 +715,10 @@
     "badgePopupReviews": "resenhas",
     "badgePopupLog": "registro",
     "badgePopupLogs": "registros",
-    "addMatch": "Registrar partida"
+    "addMatch": "Registrar partida",
+    "daysAgoToday": "hoje",
+    "daysAgoDay": "1d",
+    "daysAgo": "{{count}}d"
   },
   "exportLogsModal": {
     "title": "Baixar lista",

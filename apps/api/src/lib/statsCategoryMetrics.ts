@@ -102,17 +102,17 @@ export type RecentBoardGameStatEntry = {
   matchCount: number;
   wins: number;
   lastPlayedAt: string;
+  daysSinceLastPlayed: number;
   lastScore: number | null;
   lastScoreTrend: "higher" | "lower" | null;
 };
 
 export type BoardGameMatchStatsSort = "recent" | "mostPlayed" | "leastPlayed";
 
-export async function recentBoardGamesForStats(
+async function recentBoardGamesForStats_recent(
   userId: string,
-  playedAtWhere?: Prisma.BoardGameMatchWhereInput,
-  sort: BoardGameMatchStatsSort = "recent",
-  limit = 24,
+  playedAtWhere: Prisma.BoardGameMatchWhereInput | undefined,
+  limit: number,
   opts?: { includeTaggedMatches?: boolean }
 ): Promise<RecentBoardGameStatEntry[]> {
   const where = buildBoardGameMatchStatsWhere(userId, {
@@ -190,9 +190,9 @@ export async function recentBoardGamesForStats(
     }
   }
 
-  for (const [externalId, acc] of byExternalId) {
+  for (const [, acc] of byExternalId) {
     const scoredSessions = [...sessionRows.values()]
-      .filter((row) => row.log.externalId === externalId)
+      .filter((row) => row.log.externalId === acc.log.externalId)
       .map((row) => ({
         playedAt: row.playedAt,
         score: userScoreFromMatch(parseBoardGamePlayersJson(row.players), userId),
@@ -203,18 +203,11 @@ export async function recentBoardGamesForStats(
     acc.lastScoreTrend = boardGameScoreTrend(scoredSessions[0]?.score, scoredSessions[1]?.score);
   }
 
-  const sorted = [...byExternalId.values()].sort((a, b) => {
-    if (sort === "mostPlayed") {
-      if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
-      return b.lastPlayedAt.getTime() - a.lastPlayedAt.getTime();
-    }
-    if (sort === "leastPlayed") {
-      if (a.matchCount !== b.matchCount) return a.matchCount - b.matchCount;
-      return b.lastPlayedAt.getTime() - a.lastPlayedAt.getTime();
-    }
-    return b.lastPlayedAt.getTime() - a.lastPlayedAt.getTime();
-  });
+  const sorted = [...byExternalId.values()].sort((a, b) =>
+    b.lastPlayedAt.getTime() - a.lastPlayedAt.getTime()
+  );
 
+  const now = Date.now();
   return sorted.slice(0, limit)
     .map((entry) => ({
       logId: entry.log.id,
@@ -225,9 +218,144 @@ export async function recentBoardGamesForStats(
       matchCount: entry.matchCount,
       wins: entry.wins,
       lastPlayedAt: entry.lastPlayedAt.toISOString(),
+      daysSinceLastPlayed: Math.max(0, Math.round((now - entry.lastPlayedAt.getTime()) / 86_400_000)),
       lastScore: entry.lastScore,
       lastScoreTrend: entry.lastScoreTrend,
     }));
+}
+
+async function recentBoardGamesForStats_allTime(
+  userId: string,
+  sort: "mostPlayed" | "leastPlayed",
+  limit: number,
+  opts?: { includeTaggedMatches?: boolean }
+): Promise<RecentBoardGameStatEntry[]> {
+  const where = buildBoardGameMatchStatsWhere(userId, {
+    includeTaggedMatches: opts?.includeTaggedMatches,
+  });
+
+  const rows = await prisma.boardGameMatch.findMany({
+    where,
+    select: {
+      playedAt: true,
+      log: {
+        select: {
+          id: true,
+          userId: true,
+          externalId: true,
+          title: true,
+          image: true,
+          boardGameSource: true,
+        },
+      },
+    },
+    orderBy: { playedAt: "desc" },
+  });
+
+  const byExternalId = new Map<string, {
+    logId: string;
+    externalId: string;
+    title: string;
+    image: string | null;
+    boardGameSource: string | null;
+    matchCount: number;
+    lastPlayedAt: Date;
+  }>();
+
+  for (const row of rows) {
+    const extId = row.log.externalId;
+    let acc = byExternalId.get(extId);
+    if (!acc) {
+      acc = {
+        logId: row.log.id,
+        externalId: extId,
+        title: row.log.title,
+        image: row.log.image,
+        boardGameSource: row.log.boardGameSource,
+        matchCount: 0,
+        lastPlayedAt: row.playedAt,
+      };
+      byExternalId.set(extId, acc);
+    }
+    acc.matchCount += 1;
+    if (row.log.userId === userId) {
+      acc.logId = row.log.id;
+      acc.title = row.log.title;
+      acc.image = row.log.image;
+      acc.boardGameSource = row.log.boardGameSource;
+    }
+    if (row.playedAt.getTime() > acc.lastPlayedAt.getTime()) {
+      acc.lastPlayedAt = row.playedAt;
+    }
+  }
+
+  if (sort === "leastPlayed") {
+    const existingExtIds = new Set(byExternalId.keys());
+    const zeroMatchLogs = await prisma.log.findMany({
+      where: {
+        userId,
+        mediaType: "boardgames",
+        OR: [{ matchesPlayed: 0 }, { matchesPlayed: null }],
+        externalId: { notIn: [...existingExtIds] },
+      },
+      select: {
+        id: true,
+        externalId: true,
+        title: true,
+        image: true,
+        boardGameSource: true,
+        createdAt: true,
+      },
+    });
+    for (const log of zeroMatchLogs) {
+      byExternalId.set(log.externalId, {
+        logId: log.id,
+        externalId: log.externalId,
+        title: log.title,
+        image: log.image,
+        boardGameSource: log.boardGameSource,
+        matchCount: 0,
+        lastPlayedAt: log.createdAt,
+      });
+    }
+  }
+
+  const now = Date.now();
+  const sorted = [...byExternalId.values()].sort((a, b) => {
+    if (sort === "mostPlayed") {
+      if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
+      return b.lastPlayedAt.getTime() - a.lastPlayedAt.getTime();
+    }
+    if (a.matchCount !== b.matchCount) return a.matchCount - b.matchCount;
+    return a.lastPlayedAt.getTime() - b.lastPlayedAt.getTime();
+  });
+
+  return sorted.slice(0, limit).map((entry) => ({
+    logId: entry.logId,
+    externalId: entry.externalId,
+    title: entry.title,
+    image: entry.image,
+    boardGameSource: entry.boardGameSource as BoardGameProvider | null,
+    matchCount: entry.matchCount,
+    wins: 0,
+    lastPlayedAt: entry.lastPlayedAt.toISOString(),
+    daysSinceLastPlayed: Math.max(0, Math.round((now - entry.lastPlayedAt.getTime()) / 86_400_000)),
+    lastScore: null,
+    lastScoreTrend: null,
+  }));
+}
+
+export async function recentBoardGamesForStats(
+  userId: string,
+  playedAtWhere?: Prisma.BoardGameMatchWhereInput,
+  sort: BoardGameMatchStatsSort = "recent",
+  limit = 24,
+  opts?: { includeTaggedMatches?: boolean }
+): Promise<RecentBoardGameStatEntry[]> {
+  if (sort === "mostPlayed" || sort === "leastPlayed") {
+    return recentBoardGamesForStats_allTime(userId, sort, limit, opts);
+  }
+  return recentBoardGamesForStats_recent(userId, playedAtWhere, limit, opts);
 }
 
 export async function sumAllPagesReadForStats(

@@ -4,6 +4,7 @@ import { MotionLink } from "@/components/MotionLink";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { BookPagesBadge } from "@/components/BookPagesBadge";
+import { DaysSinceBadge } from "@/components/DaysSinceBadge";
 import { GenreBadges } from "@/components/GenreBadges";
 import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
@@ -247,12 +248,18 @@ function LogMetaRow({
       {log.mediaType === "boardgames" && (() => {
         const min = typeof log.playersMin === "number" && log.playersMin > 0 ? log.playersMin : null;
         const max = typeof log.playersMax === "number" && log.playersMax > 0 ? log.playersMax : null;
-        if (min == null && max == null) return null;
-        const label =
-          min != null && max != null && min !== max
-            ? t("mediaLogs.boardgamePlayersBadgeRange", { min: String(min), max: String(max) })
-            : t("mediaLogs.boardgamePlayersBadgeSingle", { count: String(min ?? max) });
-        return <span className={badgeSize}>{label}</span>;
+        return (
+          <>
+            {min != null || max != null ? (
+              <span className={badgeSize}>
+                {min != null && max != null && min !== max
+                  ? t("mediaLogs.boardgamePlayersBadgeRange", { min: String(min), max: String(max) })
+                  : t("mediaLogs.boardgamePlayersBadgeSingle", { count: String(min ?? max) })}
+              </span>
+            ) : null}
+            <DaysSinceBadge updatedAt={log.updatedAt} />
+          </>
+        );
       })()}
       {(() => {
         const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";

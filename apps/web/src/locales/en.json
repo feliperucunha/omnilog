@@ -715,7 +715,10 @@
     "badgePopupReviews": "reviews",
     "badgePopupLog": "log",
     "badgePopupLogs": "logs",
-    "addMatch": "Log a match"
+    "addMatch": "Log a match",
+    "daysAgoToday": "today",
+    "daysAgoDay": "1d",
+    "daysAgo": "{{count}}d"
   },
   "exportLogsModal": {
     "title": "Download list",
