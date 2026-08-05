@@ -7,6 +7,7 @@ import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { useLocale } from "@/contexts/LocaleContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LogActivitySheet } from "@/components/LogActivitySheet";
+import { ItemImage } from "@/components/ItemImage";
 import { type Log, type MediaType } from "@geeklogs/shared";
 import { paperShadow } from "@/lib/paperShadow";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
@@ -22,10 +23,19 @@ const WEEKDAY_KEYS = [
   "dashboard.calendarSun",
 ] as const;
 
+interface CalendarDayItem {
+  image: string | null;
+  title: string;
+  externalId: string;
+  mediaType: string;
+  boardGameSource?: string | null;
+}
+
 interface CalendarData {
   year: number;
   month: number;
   dates: Record<string, number>;
+  items?: Record<string, CalendarDayItem | null>;
 }
 
 function getMonthKey(year: number, month: number, day: number): string {
@@ -240,6 +250,7 @@ export function DashboardCalendar({
                 const day = i + 1;
                 const key = getMonthKey(year, month, day);
                 const count = data?.dates[key] ?? 0;
+                const item = data?.items?.[key] ?? null;
                 const isToday = isCurrentMonth && now.getDate() === day;
                 const DayCell = canInteract ? "button" : "div";
                 return (
@@ -261,18 +272,35 @@ export function DashboardCalendar({
                       {day}
                     </span>
                     {canInteract && count > 0 && (
-                      <span className="flex gap-0.5 flex-wrap justify-center px-0.5">
-                        {Array.from({ length: Math.min(count, 4) }, (_, j) => (
-                          <span
-                            key={j}
-                            className="h-1.5 w-1.5 rounded-full bg-[var(--btn-gradient-start)]"
-                            aria-hidden
+                      item?.image ? (
+                        <div className="relative mt-0.5 flex h-9 w-full min-w-0 max-w-full items-center justify-center overflow-hidden rounded-md border border-[var(--color-mid)]/30 bg-[var(--color-darkest)] py-0.5">
+                          <ItemImage
+                            src={item.image}
+                            alt={item.title}
+                            imgClassName="object-contain max-h-full max-w-[90%]"
+                            className="h-full w-full"
+                            loading="lazy"
                           />
-                        ))}
-                        {count > 4 && (
-                          <span className="text-[9px] text-[var(--color-light)] leading-none">+{count - 4}</span>
-                        )}
-                      </span>
+                          {count > 1 && (
+                            <span className="absolute bottom-0 right-0 rounded-tl-md bg-black/70 px-1 text-[9px] font-semibold leading-tight text-white">
+                              +{count - 1}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="flex gap-0.5 flex-wrap justify-center px-0.5">
+                          {Array.from({ length: Math.min(count, 4) }, (_, j) => (
+                            <span
+                              key={j}
+                              className="h-1.5 w-1.5 rounded-full bg-[var(--btn-gradient-start)]"
+                              aria-hidden
+                            />
+                          ))}
+                          {count > 4 && (
+                            <span className="text-[9px] text-[var(--color-light)] leading-none">+{count - 4}</span>
+                          )}
+                        </span>
+                      )
                     )}
                   </DayCell>
                 );

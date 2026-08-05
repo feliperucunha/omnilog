@@ -2694,16 +2694,6 @@ export function Statistics() {
                                   <OverflowMarquee className={statBarMarqueeClass}>
                                     {t(`nav.${mediaType}`)}
                                   </OverflowMarquee>
-                                  {itemCount > 0 && (
-                                    <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                                      {t(
-                                        itemCount === 1
-                                          ? "statistics.statItemsCount_one"
-                                          : "statistics.statItemsCount_other",
-                                        { count: String(itemCount) }
-                                      )}
-                                    </span>
-                                  )}
                                 </div>
                                 <div className={statBarTrackClass}>
                                   <div

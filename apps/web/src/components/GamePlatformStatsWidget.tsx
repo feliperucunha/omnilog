@@ -45,23 +45,12 @@ export function GamePlatformStatsWidget({
 
   return (
     <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-      {stats.map(({ period, hours, count }) => {
-        const itemCount = count ?? hours;
+      {stats.map(({ period, hours }) => {
         const family = getGamePlatformFamily(period);
         return (
           <div key={period} className={statBarGridClass}>
-            <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
+            <div className="flex min-h-[2.25rem] min-w-0 items-center justify-center leading-tight">
               <OverflowMarquee className={statBarMarqueeClass}>{period}</OverflowMarquee>
-              {itemCount > 0 && (
-                <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                  {t(
-                    itemCount === 1
-                      ? "statistics.statItemsCount_one"
-                      : "statistics.statItemsCount_other",
-                    { count: String(itemCount) }
-                  )}
-                </span>
-              )}
             </div>
             <div className={statBarTrackClass}>
               <div

@@ -1414,25 +1414,61 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
       },
       calendarMediaType
     ),
-    select: { startedAt: true, completedAt: true },
+    select: {
+      startedAt: true,
+      completedAt: true,
+      image: true,
+      title: true,
+      externalId: true,
+      mediaType: true,
+      boardGameSource: true,
+    },
   });
   const dates: Record<string, number> = {};
+  type CalendarDayItem = {
+    image: string | null;
+    title: string;
+    externalId: string;
+    mediaType: string;
+    boardGameSource: string | null;
+  };
+  const items: Record<string, CalendarDayItem & { ts: number }> = {};
   const toKey = (d: Date) => {
     const localMs = d.getTime() + offsetMs;
     const local = new Date(localMs);
     return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}-${String(local.getUTCDate()).padStart(2, "0")}`;
   };
+  const itemFor = (key: string, ts: number, log: (typeof logs)[number]) => {
+    const cur = items[key];
+    if (!cur || cur.ts < ts) {
+      items[key] = {
+        ts,
+        image: log.image,
+        title: log.title,
+        externalId: log.externalId,
+        mediaType: log.mediaType,
+        boardGameSource: log.boardGameSource,
+      };
+    }
+  };
   for (const log of logs) {
     if (log.startedAt && log.startedAt >= start && log.startedAt <= end) {
       const key = toKey(log.startedAt);
       dates[key] = (dates[key] ?? 0) + 1;
+      itemFor(key, log.startedAt.getTime(), log);
     }
     if (log.completedAt && log.completedAt >= start && log.completedAt <= end) {
       const key = toKey(log.completedAt);
       dates[key] = (dates[key] ?? 0) + 1;
+      itemFor(key, log.completedAt.getTime(), log);
     }
   }
-  res.json({ year, month, dates });
+  const itemsClean: Record<string, CalendarDayItem> = {};
+  for (const [k, v] of Object.entries(items)) {
+    const { ts: _ts, ...rest } = v;
+    itemsClean[k] = rest;
+  }
+  res.json({ year, month, dates, items: itemsClean });
 });
 
 /** Column keys for CSV export. When single category, only relevant columns; when all, include mediaType. */
