@@ -1,6 +1,7 @@
 import { Suspense, lazy, type ComponentType } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMe } from "@/contexts/MeContext";
 import { AppLayout } from "@/layouts/AppLayout";
 import { AnimatedOutlet } from "@/components/AnimatedOutlet";
 import { Login } from "@/pages/Login";
@@ -69,6 +70,7 @@ const FAQ = lazyWithChunkRecovery(() => import("@/pages/FAQ").then((m) => ({ def
 const Privacy = lazyWithChunkRecovery(() => import("@/pages/Privacy").then((m) => ({ default: m.Privacy })));
 const Terms = lazyWithChunkRecovery(() => import("@/pages/Terms").then((m) => ({ default: m.Terms })));
 const UserStorePage = lazyWithChunkRecovery(() => import("@/pages/UserStorePage").then((m) => ({ default: m.UserStorePage })));
+const Sandbox = lazyWithChunkRecovery(() => import("@/pages/Sandbox").then((m) => ({ default: m.Sandbox })));
 
 function LazyRouteFallback() {
   return (
@@ -114,6 +116,16 @@ const RequireOnboarded = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+/** Admin-only guard for the experimental UI sandbox (/sandbox). */
+const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
+  const { token, initializing: authInitializing } = useAuth();
+  const { me, loading } = useMe();
+  if (authInitializing || (token && loading)) return null;
+  if (!token) return <Navigate to={getUnauthenticatedEntryPath()} replace />;
+  if (me?.tier !== "admin") return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+};
+
 export default function App() {
   return (
     <>
@@ -155,6 +167,7 @@ export default function App() {
               <Route path="manga" element={<ProtectedRoute><Navigate to="/dashboard?category=manga" replace /></ProtectedRoute>} />
               <Route path="comics" element={<ProtectedRoute><Navigate to="/dashboard?category=comics" replace /></ProtectedRoute>} />
               <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="sandbox" element={<AdminOnlyRoute><Sandbox /></AdminOnlyRoute>} />
             </Route>
           </Route>
           <Route path="/:userId" element={<PublicProfileLayout />}>

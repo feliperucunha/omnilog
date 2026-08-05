@@ -10,12 +10,6 @@ export type GamePlatformStatEntry = {
   count?: number;
 };
 
-const statBarGridClass =
-  "grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto]";
-const statBarTrackClass = "h-6 min-w-0 rounded bg-[var(--color-darkest)]";
-const statBarMarqueeClass = "block min-w-0 text-xs text-[var(--color-light)]";
-const statBarValueClass = "shrink-0 text-right text-xs tabular-nums text-[var(--color-lightest)]";
-
 export function GamePlatformStatsWidget({
   stats,
   loading,
@@ -48,19 +42,17 @@ export function GamePlatformStatsWidget({
       {stats.map(({ period, hours }) => {
         const family = getGamePlatformFamily(period);
         return (
-          <div key={period} className={statBarGridClass}>
-            <div className="flex min-h-[2.25rem] min-w-0 items-center justify-center leading-tight">
-              <OverflowMarquee className={statBarMarqueeClass}>{period}</OverflowMarquee>
-            </div>
-            <div className={statBarTrackClass}>
+          <div key={period} className="flex min-w-0 items-center gap-2.5">
+            <span className="w-16 shrink-0 truncate text-[11px] font-medium text-[var(--color-lightest)]">
+              <OverflowMarquee className="block w-full">{period}</OverflowMarquee>
+            </span>
+            <div className="flex h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-mid)]/25">
               <div
-                className={cn("h-full rounded", getGamePlatformBarFillClass(family))}
-                style={{
-                  width: `${Math.max(5, (hours / maxCount) * 100)}%`,
-                }}
+                className={cn("h-full rounded-full", getGamePlatformBarFillClass(family))}
+                style={{ width: `${Math.max(0, (hours / maxCount) * 100)}%` }}
               />
             </div>
-            <span className={statBarValueClass}>
+            <span className="w-12 shrink-0 text-right text-[11px] font-bold tabular-nums text-[var(--color-lightest)]">
               {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
             </span>
           </div>

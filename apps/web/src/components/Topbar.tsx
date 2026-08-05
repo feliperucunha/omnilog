@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Settings, Info, LogOut, Loader2, CreditCard, Store } from "lucide-react";
+import { Settings, Info, LogOut, Loader2, CreditCard, Store, FlaskConical } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMe } from "@/contexts/MeContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
@@ -42,6 +43,7 @@ const LOCALE_SHORT_LABELS: Record<Locale, string> = {
 export function Topbar() {
   const { t, locale, setLocale } = useLocale();
   const { token, user, logout, signingOut, setSigningOut } = useAuth();
+  const { me } = useMe();
   const navigate = useNavigate();
   const location = useLocation();
   const pageTitleContext = usePageTitle();
@@ -170,6 +172,22 @@ export function Topbar() {
               </ToggleGroup>
             </div>
           </>
+        )}
+        {token && me?.tier === "admin" && (
+          <button
+            type="button"
+            onClick={() => navigate(location.pathname === "/sandbox" ? "/dashboard" : "/sandbox")}
+            className={cn(
+              "flex h-10 items-center gap-1.5 rounded-xl border-2 border-[var(--btn-gradient-start)] px-3 text-xs font-semibold text-[var(--color-lightest)] transition-colors",
+              location.pathname === "/sandbox"
+                ? "btn-gradient"
+                : "bg-transparent hover:bg-[var(--btn-gradient-start)]/10"
+            )}
+            aria-label="Open UI sandbox"
+          >
+            <FlaskConical className="size-4" aria-hidden />
+            <span className="max-md:hidden">UI Lab</span>
+          </button>
         )}
         {token && user && (
           <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>

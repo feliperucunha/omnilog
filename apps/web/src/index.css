@@ -324,10 +324,10 @@ body {
 /* Dark theme: elevated surfaces and visible borders so containers read clearly on the background */
 [data-theme="dark"],
 .dark {
-  /* Page background (lowest) */
-  --color-darkest: #000000;
+  /* Page background (lowest) – warm charcoal, not pure black, so cards read elevated */
+  --color-darkest: #17181C;
   /* Cards, topbar, modals, panels – clearly elevated above page */
-  --color-dark: #171717;
+  --color-dark: #212328;
   --color-mid: #404040;
   --color-light: #737373;
   --color-lightest: #fafafa;

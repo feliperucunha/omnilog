@@ -82,13 +82,19 @@ import { showErrorToast } from "@/lib/errorToast";
 import { buildRecapTitle, recapBoundsForPeriod, type RecapPeriod } from "@/lib/recapPeriodBounds";
 import { RecapView } from "@/components/RecapView";
 import * as storage from "@/lib/storage";
-import { paperShadow } from "@/lib/paperShadow";
 import { currencyMinorDecimals } from "@/lib/moneyInput";
 import { formatStatsTimeAxisLabel } from "@/lib/formatStatsPeriod";
 import { cn } from "@/lib/utils";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
+import {
+  DeltaChip,
+  Sparkline,
+  momentumFromStatsEntries,
+  type MomentumData,
+} from "@/components/statistics/StatisticsMomentum";
+import { MomentumCard, MiniBars, Donut, MomentumBreakdownRow } from "@/components/statistics/StatisticsWidgets";
 
 function formatMinorAsMoney(minor: number, currency: string): string {
   const d = currencyMinorDecimals(currency);
@@ -458,6 +464,18 @@ interface LogStatsSummary {
   boardGamesWon?: number;
 }
 
+/** GET /logs/stats?group=summaryByMonth — one entry per recent calendar month (oldest first). */
+interface LogStatsSummaryByMonth {
+  period: string;
+  totalLogs: number;
+  completedLogs: number;
+  reviewedLogs: number;
+  totalContentHours: number;
+  totalPagesRead?: number;
+  boardGamesWon?: number;
+  netByCurrency: Record<string, number>;
+}
+
 const EMPTY_SUMMARY: LogStatsSummary = {
   totalLogs: 0,
   completedLogs: 0,
@@ -467,92 +485,20 @@ const EMPTY_SUMMARY: LogStatsSummary = {
   lifetimeNetByCurrency: {},
 };
 
-/** Desktop: icon column + gap — value lines up under label text. */
-const OVERVIEW_STAT_VALUE_INSET = "md:pl-[calc(2.5rem+0.75rem)]";
-
-function OverviewStatCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  valueClassName,
-}: {
+/** Momentum stat card — uses the UI-lab `MomentumCard` (gradient tile + delta + sparkline). */
+function OverviewStatCard(props: {
   icon: LucideIcon;
   label: ReactNode;
   value: ReactNode;
   sub?: ReactNode;
   /** Optional size override (e.g. multi-line currency totals). */
   valueClassName?: string;
+  /** Optional momentum (delta vs previous period + sparkline). */
+  momentum?: MomentumData;
+  /** Localized accessibility label for the delta chip. */
+  momentumAria?: (delta: number) => string;
 }) {
-  const iconBox = (compact: boolean) => (
-    <div
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-lg border border-[var(--color-mid)]/25 bg-[var(--color-mid)]/10 text-[var(--color-lightest)]",
-        compact ? "h-9 w-9" : "h-10 w-10 rounded-xl border-[var(--color-mid)]/30 bg-[var(--color-mid)]/[0.12] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
-      )}
-      aria-hidden
-    >
-      <Icon className={compact ? "h-4 w-4" : "h-[1.125rem] w-[1.125rem]"} strokeWidth={2.25} />
-    </div>
-  );
-
-  return (
-    <Card
-      className={cn(
-        "min-w-0 overflow-hidden border border-[var(--color-surface-border)]/90 bg-[var(--color-dark)]",
-        "rounded-xl p-3.5 shadow-none",
-        "md:relative md:rounded-2xl md:bg-gradient-to-b md:from-[var(--color-dark)] md:to-[var(--color-darkest)]/50 md:p-5 md:shadow-[var(--shadow-sm)] md:transition-[border-color] md:duration-200",
-        "md:min-h-[6.75rem] md:hover:border-[var(--color-mid)]/40",
-        "group"
-      )}
-    >
-      {/* Mobile: one full-width row — icon, then label / value / sub (no indent, no decoration). */}
-      <div className="flex items-center gap-3 md:hidden">
-        {iconBox(true)}
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">{label}</p>
-          <div
-            className={cn(
-              "mt-1 w-full min-w-0 text-xl font-semibold tabular-nums leading-none text-[var(--color-lightest)]",
-              valueClassName
-            )}
-          >
-            {value}
-          </div>
-          {sub ? <div className="mt-1 text-[11px] leading-snug text-[var(--color-light)]">{sub}</div> : null}
-        </div>
-      </div>
-
-      {/* Desktop */}
-      <div className="relative hidden min-w-0 md:block">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-          aria-hidden
-        >
-          <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-[var(--color-mid)]/[0.07]" />
-        </div>
-        <div className="relative flex min-w-0 flex-col gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            {iconBox(false)}
-            <p className="min-w-0 flex-1 text-[11px] font-semibold uppercase leading-snug tracking-[0.1em] text-[var(--color-light)]">
-              {label}
-            </p>
-          </div>
-          <div className={cn("min-w-0 w-full max-w-full", OVERVIEW_STAT_VALUE_INSET)}>
-            <div
-              className={cn(
-                "w-full min-w-0 text-3xl font-semibold tabular-nums leading-none tracking-tight text-[var(--color-lightest)]",
-                valueClassName
-              )}
-            >
-              {value}
-            </div>
-            {sub ? <div className="mt-2 text-xs leading-snug text-[var(--color-light)]">{sub}</div> : null}
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
+  return <MomentumCard {...props} />;
 }
 
 function CategoryOrderSkeletonStrip() {
@@ -578,6 +524,7 @@ export function Statistics() {
   const isPro = tierHasProFeatures(me?.tier);
   const [logs, setLogs] = useState<Log[]>([]);
   const [summary, setSummary] = useState<LogStatsSummary | null>(null);
+  const [summaryByMonth, setSummaryByMonth] = useState<LogStatsSummaryByMonth[]>([]);
   const [loading, setLoading] = useState(true);
   const [statsGroup, setStatsGroup] = useState<StatsGroup>("category");
   const [stats, setStats] = useState<StatsEntry[]>([]);
@@ -754,7 +701,6 @@ export function Statistics() {
     "grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto]";
   const statBarTrackClass = "h-6 min-w-0 rounded bg-[var(--color-darkest)]";
   const statBarFillClass = "h-full rounded bg-[var(--color-mid)]";
-  const statBarMarqueeClass = "block min-w-0 text-xs text-[var(--color-light)]";
   const statBarValueClass = "shrink-0 text-right text-xs tabular-nums text-[var(--color-lightest)]";
 
   const statsMediaQuery = useCallback(() => {
@@ -1132,6 +1078,7 @@ export function Statistics() {
       ? `/logs?limit=5&sort=dateDesc${mediaQ}`
       : `/logs?limit=5&sort=dateDesc&forStatistics=1&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`;
     const summaryPath = `/logs/stats?group=summary&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`;
+    const summaryByMonthPath = `/logs/stats?group=summaryByMonth&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`;
 
     const logsCached = getCachedEntry<Log[] | { data: Log[]; nextCursor: string | null }>("GET", logsQuery);
     const summaryCached = getCachedEntry<{ data: LogStatsSummary }>("GET", summaryPath);
@@ -1172,6 +1119,22 @@ export function Statistics() {
         if (!summaryCached) setSummary(null);
       })
       .finally(() => setLoading(false));
+
+    const summaryByMonthCached = getCachedEntry<{ data: LogStatsSummaryByMonth[] }>(
+      "GET",
+      summaryByMonthPath
+    );
+    if (summaryByMonthCached) setSummaryByMonth(summaryByMonthCached.data.data ?? []);
+    void apiFetchSWR<{ data: LogStatsSummaryByMonth[] }>(summaryByMonthPath, {
+      ttlMs: HEAVY_PAGE_TTL_MS,
+      onUpdate: (res) => setSummaryByMonth((res as { data: LogStatsSummaryByMonth[] }).data ?? []),
+    })
+      .then(({ data, fromCache }) => {
+        if (!fromCache) setSummaryByMonth(data.data ?? []);
+      })
+      .catch(() => {
+        if (!summaryByMonthCached) setSummaryByMonth([]);
+      });
   }, [isPro, tzOffsetMinutes, statsMediaQuery]);
 
   useEffect(() => {
@@ -1423,18 +1386,10 @@ export function Statistics() {
     return stats;
   }, [statsGroup, stats, visibleTypes, categoryFilter]);
   const maxHours = displayedStats.length > 0 ? Math.max(...displayedStats.map((s) => s.hours), 1) : 1;
-  const maxGenreCount =
-    genreStats.length > 0 ? Math.max(...genreStats.map((s) => s.hours), 1) : 1;
-  const maxStatusOverTimeCount =
-    statusOverTimeStats.length > 0 ? Math.max(...statusOverTimeStats.map((s) => s.hours), 1) : 1;
   const maxCategoryOverTimeCount =
     categoryOverTimeStats.length > 0 ? Math.max(...categoryOverTimeStats.map((s) => s.hours), 1) : 1;
   const maxBoardGameWeightCount =
     boardGameWeightStats.length > 0 ? Math.max(...boardGameWeightStats.map((s) => s.hours), 1) : 1;
-  const maxPagesOverTimeCount =
-    pagesOverTimeStats.length > 0 ? Math.max(...pagesOverTimeStats.map((s) => s.hours), 1) : 1;
-  const maxEpisodesOverTimeCount =
-    episodesOverTimeStats.length > 0 ? Math.max(...episodesOverTimeStats.map((s) => s.hours), 1) : 1;
   const categoryOverTimeByPeriod = categoryOverTimeStats.reduce<Record<string, CategoryOverTimeEntry[]>>(
     (acc, entry) => {
       if (!acc[entry.period]) acc[entry.period] = [];
@@ -1445,7 +1400,36 @@ export function Statistics() {
   );
   const categoryOverTimePeriods = Object.keys(categoryOverTimeByPeriod).sort();
 
-  const summaryData = summary ?? EMPTY_SUMMARY;
+const summaryData = summary ?? EMPTY_SUMMARY;
+
+  /**
+   * Overview-card momentum derived from the time-series the page already
+   * fetches. Cards without a comparable series stay unchanged (momentum absent).
+   */
+  const overviewMomentum = useMemo(() => {
+    const monthSeries = (pick: (m: LogStatsSummaryByMonth) => number) =>
+      summaryByMonth
+        .map((m) => ({ period: m.period, hours: pick(m) ?? 0 }))
+        .filter((e) => e.hours != null);
+
+    const hours = momentumFromStatsEntries(
+      statsGroup === "month"
+        ? stats
+        : monthSeries((m) => m.totalContentHours ?? 0)
+    );
+    const completed = momentumFromStatsEntries(monthSeries((m) => m.completedLogs));
+    const pages = momentumFromStatsEntries(pagesOverTimeStats);
+    const episodes = momentumFromStatsEntries(episodesOverTimeStats);
+    const genre = momentumFromStatsEntries(genreStats);
+
+    const totalLogs = momentumFromStatsEntries(monthSeries((m) => m.totalLogs));
+    const reviewed = momentumFromStatsEntries(monthSeries((m) => m.reviewedLogs));
+    const boardGamesWon = momentumFromStatsEntries(monthSeries((m) => m.boardGamesWon ?? 0));
+
+    return { hours, completed, pages, episodes, genre, totalLogs, reviewed, boardGamesWon };
+  }, [stats, statsGroup, statusOverTimeStats, pagesOverTimeStats, episodesOverTimeStats, genreStats, summaryByMonth]);
+
+  const momentumAria = (delta: number) => t("statistics.momentumLabel", { delta: String(delta) });
 
   const totalPurchaseItems = useMemo(() => {
     if (!purchaseItemCounts) return 0;
@@ -1720,6 +1704,8 @@ export function Statistics() {
               icon={BookOpen}
               label={t("statistics.pagesReadTitle")}
               value={(summaryData.totalPagesRead ?? 0).toLocaleString(locale)}
+              momentum={overviewMomentum.pages}
+              momentumAria={momentumAria}
             />
           )}
           {showBoardGamesWonHighlight && (
@@ -1727,27 +1713,37 @@ export function Statistics() {
               icon={Trophy}
               label={t("statistics.boardGamesWonTitle")}
               value={(summaryData.boardGamesWon ?? 0).toLocaleString(locale)}
+              momentum={overviewMomentum.boardGamesWon}
+              momentumAria={momentumAria}
             />
           )}
           <OverviewStatCard
             icon={Layers}
             label={t("statistics.summaryTotalLogs")}
             value={summaryData.totalLogs}
+            momentum={overviewMomentum.totalLogs}
+            momentumAria={momentumAria}
           />
           <OverviewStatCard
             icon={CircleCheck}
             label={t("statistics.summaryCompleted")}
             value={summaryData.completedLogs}
+            momentum={overviewMomentum.completed}
+            momentumAria={momentumAria}
           />
           <OverviewStatCard
             icon={Clock}
             label={t("statistics.summaryHours")}
             value={summaryData.totalContentHours.toFixed(1)}
+            momentum={overviewMomentum.hours}
+            momentumAria={momentumAria}
           />
           <OverviewStatCard
             icon={Star}
             label={t("statistics.summaryReviewed")}
             value={summaryData.reviewedLogs}
+            momentum={overviewMomentum.reviewed}
+            momentumAria={momentumAria}
           />
           <OverviewStatCard
             icon={Scale}
@@ -1809,8 +1805,7 @@ export function Statistics() {
           {!boardGameMatchesCollapsed && (
             <section aria-label={t("statistics.matchesPlayedTitle")} className="min-w-0 w-full">
               <Card
-                className="flex min-h-0 min-w-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
-                style={paperShadow}
+                className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3"
               >
                 <div className="grid min-w-0 shrink-0 grid-cols-1 gap-2 sm:grid-cols-2">
                   <Select
@@ -1870,10 +1865,7 @@ export function Statistics() {
           </button>
           {!gamePlatformsCollapsed && (
             <section aria-label={t("statistics.mostPlayedPlatformsTitle")} className="min-w-0 w-full">
-              <Card
-                className="flex min-h-0 min-w-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
-                style={paperShadow}
-              >
+              <Card className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
                 <GamePlatformStatsWidget
                   stats={gamePlatformStats}
                   loading={gamePlatformStatsLoading}
@@ -1902,10 +1894,7 @@ export function Statistics() {
           </button>
           {!gameWeightCollapsed && (
             <section aria-label={t("statistics.byGameWeight")} className="min-w-0 w-full">
-              <Card
-                className="flex min-h-0 min-w-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
-                style={paperShadow}
-              >
+              <Card className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
                 <Select
                   value={boardGameWeightScope}
                   onValueChange={(v) =>
@@ -1938,60 +1927,52 @@ export function Statistics() {
                         boardGameWeightLoading && "opacity-60"
                       )}
                     >
-                      {boardGameWeightStats.map(({ period, hours, count }) => {
-                        const itemCount = count ?? hours;
-                        const weightTitle = t("statistics.weightBinActivityTitle", {
-                          weight: period,
-                        });
-                        const rowClass = cn(
-                          statBarGridClass,
-                          "w-full rounded-lg px-0 py-1.5 text-left max-md:min-h-[44px]"
-                        );
-                        const rowBody = (
-                          <>
-                            <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center leading-tight">
-                              <OverflowMarquee className={statBarMarqueeClass}>
-                                {t("statistics.weightBinLabel", { weight: period })}
-                              </OverflowMarquee>
-                            </div>
-                            <div className={statBarTrackClass}>
-                              <div
-                                className={statBarFillClass}
-                                style={{
-                                  width:
-                                    itemCount > 0
-                                      ? `${Math.max(5, (hours / maxBoardGameWeightCount) * 100)}%`
-                                      : "0%",
-                                }}
-                              />
-                            </div>
-                            <span className={statBarValueClass}>
-                              {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
-                            </span>
-                          </>
-                        );
-                        if (itemCount <= 0) {
+                      <div
+                        className="flex min-h-[7rem] min-w-0 items-end gap-2"
+                        role="list"
+                        aria-label={t("statistics.byGameWeight")}
+                      >
+                        {boardGameWeightStats.map(({ period, hours, count }) => {
+                          const itemCount = count ?? hours;
+                          const weightTitle = t("statistics.weightBinActivityTitle", {
+                            weight: period,
+                          });
+                          const bar = (
+                            <div
+                              className="w-full rounded-t-md bg-[var(--btn-gradient-start)]"
+                              style={{
+                                height: `${Math.max(8, (itemCount > 0 ? hours : 0) / Math.max(1, maxBoardGameWeightCount) * 56)}px`,
+                              }}
+                            />
+                          );
                           return (
-                            <div key={period} className={rowClass}>
-                              {rowBody}
+                            <div
+                              key={period}
+                              className="flex min-w-0 flex-1 flex-col items-center gap-1"
+                              role="listitem"
+                            >
+                              {itemCount > 0 ? (
+                                <button
+                                  type="button"
+                                  className="flex w-full flex-col items-center gap-1 rounded-t-md transition-transform hover:scale-[1.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] active:scale-[0.99]"
+                                  onClick={() => openWeightBinActivity(period, weightTitle)}
+                                  aria-label={weightTitle}
+                                >
+                                  {bar}
+                                </button>
+                              ) : (
+                                bar
+                              )}
+                              <span className="text-[10px] tabular-nums text-[var(--color-light)]">
+                                {t("statistics.weightBinLabel", { weight: period })}
+                              </span>
+                              <span className="text-[10px] tabular-nums text-[var(--color-lightest)]">
+                                {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
+                              </span>
                             </div>
                           );
-                        }
-                        return (
-                          <button
-                            key={period}
-                            type="button"
-                            className={cn(
-                              rowClass,
-                              "transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
-                            )}
-                            onClick={() => openWeightBinActivity(period, weightTitle)}
-                            aria-label={weightTitle}
-                          >
-                            {rowBody}
-                          </button>
-                        );
-                      })}
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2015,35 +1996,56 @@ export function Statistics() {
               <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
             )}
             <span>{t("statistics.pagesOverTime")}</span>
+            {overviewMomentum.pages?.delta != null && (
+              <DeltaChip delta={overviewMomentum.pages.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.pages.delta)} />
+            )}
           </button>
           {!pagesOverTimeCollapsed && (
             <section aria-label={t("statistics.pagesOverTime")} className="min-w-0 w-full">
-              <Card
-                className="flex min-h-0 min-w-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
-                style={paperShadow}
-              >
-                {isPro && (
-                  <Select
-                    value={pagesOverTimeGroup}
-                    onValueChange={(v) => setPagesOverTimeGroup(v as StatusOverTimeGroup)}
-                    options={[
-                      { value: "month", label: t("dashboard.byMonth") },
-                      { value: "year", label: t("dashboard.byYear") },
-                    ]}
-                    aria-label={t("statistics.timeGranularityLabel")}
-                    className="w-full min-w-0 sm:max-w-[220px]"
-                    triggerClassName="w-full min-w-0"
-                  />
+              <Card className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                  {isPro && (
+                    <Select
+                      value={pagesOverTimeGroup}
+                      onValueChange={(v) => setPagesOverTimeGroup(v as StatusOverTimeGroup)}
+                      options={[
+                        { value: "month", label: t("dashboard.byMonth") },
+                        { value: "year", label: t("dashboard.byYear") },
+                      ]}
+                      aria-label={t("statistics.timeGranularityLabel")}
+                      className="w-full min-w-0 sm:max-w-[220px]"
+                      triggerClassName="w-full min-w-0"
+                    />
+                  )}
+                  {overviewMomentum.pages?.series && overviewMomentum.pages.series.length > 1 && (
+                    <Sparkline points={overviewMomentum.pages.series} width={120} height={28} className="hidden sm:block" />
+                  )}
+                </div>
+                {pagesOverTimeStats.length > 0 && (
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <div className="flex min-w-0 flex-wrap items-end justify-between gap-2">
+                      <span className="text-[11px] font-medium text-[var(--color-light)]">
+                        {t("dashboard.pagesRead")}
+                      </span>
+                    </div>
+                    <div className="flex h-24 min-w-0 items-end gap-1" aria-hidden>
+                      <MiniBars
+                        values={pagesOverTimeStats.map(({ hours }) => hours)}
+                        height={96}
+                        color="var(--btn-gradient-start)"
+                      />
+                    </div>
+                  </div>
                 )}
-                <div className="min-h-[12.5rem] min-w-0">
+                <div className="min-h-0 min-w-0">
                   {pagesOverTimeLoading ? (
-                    <StatisticsBarsSkeleton rows={6} />
+                    <StatisticsBarsSkeleton rows={3} />
                   ) : pagesOverTimeStats.length === 0 ? (
-                    <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
+                    <p className="flex min-h-[6rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
                       {t("statistics.noPagesOverTimeYet")}
                     </p>
                   ) : (
-                    <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
+                    <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-3">
                       {pagesOverTimeStats.map(({ period, hours, count }) => {
                         const itemCount = count ?? 0;
                         const timeLabel = formatStatsTimeAxisLabel(
@@ -2052,53 +2054,34 @@ export function Statistics() {
                           locale
                         );
                         const activityTitle = t("statistics.activityInPeriod", { period: timeLabel });
-                        const periodBody = (
-                          <>
-                            <StatsTimeSectionDivider label={timeLabel} />
-                            <div className={statBarGridClass}>
-                              <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                                {itemCount > 0 && (
-                                  <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                                    {t(
-                                      itemCount === 1
-                                        ? "statistics.statItemsCount_one"
-                                        : "statistics.statItemsCount_other",
-                                      { count: String(itemCount) }
-                                    )}
-                                  </span>
-                                )}
-                              </div>
-                              <div className={statBarTrackClass}>
-                                <div
-                                  className={statBarFillClass}
-                                  style={{
-                                    width: `${Math.max(5, (hours / maxPagesOverTimeCount) * 100)}%`,
-                                  }}
-                                />
-                              </div>
-                              <span className={statBarValueClass}>
-                                {t("statistics.pagesCount", { count: String(Math.round(hours)) })}
-                              </span>
-                            </div>
-                          </>
-                        );
                         return (
-                          <div key={period} className="flex min-w-0 flex-col gap-2">
-                            {itemCount > 0 ? (
-                              <button
-                                type="button"
-                                className={cn(logsPeriodActivityBtnClass, "flex-col items-stretch gap-2")}
-                                onClick={() =>
-                                  openLogsPeriodActivity(period, pagesOverTimeGroup, activityTitle)
-                                }
-                                aria-label={activityTitle}
-                              >
-                                {periodBody}
-                              </button>
-                            ) : (
-                              periodBody
+                          <button
+                            key={period}
+                            type="button"
+                            disabled={itemCount === 0}
+                            onClick={() =>
+                              openLogsPeriodActivity(period, pagesOverTimeGroup, activityTitle)
+                            }
+                            aria-label={activityTitle}
+                            className="flex min-w-0 flex-col gap-0.5 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 px-2.5 py-2 text-left transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] disabled:cursor-default disabled:opacity-50"
+                          >
+                            <span className="min-w-0 truncate text-[10px] tabular-nums text-[var(--color-light)]">
+                              {timeLabel}
+                            </span>
+                            <span className="text-sm font-semibold tabular-nums text-[var(--color-text)]">
+                              {Math.round(hours).toLocaleString(locale)}
+                            </span>
+                            {itemCount > 0 && (
+                              <span className="text-[10px] tabular-nums text-[var(--color-light)]">
+                                {t(
+                                  itemCount === 1
+                                    ? "statistics.statItemsCount_one"
+                                    : "statistics.statItemsCount_other",
+                                  { count: String(itemCount) }
+                                )}
+                              </span>
                             )}
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -2124,35 +2107,49 @@ export function Statistics() {
               <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
             )}
             <span>{t("statistics.episodesOverTime")}</span>
+            {overviewMomentum.episodes?.delta != null && (
+              <DeltaChip delta={overviewMomentum.episodes.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.episodes.delta)} />
+            )}
           </button>
           {!episodesOverTimeCollapsed && (
             <section aria-label={t("statistics.episodesOverTime")} className="min-w-0 w-full">
-              <Card
-                className="flex min-h-0 min-w-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
-                style={paperShadow}
-              >
-                {isPro && (
-                  <Select
-                    value={episodesOverTimeGroup}
-                    onValueChange={(v) => setEpisodesOverTimeGroup(v as StatusOverTimeGroup)}
-                    options={[
-                      { value: "month", label: t("dashboard.byMonth") },
-                      { value: "year", label: t("dashboard.byYear") },
-                    ]}
-                    aria-label={t("statistics.timeGranularityLabel")}
-                    className="w-full min-w-0 sm:max-w-[220px]"
-                    triggerClassName="w-full min-w-0"
-                  />
+              <Card className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                  {isPro && (
+                    <Select
+                      value={episodesOverTimeGroup}
+                      onValueChange={(v) => setEpisodesOverTimeGroup(v as StatusOverTimeGroup)}
+                      options={[
+                        { value: "month", label: t("dashboard.byMonth") },
+                        { value: "year", label: t("dashboard.byYear") },
+                      ]}
+                      aria-label={t("statistics.timeGranularityLabel")}
+                      className="w-full min-w-0 sm:max-w-[220px]"
+                      triggerClassName="w-full min-w-0"
+                    />
+                  )}
+                  {overviewMomentum.episodes?.series && overviewMomentum.episodes.series.length > 1 && (
+                    <Sparkline points={overviewMomentum.episodes.series} width={120} height={28} className="hidden sm:block" />
+                  )}
+                </div>
+                {episodesOverTimeStats.length > 0 && (
+                  <div className="flex h-14 min-w-0 items-end gap-1" aria-hidden>
+                    <MiniBars
+                      values={episodesOverTimeStats.map(({ hours }) => hours)}
+                      height={56}
+                      color="var(--btn-gradient-end)"
+                    />
+                  </div>
                 )}
-                <div className="min-h-[12.5rem] min-w-0">
+                <div className="min-h-0 min-w-0">
                   {episodesOverTimeLoading ? (
-                    <StatisticsBarsSkeleton rows={6} />
+                    <StatisticsBarsSkeleton rows={3} />
                   ) : episodesOverTimeStats.length === 0 ? (
-                    <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
+                    <p className="flex min-h-[6rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
                       {t("statistics.noEpisodesOverTimeYet")}
                     </p>
                   ) : (
-                    <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
+                    <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-3">
                       {episodesOverTimeStats.map(({ period, hours, count }) => {
                         const itemCount = count ?? 0;
                         const timeLabel = formatStatsTimeAxisLabel(
@@ -2161,58 +2158,39 @@ export function Statistics() {
                           locale
                         );
                         const activityTitle = t("statistics.activityInPeriod", { period: timeLabel });
-                        const periodBody = (
-                          <>
-                            <StatsTimeSectionDivider label={timeLabel} />
-                            <div className={statBarGridClass}>
-                              <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                                {itemCount > 0 && (
-                                  <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                                    {t(
-                                      itemCount === 1
-                                        ? "statistics.statItemsCount_one"
-                                        : "statistics.statItemsCount_other",
-                                      { count: String(itemCount) }
-                                    )}
-                                  </span>
-                                )}
-                              </div>
-                              <div className={statBarTrackClass}>
-                                <div
-                                  className={statBarFillClass}
-                                  style={{
-                                    width: `${Math.max(5, (hours / maxEpisodesOverTimeCount) * 100)}%`,
-                                  }}
-                                />
-                              </div>
-                              <span className={statBarValueClass}>
-                                {t("statistics.episodesCount", { count: String(Math.round(hours)) })}
-                              </span>
-                            </div>
-                          </>
-                        );
                         return (
-                          <div key={period} className="flex min-w-0 flex-col gap-2">
-                            {itemCount > 0 ? (
-                              <button
-                                type="button"
-                                className={cn(logsPeriodActivityBtnClass, "flex-col items-stretch gap-2")}
-                                onClick={() =>
-                                  openLogsPeriodActivity(
-                                    period,
-                                    episodesOverTimeGroup,
-                                    activityTitle,
-                                    categoryFilter === "all" ? "tv" : undefined
-                                  )
-                                }
-                                aria-label={activityTitle}
-                              >
-                                {periodBody}
-                              </button>
-                            ) : (
-                              periodBody
+                          <button
+                            key={period}
+                            type="button"
+                            disabled={itemCount === 0}
+                            onClick={() =>
+                              openLogsPeriodActivity(
+                                period,
+                                episodesOverTimeGroup,
+                                activityTitle,
+                                categoryFilter === "all" ? "tv" : undefined
+                              )
+                            }
+                            aria-label={activityTitle}
+                            className="flex min-w-0 flex-col gap-0.5 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 px-2.5 py-2 text-left transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] disabled:cursor-default disabled:opacity-50"
+                          >
+                            <span className="min-w-0 truncate text-[10px] tabular-nums text-[var(--color-light)]">
+                              {timeLabel}
+                            </span>
+                            <span className="text-sm font-semibold tabular-nums text-[var(--color-text)]">
+                              {Math.round(hours).toLocaleString(locale)}
+                            </span>
+                            {itemCount > 0 && (
+                              <span className="text-[10px] tabular-nums text-[var(--color-light)]">
+                                {t(
+                                  itemCount === 1
+                                    ? "statistics.statItemsCount_one"
+                                    : "statistics.statItemsCount_other",
+                                  { count: String(itemCount) }
+                                )}
+                              </span>
                             )}
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -2245,10 +2223,9 @@ export function Statistics() {
           className="min-w-0 w-full"
         >
           <Card
-            className="overflow-hidden border-[var(--color-surface-border)]/80 bg-[var(--color-dark)] p-4 md:p-6"
-            style={paperShadow}
+            className="overflow-hidden rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3 md:p-4"
           >
-            <div className="mb-5 flex min-w-0 flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="mb-4 flex min-w-0 flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               {!purchaseSpendingLoading && totalFinanceItems > 0 && (
                 <p className="min-w-0 text-sm text-[var(--color-light)] sm:max-w-[55%]">
                   {t(
@@ -2301,7 +2278,6 @@ export function Statistics() {
                   if (maxMinorGlobal === 0) maxMinorGlobal = 1;
                   return (
                     <div className="flex min-w-0 flex-col gap-3">
-                      <p className="text-[11px] text-[var(--color-light)]">{t("statistics.spendBarCaption")}</p>
                       {spendMediaTypesWithActivity.map((mt) => {
                         const byCurrency = purchaseSpending?.[mt] ?? {};
                         const bySaleCurrency = saleProceedsByCategory?.[mt] ?? {};
@@ -2491,11 +2467,16 @@ export function Statistics() {
               <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
             )}
             <span>{t("statistics.sectionChartsTitle")}</span>
+            {genreGraphMode === "genre" && overviewMomentum.genre?.delta != null && (
+              <DeltaChip delta={overviewMomentum.genre.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.genre.delta)} />
+            )}
+            {genreGraphMode === "statusOverTime" && overviewMomentum.completed?.delta != null && (
+              <DeltaChip delta={overviewMomentum.completed.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.completed.delta)} />
+            )}
           </button>
           {!chartsCollapsed && (
         <Card
-          className="min-w-0 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 md:flex md:h-full md:min-h-0 md:flex-1 md:flex-col"
-          style={paperShadow}
+          className="min-w-0 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3 md:flex md:h-full md:min-h-0 md:flex-1 md:flex-col"
         >
           <div className="mb-3 flex min-w-0 shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <Select
@@ -2543,36 +2524,60 @@ export function Statistics() {
                   {t("dashboard.noStatsYet")}
                 </p>
               ) : (
-                <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-                  {genreStats.map(({ period, hours, count }) => {
-                    const itemCount = count ?? hours;
+                <div className="flex min-w-0 flex-wrap items-center justify-center gap-5 sm:gap-8">
+                  {(() => {
+                    const total = genreStats.reduce((acc, s) => acc + (s.hours > 0 ? s.hours : 0), 0) || 1;
+                    const palette = [
+                      "var(--btn-gradient-start)",
+                      "#F59E0B",
+                      "#3B82F6",
+                      "#8B5CF6",
+                      "#EC4899",
+                      "#10B981",
+                    ];
+                    const segments = genreStats.map((s, i) => ({
+                      color: palette[i % palette.length],
+                      value: s.hours > 0 ? s.hours : 0,
+                    }));
                     return (
-                      <div key={period} className={statBarGridClass}>
-                        <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                          <OverflowMarquee className={statBarMarqueeClass}>{period}</OverflowMarquee>
-                          {itemCount > 0 && (
-                            <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                              {t(
-                                itemCount === 1
-                                  ? "statistics.statItemsCount_one"
-                                  : "statistics.statItemsCount_other",
-                                { count: String(itemCount) }
-                              )}
-                            </span>
-                          )}
+                      <>
+                        <Donut segments={segments} size={128} stroke={16} />
+                        <div className="flex min-w-0 flex-col gap-1.5">
+                          {genreStats.map(({ period, hours, count }, i) => {
+                            const itemCount = count ?? hours;
+                            const pct = total > 0 ? Math.round((hours / total) * 100) : 0;
+                            return (
+                              <div key={period} className="flex items-center justify-between gap-3">
+                                <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--color-light)]">
+                                  <span
+                                    className="h-2 w-2 shrink-0 rounded-full"
+                                    style={{ background: palette[i % palette.length] }}
+                                    aria-hidden
+                                  />
+                                  <span className="truncate">{period}</span>
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                  <span className="text-[11px] font-bold tabular-nums text-[var(--color-lightest)]">
+                                    {pct}%
+                                  </span>
+                                  {itemCount > 0 && (
+                                    <span className="text-[10px] tabular-nums text-[var(--color-light)]">
+                                      {t(
+                                        itemCount === 1
+                                          ? "statistics.statItemsCount_one"
+                                          : "statistics.statItemsCount_other",
+                                        { count: String(itemCount) }
+                                      )}
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
-                        <div className={statBarTrackClass}>
-                          <div
-                            className={statBarFillClass}
-                            style={{ width: `${Math.max(5, (hours / maxGenreCount) * 100)}%` }}
-                          />
-                        </div>
-                        <span className={statBarValueClass}>
-                          {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
-                        </span>
-                      </div>
+                      </>
                     );
-                  })}
+                  })()}
                 </div>
               )}
             </div>
@@ -2587,6 +2592,16 @@ export function Statistics() {
                 </p>
               ) : (
                 <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
+                  {statusOverTimeStats.length > 0 && (
+                    <div className="flex h-14 min-w-0 items-end gap-1" aria-hidden>
+                      <MiniBars
+                        values={statusOverTimeStats.map(({ hours }) => hours)}
+                        height={56}
+                        color="var(--btn-gradient-end)"
+                      />
+                    </div>
+                  )}
+                  <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-3">
                   {statusOverTimeStats.map(({ period, hours, count }) => {
                     const itemCount = count ?? hours;
                     const timeLabel = formatStatsTimeAxisLabel(
@@ -2595,53 +2610,37 @@ export function Statistics() {
                       locale
                     );
                     const activityTitle = t("statistics.activityInPeriod", { period: timeLabel });
-                    const periodBody = (
-                      <>
-                        <StatsTimeSectionDivider label={timeLabel} />
-                        <div className={statBarGridClass}>
-                          <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                            {itemCount > 0 && (
-                              <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                                {t(
-                                  itemCount === 1
-                                    ? "statistics.statItemsCount_one"
-                                    : "statistics.statItemsCount_other",
-                                  { count: String(itemCount) }
-                                )}
-                              </span>
-                            )}
-                          </div>
-                          <div className={statBarTrackClass}>
-                            <div
-                              className={statBarFillClass}
-                              style={{ width: `${Math.max(5, (hours / maxStatusOverTimeCount) * 100)}%` }}
-                            />
-                          </div>
-                          <span className={statBarValueClass}>
-                            {t("dashboard.completedCount", { count: String(Math.round(hours)) })}
-                          </span>
-                        </div>
-                      </>
-                    );
                     return (
-                      <div key={period} className="flex min-w-0 flex-col gap-2">
-                        {itemCount > 0 ? (
-                          <button
-                            type="button"
-                            className={cn(logsPeriodActivityBtnClass, "flex-col items-stretch gap-2")}
-                            onClick={() =>
-                              openLogsPeriodActivity(period, statusOverTimeGroup, activityTitle)
-                            }
-                            aria-label={activityTitle}
-                          >
-                            {periodBody}
-                          </button>
-                        ) : (
-                          periodBody
+                      <button
+                        key={period}
+                        type="button"
+                        disabled={itemCount === 0}
+                        onClick={() =>
+                          openLogsPeriodActivity(period, statusOverTimeGroup, activityTitle)
+                        }
+                        aria-label={activityTitle}
+                        className="flex min-w-0 flex-col gap-0.5 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 px-2.5 py-2 text-left transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] disabled:cursor-default disabled:opacity-50"
+                      >
+                        <span className="min-w-0 truncate text-[10px] tabular-nums text-[var(--color-light)]">
+                          {timeLabel}
+                        </span>
+                        <span className="text-sm font-semibold tabular-nums text-[var(--color-text)]">
+                          {Math.round(hours).toLocaleString(locale)}
+                        </span>
+                        {itemCount > 0 && (
+                          <span className="text-[10px] tabular-nums text-[var(--color-light)]">
+                            {t(
+                              itemCount === 1
+                                ? "statistics.statItemsCount_one"
+                                : "statistics.statItemsCount_other",
+                              { count: String(itemCount) }
+                            )}
+                          </span>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
+                  </div>
                 </div>
               )}
             </div>
@@ -2688,51 +2687,25 @@ export function Statistics() {
                               period: timeLabel,
                               category: t(`nav.${mediaType}`),
                             });
-                            const rowBody = (
-                              <>
-                                <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                                  <OverflowMarquee className={statBarMarqueeClass}>
-                                    {t(`nav.${mediaType}`)}
-                                  </OverflowMarquee>
-                                </div>
-                                <div className={statBarTrackClass}>
-                                  <div
-                                    className={statBarFillClass}
-                                    style={{
-                                      width: `${Math.max(5, (hours / maxCategoryOverTimeCount) * 100)}%`,
-                                    }}
-                                  />
-                                </div>
-                                <span className={statBarValueClass}>
-                                  {t("dashboard.logsCount", { count: String(Math.round(hours)) })}
-                                </span>
-                              </>
-                            );
                             return (
-                              <div key={`${period}-${mediaType}`}>
-                                {itemCount > 0 ? (
-                                  <button
-                                    type="button"
-                                    className={cn(
-                                      statBarGridClass,
-                                      "w-full rounded-lg transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] max-md:min-h-[44px]"
-                                    )}
-                                    onClick={() =>
-                                      openLogsPeriodActivity(
-                                        period,
-                                        categoryOverTimeGroup,
-                                        rowTitle,
-                                        mediaType as MediaType
-                                      )
-                                    }
-                                    aria-label={rowTitle}
-                                  >
-                                    {rowBody}
-                                  </button>
-                                ) : (
-                                  <div className={statBarGridClass}>{rowBody}</div>
-                                )}
-                              </div>
+                              <MomentumBreakdownRow
+                                key={`${period}-${mediaType}`}
+                                label={t(`nav.${mediaType}`)}
+                                value={t("dashboard.logsCount", { count: String(Math.round(hours)) })}
+                                pct={(hours / Math.max(1, maxCategoryOverTimeCount)) * 100}
+                                color="var(--btn-gradient-start)"
+                                onClick={
+                                  itemCount > 0
+                                    ? () =>
+                                        openLogsPeriodActivity(
+                                          period,
+                                          categoryOverTimeGroup,
+                                          rowTitle,
+                                          mediaType as MediaType
+                                        )
+                                    : undefined
+                                }
+                              />
                             );
                           })}
                         </div>
@@ -2769,12 +2742,14 @@ export function Statistics() {
                 <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
               )}
               <span>{t("dashboard.statsTitle")}</span>
+              {overviewMomentum.hours?.delta != null && (
+                <DeltaChip delta={overviewMomentum.hours.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.hours.delta)} />
+              )}
             </button>
             {!statsCollapsed && (
               <>
                 <Card
-                  className="min-w-0 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 md:flex md:h-full md:min-h-0 md:flex-1 md:flex-col"
-                  style={paperShadow}
+                  className="min-w-0 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3 md:flex md:h-full md:min-h-0 md:flex-1 md:flex-col"
                 >
                   <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
                     <div className="w-full min-w-0 shrink-0">
@@ -2818,14 +2793,20 @@ export function Statistics() {
                                   locale
                                 )
                               : null;
+                            if (!isTimeAxis) {
+                              return (
+                                <MomentumBreakdownRow
+                                  key={period}
+                                  label={t(`nav.${period}`)}
+                                  value={t("dashboard.hoursConsumed", { hours: hours.toFixed(1) })}
+                                  pct={(hours / Math.max(1, maxHours)) * 100}
+                                  color="var(--btn-gradient-start)"
+                                />
+                              );
+                            }
                             const barRow = (
                               <div className={statBarGridClass}>
                                 <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                                  {!isTimeAxis && (
-                                    <OverflowMarquee className={statBarMarqueeClass}>
-                                      {t(`nav.${period}`)}
-                                    </OverflowMarquee>
-                                  )}
                                   {(count ?? 0) > 0 && (
                                     <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
                                       {t(
@@ -2849,8 +2830,8 @@ export function Statistics() {
                               </div>
                             );
                             return (
-                              <div key={period} className={cn(isTimeAxis && "flex min-w-0 flex-col gap-2")}>
-                                {isTimeAxis && timeLabel != null && (
+                              <div key={period} className={cn("flex min-w-0 flex-col gap-2")}>
+                                {timeLabel != null && (
                                   <StatsTimeSectionDivider label={timeLabel} />
                                 )}
                                 {barRow}
@@ -2889,8 +2870,7 @@ export function Statistics() {
                 </div>
               ) : recent.length === 0 ? (
                 <Card
-                  className="flex min-h-[14rem] flex-1 flex-col border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 md:min-h-0"
-                  style={paperShadow}
+                  className="flex min-h-[14rem] flex-1 flex-col rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-6 md:min-h-0"
                 >
                   <p className="flex min-h-0 flex-1 items-center justify-center text-center text-[var(--color-light)]">
                     <span>

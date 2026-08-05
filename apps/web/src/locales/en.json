@@ -39,6 +39,7 @@
     "settings": "Settings",
     "plans": "Plans",
     "about": "About",
+    "lab": "UI Lab",
     "logOut": "Log out",
     "signingOut": "Signing out…",
     "logIn": "Log in",
@@ -584,7 +585,8 @@
     "mostPlayedPlatformsTitle": "Most played platforms",
     "gamePlatformsTitle": "By platform",
     "gamePlatformsSub": "How many games you logged on each platform or console",
-    "gamePlatformsEmpty": "No platform set on your game logs yet. Pick a platform when logging a game."
+    "gamePlatformsEmpty": "No platform set on your game logs yet. Pick a platform when logging a game.",
+    "momentumLabel": "{{delta}}% vs previous period"
   },
   "recap": {
     "button": "Recap",

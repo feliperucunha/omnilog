@@ -315,6 +315,7 @@ import {
   completedAtBoundsForStatsPeriod,
   freeTierStatisticsMonthRange,
   freeTierStatisticsMonthWhere,
+  recentMonthRanges,
 } from "../lib/statisticsScope.js";
 
 const FREE_LOG_LIMIT = 500;
@@ -767,6 +768,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
 
   const STATS_GROUPS = new Set([
     "summary",
+    "summaryByMonth",
     "year",
     "genre",
     "category",
@@ -1003,6 +1005,120 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       group: "summary",
       data: summaryPayload,
     });
+    return;
+  }
+
+  if (group === "summaryByMonth") {
+    const ranges = recentMonthRanges(tzOffsetMinutes, fullStatsAccess ? 13 : 1);
+
+    const completedMonthWhere = (range: { gte: Date; lte: Date }): Prisma.LogWhereInput =>
+      applyStatsMediaFilter(
+        { userId, completedAt: { gte: range.gte, lte: range.lte } },
+        statsMediaType
+      );
+
+    const months: Array<{ period: string; totalLogs: number; completedLogs: number; reviewedLogs: number; totalContentHours: number; totalPagesRead?: number; boardGamesWon?: number; netByCurrency: Record<string, number> }> = [];
+    for (const range of ranges) {
+      const monthTotalWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
+        { userId, createdAt: { gte: range.gte, lte: range.lte } },
+        statsMediaType
+      );
+      const reviewedMonthWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
+        { userId, grade: { not: null }, completedAt: { gte: range.gte, lte: range.lte } },
+        statsMediaType
+      );
+      const spendMonthWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
+        {
+          userId,
+          mediaType: { in: [...SPEND_TRACKED_MEDIA_TYPES] },
+          OR: [
+            { AND: [{ purchaseAmountMinor: { not: null } }, { purchaseCurrency: { not: null } }] },
+            { AND: [{ saleAmountMinor: { not: null } }, { saleCurrency: { not: null } }] },
+          ],
+        },
+        statsMediaType
+      );
+      const spendDateWhere = logSpendStatsDateWhere({ gte: range.gte, lte: range.lte });
+      const spendWhereWithDate =
+        Object.keys(spendDateWhere).length > 0
+          ? mergeLogWhere(spendMonthWhere, spendDateWhere)
+          : spendMonthWhere;
+
+      const [totalLogs, completedLogs, reviewedLogs, completedLogsList, spendRows] = await Promise.all([
+        prisma.log.count({ where: monthTotalWhere }),
+        prisma.log.count({ where: completedMonthWhere(range) }),
+        prisma.log.count({ where: reviewedMonthWhere }),
+        prisma.log.findMany({
+          where: completedMonthWhere(range),
+          select: {
+            id: true,
+            completedAt: true,
+            contentHours: true,
+            startedAt: true,
+            mediaType: true,
+            hoursToBeat: true,
+            matchesPlayed: true,
+          },
+        }),
+        prisma.log.findMany({
+          where: spendWhereWithDate,
+          select: {
+            purchaseAmountMinor: true,
+            purchaseCurrency: true,
+            saleAmountMinor: true,
+            saleCurrency: true,
+          },
+        }),
+      ]);
+      const { totalHours } = rollupHoursFromCompletedLogs(
+        await attachBoardGameSessionHours(completedLogsList)
+      );
+      const totalsPurchaseByCur: Record<string, number> = {};
+      const totalsSaleByCur: Record<string, number> = {};
+      for (const row of spendRows) {
+        const pn = row.purchaseAmountMinor;
+        const pc = row.purchaseCurrency;
+        if (pn != null && pc != null) totalsPurchaseByCur[pc] = (totalsPurchaseByCur[pc] ?? 0) + pn;
+        const sn = row.saleAmountMinor;
+        const sc = row.saleCurrency;
+        if (sn != null && sc != null) totalsSaleByCur[sc] = (totalsSaleByCur[sc] ?? 0) + sn;
+      }
+      const currencies = new Set([...Object.keys(totalsPurchaseByCur), ...Object.keys(totalsSaleByCur)]);
+      const netByCurrency: Record<string, number> = {};
+      for (const cur of currencies) {
+        netByCurrency[cur] = (totalsSaleByCur[cur] ?? 0) - (totalsPurchaseByCur[cur] ?? 0);
+      }
+
+      const month: (typeof months)[number] = {
+        period: range.key,
+        totalLogs,
+        completedLogs,
+        reviewedLogs,
+        totalContentHours: totalHours,
+        netByCurrency,
+      };
+      const monthHighlightWhere: Prisma.LogWhereInput = {
+        completedAt: { gte: range.gte, lte: range.lte },
+      };
+      if (!statsMediaType) {
+        month.totalPagesRead = await sumAllPagesReadForStats(userId, monthHighlightWhere);
+        month.boardGamesWon = await countBoardGameWinsForStats(userId, monthHighlightWhere, {
+          taggedPlayedAtWhere: { playedAt: { gte: range.gte, lte: range.lte } },
+        });
+      } else if (isReadingMediaType(statsMediaType)) {
+        month.totalPagesRead = await sumPagesReadForStats(
+          userId,
+          statsMediaType,
+          monthHighlightWhere
+        );
+      } else if (statsMediaType === "boardgames") {
+        month.boardGamesWon = await countBoardGameWinsForStats(userId, monthHighlightWhere, {
+          taggedPlayedAtWhere: { playedAt: { gte: range.gte, lte: range.lte } },
+        });
+      }
+      months.push(month);
+    }
+    res.json({ group: "summaryByMonth", data: months });
     return;
   }
 

@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { paperShadow } from "@/lib/paperShadow";
 
-/** Overview cards (Statistics summary row). */
+/** Overview cards (Statistics summary row) — mirrors the MomentumCard layout. */
 export function StatisticsSummarySkeleton() {
   return (
     <section
@@ -10,27 +10,22 @@ export function StatisticsSummarySkeleton() {
       className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 md:gap-4"
     >
       {Array.from({ length: 5 }).map((_, i) => (
-        <Card
+        <div
           key={i}
-          className="min-w-0 overflow-hidden rounded-xl border border-[var(--color-surface-border)]/90 bg-[var(--color-dark)] p-3.5 shadow-none md:min-h-[6.75rem] md:rounded-2xl md:bg-gradient-to-b md:from-[var(--color-dark)] md:to-[var(--color-darkest)]/55 md:p-5 md:shadow-[var(--shadow-sm)]"
+          className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3"
         >
-          <div className="flex items-center gap-3 md:hidden">
-            <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <Skeleton className="h-2 w-28 max-w-full rounded" />
-              <Skeleton className="h-7 w-16 rounded-md" />
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            <Skeleton className="h-7 w-7 shrink-0 rounded-lg" />
+            <Skeleton className="h-4 w-10 rounded-full" />
           </div>
-          <div className="hidden flex-col gap-3 md:flex">
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
-              <Skeleton className="h-2.5 w-24 max-w-[min(100%,8rem)] rounded" />
+          <div className="flex items-end justify-between gap-2">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Skeleton className="h-2 w-20 max-w-full rounded" />
+              <Skeleton className="h-5 w-10 rounded" />
             </div>
-            <div className="space-y-2 pl-[calc(2.5rem+0.75rem)]">
-              <Skeleton className="h-8 w-14 max-w-full rounded-md" />
-            </div>
+            <Skeleton className="h-7 w-16 shrink-0 rounded-sm" />
           </div>
-        </Card>
+        </div>
       ))}
     </section>
   );

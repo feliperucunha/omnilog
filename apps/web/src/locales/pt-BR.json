@@ -39,6 +39,7 @@
     "settings": "Configurações",
     "plans": "Planos",
     "about": "Sobre",
+    "lab": "Laboratório UI",
     "logOut": "Sair",
     "signingOut": "Saindo…",
     "logIn": "Entrar",
@@ -584,7 +585,8 @@
     "mostPlayedPlatformsTitle": "Plataformas mais jogadas",
     "gamePlatformsTitle": "Por plataforma",
     "gamePlatformsSub": "Quantos jogos você registrou em cada plataforma ou console",
-    "gamePlatformsEmpty": "Nenhuma plataforma nos seus jogos ainda. Escolha uma ao registrar um jogo."
+    "gamePlatformsEmpty": "Nenhuma plataforma nos seus jogos ainda. Escolha uma ao registrar um jogo.",
+    "momentumLabel": "{{delta}}% em relação ao período anterior"
   },
   "recap": {
     "button": "Retrospectiva",
