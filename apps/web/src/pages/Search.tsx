@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -230,8 +230,9 @@ export function Search() {
   );
   const [recRefreshNonce, setRecRefreshNonce] = useState(0);
   const [recommendationsSectionOpen, setRecommendationsSectionOpen] = useState(
-    () => pageCache?.recommendationsSectionOpen ?? false
+    () => pageCache?.recommendationsSectionOpen ?? !pageCache?.hasSearched
   );
+  const recommendationsLockedRef = useRef(Boolean(pageCache?.hasSearched));
   /** Desktop: map vertical wheel to horizontal scroll (mobile uses native touch; unchanged). */
   const { token } = useAuth();
   const { me, loading: meLoading } = useMe();
@@ -310,6 +311,8 @@ export function Search() {
   const runSearch = useCallback(
     async (q: string, typeOverride?: SearchFilterParam, sortOverride?: string) => {
       if (!q.trim()) return;
+      recommendationsLockedRef.current = true;
+      setRecommendationsSectionOpen(false);
       const filter = typeOverride ?? searchFilter;
       const sort = sortOverride ?? sortBy;
       if (filter === SEARCH_USERS_TYPE) {
@@ -637,7 +640,10 @@ export function Search() {
       <button
         type="button"
         className="flex w-full items-center gap-3 rounded-t-lg px-4 py-3 text-left transition-colors hover:bg-[var(--color-mid)]/10 sm:py-3.5"
-        onClick={() => setRecommendationsSectionOpen((o) => !o)}
+        onClick={() => {
+          if (recommendationsLockedRef.current) return;
+          setRecommendationsSectionOpen((o) => !o);
+        }}
         aria-expanded={recommendationsSectionOpen}
         aria-controls="search-recommendations-panel"
         aria-labelledby="search-recommendations-heading"
@@ -662,16 +668,18 @@ export function Search() {
           {recommendationsSectionOpen ? t("search.recommendationsCollapse") : t("search.recommendationsExpand")}
         </span>
       </button>
-      {recommendationsSectionOpen && (
+      <AnimatePresence initial={false}>
+        {recommendationsSectionOpen && (
           <motion.div
-          id="search-recommendations-panel"
-          role="region"
-          aria-labelledby="search-recommendations-heading"
-          className="flex flex-col gap-3 border-t border-[var(--color-surface-border)] px-4 pb-4 pt-3"
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        >
+            id="search-recommendations-panel"
+            role="region"
+            aria-labelledby="search-recommendations-heading"
+            className="flex flex-col gap-3 overflow-hidden border-t border-[var(--color-surface-border)] px-4 pb-4 pt-3"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          >
           {currentRecLoading && currentRecResults.length === 0 && (
             <div
               className="h-36 w-full animate-pulse rounded-lg bg-[var(--color-mid)]/20 sm:h-40"
@@ -720,8 +728,9 @@ export function Search() {
             (!currentRecRequiresApiKey || skipApiKeyReq) && (
               <p className="text-sm text-[var(--color-light)]">{t("search.recommendationsEmpty")}</p>
             )}
-        </motion.div>
-      )}
+          </motion.div>
+        )}
+        </AnimatePresence>
     </Card>
   ) : null;
 
