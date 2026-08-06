@@ -13,4 +13,5 @@ export {
   StatisticsSpendByCategorySkeleton,
   StatisticsCategoryOverTimeSkeleton,
   StatisticsRecentLogsSkeleton,
+  StatisticsLibraryStatusSkeleton,
 } from "./StatisticsSkeleton";

@@ -57,6 +57,29 @@ export function StatisticsSpendByCategorySkeleton({ rows = 5 }: { rows?: number 
   );
 }
 
+/** Donut + legend mirroring the Library status widget. */
+export function StatisticsLibraryStatusSkeleton() {
+  return (
+    <div className="flex min-w-0 flex-col items-center gap-4 sm:flex-row" aria-hidden>
+      <Skeleton className="h-[132px] w-[132px] shrink-0 rounded-full" />
+      <div className="flex min-w-0 w-full flex-1 flex-col gap-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5"
+          >
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Skeleton className="h-2.5 w-2.5 shrink-0 rounded-full" />
+              <Skeleton className="h-2.5 w-24 max-w-full rounded" />
+            </div>
+            <Skeleton className="h-2.5 w-12 shrink-0 rounded" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Bar rows matching genre / status / category / hours charts (fixed height to avoid layout shift). */
 export function StatisticsBarsSkeleton({ rows = 6 }: { rows?: number }) {
   return (

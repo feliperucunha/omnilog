@@ -785,9 +785,50 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     "episodesByMonth",
     "episodesByYear",
     "month",
+    "status",
   ]);
   const groupParam = typeof req.query.group === "string" ? req.query.group : "month";
   const group = STATS_GROUPS.has(groupParam) ? groupParam : "month";
+
+  if (group === "status") {
+    // Same window/filter scopes as the Overview "summary" group so the donut's
+    // "Completed" always matches the Overview Completed card.
+    const statusScope = applyStatsMediaFilter(
+      freeMonthWhere ? mergeLogWhere({ userId }, freeMonthWhere) : { userId },
+      statsMediaType
+    );
+    const completedWhere = applyStatsMediaFilter(
+      freeMonthRange
+        ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+        : { userId, completedAt: { not: null } },
+      statsMediaType
+    );
+    const [rows, completedCount] = await Promise.all([
+      prisma.log.findMany({ where: statusScope, select: { status: true } }),
+      prisma.log.count({ where: completedWhere }),
+    ]);
+    const total = rows.length;
+    const completed = completedCount;
+    let inProgress = 0;
+    let planned = 0;
+    let dropped = 0;
+    let other = 0;
+    for (const row of rows) {
+      const s = row.status ?? "";
+      // Completed is derived from the completion date (same as the Overview
+      // card), so completed-status rows are already counted there — skip.
+      if (isCompleted(s)) continue;
+      if (isInProgress(s)) inProgress++;
+      else if (s.toLowerCase().startsWith("plan to ")) planned++;
+      else if (s === "dropped") dropped++;
+      else other++;
+    }
+    res.json({
+      group: "status",
+      data: { total, completed, inProgress, planned, dropped, other },
+    });
+    return;
+  }
 
   if (group === "purchaseSpending") {
     const periodRaw = typeof req.query.period === "string" ? req.query.period.trim() : "month";

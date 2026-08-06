@@ -37,6 +37,7 @@ import {
   StatisticsSpendByCategorySkeleton,
   StatisticsCategoryOverTimeSkeleton,
   StatisticsRecentLogsSkeleton,
+  StatisticsLibraryStatusSkeleton,
 } from "@/components/skeletons";
 import {
   BoardGameRecentStatsWidget,
@@ -423,6 +424,7 @@ type BoardGameMatchesSort = "recent" | "mostPlayed" | "leastPlayed";
 const STORAGE_KEY_STATS = "geeklogs.statistics.statsCollapsed";
 const STORAGE_KEY_RECENT = "geeklogs.statistics.recentLogsCollapsed";
 const STORAGE_KEY_SUMMARY = "geeklogs.statistics.summaryCollapsed";
+const STORAGE_KEY_LIBRARY_STATUS = "geeklogs.statistics.libraryStatusCollapsed";
 const STORAGE_KEY_PURCHASE = "geeklogs.statistics.purchaseCollapsed";
 const STORAGE_KEY_BOARD_GAME_MATCHES = "geeklogs.statistics.boardGameMatchesCollapsed";
 const STORAGE_KEY_GAME_PLATFORMS = "geeklogs.statistics.gamePlatformsCollapsed";
@@ -476,6 +478,16 @@ interface LogStatsSummaryByMonth {
   netByCurrency: Record<string, number>;
 }
 
+/** GET /logs/stats?group=status — whole-library breakdown by normalized status. */
+interface LogLibraryStatus {
+  total: number;
+  completed: number;
+  inProgress: number;
+  planned: number;
+  dropped: number;
+  other: number;
+}
+
 const EMPTY_SUMMARY: LogStatsSummary = {
   totalLogs: 0,
   completedLogs: 0,
@@ -499,6 +511,92 @@ function OverviewStatCard(props: {
   momentumAria?: (delta: number) => string;
 }) {
   return <MomentumCard {...props} />;
+}
+
+/** Donut + legend summarizing the current library status distribution. */
+function LibraryStatusDonut({
+  status,
+  labels,
+}: {
+  status: LogLibraryStatus;
+  labels: {
+    completed: string;
+    inProgress: string;
+    planned: string;
+    dropped: string;
+    other: string;
+  };
+}) {
+  const segments = [
+    { key: "completed", label: labels.completed, value: status.completed, color: "var(--btn-gradient-start)" },
+    { key: "inProgress", label: labels.inProgress, value: status.inProgress, color: "#F59E0B" },
+    { key: "planned", label: labels.planned, value: status.planned, color: "#3B82F6" },
+    { key: "dropped", label: labels.dropped, value: status.dropped, color: "#EF4444" },
+    { key: "other", label: labels.other, value: status.other, color: "var(--color-mid)" },
+  ].filter((s) => s.value > 0);
+  const total = status.total || 1;
+  const size = 132;
+  const stroke = 18;
+  const radius = (size - stroke) / 2;
+  const c = 2 * Math.PI * radius;
+  let acc = 0;
+  return (
+    <div className="flex min-w-0 flex-col items-center gap-4 sm:flex-row">
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="-rotate-90 shrink-0"
+        role="img"
+        aria-hidden
+      >
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="var(--color-mid)"
+          strokeWidth={stroke}
+          opacity={0.2}
+        />
+        {segments.map((s) => {
+          const frac = s.value / total;
+          const dash = c * frac;
+          const offset = -acc * c;
+          acc += frac;
+          return (
+            <circle
+              key={s.key}
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={stroke}
+              strokeDasharray={`${dash} ${c - dash}`}
+              strokeDashoffset={offset}
+            />
+          );
+        })}
+      </svg>
+      <div className="flex min-w-0 w-full flex-1 flex-col gap-0.5">
+        {segments.map((s) => (
+          <div
+            key={s.key}
+            className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-[var(--color-mid)]/10"
+          >
+            <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--color-light)]">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} aria-hidden />
+              <span className="truncate">{s.label}</span>
+            </span>
+            <span className="shrink-0 text-right text-[11px] tabular-nums text-[var(--color-lightest)]">
+              {s.value} <span className="text-[var(--color-light)]">· {Math.round((s.value / total) * 100)}%</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function CategoryOrderSkeletonStrip() {
@@ -541,6 +639,8 @@ export function Statistics() {
   const [statusOverTimeGroup, setStatusOverTimeGroup] = useState<StatusOverTimeGroup>("month");
   const [statusOverTimeStats, setStatusOverTimeStats] = useState<StatsEntry[]>([]);
   const [statusOverTimeLoading, setStatusOverTimeLoading] = useState(true);
+  const [libraryStatus, setLibraryStatus] = useState<LogLibraryStatus | null>(null);
+  const [libraryStatusLoading, setLibraryStatusLoading] = useState(true);
   const [categoryOverTimeGroup, setCategoryOverTimeGroup] = useState<StatusOverTimeGroup>("month");
   const [categoryOverTimeStats, setCategoryOverTimeStats] = useState<CategoryOverTimeEntry[]>([]);
   const [categoryOverTimeLoading, setCategoryOverTimeLoading] = useState(true);
@@ -558,6 +658,7 @@ export function Statistics() {
   const [statsCollapsed, setStatsCollapsedState] = useState(false);
   const [recentLogsCollapsed, setRecentLogsCollapsedState] = useState(false);
   const [summaryCollapsed, setSummaryCollapsedState] = useState(false);
+  const [libraryStatusCollapsed, setLibraryStatusCollapsedState] = useState(false);
   const [purchaseCollapsed, setPurchaseCollapsedState] = useState(false);
   const [boardGameMatchesCollapsed, setBoardGameMatchesCollapsedState] = useState(false);
   const [gamePlatformsCollapsed, setGamePlatformsCollapsedState] = useState(false);
@@ -611,6 +712,7 @@ export function Statistics() {
       storage.getItem(STORAGE_KEY_STATS),
       storage.getItem(STORAGE_KEY_RECENT),
       storage.getItem(STORAGE_KEY_SUMMARY),
+      storage.getItem(STORAGE_KEY_LIBRARY_STATUS),
       storage.getItem(STORAGE_KEY_PURCHASE),
       storage.getItem(STORAGE_KEY_BOARD_GAME_MATCHES),
       storage.getItem(STORAGE_KEY_GAME_PLATFORMS),
@@ -619,11 +721,12 @@ export function Statistics() {
       storage.getItem(STORAGE_KEY_GAME_WEIGHT),
       storage.getItem(STORAGE_KEY_PAGES_OVER_TIME),
       storage.getItem(STORAGE_KEY_EPISODES_OVER_TIME),
-    ]).then(([statsVal, recentVal, summaryVal, purchaseVal, boardGameMatchesVal, gamePlatformsVal, calendarVal, chartsVal, gameWeightVal, pagesOverTimeVal, episodesOverTimeVal]) => {
+    ]).then(([statsVal, recentVal, summaryVal, libraryStatusVal, purchaseVal, boardGameMatchesVal, gamePlatformsVal, calendarVal, chartsVal, gameWeightVal, pagesOverTimeVal, episodesOverTimeVal]) => {
       if (cancelled) return;
       if (statsVal === "true") setStatsCollapsedState(true);
       if (recentVal === "true") setRecentLogsCollapsedState(true);
       if (summaryVal === "true") setSummaryCollapsedState(true);
+      if (libraryStatusVal === "true") setLibraryStatusCollapsedState(true);
       if (purchaseVal === "true") setPurchaseCollapsedState(true);
       if (boardGameMatchesVal === "true") setBoardGameMatchesCollapsedState(true);
       if (gamePlatformsVal === "true") setGamePlatformsCollapsedState(true);
@@ -651,6 +754,11 @@ export function Statistics() {
   const setSummaryCollapsed = useCallback((value: boolean) => {
     setSummaryCollapsedState(value);
     void storage.setItem(STORAGE_KEY_SUMMARY, String(value));
+  }, []);
+
+  const setLibraryStatusCollapsed = useCallback((value: boolean) => {
+    setLibraryStatusCollapsedState(value);
+    void storage.setItem(STORAGE_KEY_LIBRARY_STATUS, String(value));
   }, []);
 
   const setPurchaseCollapsed = useCallback((value: boolean) => {
@@ -770,6 +878,15 @@ export function Statistics() {
     [tzOffsetMinutes, statsMediaQuery]
   );
 
+  const fetchLibraryStatus = useCallback(async () => {
+    const path = `/logs/stats?group=status&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
+    await loadWithSWR<{ data: LogLibraryStatus }>(
+      path,
+      (res) => setLibraryStatus(res.data ?? null),
+      { setLoading: setLibraryStatusLoading, onError: () => setLibraryStatus(null) }
+    );
+  }, [tzOffsetMinutes, statsMediaQuery]);
+
   const fetchCategoryOverTimeStats = useCallback(
     async (group: "categoryByMonth" | "categoryByYear") => {
       const path = `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
@@ -864,6 +981,10 @@ export function Statistics() {
   useEffect(() => {
     void fetchGenreStats();
   }, [fetchGenreStats]);
+
+  useEffect(() => {
+    void fetchLibraryStatus();
+  }, [fetchLibraryStatus]);
 
   useEffect(() => {
     void fetchGamePlatformStats();
@@ -1783,6 +1904,47 @@ const summaryData = summary ?? EMPTY_SUMMARY;
             })()}
           />
         </section>
+          )}
+        </div>
+      )}
+
+      {(
+        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setLibraryStatusCollapsed(!libraryStatusCollapsed)}
+            className={collapsibleSectionBtnClass}
+            aria-expanded={!libraryStatusCollapsed}
+          >
+            {libraryStatusCollapsed ? (
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            ) : (
+              <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+            )}
+            <span>{t("statistics.libraryStatusTitle")}</span>
+          </button>
+          {!libraryStatusCollapsed && (
+            <section
+              aria-label={t("statistics.libraryStatusTitle")}
+              className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3 md:p-4"
+            >
+              {libraryStatusLoading ? (
+                <StatisticsLibraryStatusSkeleton />
+              ) : libraryStatus && libraryStatus.total > 0 ? (
+                <LibraryStatusDonut
+                  status={libraryStatus}
+                  labels={{
+                    completed: t("statistics.libraryStatusCompleted"),
+                    inProgress: t("statistics.libraryStatusInProgress"),
+                    planned: t("statistics.libraryStatusPlanned"),
+                    dropped: t("statistics.libraryStatusDropped"),
+                    other: t("statistics.libraryStatusOther"),
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-[var(--color-light)]">{t("statistics.libraryStatusEmpty")}</p>
+              )}
+            </section>
           )}
         </div>
       )}
