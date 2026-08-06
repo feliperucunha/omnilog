@@ -123,16 +123,11 @@ type RecMeta = {
   tutorial?: string;
 };
 
-/** Media types supported by GET /search/recommendations (others skip the request). */
-const RECOMMENDATION_MEDIA_TYPES: MediaType[] = [
-  "movies",
-  "tv",
-  "games",
-  "anime",
-  "boardgames",
-  "books",
-  "manga",
-];
+/** Media types that show the Netflix-style browse carousels on the blank search state. */
+const BROWSE_MEDIA_TYPES: MediaType[] = ["movies", "tv", "anime", "boardgames", "books"];
+
+/** Media types that show the "Recommended for you" picks carousel. */
+const RECOMMENDATION_MEDIA_TYPES: MediaType[] = BROWSE_MEDIA_TYPES.filter((type) => type !== "anime");
 
 type UserSearchResult = SearchPageUserResult;
 
@@ -230,6 +225,16 @@ export function Search() {
     }
   );
   const [recRefreshNonce, setRecRefreshNonce] = useState(0);
+  const [recLoadedByMediaType, setRecLoadedByMediaType] = useState<Partial<Record<MediaType, boolean>>>(
+    () => {
+      if (!pageCache?.recByMediaType) return {};
+      const out: Partial<Record<MediaType, boolean>> = {};
+      for (const type of Object.keys(pageCache.recByMediaType) as MediaType[]) {
+        out[type] = false;
+      }
+      return out;
+    }
+  );
   const [browseByMediaType, setBrowseByMediaType] = useState<Partial<Record<MediaType, BrowseRail[]>>>(
     () => pageCache?.browseByMediaType ?? {}
   );
@@ -247,6 +252,16 @@ export function Search() {
     }
   );
   const [browseRefreshNonce, setBrowseRefreshNonce] = useState(0);
+  const [browseLoadedByMediaType, setBrowseLoadedByMediaType] = useState<Partial<Record<MediaType, boolean>>>(
+    () => {
+      if (!pageCache?.browseByMediaType) return {};
+      const out: Partial<Record<MediaType, boolean>> = {};
+      for (const type of Object.keys(pageCache.browseByMediaType) as MediaType[]) {
+        out[type] = false;
+      }
+      return out;
+    }
+  );
   /** Desktop: map vertical wheel to horizontal scroll (mobile uses native touch; unchanged). */
   const { token } = useAuth();
   const { me, loading: meLoading } = useMe();
@@ -481,8 +496,7 @@ export function Search() {
       return;
     }
     const type = mediaType;
-    const hasCachedRec =
-      (recByMediaType[type]?.length ?? 0) > 0 || recMetaByMediaType[type]?.requiresApiKey != null;
+    const hasCachedRec = !!recLoadedByMediaType[type];
     if (recRefreshNonce === 0 && hasCachedRec) {
       return;
     }
@@ -512,9 +526,13 @@ export function Search() {
             tutorial: data.tutorial,
           },
         }));
+        setRecLoadedByMediaType((prev) => ({ ...prev, [type]: true }));
       })
       .catch(() => {
         // Keep cached recommendations for this category on error.
+        if (!cancelled) {
+          setRecLoadedByMediaType((prev) => ({ ...prev, [type]: true }));
+        }
       })
       .finally(() => {
         if (!cancelled) {
@@ -524,15 +542,14 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [mediaType, searchFilter, token, recRefreshNonce, me, boardGameProvider, recByMediaType, recMetaByMediaType]);
+  }, [mediaType, searchFilter, token, recRefreshNonce, boardGameProvider, recLoadedByMediaType]);
 
   useEffect(() => {
-    if (searchFilter === SEARCH_USERS_TYPE || !RECOMMENDATION_MEDIA_TYPES.includes(mediaType)) {
+    if (searchFilter === SEARCH_USERS_TYPE || !BROWSE_MEDIA_TYPES.includes(mediaType)) {
       return;
     }
     const type = mediaType;
-    const hasCachedBrowse =
-      (browseByMediaType[type]?.length ?? 0) > 0 || browseMetaByMediaType[type]?.requiresApiKey != null;
+    const hasCachedBrowse = !!browseLoadedByMediaType[type];
     if (browseRefreshNonce === 0 && hasCachedBrowse) {
       return;
     }
@@ -565,9 +582,13 @@ export function Search() {
             tutorial: data.tutorial,
           },
         }));
+        setBrowseLoadedByMediaType((prev) => ({ ...prev, [type]: true }));
       })
       .catch(() => {
         // Keep cached browse rails for this category on error.
+        if (!cancelled) {
+          setBrowseLoadedByMediaType((prev) => ({ ...prev, [type]: true }));
+        }
       })
       .finally(() => {
         if (!cancelled) {
@@ -577,7 +598,7 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [mediaType, searchFilter, token, browseRefreshNonce, me, boardGameProvider, browseByMediaType, browseMetaByMediaType]);
+  }, [mediaType, searchFilter, token, browseRefreshNonce, boardGameProvider, browseLoadedByMediaType]);
 
   const handleSearch = async (e: React.FormEvent) => {
     setHasSearched(true);
@@ -595,10 +616,12 @@ export function Search() {
       setRecByMediaType({});
       setRecMetaByMediaType({});
       setRecLoadingByMediaType({});
+      setRecLoadedByMediaType({});
       setRecRefreshNonce((n) => n + 1);
       setBrowseByMediaType({});
       setBrowseMetaByMediaType({});
       setBrowseLoadingByMediaType({});
+      setBrowseLoadedByMediaType({});
       setBrowseRefreshNonce((n) => n + 1);
     }
   });
@@ -707,6 +730,9 @@ export function Search() {
   const showRecommendations =
     searchFilter !== SEARCH_USERS_TYPE && RECOMMENDATION_MEDIA_TYPES.includes(mediaType);
 
+  const showBrowse =
+    searchFilter !== SEARCH_USERS_TYPE && BROWSE_MEDIA_TYPES.includes(mediaType);
+
   const recommendationsSection = showRecommendations ? (
     <div className="flex flex-col gap-2">
       <h2
@@ -766,7 +792,7 @@ export function Search() {
     </div>
   ) : null;
 
-  const browseSection = showRecommendations ? (
+  const browseSection = showBrowse ? (
     <div className="flex flex-col gap-5">
       {currentBrowseLoading && currentBrowseRails.length === 0 && (
         <>

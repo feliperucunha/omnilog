@@ -1,7 +1,12 @@
 import { decodeHtmlEntities, type SearchResult, type ItemDetail, SEARCH_RESULTS_PAGE_SIZE } from "@geeklogs/shared";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
+import { upstreamFetch } from "../lib/upstreamFetch.js";
 
 const BASE = "https://api.rawg.io/api";
+
+function rawgFetch(url: string, init?: RequestInit): Promise<Response> {
+  return upstreamFetch(url, { ...init, provider: "rawg", retry: true });
+}
 
 function getKey(apiKey?: string | null): string | null {
   return apiKey ?? process.env.RAWG_API_KEY ?? null;
@@ -40,7 +45,7 @@ function mapRawgGameToSearchResult(item: RawgGameListRow): SearchResult {
 async function fetchRawgGameGenreIds(gameId: string, apiKey?: string | null): Promise<number[]> {
   const key = getKey(apiKey);
   if (!key) return [];
-  const res = await fetch(`${BASE}/games/${encodeURIComponent(gameId)}?key=${key}`);
+  const res = await rawgFetch(`${BASE}/games/${encodeURIComponent(gameId)}?key=${key}`);
   if (res.status === 401) throw new InvalidApiKeyError("rawg");
   if (!res.ok) return [];
   const data = (await res.json()) as { genres?: Array<{ id?: number }> };
@@ -77,7 +82,7 @@ export async function getGamesRecommendationsFromSeedsViaGenres(
     ordering: "-rating",
     genres: gidList.join(","),
   });
-  const res = await fetch(`${BASE}/games?${params.toString()}`);
+  const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
   if (res.status === 401) throw new InvalidApiKeyError("rawg");
   if (!res.ok) return [];
   const data = (await res.json()) as { results?: RawgGameListRow[] };
@@ -97,7 +102,7 @@ export async function getGamesRecommendationsFromSeedsViaGenres(
 export async function getGameById(id: string, apiKey?: string | null): Promise<ItemDetail | null> {
   const key = getKey(apiKey);
   if (!key) return null;
-  const res = await fetch(`${BASE}/games/${id}?key=${key}`);
+  const res = await rawgFetch(`${BASE}/games/${id}?key=${key}`);
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("rawg");
   if (!res.ok) return null;
   const data = (await res.json()) as {
@@ -198,7 +203,7 @@ export async function searchGames(
     page_size: String(Math.min(40, SEARCH_RESULTS_PAGE_SIZE)),
   });
   if (ordering) params.set("ordering", ordering);
-  const res = await fetch(
+  const res = await rawgFetch(
     `${BASE}/games?${params.toString()}`
   );
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("rawg");
@@ -216,7 +221,7 @@ export async function getGameSuggestionsFromRawg(
 ): Promise<SearchResult[]> {
   const key = getKey(apiKey);
   if (!key) return [];
-  const res = await fetch(`${BASE}/games/${encodeURIComponent(gameId)}/suggested?key=${key}&page_size=${max}`);
+  const res = await rawgFetch(`${BASE}/games/${encodeURIComponent(gameId)}/suggested?key=${key}&page_size=${max}`);
   if (res.status === 401) throw new InvalidApiKeyError("rawg");
   // 403/404: not available on consumer API tier or unknown game
   if (res.status === 403 || res.status === 404 || !res.ok) return [];
@@ -229,7 +234,7 @@ export async function getPopularGames(apiKey?: string | null, max = 12): Promise
   const key = getKey(apiKey);
   if (!key) return [];
   const params = new URLSearchParams({ key, page_size: String(max), ordering: "-rating" });
-  const res = await fetch(`${BASE}/games?${params.toString()}`);
+  const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
   if (res.status === 401) throw new InvalidApiKeyError("rawg");
   if (!res.ok) return [];
   const data = (await res.json()) as { results?: RawgGameListRow[] };
@@ -241,7 +246,7 @@ export async function getTrendingGames(apiKey?: string | null, max = 12): Promis
   const key = getKey(apiKey);
   if (!key) return [];
   const params = new URLSearchParams({ key, page_size: String(max), ordering: "-added" });
-  const res = await fetch(`${BASE}/games?${params.toString()}`);
+  const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
   if (res.status === 401) throw new InvalidApiKeyError("rawg");
   if (!res.ok) return [];
   const data = (await res.json()) as { results?: RawgGameListRow[] };
@@ -253,7 +258,7 @@ export async function getNewReleasesGames(apiKey?: string | null, max = 12): Pro
   const key = getKey(apiKey);
   if (!key) return [];
   const params = new URLSearchParams({ key, page_size: String(max), ordering: "-released" });
-  const res = await fetch(`${BASE}/games?${params.toString()}`);
+  const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
   if (res.status === 401) throw new InvalidApiKeyError("rawg");
   if (!res.ok) return [];
   const data = (await res.json()) as { results?: RawgGameListRow[] };
