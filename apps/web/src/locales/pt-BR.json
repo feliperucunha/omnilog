@@ -466,7 +466,14 @@
     "userWithoutUsername": "Usuário",
     "viewMore": "Ver mais",
     "viewLess": "Ver menos",
-    "viewReview": "Ver resenha"
+    "viewReview": "Ver resenha",
+    "ratedEntry": "avaliou",
+    "finishedEntry": "terminou",
+    "loggedEntry": "registrou",
+    "timeAgoJustNow": "agora",
+    "timeAgoMinutes": "há {{count}}min",
+    "timeAgoHours": "há {{count}}h",
+    "timeAgoDays": "há {{count}}d"
   },
   "dashboard": {
     "title": "Início",

@@ -12,7 +12,7 @@ import { StarRating } from "@/components/StarRating";
 import type { LogViewMode } from "@/lib/logViewPreference";
 import { formatTimeToFinish } from "@/lib/formatDuration";
 import { formatLogScopeLabel, getLogCardDisplay } from "@/lib/logDisplay";
-import { logStatusBadgeClass, logStatusBorderClass, getSeriesAirState } from "@/lib/logStatusColors";
+import { logStatusBadgeClass, logStatusRailClass, getSeriesAirState } from "@/lib/logStatusColors";
 import { gradeToStars } from "@/lib/gradeStars";
 import {
   LOG_CARD_ACTION_COLUMN,
@@ -77,8 +77,9 @@ function showIncrementForLog(log: Log, mediaType: MediaType, hasProgressButton: 
   return EPISODE_TYPES.includes(mediaType) || CHAPTER_TYPES.includes(mediaType) || VOLUME_TYPES.includes(mediaType);
 }
 
-function listBorderClass(log: Log): string {
-  return logStatusBorderClass(log.status);
+function listBorderClass(log: Log, compact: boolean): string {
+  if (compact) return "border border-[var(--color-mid)]/25";
+  return logStatusRailClass(log.status);
 }
 
 function statusBadgeClass(log: Log): string {
@@ -552,10 +553,10 @@ export function MediaLogCard({
 }: MediaLogCardProps) {
   const display = getLogCardDisplay(log);
   const scopeLabel = formatLogScopeLabel(t, display);
-  const borderClass = listBorderClass(log);
   const isReviewExpanded = embedded && expandedReviewLogId === log.id;
   const isCompact = view === "compact";
   const isGrid = view === "grid";
+  const borderClass = listBorderClass(log, isCompact);
 
   if (isCompact) {
     return (

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { DashboardHub, DashboardLogbook } from "./dashboard";
+import { DashboardA, DashboardB, DashboardC } from "./dashboardVersions";
 import { LogsPosters, LogsTable, LogsKanban } from "./logs";
 import { StatsModules, StatsMomentum } from "./statistics";
 import { ItemHero, ItemSplit, ItemProgress } from "./item";
@@ -19,8 +19,9 @@ import { InfoFaq, InfoContext, InfoTrust } from "./info";
 
 /** Full interactive desktop+mobile implementations, keyed by option id. */
 export const PREVIEWS: Record<string, ReactNode> = {
-  "dashboard-b": <DashboardHub />,
-  "dashboard-c": <DashboardLogbook />,
+  "dashboard-a": <DashboardA />,
+  "dashboard-b": <DashboardB />,
+  "dashboard-c": <DashboardC />,
   "logs-a": <LogsPosters />,
   "logs-b": <LogsTable />,
   "logs-c": <LogsKanban />,

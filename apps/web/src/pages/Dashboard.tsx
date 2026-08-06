@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Share2, User, ChevronDown, ChevronRight } from "lucide-react";
@@ -33,7 +33,6 @@ import { useMe } from "@/contexts/MeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   MEDIA_TYPES,
-  SPEND_TRACKED_MEDIA_TYPES,
   type MediaType,
   toMediaType,
 } from "@geeklogs/shared";
@@ -47,32 +46,15 @@ import {
   type MediaLogsSort,
   type SharedFilters,
 } from "@/pages/MediaLogs";
-import { Select } from "@/components/ui/select";
-import { BookPagesBadge } from "@/components/BookPagesBadge";
-import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
-import { StarRating } from "@/components/StarRating";
-import { gradeToStars } from "@/lib/gradeStars";
-import { formatLogScopeLabel, getLogCardDisplay } from "@/lib/logDisplay";
-import { formatTimeToFinish } from "@/lib/formatDuration";
-import { getStatusLabel } from "@/lib/statusLabel";
-import { logStatusBadgeClass, logStatusBorderClass } from "@/lib/logStatusColors";
-import { tapScale, tapTransition } from "@/lib/animations";
+import { getLogCardDisplay } from "@/lib/logDisplay";
+import { isCompletedStatus } from "@/lib/logStatusColors";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
 import { itemDetailPath } from "@/lib/itemRoutes";
-import {
-  LOG_CARD_BODY_GAP,
-  LOG_CARD_BODY_PADDING,
-  LOG_CARD_HEIGHT_FEED_COLLAPSED,
-  LOG_CARD_HEIGHT_FEED_EXPANDED,
-  LOG_CARD_IMAGE_COLUMN_ROUNDED_L,
-  LOG_CARD_TITLE,
-} from "@/lib/logCardLayout";
-import { MotionLink } from "@/components/MotionLink";
+import { cn } from "@/lib/utils";
 import * as storage from "@/lib/storage";
 import { ReactionButtons } from "@/components/ReactionButtons";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
-import { paperShadow } from "@/lib/paperShadow";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
@@ -87,13 +69,6 @@ const BETA_MODAL_STORAGE_KEY = "geeklogs.betaModalSeen";
 const SOCIAL_COLLAPSED_STORAGE_KEY = "geeklogs.dashboard.socialCollapsed";
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-const FEED_SCORE_SOURCE_LABELS: Partial<Record<MediaType, string>> = {
-  movies: "IMDB",
-  tv: "IMDB",
-  anime: "MAL",
-  manga: "MAL",
-  games: "RAWG",
-};
 /** Base URL for share profile link (always prod so shared links work). */
 const PROFILE_SHARE_BASE_URL = "https://geeklogs.com.br";
 
@@ -143,6 +118,34 @@ function CategoryOrderSkeletonStrip() {
         ))}
       </div>
     </div>
+  );
+}
+
+/** Friend filter pill used in the Social section (All + followed users). */
+function FeedFilterPill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[11px] font-medium transition-colors max-md:min-h-[40px]",
+        active
+          ? "border-[var(--btn-gradient-start)] bg-[var(--btn-gradient-start)]/15 text-[var(--color-lightest)]"
+          : "border-[var(--color-mid)]/40 bg-[var(--color-dark)] text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+      )}
+    >
+      {children}
+      {active && <span className="h-1.5 w-1.5 rounded-full bg-[var(--btn-gradient-start)]" aria-hidden />}
+    </button>
   );
 }
 
@@ -203,8 +206,6 @@ export function Dashboard() {
   const [feedFriendFilter, setFeedFriendFilter] = useState<string>("all");
   const [followedUsers, setFollowedUsers] = useState<Array<{ id: string; username: string | null }>>([]);
   const [showBetaModal, setShowBetaModal] = useState(false);
-  /** Log id whose review is expanded in-card (no modal). */
-  const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
   const [socialCollapsed, setSocialCollapsed] = useState(false);
   const [milestoneProgress, setMilestoneProgress] = useState<MilestoneProgressResponse | null>(null);
   const isMobile = useIsMobile();
@@ -701,39 +702,42 @@ export function Dashboard() {
                 const now = Date.now();
                 const newCount = feed.filter((e) => now - new Date(e.log.createdAt).getTime() < ONE_WEEK_MS).length;
                 return (
-                  <span className="shrink-0 text-sm font-normal text-[var(--color-light)]">
+                  <span className="shrink-0 rounded-full border border-[var(--color-mid)]/25 bg-[var(--color-mid)]/15 px-2.5 py-1 text-xs font-medium text-[var(--color-lightest)]">
                     {t("social.newEntriesLastWeek", { count: String(newCount) })}
                   </span>
                 );
               })()}
             </button>
             {!socialCollapsed && (
-              <Select
-                value={feedFriendFilter}
-                onValueChange={setFeedFriendFilter}
-                options={[
-                  { value: "all", label: t("social.filterAll") },
-                  ...followedUsers.map((u) => ({
-                    value: u.id,
-                    label: u.username ?? u.id,
-                  })),
-                ]}
+              <div
+                role="group"
                 aria-label={t("social.filterByFriend")}
-                className="min-w-0 w-full max-md:h-auto max-md:self-auto md:w-[11rem] md:max-w-[min(100%,12rem)] md:shrink-0"
-                triggerClassName="h-10 w-full min-w-0 max-w-none max-md:min-h-[44px] md:h-10 md:min-h-10 md:max-h-10"
-                contentScrollable={followedUsers.length > 6}
-              />
+                className="scrollbar-hide -mx-1 flex min-w-0 items-center gap-1.5 overflow-x-auto px-1 pb-1 md:mx-0 md:w-auto md:shrink-0 md:flex-none md:flex-wrap md:justify-end md:overflow-visible md:px-0 md:pb-0"
+              >
+                <FeedFilterPill active={feedFriendFilter === "all"} onClick={() => setFeedFriendFilter("all")}>
+                  {t("social.filterAll")}
+                </FeedFilterPill>
+                {followedUsers.map((u) => (
+                  <FeedFilterPill
+                    key={u.id}
+                    active={feedFriendFilter === u.id}
+                    onClick={() => setFeedFriendFilter(feedFriendFilter === u.id ? "all" : u.id)}
+                  >
+                    {u.username ?? u.id}
+                  </FeedFilterPill>
+                ))}
+              </div>
             )}
           </div>
           {!socialCollapsed && (
           <div id="dashboard-social-content" role="region" aria-labelledby="dashboard-social-heading">
-            <div className="flex min-w-0 flex-col gap-4 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-dark)]/50 p-4">
+            <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-[var(--color-mid)]/15 bg-[var(--color-darkest)]/40 p-3 md:gap-4 md:p-4">
               {feedLoading && feed.length === 0 ? (
             <div className="flex flex-col gap-2">
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="flex min-w-0 gap-3 overflow-hidden rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 animate-pulse"
+                  className="flex min-w-0 gap-3 overflow-hidden rounded-2xl border border-[var(--color-surface-border)]/50 bg-[var(--color-dark)] p-4 animate-pulse"
                 >
                   <div className="h-12 w-9 shrink-0 rounded bg-[var(--color-mid)]/30" />
                   <div className="flex-1 space-y-2">
@@ -744,7 +748,7 @@ export function Dashboard() {
               ))}
             </div>
           ) : feed.length === 0 ? (
-            <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-sm)]">
+            <Card className="rounded-2xl border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-sm)]">
               <p className="text-center text-[var(--color-light)]">
                 {t("social.emptyFeed")}
               </p>
@@ -760,222 +764,77 @@ export function Dashboard() {
               <div className="flex min-w-0 flex-col gap-2">
                 {feed.map(({ log, user: feedUser }) => {
                   const display = getLogCardDisplay(log);
-                  const scopeLabel = formatLogScopeLabel(t, display);
-                  const listBorderClass = logStatusBorderClass(log.status);
-                  const badgeClass = logStatusBadgeClass(log.status);
-                  const isExpanded = expandedReviewLogId === log.id;
+                  const profilePath = feedUserProfilePath(feedUser.username ?? feedUser.id, log.mediaType);
+                  const verb =
+                    display.grade != null
+                      ? t("social.ratedEntry")
+                      : isCompletedStatus(log.status)
+                        ? t("social.finishedEntry")
+                        : t("social.loggedEntry");
+                  const ago = (() => {
+                    const diff = Date.now() - new Date(log.createdAt).getTime();
+                    if (diff < 60_000) return t("social.timeAgoJustNow");
+                    const mins = Math.floor(diff / 60_000);
+                    if (mins < 60) return t("social.timeAgoMinutes", { count: String(mins) });
+                    const hrs = Math.floor(mins / 60);
+                    if (hrs < 24) return t("social.timeAgoHours", { count: String(hrs) });
+                    const days = Math.floor(hrs / 24);
+                    return t("social.timeAgoDays", { count: String(days) });
+                  })();
                   return (
-                  <motion.li
-                    key={log.id}
-                    variants={listStaggerItemVariants}
-                    className={`list-none ${listStaggerItemClassName}`}
-                  >
-                    <div
-                      className={`flex min-w-0 flex-row overflow-hidden rounded-lg bg-[var(--color-dark)] p-0 ${!isExpanded ? LOG_CARD_HEIGHT_FEED_COLLAPSED : LOG_CARD_HEIGHT_FEED_EXPANDED} ${listBorderClass}`}
-                      style={paperShadow}
+                    <motion.li
+                      key={log.id}
+                      variants={listStaggerItemVariants}
+                      className={`list-none ${listStaggerItemClassName}`}
                     >
-                      {/* Left: image full height */}
-                      <MotionLink
-                        to={itemDetailPath(log.mediaType, log.externalId)}
-                        whileTap={tapScale}
-                        transition={tapTransition}
-                        className={LOG_CARD_IMAGE_COLUMN_ROUNDED_L}
-                      >
-                        <div className="absolute inset-0 min-h-0 rounded-l-lg">
-                          <ItemImage
-                            src={log.image}
-                            className="h-full w-full min-h-0 rounded-l-lg"
-                            mediaType={log.mediaType}
-                            boardGameSource={log.boardGameSource}
-                          />
-                        </div>
-                        {(() => {
-                          const sourceLabel = FEED_SCORE_SOURCE_LABELS[log.mediaType];
-                          const showScore = sourceLabel != null && typeof log.apiScore === "number" && log.apiScore > 0;
-                          if (!showScore) return null;
-                          return (
-                            <span
-                              className="absolute top-1 right-1 z-10 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-semibold text-yellow-300 backdrop-blur-sm sm:top-1.5 sm:right-1.5 sm:text-[10px] whitespace-nowrap"
-                              title={`${sourceLabel} ${log.apiScore!.toFixed(1)} / 10`}
-                            >
-                              {sourceLabel} {log.apiScore!.toFixed(1)}
-                            </span>
-                          );
-                        })()}
-                        {log.status && (
-                          <span
-                            className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium sm:bottom-1.5 sm:right-1.5 sm:text-[10px] whitespace-nowrap ${badgeClass}`}
-                            title={getStatusLabel(t, log.status, log.mediaType)}
-                          >
-                            {getStatusLabel(t, log.status, log.mediaType)}
-                          </span>
-                        )}
-                      </MotionLink>
-                      {/* Middle: title, meta, user, review */}
-                      <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${LOG_CARD_BODY_GAP} ${LOG_CARD_BODY_PADDING} ${!isExpanded ? "min-h-0" : ""}`}>
-                        <MotionLink
-                          to={itemDetailPath(log.mediaType, log.externalId)}
-                          whileTap={tapScale}
-                          transition={tapTransition}
-                          className="block min-w-0 shrink-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
-                        >
-                          <OverflowMarquee className={LOG_CARD_TITLE}>
-                            {log.title}
-                          </OverflowMarquee>
-                        </MotionLink>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-light)] shrink-0">
-                          {display.grade != null ? (
-                            <StarRating value={gradeToStars(display.grade)} readOnly size="sm" showGradeText={false} />
-                          ) : (
-                            <span>—</span>
-                          )}
-                          {scopeLabel ? (
-                            <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
-                              {scopeLabel}
-                            </span>
-                          ) : null}
-                          {(log.mediaType === "tv" || log.mediaType === "movies" || log.mediaType === "anime") &&
-                            log.networks?.[0] && (
-                            <span className="rounded-full bg-[var(--color-mid)]/30 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
-                              {log.networks[0]}
-                            </span>
-                          )}
-                          {log.mediaType === "books" && (
-                            <BookPagesBadge pagesCount={log.pagesCount} />
-                          )}
-                          {log.mediaType === "boardgames" && (() => {
-                            const min = typeof log.playersMin === "number" && log.playersMin > 0 ? log.playersMin : null;
-                            const max = typeof log.playersMax === "number" && log.playersMax > 0 ? log.playersMax : null;
-                            if (min == null && max == null) return null;
-                            const label =
-                              min != null && max != null && min !== max
-                                ? t("mediaLogs.boardgamePlayersBadgeRange", { min: String(min), max: String(max) })
-                                : t("mediaLogs.boardgamePlayersBadgeSingle", { count: String(min ?? max) });
-                            return (
-                              <span className="rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap">
-                                {label}
-                              </span>
-                            );
-                          })()}
-                          {(() => {
-                            const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
-                            return duration ? (
-                              <span className="whitespace-nowrap">{t("dashboard.finishedIn", { duration })}</span>
-                            ) : null;
-                          })()}
-                          {(SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(log.mediaType) &&
-                            (log.own === true ||
-                              log.wantToBuy === true ||
-                              (log.mediaType === "boardgames" &&
-                                log.matchesPlayed != null &&
-                                log.matchesPlayed > 0)) && (
-                            <>
-                              {log.own === true && (
-                                <span className="whitespace-nowrap">{t("itemReviewForm.own")}</span>
-                              )}
-                              {log.wantToBuy === true && (
-                                <span className="whitespace-nowrap">{t("itemReviewForm.wantToBuy")}</span>
-                              )}
-                              {log.mediaType === "boardgames" &&
-                                log.matchesPlayed != null &&
-                                log.matchesPlayed > 0 && (
-                                <span className="whitespace-nowrap">
-                                  {t("itemReviewForm.matchesPlayed")}: {log.matchesPlayed}
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-2.5 rounded-xl border border-[var(--color-mid)]/10 bg-[var(--color-dark)] p-2.5 shadow-[var(--shadow-sm)]">
                         <Link
-                          to={feedUserProfilePath(feedUser.username ?? feedUser.id, log.mediaType)}
-                          className="flex w-fit items-center gap-1.5 text-xs text-[var(--color-light)] hover:text-[var(--color-lightest)] hover:underline shrink-0"
+                          to={profilePath}
+                          aria-label={feedUser.username ?? t("social.userWithoutUsername")}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--btn-gradient-start)]/20 text-[var(--btn-gradient-start)] hover:bg-[var(--btn-gradient-start)]/30"
                         >
-                          <User className="size-3.5 shrink-0" aria-hidden />
-                          {feedUser.username ?? t("social.userWithoutUsername")} · {t(`nav.${log.mediaType}`)}
+                          <User className="size-4" aria-hidden />
                         </Link>
-                        {display.review ? (
-                          <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden min-w-0">
-                            {(() => {
-                              const review = display.review!;
-                              return (
-                                <>
-                                  {isExpanded ? (
-                                    <div className="min-h-0 overflow-hidden shrink-0">
-                                      <p className="text-xs text-[var(--color-light)] whitespace-pre-wrap break-words">
-                                        {review}
-                                      </p>
-                                    </div>
-                                  ) : null}
-                                  <Button
-                                    type="button"
-                                    variant="link"
-                                    size="sm"
-                                    className="w-fit shrink-0 h-auto p-0 text-xs text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300"
-                                    onClick={() => setExpandedReviewLogId(isExpanded ? null : log.id)}
-                                  >
-                                    {isExpanded ? t("social.viewLess") : t("social.viewReview")}
-                                  </Button>
-                                  <div className="flex shrink-0 flex-wrap items-center gap-2 pt-1 mt-auto">
-                                    <ReactionButtons
-                                      logId={log.id}
-                                      likesCount={log.likesCount ?? 0}
-                                      dislikesCount={log.dislikesCount ?? 0}
-                                      userReaction={log.userReaction ?? null}
-                                      disabled={!token}
-                                      onReactionChange={(payload) => {
-                                        setFeed((prev) =>
-                                          prev.map((e) =>
-                                            e.log.id === log.id
-                                              ? {
-                                                  ...e,
-                                                  log: {
-                                                    ...e.log,
-                                                    likesCount: payload.likesCount,
-                                                    dislikesCount: payload.dislikesCount,
-                                                    userReaction: payload.userReaction,
-                                                  },
-                                                }
-                                              : e
-                                          )
-                                        );
-                                      }}
-                                    />
-                                  </div>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        ) : (
-                          <div className="flex shrink-0 flex-wrap items-center gap-2 pt-1 mt-auto">
-                            <ReactionButtons
-                              logId={log.id}
-                              likesCount={log.likesCount ?? 0}
-                              dislikesCount={log.dislikesCount ?? 0}
-                              userReaction={log.userReaction ?? null}
-                              disabled={!token}
-                              onReactionChange={(payload) => {
-                                setFeed((prev) =>
-                                  prev.map((e) =>
-                                    e.log.id === log.id
-                                      ? {
-                                          ...e,
-                                          log: {
-                                            ...e.log,
-                                            likesCount: payload.likesCount,
-                                            dislikesCount: payload.dislikesCount,
-                                            userReaction: payload.userReaction,
-                                          },
-                                        }
-                                      : e
-                                  )
-                                );
-                              }}
-                            />
-                          </div>
-                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-semibold text-[var(--color-lightest)]">
+                            <Link to={profilePath} className="text-[var(--btn-gradient-start)] hover:underline">
+                              @{feedUser.username ?? t("social.userWithoutUsername")}
+                            </Link>{" "}
+                            <span className="font-normal text-[var(--color-light)]">{verb}</span>{" "}
+                            <Link to={itemDetailPath(log.mediaType, log.externalId)} className="font-semibold text-[var(--color-lightest)] hover:underline">
+                              {log.title}
+                            </Link>
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-[var(--color-light)]">
+                            {t(`nav.${log.mediaType}`)} · {ago}
+                          </p>
+                        </div>
+                        <ReactionButtons
+                          logId={log.id}
+                          likesCount={log.likesCount ?? 0}
+                          dislikesCount={log.dislikesCount ?? 0}
+                          userReaction={log.userReaction ?? null}
+                          disabled={!token}
+                          onReactionChange={(payload) =>
+                            setFeed((prev) =>
+                              prev.map((e) =>
+                                e.log.id === log.id
+                                  ? {
+                                      ...e,
+                                      log: {
+                                        ...e.log,
+                                        likesCount: payload.likesCount,
+                                        dislikesCount: payload.dislikesCount,
+                                        userReaction: payload.userReaction,
+                                      },
+                                    }
+                                  : e
+                              )
+                            )
+                          }
+                        />
                       </div>
-                    </div>
-                  </motion.li>
+                    </motion.li>
                   );
                 })}
               </div>

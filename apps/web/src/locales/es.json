@@ -445,7 +445,14 @@
     "userWithoutUsername": "Usuario",
     "viewMore": "Ver más",
     "viewLess": "Ver menos",
-    "viewReview": "Ver reseña"
+    "viewReview": "Ver reseña",
+    "ratedEntry": "valoró",
+    "finishedEntry": "terminó",
+    "loggedEntry": "registró",
+    "timeAgoJustNow": "ahora",
+    "timeAgoMinutes": "hace {{count}} min",
+    "timeAgoHours": "hace {{count}} h",
+    "timeAgoDays": "hace {{count}} d"
   },
   "dashboard": {
     "title": "Inicio",

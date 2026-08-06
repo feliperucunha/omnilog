@@ -1050,7 +1050,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 
   if (group === "summaryByMonth") {
-    const ranges = recentMonthRanges(tzOffsetMinutes, fullStatsAccess ? 13 : 1);
+    const ranges = recentMonthRanges(tzOffsetMinutes, fullStatsAccess ? 13 : 2);
 
     const completedMonthWhere = (range: { gte: Date; lte: Date }): Prisma.LogWhereInput =>
       applyStatsMediaFilter(

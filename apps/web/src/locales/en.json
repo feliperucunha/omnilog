@@ -466,7 +466,14 @@
     "userWithoutUsername": "User",
     "viewMore": "View more",
     "viewLess": "View less",
-    "viewReview": "View review"
+    "viewReview": "View review",
+    "ratedEntry": "rated",
+    "finishedEntry": "finished",
+    "loggedEntry": "logged",
+    "timeAgoJustNow": "just now",
+    "timeAgoMinutes": "{{count}}m ago",
+    "timeAgoHours": "{{count}}h ago",
+    "timeAgoDays": "{{count}}d ago"
   },
   "dashboard": {
     "title": "Home",

@@ -38,6 +38,15 @@ export function logStatusBorderClass(status: string | null | undefined): string 
   return "border border-[var(--color-mid)]";
 }
 
+/** Left-only status rail on an otherwise neutral card border (option A "Status Rail" look). */
+export function logStatusRailClass(status: string | null | undefined): string {
+  if (status == null) return "border border-[var(--color-surface-border)]";
+  if (isDroppedStatus(status)) return "border border-[var(--color-mid)]/25 border-l-2 border-l-red-500";
+  if (isInProgressStatus(status)) return "border border-[var(--color-mid)]/25 border-l-2 border-l-amber-400";
+  if (isCompletedStatus(status)) return "border border-[var(--color-mid)]/25 border-l-2 border-l-emerald-600";
+  return "border border-[var(--color-mid)]/25 border-l-2 border-l-[var(--color-mid)]";
+}
+
 /** Tint for status select triggers in review forms. */
 export function logStatusSelectTriggerClass(status: string | null | undefined): string {
   if (!status) return "";
