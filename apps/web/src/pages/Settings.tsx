@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ChevronDown, ChevronRight, Download, HelpCircle, Loader2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronRight, Download, Eye, HelpCircle, Loader2, Search as SearchIcon, User2 as UserIcon, Zap } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -33,7 +33,7 @@ import {
 } from "@geeklogs/shared";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
-import { tierHasProFeatures } from "@/lib/userTier";
+import { tierHasProFeatures, tierHasUnlimitedLogs } from "@/lib/userTier";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import {
@@ -49,6 +49,8 @@ import { UserSettingsSection } from "@/components/UserSettingsSection";
 
 type KeysStatus = { tmdb: boolean; rawg: boolean; bgg: boolean; ludopedia: boolean; comicvine: boolean };
 
+const FREE_LOG_LIMIT = 500;
+
 const LOCALE_SHORT_LABELS: Record<Locale, string> = {
   en: "EN",
   "pt-BR": "PT",
@@ -61,39 +63,100 @@ function SettingsCollapsibleSection({
   onToggle,
   children,
   className,
+  labelRight,
+  hidden,
 }: {
   title: ReactNode;
   open: boolean;
   onToggle: () => void;
   children: ReactNode;
   className?: string;
+  labelRight?: ReactNode;
+  hidden?: boolean;
 }) {
+  if (hidden) return null;
   return (
     <div
       className={cn(
-        "rounded-md border border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-md)]",
+        "rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 p-1.5",
         className
       )}
     >
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-2 px-4 py-3 max-md:min-h-[44px] text-left text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-darkest)]/50 focus:outline-none"
+        className="flex w-full items-center gap-1 px-2 py-1.5 text-left transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none max-md:min-h-[44px]"
         aria-expanded={open}
       >
         {open ? (
-          <ChevronDown className="h-5 w-5 shrink-0 text-[var(--color-light)]" aria-hidden />
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--color-light)] transition-transform" aria-hidden />
         ) : (
-          <ChevronRight className="h-5 w-5 shrink-0 text-[var(--color-light)]" aria-hidden />
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--color-light)] transition-transform" aria-hidden />
         )}
-        <span className="min-w-0 flex-1 font-semibold">
-          {typeof title === "string" ? <OverflowMarquee>{title}</OverflowMarquee> : title}
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-light)]">
+          {title}
         </span>
+        {labelRight ? <span className="ml-auto shrink-0">{labelRight}</span> : null}
       </button>
-      {open && (
-        <div className="border-t border-[var(--color-surface-border)] px-4 pb-4 pt-4">{children}</div>
-      )}
+      {open && <div className="mt-1 px-1 pb-1.5 pt-0.5">{children}</div>}
     </div>
+  );
+}
+
+/** Option-A settings row: label left, control/value right, hover background. */
+function SettingsRow({
+  label,
+  desc,
+  right,
+  onClick,
+  className,
+  disabled,
+}: {
+  label: ReactNode;
+  desc?: ReactNode;
+  right?: ReactNode;
+  onClick?: () => void;
+  className?: string;
+  disabled?: boolean;
+}) {
+  const inner = (
+    <>
+      <span className="min-w-0 flex-1 text-[11px] font-medium leading-snug text-[var(--color-lightest)]">
+        {label}
+        {desc ? (
+          <span className="mt-0.5 block text-[10px] font-normal leading-snug text-[var(--color-light)]">
+            {desc}
+          </span>
+        ) : null}
+      </span>
+      {right != null ? <span className="shrink-0 pl-2">{right}</span> : null}
+    </>
+  );
+  if (!onClick) {
+    return (
+      <div
+        className={cn(
+          "flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-[var(--color-mid)]/10",
+          disabled && "pointer-events-none opacity-60",
+          className
+        )}
+      >
+        {inner}
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] max-md:min-h-[44px]",
+        className
+      )}
+    >
+      {inner}
+    </button>
   );
 }
 
@@ -121,9 +184,7 @@ export function Settings() {
   /** Order of categories: visible types first (this order), then hidden. Determines order on home and search. */
   const [orderedMediaTypes, setOrderedMediaTypes] = useState<MediaType[]>(() => [...MEDIA_TYPES]);
   const [searchParams] = useSearchParams();
-  const [settingsTab, setSettingsTab] = useState<"app" | "user">(() =>
-    searchParams.get("tab") === "user" ? "user" : "app"
-  );
+  const [profileEditorOpen, setProfileEditorOpen] = useState(() => searchParams.get("tab") === "user");
   const [generalOpen, setGeneralOpen] = useState(true);
   const [profileVisibilityOpen, setProfileVisibilityOpen] = useState(true);
   const [navigationOpen, setNavigationOpen] = useState(true);
@@ -154,6 +215,17 @@ export function Settings() {
   const exportOpenSnapshotRef = useRef<Set<MediaType>>(new Set());
   const prevExportModalOpenRef = useRef(false);
   const isMobile = useIsMobile();
+  const [settingsSearch, setSettingsSearch] = useState("");
+  const [searchReadOnly, setSearchReadOnly] = useState(true);
+
+  const settingsSearchMatches = useCallback(
+    (...terms: (string | undefined | null)[]) => {
+      const q = settingsSearch.trim().toLowerCase();
+      if (!q) return true;
+      return terms.some((term) => term?.toLowerCase().includes(q));
+    },
+    [settingsSearch]
+  );
 
   useEffect(() => {
     if (exportModalOpen && !prevExportModalOpenRef.current) {
@@ -163,9 +235,60 @@ export function Settings() {
   }, [exportModalOpen, exportSelectedCategories]);
 
   useEffect(() => {
-    if (searchParams.get("open") === "api-keys") setAdvancedOpen(true);
-    if (searchParams.get("tab") === "user") setSettingsTab("user");
+    if (searchParams.get("open") === "api-keys") {
+      setAdvancedOpen(true);
+      setSettingsSearch("");
+    }
+    if (searchParams.get("tab") === "user") setProfileEditorOpen(true);
   }, [searchParams]);
+
+  const generalSectionVisible = settingsSearchMatches(
+    t("settings.general"),
+    t("settings.subscription"),
+    t("settings.language"),
+    t("nav.theme"),
+    t("settings.recapEmailsTitle"),
+    t("settings.showCompleteModal")
+  );
+  const profileVisibilitySectionVisible = settingsSearchMatches(
+    t("settings.profileVisibilityTitle"),
+    t("settings.profileVisibilityShowPublicProfile"),
+    t("settings.profileVisibilityShowLogCount"),
+    t("settings.profileVisibilityShowReviews")
+  );
+  const navigationSectionVisible = settingsSearchMatches(
+    t("settings.appNavigationTitle"),
+    t("settings.boardGameProviderLabel"),
+    t("settings.animeMangaTitleLanguageLabel")
+  );
+  const exportSectionVisible = settingsSearchMatches(
+    t("tiers.exportLogs"),
+    t("settings.exportModalTitle")
+  );
+  const apiKeysSectionVisible = settingsSearchMatches(
+    t("settings.apiKeys"),
+    t("settings.apiKeysIntro"),
+    "tmdb",
+    "rawg",
+    "bgg",
+    "ludopedia",
+    "comicvine"
+  );
+  const adminSectionVisible =
+    me?.tier === "admin" &&
+    settingsSearchMatches(
+      t("settings.adminSection"),
+      t("settings.adminUsersTitle"),
+      t("settings.adminFeatureFlagsTitle")
+    );
+  const noAppResults =
+    settingsSearch.trim() !== "" &&
+    !generalSectionVisible &&
+    !profileVisibilitySectionVisible &&
+    !navigationSectionVisible &&
+    !exportSectionVisible &&
+    !apiKeysSectionVisible &&
+    !adminSectionVisible;
 
   useEffect(() => {
     if (me?.tier !== "admin" || !adminOpen) return;
@@ -554,93 +677,222 @@ export function Settings() {
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
     >
       <div className="flex flex-col gap-8">
-        <div className="flex gap-1 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50 p-1">
-          <button
-            type="button"
-            onClick={() => setSettingsTab("app")}
-            className={cn(
-              "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              settingsTab === "app"
-                ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
-                : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-            )}
-          >
-            {t("settings.tabApp")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setSettingsTab("user")}
-            className={cn(
-              "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              settingsTab === "user"
-                ? "bg-[var(--color-mid)]/50 text-[var(--color-lightest)]"
-                : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-            )}
-          >
-            {t("settings.tabUser")}
-          </button>
-        </div>
+        {me && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3 rounded-2xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-4">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--btn-gradient-start)] text-lg font-black text-white">
+                {(me.user.username?.[0] ?? me.user.email[0] ?? "?").toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-[var(--color-lightest)]">
+                  {me.user.username ? `@${me.user.username}` : me.user.email}
+                </p>
+                <p className="text-[11px] text-[var(--color-light)]">
+                  {me.tier === "pro" ? (
+                    me.daysRemaining != null ? (
+                      <>
+                        {t("tiers.pro")} ·{" "}
+                        {me.daysRemaining === 1
+                          ? t("settings.subscriptionDaysLeftOne")
+                          : t("settings.subscriptionDaysLeft", { count: String(me.daysRemaining) })}
+                      </>
+                    ) : (
+                      t("tiers.pro")
+                    )
+                  ) : me.tier === "admin" ? (
+                    t("tiers.admin")
+                  ) : me.tier === "beta" ? (
+                    t("tiers.beta")
+                  ) : (
+                    t("tiers.free")
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfileEditorOpen((prev) => !prev)}
+                aria-expanded={profileEditorOpen}
+                className="shrink-0 rounded-lg border border-[var(--color-mid)]/40 px-2.5 py-1 text-[10px] font-semibold text-[var(--color-light)] transition-colors hover:bg-[var(--color-mid)]/10"
+              >
+                {profileEditorOpen ? t("common.close") : t("settings.editProfileLabel")}
+              </button>
+            </div>
 
-        {settingsTab === "user" ? (
-          <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 shadow-[var(--shadow-md)]">
-            <UserSettingsSection />
-          </Card>
-        ) : (
+            <AnimatePresence initial={false}>
+              {profileEditorOpen && (
+                <motion.div
+                  key="profile-editor"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="rounded-2xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-4">
+                    <UserSettingsSection />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="rounded-xl bg-[var(--btn-gradient-start)]/10 p-3">
+              <div className="flex items-center justify-between gap-3 text-[11px]">
+                <span className="font-semibold text-[var(--color-lightest)]">{t("settings.usageTitle")}</span>
+                {tierHasUnlimitedLogs(me.tier) ? (
+                  <span className="truncate text-[var(--color-light)]">
+                    {t("tiers.usageUnlimited", { count: String(me.logCount ?? 0) })}
+                  </span>
+                ) : (
+                  <span className="truncate text-[var(--color-light)]">
+                    {t("tiers.usage", {
+                      count: String(me.logCount ?? 0),
+                      limit: String(FREE_LOG_LIMIT),
+                    })}
+                  </span>
+                )}
+              </div>
+              {!tierHasUnlimitedLogs(me.tier) && (
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-mid)]/30">
+                  <div
+                    className="h-full rounded-full bg-[var(--btn-gradient-start)]"
+                    style={{
+                      width: `${Math.min(100, Math.max(2, ((me.logCount ?? 0) / FREE_LOG_LIMIT) * 100))}%`,
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <button
+                type="button"
+                onClick={() => setProfileEditorOpen(true)}
+                className="flex flex-col gap-1 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 p-3 text-left transition-colors hover:bg-[var(--color-mid)]/10"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--btn-gradient-start)]/15 text-[var(--btn-gradient-start)]">
+                  <UserIcon className="size-3.5" aria-hidden />
+                </span>
+                <span className="text-xs font-bold text-[var(--color-lightest)]">{t("settings.quickProfile")}</span>
+                <span className="truncate text-[10px] text-[var(--color-light)]">{t("settings.quickProfileDesc")}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setProfileVisibilityOpen(true)}
+                className="flex flex-col gap-1 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 p-3 text-left transition-colors hover:bg-[var(--color-mid)]/10"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--btn-gradient-start)]/15 text-[var(--btn-gradient-start)]">
+                  <Eye className="size-3.5" aria-hidden />
+                </span>
+                <span className="text-xs font-bold text-[var(--color-lightest)]">{t("settings.quickPrivacy")}</span>
+                <span className="truncate text-[10px] text-[var(--color-light)]">{t("settings.quickPrivacyDesc")}</span>
+              </button>
+              <Link
+                to="/tiers"
+                className="flex flex-col gap-1 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 p-3 text-left transition-colors hover:bg-[var(--color-mid)]/10"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--btn-gradient-start)]/15 text-[var(--btn-gradient-start)]">
+                  <Zap className="size-3.5" aria-hidden />
+                </span>
+                <span className="text-xs font-bold text-[var(--color-lightest)]">{t("settings.quickPlan")}</span>
+                <span className="truncate text-[10px] text-[var(--color-light)]">{t("settings.quickPlanDesc")}</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  if (tierHasProFeatures(me.tier)) setExportModalOpen(true);
+                  else setExportOpen(true);
+                }}
+                className="flex flex-col gap-1 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 p-3 text-left transition-colors hover:bg-[var(--color-mid)]/10"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--btn-gradient-start)]/15 text-[var(--btn-gradient-start)]">
+                  <Download className="size-3.5" aria-hidden />
+                </span>
+                <span className="text-xs font-bold text-[var(--color-lightest)]">{t("tiers.exportLogs")}</span>
+                <span className="truncate text-[10px] text-[var(--color-light)]">{t("settings.exportModalDesc")}</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-xl border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/60 px-3 py-2.5">
+              <SearchIcon className="size-4 shrink-0 text-[var(--color-light)]" aria-hidden />
+              <input
+                value={settingsSearch}
+                onChange={(e) => setSettingsSearch(e.target.value)}
+                placeholder={t("settings.searchPlaceholder")}
+                type="search"
+                name="settings_search"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                readOnly={searchReadOnly}
+                onFocus={() => setSearchReadOnly(false)}
+                onPointerDown={() => setSearchReadOnly(false)}
+                data-1p-ignore="true"
+                data-lpignore="true"
+                data-form-type="other"
+                data-ddg-inputtype="unrecognized"
+                className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-lightest)] outline-none placeholder:text-[var(--color-light)] [&::-webkit-search-cancel-button]:hidden"
+                aria-label={t("settings.searchPlaceholder")}
+              />
+              {settingsSearch && (
+                <button
+                  type="button"
+                  onClick={() => setSettingsSearch("")}
+                  className="shrink-0 rounded p-1 text-[var(--color-light)] transition-colors hover:text-[var(--color-lightest)]"
+                  aria-label={t("settings.searchClear")}
+                >
+                  <ChevronRight className="size-4 rotate-90" aria-hidden />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <>
         <SettingsCollapsibleSection
           title={t("settings.general")}
           open={generalOpen}
           onToggle={() => setGeneralOpen((prev) => !prev)}
+          hidden={!generalSectionVisible}
         >
-          <div className="divide-y divide-[var(--color-mid)]/20">
-            {me && (
-              <div className="flex flex-col gap-2 py-4 first:pt-0">
-                <span className="text-sm font-medium text-[var(--color-lightest)]">
-                  {t("settings.subscription")}
-                </span>
-                <p className="text-sm text-[var(--color-light)]">
-                  {me.tier === "pro" ? (
-                    me.daysRemaining != null ? (
-                      <>
-                        {me.daysRemaining === 1
-                          ? t("settings.subscriptionDaysLeftOne")
-                          : t("settings.subscriptionDaysLeft", { count: String(me.daysRemaining) })}
-                        {" · "}
-                        <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
-                          {t("tiers.manageSubscription")}
-                        </Link>
-                      </>
-                    ) : (
-                      <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
-                        {t("tiers.manageSubscription")}
-                      </Link>
-                    )
-                  ) : me.tier === "admin" ? (
-                    <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
-                      {t("tiers.admin")}
-                    </Link>
-                  ) : me.tier === "beta" ? (
-                    <>
-                      {t("settings.subscriptionBeta")}{" "}
-                      <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
-                        {t("settings.viewPlans")}
-                      </Link>
-                    </>
-                  ) : (
-                    <Link to="/tiers" className="underline hover:no-underline text-[var(--color-lightest)]">
-                      {t("settings.viewPlans")}
-                    </Link>
-                  )}
-                </p>
-              </div>
-            )}
-            <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <div className="min-w-0">
-                <span className="text-sm font-medium text-[var(--color-lightest)]">
-                  {t("settings.language")}
-                </span>
-              </div>
-              <div className="shrink-0">
+          <div className="flex flex-col gap-0.5">
+            <SettingsRow
+              label={t("settings.subscription")}
+              desc={
+                me
+                  ? me.tier === "pro"
+                    ? me.daysRemaining != null
+                      ? me.daysRemaining === 1
+                        ? t("settings.subscriptionDaysLeftOne")
+                        : t("settings.subscriptionDaysLeft", { count: String(me.daysRemaining) })
+                      : t("tiers.manageSubscription")
+                    : me.tier === "admin"
+                      ? t("tiers.admin")
+                      : me.tier === "beta"
+                        ? t("settings.subscriptionBeta")
+                        : t("settings.viewPlans")
+                  : undefined
+              }
+              right={
+                me ? (
+                  <Link
+                    to="/tiers"
+                    className="text-[10px] font-semibold text-[var(--btn-gradient-start)] hover:underline"
+                  >
+                    {me.tier === "pro" && me.daysRemaining == null
+                      ? t("tiers.manageSubscription")
+                      : me.tier === "beta"
+                        ? t("settings.viewPlans")
+                        : me.tier === "admin"
+                          ? t("tiers.admin")
+                          : t("settings.viewPlans")}
+                  </Link>
+                ) : undefined
+              }
+            />
+            <SettingsRow
+              label={t("settings.language")}
+              right={
                 <ToggleGroup
                   type="single"
                   value={locale}
@@ -652,47 +904,33 @@ export function Settings() {
                     <ToggleGroupItem
                       key={opt.value}
                       value={opt.value}
-                      className="h-9 px-4 text-sm font-medium data-[state=on]:bg-[var(--color-mid)]/50 data-[state=on]:text-[var(--color-lightest)] rounded-md"
+                      className="h-7 px-3 text-xs font-medium data-[state=on]:bg-[var(--color-mid)]/50 data-[state=on]:text-[var(--color-lightest)] rounded-md"
                       aria-label={opt.label}
                     >
                       {LOCALE_SHORT_LABELS[opt.value]}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <div className="min-w-0">
-                <span className="text-sm font-medium text-[var(--color-lightest)]">
-                  {t("nav.theme")}
-                </span>
-              </div>
-              <div className="shrink-0">
-                <ThemeSwitcher />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <div className="min-w-0">
-                <span className="text-sm font-medium text-[var(--color-lightest)]">
-                  {t("settings.recapEmailsTitle")}
-                </span>
-              </div>
-              <div className="shrink-0 pt-0.5">
+              }
+            />
+            <SettingsRow
+              label={t("nav.theme")}
+              right={<ThemeSwitcher />}
+            />
+            <SettingsRow
+              label={t("settings.recapEmailsTitle")}
+              right={
                 <Switch
                   checked={recapEmailsEnabled}
                   disabled={recapSaving || !me}
                   onCheckedChange={(v) => void handleRecapEmailsChange(v)}
                   aria-label={t("settings.recapEmailsTitle")}
                 />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 last:pb-0">
-              <div className="min-w-0">
-                <span className="text-sm font-medium text-[var(--color-lightest)]">
-                  {t("settings.showCompleteModal")}
-                </span>
-              </div>
-              <div className="shrink-0 pt-0.5">
+              }
+            />
+            <SettingsRow
+              label={t("settings.showCompleteModal")}
+              right={
                 <Switch
                   checked={showCompleteModal}
                   onCheckedChange={(checked) => {
@@ -701,8 +939,8 @@ export function Settings() {
                   }}
                   aria-label={t("settings.showCompleteModal")}
                 />
-              </div>
-            </div>
+              }
+            />
           </div>
         </SettingsCollapsibleSection>
 
@@ -710,171 +948,132 @@ export function Settings() {
           title={t("settings.profileVisibilityTitle")}
           open={profileVisibilityOpen}
           onToggle={() => setProfileVisibilityOpen((prev) => !prev)}
+          hidden={!profileVisibilitySectionVisible}
         >
-          <motion.div
-            className="flex flex-col gap-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
+          <div className="flex flex-col gap-0.5">
             {me?.user.username ? (
-              <p className="text-sm text-[var(--color-light)]">
-                <Link
-                  to={`/${me.user.username}`}
-                  className="text-[var(--color-primary)] underline-offset-2 hover:underline"
-                >
-                  {t("settings.profileVisibilityViewProfile")}
-                </Link>
-              </p>
+              <SettingsRow
+                label={t("settings.profileVisibilityViewProfile")}
+                right={<ChevronRight className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />}
+                onClick={() => {
+                  window.location.href = `/${me.user.username}`;
+                }}
+              />
             ) : null}
-            <motion.div
-              className="divide-y divide-[var(--color-surface-border)]"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <p className="pb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
-                {t("settings.profileVisibilitySectionProfile")}
-              </p>
-              {(
+            <p className="px-2 pb-0.5 pt-2 text-[9px] font-bold uppercase tracking-wider text-[var(--color-light)]">
+              {t("settings.profileVisibilitySectionProfile")}
+            </p>
+            {(
+              [
+                ["showPublicProfile", "settings.profileVisibilityShowPublicProfile"],
+                ["showLogCount", "settings.profileVisibilityShowLogCount"],
+                ["showPinnedBadges", "settings.profileVisibilityShowPinnedBadges"],
+                ["showMilestoneBadges", "settings.profileVisibilityShowMilestoneBadges"],
+              ] as const
+            ).map(([key, labelKey]) => (
+              <SettingsRow
+                key={key}
+                label={t(labelKey)}
+                right={
+                  <Switch
+                    checked={profileVisibility[key]}
+                    disabled={visibilitySaving || !me}
+                    onCheckedChange={(v) => void handleProfileVisibilityChange(key, v)}
+                    aria-label={t(labelKey)}
+                  />
+                }
+              />
+            ))}
+            <p className="px-2 pb-0.5 pt-2 text-[9px] font-bold uppercase tracking-wider text-[var(--color-light)]">
+              {t("settings.profileVisibilitySectionMarket")}
+            </p>
+            {(
+              [["showMarketListings", "settings.profileVisibilityShowMarketListings"]] as const
+            ).map(([key, labelKey]) => (
+              <SettingsRow
+                key={key}
+                label={t(labelKey)}
+                disabled={!profileVisibility.showPublicProfile}
+                right={
+                  <Switch
+                    checked={profileVisibility[key]}
+                    disabled={visibilitySaving || !me || !profileVisibility.showPublicProfile}
+                    onCheckedChange={(v) => void handleProfileVisibilityChange(key, v)}
+                    aria-label={t(labelKey)}
+                  />
+                }
+              />
+            ))}
+            <p className="px-2 pb-0.5 pt-2 text-[9px] font-bold uppercase tracking-wider text-[var(--color-light)]">
+              {t("settings.profileVisibilitySectionBoardGames")}
+            </p>
+            {(
+              [
                 [
-                  ["showPublicProfile", "settings.profileVisibilityShowPublicProfile"],
-                  ["showLogCount", "settings.profileVisibilityShowLogCount"],
-                  ["showPinnedBadges", "settings.profileVisibilityShowPinnedBadges"],
-                  ["showMilestoneBadges", "settings.profileVisibilityShowMilestoneBadges"],
-                ] as const
-              ).map(([key, labelKey]) => (
-                <motion.div
-                  key={key}
-                  className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-                >
-                  <div className="min-w-0">
-                    <span className="text-sm font-medium text-[var(--color-lightest)]">
-                      {t(labelKey)}
-                    </span>
-                  </div>
-                  <div className="shrink-0 pt-0.5">
-                    <Switch
-                      checked={profileVisibility[key]}
-                      disabled={visibilitySaving || !me}
-                      onCheckedChange={(v) => void handleProfileVisibilityChange(key, v)}
-                      aria-label={t(labelKey)}
-                    />
-                  </div>
-                </motion.div>
-              ))}
-              <p className="pb-2 pt-4 text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
-                {t("settings.profileVisibilitySectionMarket")}
-              </p>
-              {(
-                [["showMarketListings", "settings.profileVisibilityShowMarketListings"]] as const
-              ).map(([key, labelKey]) => (
-                <motion.div
-                  key={key}
-                  className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-                >
-                  <div className="min-w-0">
-                    <span className="text-sm font-medium text-[var(--color-lightest)]">
-                      {t(labelKey)}
-                    </span>
-                  </div>
-                  <div className="shrink-0 pt-0.5">
-                    <Switch
-                      checked={profileVisibility[key]}
-                      disabled={
-                        visibilitySaving || !me || !profileVisibility.showPublicProfile
-                      }
-                      onCheckedChange={(v) => void handleProfileVisibilityChange(key, v)}
-                      aria-label={t(labelKey)}
-                    />
-                  </div>
-                </motion.div>
-              ))}
-              <p className="pb-2 pt-4 text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
-                {t("settings.profileVisibilitySectionBoardGames")}
-              </p>
-              {(
-                [
-                  [
-                    "showTaggedBoardGameMatches",
-                    "settings.profileVisibilityShowTaggedBoardGameMatches",
-                  ],
-                ] as const
-              ).map(([key, labelKey]) => (
-                <motion.div
-                  key={key}
-                  className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-                >
-                  <div className="min-w-0">
-                    <span className="text-sm font-medium text-[var(--color-lightest)]">
-                      {t(labelKey)}
-                    </span>
-                  </div>
-                  <div className="shrink-0 pt-0.5">
-                    <Switch
-                      checked={profileVisibility[key]}
-                      disabled={
-                        visibilitySaving || !me || !profileVisibility.showPublicProfile
-                      }
-                      onCheckedChange={(v) => void handleProfileVisibilityChange(key, v)}
-                      aria-label={t(labelKey)}
-                    />
-                  </div>
-                </motion.div>
-              ))}
-              <p className="pb-2 pt-4 text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
-                {t("settings.profileVisibilitySectionLogs")}
-              </p>
-              {(
-                [
-                  ["showStatus", "settings.profileVisibilityShowStatus"],
-                  ["showRatings", "settings.profileVisibilityShowRatings"],
-                  ["showReviews", "settings.profileVisibilityShowReviews"],
-                  ["showGenres", "settings.profileVisibilityShowGenres"],
-                  ["showApiScores", "settings.profileVisibilityShowApiScores"],
-                  ["showProgress", "settings.profileVisibilityShowProgress"],
-                  ["showCompletionTime", "settings.profileVisibilityShowCompletionTime"],
-                  ["showCollectionTags", "settings.profileVisibilityShowCollectionTags"],
-                  ["showTvMetadata", "settings.profileVisibilityShowTvMetadata"],
-                  ["showEnrichmentDetails", "settings.profileVisibilityShowEnrichmentDetails"],
-                ] as const
-              ).map(([key, labelKey]) => (
-                <motion.div
-                  key={key}
-                  className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 last:pb-0"
-                >
-                  <motion.div className="min-w-0">
-                    <span
-                      className={cn(
-                        "text-sm font-medium",
-                        profileVisibility.showPublicProfile
-                          ? "text-[var(--color-lightest)]"
-                          : "text-[var(--color-light)]"
-                      )}
-                    >
-                      {t(labelKey)}
-                    </span>
-                  </motion.div>
-                  <motion.div className="shrink-0 pt-0.5">
-                    <Switch
-                      checked={profileVisibility[key]}
-                      disabled={
-                        visibilitySaving || !me || !profileVisibility.showPublicProfile
-                      }
-                      onCheckedChange={(v) => void handleProfileVisibilityChange(key, v)}
-                      aria-label={t(labelKey)}
-                    />
-                  </motion.div>
-                </motion.div>
-              ))}
-            </motion.div>
-          </motion.div>
+                  "showTaggedBoardGameMatches",
+                  "settings.profileVisibilityShowTaggedBoardGameMatches",
+                ],
+              ] as const
+            ).map(([key, labelKey]) => (
+              <SettingsRow
+                key={key}
+                label={t(labelKey)}
+                disabled={!profileVisibility.showPublicProfile}
+                right={
+                  <Switch
+                    checked={profileVisibility[key]}
+                    disabled={
+                      visibilitySaving || !me || !profileVisibility.showPublicProfile
+                    }
+                    onCheckedChange={(v) => void handleProfileVisibilityChange(key, v)}
+                    aria-label={t(labelKey)}
+                  />
+                }
+              />
+            ))}
+            <p className="px-2 pb-0.5 pt-2 text-[9px] font-bold uppercase tracking-wider text-[var(--color-light)]">
+              {t("settings.profileVisibilitySectionLogs")}
+            </p>
+            {(
+              [
+                ["showStatus", "settings.profileVisibilityShowStatus"],
+                ["showRatings", "settings.profileVisibilityShowRatings"],
+                ["showReviews", "settings.profileVisibilityShowReviews"],
+                ["showGenres", "settings.profileVisibilityShowGenres"],
+                ["showApiScores", "settings.profileVisibilityShowApiScores"],
+                ["showProgress", "settings.profileVisibilityShowProgress"],
+                ["showCompletionTime", "settings.profileVisibilityShowCompletionTime"],
+                ["showCollectionTags", "settings.profileVisibilityShowCollectionTags"],
+                ["showTvMetadata", "settings.profileVisibilityShowTvMetadata"],
+                ["showEnrichmentDetails", "settings.profileVisibilityShowEnrichmentDetails"],
+              ] as const
+            ).map(([key, labelKey]) => (
+              <SettingsRow
+                key={key}
+                label={t(labelKey)}
+                disabled={!profileVisibility.showPublicProfile}
+                right={
+                  <Switch
+                    checked={profileVisibility[key]}
+                    disabled={
+                      visibilitySaving || !me || !profileVisibility.showPublicProfile
+                    }
+                    onCheckedChange={(v) => void handleProfileVisibilityChange(key, v)}
+                    aria-label={t(labelKey)}
+                  />
+                }
+              />
+            ))}
+          </div>
         </SettingsCollapsibleSection>
 
         <SettingsCollapsibleSection
           title={t("settings.appNavigationTitle")}
           open={navigationOpen}
           onToggle={() => setNavigationOpen((prev) => !prev)}
+          hidden={!navigationSectionVisible}
         >
-          <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-0.5">
             {me && tierHasProFeatures(me.tier) ? (
               <MediaCategoryDragList
                   order={orderedMediaTypes}
@@ -893,72 +1092,52 @@ export function Settings() {
                   listAriaLabel={t("settings.visibleMediaTypesLabel")}
                 />
             ) : (
-              <div className="flex flex-col gap-3">
-                <p className="text-sm text-[var(--color-light)]">
-                  {t("settings.appNavigationProOnlyIntro")}
-                </p>
-                <Button variant="outline" className="w-fit" asChild>
-                  <Link to="/tiers">{t("settings.publicProfileUpgrade")}</Link>
-                </Button>
-              </div>
+              <SettingsRow
+                label={t("settings.appNavigationProOnlyIntro")}
+                right={
+                  <Button variant="outline" className="h-7 px-3 text-xs" asChild>
+                    <Link to="/tiers">{t("settings.publicProfileUpgrade")}</Link>
+                  </Button>
+                }
+              />
             )}
 
-            <div className="relative overflow-hidden">
-              <div className="mb-3">
-                <p className="text-sm font-semibold text-[var(--color-lightest)]">
-                  {t("settings.boardGameProviderLabel")}
-                </p>
-              </div>
-              <div
-                className={cn("flex flex-col gap-4", savingBoardGameProvider && "pointer-events-none opacity-60")}
-                aria-busy={savingBoardGameProvider}
-              >
-                <BoardGameProviderSelector
-                  value={me?.boardGameProvider ?? "bgg"}
-                  onValueChange={(next) => void handleBoardGameProviderChange(next)}
-                  disabled={savingBoardGameProvider}
-                />
-              </div>
-              {savingBoardGameProvider && (
-                <div
-                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-md bg-[var(--color-dark)]/75 backdrop-blur-[2px]"
-                  role="status"
-                  aria-live="polite"
-                  aria-label={t("settings.saving")}
-                >
-                  <Loader2 className="h-10 w-10 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
-                  <span className="text-sm font-medium text-[var(--color-lightest)]">{t("settings.saving")}</span>
-                </div>
+            <div
+              className={cn(
+                "flex flex-col gap-0.5",
+                savingBoardGameProvider && "pointer-events-none opacity-60"
               )}
+              aria-busy={savingBoardGameProvider}
+            >
+              <SettingsRow
+                label={t("settings.boardGameProviderLabel")}
+                right={
+                  <BoardGameProviderSelector
+                    value={me?.boardGameProvider ?? "bgg"}
+                    onValueChange={(next) => void handleBoardGameProviderChange(next)}
+                    disabled={savingBoardGameProvider}
+                  />
+                }
+              />
             </div>
 
-            <div className="relative overflow-hidden">
-              <div className="mb-3">
-                <p className="text-sm font-semibold text-[var(--color-lightest)]">
-                  {t("settings.animeMangaTitleLanguageLabel")}
-                </p>
-              </div>
-              <div
-                className={cn("flex flex-col gap-4", savingAnimeMangaTitleLanguage && "pointer-events-none opacity-60")}
-                aria-busy={savingAnimeMangaTitleLanguage}
-              >
-                <AnimeMangaTitleLanguageSelector
-                  value={me?.animeMangaTitleLanguage ?? "original"}
-                  onValueChange={(next) => void handleAnimeMangaTitleLanguageChange(next)}
-                  disabled={savingAnimeMangaTitleLanguage}
-                />
-              </div>
-              {savingAnimeMangaTitleLanguage && (
-                <div
-                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-md bg-[var(--color-dark)]/75 backdrop-blur-[2px]"
-                  role="status"
-                  aria-live="polite"
-                  aria-label={t("settings.saving")}
-                >
-                  <Loader2 className="h-10 w-10 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
-                  <span className="text-sm font-medium text-[var(--color-lightest)]">{t("settings.saving")}</span>
-                </div>
+            <div
+              className={cn(
+                "flex flex-col gap-0.5",
+                savingAnimeMangaTitleLanguage && "pointer-events-none opacity-60"
               )}
+              aria-busy={savingAnimeMangaTitleLanguage}
+            >
+              <SettingsRow
+                label={t("settings.animeMangaTitleLanguageLabel")}
+                right={
+                  <AnimeMangaTitleLanguageSelector
+                    value={me?.animeMangaTitleLanguage ?? "original"}
+                    onValueChange={(next) => void handleAnimeMangaTitleLanguageChange(next)}
+                    disabled={savingAnimeMangaTitleLanguage}
+                  />
+                }
+              />
             </div>
           </div>
         </SettingsCollapsibleSection>
@@ -968,31 +1147,36 @@ export function Settings() {
             title={t("tiers.exportLogs")}
             open={exportOpen}
             onToggle={() => setExportOpen((prev) => !prev)}
+            hidden={!exportSectionVisible}
             className={!tierHasProFeatures(me.tier) ? "opacity-75" : undefined}
           >
-            <div className="flex flex-col gap-4">
-              {tierHasProFeatures(me.tier) ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-fit gap-2"
-                  onClick={() => setExportModalOpen(true)}
-                >
-                  <Download className="h-4 w-4" aria-hidden />
-                  {t("tiers.exportLogs")}
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  className="w-fit gap-2 opacity-70"
-                  asChild
-                >
-                  <Link to="/tiers">
-                    <Download className="h-4 w-4" aria-hidden />
-                    {t("tiers.exportLogs")}
-                  </Link>
-                </Button>
-              )}
+            <div className="flex flex-col gap-0.5">
+              <SettingsRow
+                label={t("settings.exportModalTitle")}
+                right={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-7 gap-1.5 px-3 text-xs"
+                    onClick={() => {
+                      if (tierHasProFeatures(me.tier)) setExportModalOpen(true);
+                    }}
+                    asChild={!tierHasProFeatures(me.tier)}
+                  >
+                    {tierHasProFeatures(me.tier) ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Download className="h-3.5 w-3.5" aria-hidden />
+                        {t("tiers.exportLogs")}
+                      </span>
+                    ) : (
+                      <Link to="/tiers" className="inline-flex items-center gap-1.5">
+                        <Download className="h-3.5 w-3.5" aria-hidden />
+                        {t("tiers.exportLogs")}
+                      </Link>
+                    )}
+                  </Button>
+                }
+              />
             </div>
           </SettingsCollapsibleSection>
         )}
@@ -1024,14 +1208,15 @@ export function Settings() {
           title={t("settings.apiKeys")}
           open={advancedOpen}
           onToggle={() => setAdvancedOpen((prev) => !prev)}
+          hidden={!apiKeysSectionVisible}
         >
           <div>
-              <div className="mb-4 flex items-start gap-2">
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm text-[var(--color-light)]">
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[var(--color-darkest)]/40 px-2 py-2">
+                <div className="flex-1 space-y-0.5">
+                  <p className="text-[11px] text-[var(--color-light)]">
                     {t("settings.apiKeysIntro")}
                   </p>
-                  <p className="text-sm text-[var(--color-light)]">
+                  <p className="text-[10px] text-[var(--color-light)]">
                     {t("settings.apiKeyTutorialIntro")}
                   </p>
                 </div>
@@ -1041,7 +1226,7 @@ export function Settings() {
                   aria-label={t("settings.apiKeysSupport")}
                   title={t("settings.apiKeysSupport")}
                 >
-                  <HelpCircle className="h-5 w-5" aria-hidden />
+                  <HelpCircle className="h-4 w-4" aria-hidden />
                 </a>
               </div>
               <div className="flex flex-col gap-4">
@@ -1074,44 +1259,44 @@ export function Settings() {
                     <Card
                       key={provider}
                       className={cn(
-                        "border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-md)]",
+                        "rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 p-3",
                         isBoardGameApiKey && "relative overflow-hidden",
                       )}
                     >
                       <div
-                        className={cn("flex flex-col gap-4", isBoardGameKeySaving && "pointer-events-none opacity-60")}
+                        className={cn("flex flex-col gap-2.5", isBoardGameKeySaving && "pointer-events-none opacity-60")}
                         aria-busy={isBoardGameKeySaving}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <h3 className="min-w-0 flex-1 text-lg font-semibold text-[var(--color-lightest)]">
+                          <h3 className="min-w-0 flex-1 text-sm font-semibold text-[var(--color-lightest)]">
                             <OverflowMarquee>{meta.name}</OverflowMarquee>
                           </h3>
                           <div className="flex flex-wrap items-center gap-2">
                             {provider === "bgg" && (
-                              <span className="rounded border border-[var(--color-mid)]/50 bg-[var(--color-darkest)]/80 px-2 py-0.5 text-xs text-[var(--color-light)]">
+                              <span className="rounded border border-[var(--color-mid)]/50 bg-[var(--color-darkest)]/80 px-2 py-0.5 text-[10px] text-[var(--color-light)]">
                                 {t("settings.bggApprovalBadge")}
                               </span>
                             )}
                             {isSet && (
-                              <span className="rounded bg-[var(--color-darkest)] px-2 py-0.5 text-xs text-[var(--color-light)]">
+                              <span className="rounded bg-[var(--color-darkest)] px-2 py-0.5 text-[10px] text-[var(--color-light)]">
                                 {t("settings.keySaved")}
                               </span>
                             )}
                           </div>
                         </div>
-                        <p className="whitespace-pre-wrap text-sm text-[var(--color-light)]">
+                        <p className="whitespace-pre-wrap text-[11px] text-[var(--color-light)]">
                           {t(`settings.apiKeyTutorial.${provider}`)}
                         </p>
                         <a
                           href={meta.link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-[var(--color-light)] underline hover:text-[var(--color-lightest)]"
+                          className="w-fit text-[11px] text-[var(--color-light)] underline hover:text-[var(--color-lightest)]"
                         >
                           {t("settings.getApiKey")}
                         </a>
-                        <div className="space-y-2">
-                          <Label>{t("settings.apiKeyLabel")}</Label>
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-medium text-[var(--color-light)]">{t("settings.apiKeyLabel")}</Label>
                           <Input
                             type="password"
                             placeholder={isSet ? t("settings.enterNewKeyToReplace") : t("settings.pasteKey", { name: meta.name })}
@@ -1121,13 +1306,13 @@ export function Settings() {
                           />
                         </div>
                         <Button
-                          className="w-fit"
+                          className="h-7 w-fit px-3 text-xs"
                           onClick={() => handleSave(provider)}
                           disabled={!value.trim() || saving === provider}
                         >
                           {saving === provider ? (
                             <span className="inline-flex items-center gap-2">
-                              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
                               {t("settings.saving")}
                             </span>
                           ) : isSet ? (
@@ -1160,42 +1345,43 @@ export function Settings() {
             title={t("settings.adminSection")}
             open={adminOpen}
             onToggle={() => setAdminOpen((prev) => !prev)}
+            hidden={!adminSectionVisible}
           >
-                <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-6 lg:items-start">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-4 lg:items-start">
                   <section
                     className="min-w-0 lg:col-span-8"
                     aria-labelledby="admin-users-heading"
                   >
                     <h3
                       id="admin-users-heading"
-                      className="mb-3 text-base font-semibold text-[var(--color-lightest)]"
+                      className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-[var(--color-light)]"
                     >
                       {t("settings.adminUsersTitle")}
                     </h3>
                     {adminUsersLoading && (
-                      <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
+                      <p className="px-2 text-[11px] text-[var(--color-light)]">{t("common.loading")}</p>
                     )}
                     {adminUsersError && (
-                      <p className="text-sm text-red-400">{adminUsersError}</p>
+                      <p className="px-2 text-[11px] text-red-400">{adminUsersError}</p>
                     )}
                     {!adminUsersLoading && !adminUsersError && adminUsers.length > 0 && (
                       <div className="overflow-x-auto rounded-lg border border-[var(--color-mid)]/30">
-                        <table className="w-full min-w-[600px] text-left text-sm">
+                        <table className="w-full min-w-[600px] text-left text-[11px]">
                           <thead>
                             <tr className="border-b border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/50">
-                              <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">
+                              <th className="px-2.5 py-1.5 font-semibold text-[var(--color-lightest)]">
                                 {t("settings.adminTableEmail")}
                               </th>
-                              <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">
+                              <th className="px-2.5 py-1.5 font-semibold text-[var(--color-lightest)]">
                                 {t("settings.adminTableUsername")}
                               </th>
-                              <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">
+                              <th className="px-2.5 py-1.5 font-semibold text-[var(--color-lightest)]">
                                 {t("settings.adminTableLogins")}
                               </th>
-                              <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">
+                              <th className="px-2.5 py-1.5 font-semibold text-[var(--color-lightest)]">
                                 {t("settings.adminTableLogs")}
                               </th>
-                              <th className="px-3 py-2 font-semibold text-[var(--color-lightest)]">
+                              <th className="px-2.5 py-1.5 font-semibold text-[var(--color-lightest)]">
                                 {t("settings.adminTableLastLogin")}
                               </th>
                             </tr>
@@ -1203,11 +1389,11 @@ export function Settings() {
                           <tbody>
                             {adminUsers.map((u) => (
                               <tr key={u.id} className="border-b border-[var(--color-mid)]/20">
-                                <td className="px-3 py-2 text-[var(--color-lightest)]">{u.email}</td>
-                                <td className="px-3 py-2 text-[var(--color-light)]">{u.username ?? "—"}</td>
-                                <td className="px-3 py-2 text-[var(--color-light)]">{u.loginCount}</td>
-                                <td className="px-3 py-2 text-[var(--color-light)]">{u.logsCount}</td>
-                                <td className="px-3 py-2 text-[var(--color-light)]">
+                                <td className="px-2.5 py-1.5 text-[var(--color-lightest)]">{u.email}</td>
+                                <td className="px-2.5 py-1.5 text-[var(--color-light)]">{u.username ?? "—"}</td>
+                                <td className="px-2.5 py-1.5 text-[var(--color-light)]">{u.loginCount}</td>
+                                <td className="px-2.5 py-1.5 text-[var(--color-light)]">{u.logsCount}</td>
+                                <td className="px-2.5 py-1.5 text-[var(--color-light)]">
                                   {u.lastLoginAt
                                     ? new Date(u.lastLoginAt).toLocaleString(locale, {
                                         dateStyle: "short",
@@ -1222,13 +1408,13 @@ export function Settings() {
                       </div>
                     )}
                     {!adminUsersLoading && !adminUsersError && adminUsers.length === 0 && adminOpen && (
-                      <p className="text-sm text-[var(--color-light)]">{t("settings.adminNoUsers")}</p>
+                      <p className="px-2 text-[11px] text-[var(--color-light)]">{t("settings.adminNoUsers")}</p>
                     )}
 
-                    <section className="mt-8" aria-labelledby="admin-digest-heading">
+                    <section className="mt-4" aria-labelledby="admin-digest-heading">
                       <h3
                         id="admin-digest-heading"
-                        className="mb-3 text-base font-semibold text-[var(--color-lightest)]"
+                        className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-[var(--color-light)]"
                       >
                         {t("settings.adminDigestTitle")}
                       </h3>
@@ -1237,11 +1423,11 @@ export function Settings() {
                         variant="secondary"
                         disabled={digestSending}
                         onClick={() => void handleSendMonthlyDigest()}
-                        className="max-md:min-h-[44px]"
+                        className="h-7 max-md:min-h-[44px]"
                       >
                         {digestSending ? (
                           <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" aria-hidden />
                             {t("common.loading")}
                           </>
                         ) : (
@@ -1252,46 +1438,46 @@ export function Settings() {
                   </section>
 
                   <section
-                    className="min-w-0 border-t border-[var(--color-surface-border)] pt-8 lg:col-span-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
+                    className="min-w-0 border-t border-[var(--color-mid)]/20 pt-4 lg:col-span-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0"
                     aria-labelledby="admin-feature-flags-heading"
                   >
                     <h3
                       id="admin-feature-flags-heading"
-                      className="mb-3 text-base font-semibold text-[var(--color-lightest)]"
+                      className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-[var(--color-light)]"
                     >
                       {t("settings.adminFeatureFlagsTitle")}
                     </h3>
                     {adminFeatureFlagsLoading && (
-                      <p className="text-sm text-[var(--color-light)]">{t("common.loading")}</p>
+                      <p className="px-2 text-[11px] text-[var(--color-light)]">{t("common.loading")}</p>
                     )}
                     {adminFeatureFlagsError && (
-                      <p className="text-sm text-red-400">{adminFeatureFlagsError}</p>
+                      <p className="px-2 text-[11px] text-red-400">{adminFeatureFlagsError}</p>
                     )}
                     {!adminFeatureFlagsLoading &&
                       !adminFeatureFlagsError &&
                       adminFeatureFlags.length === 0 && (
-                        <p className="text-sm text-[var(--color-light)]">
+                        <p className="px-2 text-[11px] text-[var(--color-light)]">
                           {t("settings.adminFeatureFlagsEmpty")}
                         </p>
                       )}
-                    <ul className="flex flex-col gap-4">
+                    <ul className="flex flex-col gap-1">
                       {adminFeatureFlags.map((f) => (
                         <li
                           key={f.key}
-                          className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/30 p-4"
+                          className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/30 px-2.5 py-2"
                         >
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <p className="font-medium text-[var(--color-lightest)]">
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <p className="text-[11px] font-medium text-[var(--color-lightest)]">
                               {t(`settings.adminFlag_${f.key}`)}
                             </p>
-                            <p className="text-xs leading-relaxed text-[var(--color-light)]">
+                            <p className="text-[10px] leading-relaxed text-[var(--color-light)]">
                               {t(`settings.adminFlag_${f.key}_hint`)}
                             </p>
-                            <p className="font-mono text-[10px] text-[var(--color-mid)]">{f.key}</p>
+                            <p className="font-mono text-[9px] text-[var(--color-mid)]">{f.key}</p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
                             {adminFlagSavingKey === f.key && (
-                              <span className="text-xs text-[var(--color-light)]">
+                              <span className="text-[10px] text-[var(--color-light)]">
                                 {t("settings.adminFeatureFlagsSaving")}
                               </span>
                             )}
@@ -1311,8 +1497,24 @@ export function Settings() {
                 </div>
           </SettingsCollapsibleSection>
         )}
-        </>
+        {noAppResults && (
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[var(--color-mid)]/30 bg-[var(--color-darkest)]/30 px-4 py-8 text-center">
+            <p className="text-sm font-semibold text-[var(--color-lightest)]">
+              {t("settings.searchNoResultsTitle")}
+            </p>
+            <p className="text-xs text-[var(--color-light)]">
+              {t("settings.searchNoResultsHint")}
+            </p>
+            <button
+              type="button"
+              onClick={() => setSettingsSearch("")}
+              className="text-xs font-medium text-[var(--btn-gradient-start)] underline-offset-2 hover:underline"
+            >
+              {t("settings.searchClear")}
+            </button>
+          </div>
         )}
+        </>
       </div>
     </motion.div>
   );

@@ -378,7 +378,21 @@
     "adminDigestIntro": "Envia um resumo do mês civil anterior (UTC) para o seu e-mail da conta. A API precisa ter SMTP configurado.",
     "adminDigestSend": "Enviar resumo para meu e-mail",
     "adminDigestSent": "E-mail de resumo enviado — {{month}}.",
-    "adminDigestFailed": "E-mail não enviado. Verifique o SMTP da API."
+    "adminDigestFailed": "E-mail não enviado. Verifique o SMTP da API.",
+    "searchPlaceholder": "Buscar configurações…",
+    "searchClear": "Limpar",
+    "usageTitle": "Uso",
+    "quickProfile": "Perfil",
+    "quickProfileDesc": "Nome, avatar, visibilidade",
+    "quickPrivacy": "Privacidade",
+    "quickPrivacyDesc": "Quem pode ver seus registros",
+    "quickPlan": "Plano",
+    "quickPlanDesc": "Assinatura e limites",
+    "quickData": "Dados",
+    "quickDataDesc": "Exportar e jogos de tabuleiro",
+    "editProfileLabel": "Editar",
+    "searchNoResultsTitle": "Nenhuma configuração encontrada",
+    "searchNoResultsHint": "Tente outro termo ou limpe a busca para ver todas as opções."
   },
   "starRating": {
     "clear": "Remover nota",

@@ -378,7 +378,21 @@
     "adminDigestIntro": "Sends a digest for the previous calendar month (UTC) to your account email. The API must have SMTP configured.",
     "adminDigestSend": "Send recap to my email",
     "adminDigestSent": "Recap email sent for {{month}}.",
-    "adminDigestFailed": "Email was not sent. Check API SMTP settings."
+    "adminDigestFailed": "Email was not sent. Check API SMTP settings.",
+    "searchPlaceholder": "Search settings…",
+    "searchClear": "Clear search",
+    "editProfileLabel": "Edit",
+    "usageTitle": "Usage",
+    "quickProfile": "Profile",
+    "quickProfileDesc": "Name, avatar, visibility",
+    "quickPrivacy": "Privacy",
+    "quickPrivacyDesc": "Who can see your logs",
+    "quickPlan": "Plan",
+    "quickPlanDesc": "Subscription & limits",
+    "quickData": "Data",
+    "quickDataDesc": "Export & board games",
+    "searchNoResultsTitle": "No settings found",
+    "searchNoResultsHint": "Try a different term, or clear the search to see all options."
   },
   "starRating": {
     "clear": "Remove rating",
