@@ -235,3 +235,27 @@ export async function getPopularGames(apiKey?: string | null, max = 12): Promise
   const data = (await res.json()) as { results?: RawgGameListRow[] };
   return (data.results ?? []).slice(0, max).map((item) => mapRawgGameToSearchResult(item));
 }
+
+/** Most-added games ("hottest" / trending rail). */
+export async function getTrendingGames(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const params = new URLSearchParams({ key, page_size: String(max), ordering: "-added" });
+  const res = await fetch(`${BASE}/games?${params.toString()}`);
+  if (res.status === 401) throw new InvalidApiKeyError("rawg");
+  if (!res.ok) return [];
+  const data = (await res.json()) as { results?: RawgGameListRow[] };
+  return (data.results ?? []).slice(0, max).map((item) => mapRawgGameToSearchResult(item));
+}
+
+/** Newest game releases (new releases rail). */
+export async function getNewReleasesGames(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const params = new URLSearchParams({ key, page_size: String(max), ordering: "-released" });
+  const res = await fetch(`${BASE}/games?${params.toString()}`);
+  if (res.status === 401) throw new InvalidApiKeyError("rawg");
+  if (!res.ok) return [];
+  const data = (await res.json()) as { results?: RawgGameListRow[] };
+  return (data.results ?? []).slice(0, max).map((item) => mapRawgGameToSearchResult(item));
+}

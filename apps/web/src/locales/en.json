@@ -580,7 +580,7 @@
     "summaryHoursItems_other": "{{count}} items with time logged",
     "pagesReadTitle": "Pages read",
     "pagesReadSub": "Total pages logged across your library in this category",
-    "byGameWeight": "By weight",
+    "byGameWeight": "Board games by weight",
     "weightFilterLabel": "Weight chart filter",
     "weightFilterAll": "All",
     "weightFilterInCollection": "In collection",
@@ -681,9 +681,12 @@
     "recommendationsTitle": "Recommended for you",
     "recommendationsExpand": "Show recommendations",
     "recommendationsCollapse": "Hide recommendations",
-    "recommendationsNav": "Recommended titles carousel",
-    "recommendationsDotLabel": "Go to page {{index}}",
-    "recommendationsEmpty": "No recommendations right now. Try logging a few titles or searching for games you like."
+    "recommendationsEmpty": "No recommendations right now. Try logging a few titles or searching for games you like.",
+    "browseTrending": "Trending now",
+    "browseTopRated": "Top rated",
+    "browsePopular": "Most viewed",
+    "browseNewReleases": "New releases",
+    "browseHot": "Hot right now"
   },
   "searchSort": {
     "relevance": "Relevance",

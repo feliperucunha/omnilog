@@ -29,6 +29,8 @@ const GROUP_TITLES: Record<string, string> = {
   "workflow-review": "Reviews",
   onboarding: "Onboarding",
   "market-detail": "Market listing",
+  filters: "Filters & sorting",
+  drawers: "Drawers",
   info: "Help & info",
 };
 

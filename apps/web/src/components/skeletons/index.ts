@@ -1,5 +1,6 @@
 export { DashboardSkeleton } from "./DashboardSkeleton";
 export { SearchSkeleton } from "./SearchSkeleton";
+export { BrowseRailSkeleton, BrowseRailsSkeleton } from "./BrowseRailSkeleton";
 export { MediaLogsSkeleton } from "./MediaLogsSkeleton";
 export { MediaLogsListSkeleton } from "./MediaLogsListSkeleton";
 export { ItemPageSkeleton } from "./ItemPageSkeleton";

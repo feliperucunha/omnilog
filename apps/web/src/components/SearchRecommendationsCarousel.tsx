@@ -37,54 +37,6 @@ function wrapOffsetInLoop(offset: number, loopWidth: number): number {
   return o;
 }
 
-function pageCountForLoop(loopWidth: number, pageWidth: number): number {
-  if (loopWidth <= 0) return 1;
-  if (pageWidth <= 0) return 1;
-  return Math.max(1, Math.ceil(loopWidth / pageWidth));
-}
-
-function pageIndexForOffset(offset: number, loopWidth: number, pageWidth: number): number {
-  if (loopWidth <= 0 || pageWidth <= 0) return 0;
-  const pc = pageCountForLoop(loopWidth, pageWidth);
-  const p = wrapOffsetInLoop(offset, loopWidth);
-  let idx = Math.floor(p / pageWidth);
-  if (idx < 0) idx = 0;
-  if (idx >= pc) idx = pc - 1;
-  return idx;
-}
-
-function pageStartOffset(pageIndex: number, pageWidth: number): number {
-  return pageIndex * pageWidth;
-}
-
-/** Segments for shortest scroll path on the loop (may use duplicate strip). */
-function shortestPathSegments(
-  from: number,
-  to: number,
-  lw: number
-): { from: number; to: number }[] {
-  const dF = to >= from ? to - from : lw - from + to;
-  const dB = from >= to ? from - to : from + lw - to;
-  if (dF <= dB) {
-    if (to >= from) return [{ from, to }];
-    return [{ from, to: to + lw }];
-  }
-  if (from >= to) return [{ from, to }];
-  return [
-    { from, to: 0 },
-    { from: lw, to },
-  ];
-}
-
-function easeInOutCubic(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-/** ~0.45 px/ms → feels like manual scrolling; clamped for short/long jumps. */
-function durationMsForDistance(dist: number): number {
-  return Math.min(1400, Math.max(380, dist / 0.45));
-}
-
 export interface SearchRecommendationsCarouselProps {
   items: SearchResult[];
   mediaType: MediaType;
@@ -130,6 +82,8 @@ export function SearchRecommendationsCarousel({
                 className="h-full w-full"
                 mediaType={mediaType}
                 activeBoardGameProvider={mediaType === "boardgames" ? boardGameProvider : undefined}
+                loading="lazy"
+                referrerPolicy="no-referrer"
               />
               {token && status && (
                 <span
@@ -187,7 +141,6 @@ export function SearchRecommendationsCarousel({
     <div className="flex flex-col gap-3 max-md:-mx-0.5 max-md:px-0.5">
       <RecommendationsAutoCarousel
         items={items}
-        mediaType={mediaType}
         renderSlide={(item, suffix) =>
           renderRecommendationCard(
             item,
@@ -203,7 +156,6 @@ export function SearchRecommendationsCarousel({
 
 interface AutoCarouselProps {
   items: SearchResult[];
-  mediaType: MediaType;
   renderSlide: (item: SearchResult, suffix: string) => ReactNode;
   t: TFunction;
 }
@@ -236,7 +188,6 @@ function touchFromList(list: TouchList, id: number): Touch | undefined {
 
 function RecommendationsAutoCarousel({
   items,
-  mediaType,
   renderSlide,
   t,
 }: AutoCarouselProps) {
@@ -246,29 +197,18 @@ function RecommendationsAutoCarousel({
   const trackRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(0);
   const loopWidthRef = useRef(0);
-  const pageWidthRef = useRef(0);
-  const lastPageRef = useRef(-1);
   const rafRef = useRef(0);
-  const dotAnimRafRef = useRef(0);
   const lastTimeRef = useRef<number | null>(null);
   const reducedMotionRef = useRef(false);
   const dragSessionRef = useRef<DragSession | null>(null);
   const windowDragCleanupRef = useRef<(() => void) | null>(null);
   const stopAutoRef = useRef<() => void>(() => {});
-  const cancelDotAnimRef = useRef<() => void>(() => {});
   const applyTransformRef = useRef<() => void>(() => {});
 
   const [paused, setPaused] = useState(false);
-  const [pageCount, setPageCount] = useState(1);
-  const [activePage, setActivePage] = useState(0);
   const [isHorizontalDrag, setIsHorizontalDrag] = useState(false);
-
-  const cancelDotAnim = useCallback(() => {
-    if (dotAnimRafRef.current) {
-      cancelAnimationFrame(dotAnimRafRef.current);
-      dotAnimRafRef.current = 0;
-    }
-  }, []);
+  const [isVisible, setIsVisible] = useState(true);
+  const isVisibleRef = useRef(true);
 
   const measure = useCallback(() => {
     const track = trackRef.current;
@@ -290,21 +230,6 @@ function RecommendationsAutoCarousel({
     loopWidthRef.current = Math.max(1, acc);
   }, [items.length]);
 
-  const syncPageLayout = useCallback(() => {
-    const vp = viewportRef.current;
-    const pw = vp?.clientWidth ?? 0;
-    pageWidthRef.current = pw;
-    measure();
-    const lw = loopWidthRef.current;
-    const pc = pageCountForLoop(lw, pw);
-    setPageCount(pc);
-    const cur = Math.min(pageIndexForOffset(offsetRef.current, lw, pw), pc - 1);
-    if (cur !== lastPageRef.current) {
-      lastPageRef.current = cur;
-      setActivePage(cur);
-    }
-  }, [measure]);
-
   useLayoutEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     reducedMotionRef.current = mq.matches;
@@ -318,9 +243,22 @@ function RecommendationsAutoCarousel({
   }, []);
 
   useLayoutEffect(() => {
-    cancelDotAnim();
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const intersecting = entries.some((e) => e.isIntersecting);
+        isVisibleRef.current = intersecting;
+        setIsVisible(intersecting);
+      },
+      { rootMargin: "200px" }
+    );
+    io.observe(vp);
+    return () => io.disconnect();
+  }, [itemIds]);
+
+  useLayoutEffect(() => {
     offsetRef.current = 0;
-    lastPageRef.current = -1;
     windowDragCleanupRef.current?.();
     windowDragCleanupRef.current = null;
     dragSessionRef.current = null;
@@ -328,19 +266,17 @@ function RecommendationsAutoCarousel({
     if (trackRef.current) {
       trackRef.current.style.transform = "translate3d(0,0,0)";
     }
-    syncPageLayout();
+    measure();
     const vp = viewportRef.current;
     const track = trackRef.current;
     if (!vp || !track) return;
     const ro = new ResizeObserver(() => {
-      syncPageLayout();
+      measure();
     });
     ro.observe(vp);
     ro.observe(track);
     return () => ro.disconnect();
-  }, [cancelDotAnim, syncPageLayout, itemIds]);
-
-  useEffect(() => () => cancelDotAnim(), [cancelDotAnim]);
+  }, [measure, itemIds]);
 
   const applyTransform = useCallback(() => {
     const track = trackRef.current;
@@ -354,9 +290,8 @@ function RecommendationsAutoCarousel({
 
   useEffect(() => {
     stopAutoRef.current = stopAuto;
-    cancelDotAnimRef.current = cancelDotAnim;
     applyTransformRef.current = applyTransform;
-  }, [stopAuto, cancelDotAnim, applyTransform]);
+  }, [stopAuto, applyTransform]);
 
   /**
    * Mobile: child <button> is the touch target; bubbled React pointer events often miss moves.
@@ -378,12 +313,6 @@ function RecommendationsAutoCarousel({
       const lw = loopWidthRef.current;
       offsetRef.current = wrapOffsetInLoop(session.startOffset - (clientX - session.startX), lw);
       applyTransformRef.current();
-      const pw = pageWidthRef.current;
-      const d = pageIndexForOffset(offsetRef.current, lw, pw);
-      if (d !== lastPageRef.current) {
-        lastPageRef.current = d;
-        setActivePage(d);
-      }
     };
 
     const armHorizontalDrag = (
@@ -398,7 +327,6 @@ function RecommendationsAutoCarousel({
         if (Math.abs(dx) < 8 || Math.abs(dx) <= Math.abs(dy)) return false;
         session.dragging = true;
         setPaused(true);
-        cancelDotAnimRef.current();
         setIsHorizontalDrag(true);
       }
       ev?.preventDefault();
@@ -493,8 +421,9 @@ function RecommendationsAutoCarousel({
   }, [itemIds, items.length]);
 
   useEffect(() => {
-    if (paused || items.length === 0 || reducedMotionRef.current) {
+    if (paused || !isVisible || items.length === 0 || reducedMotionRef.current) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
       return;
     }
 
@@ -518,13 +447,6 @@ function RecommendationsAutoCarousel({
         trackEl.style.transform = `translate3d(${-o}px,0,0)`;
       }
 
-      const pw = pageWidthRef.current;
-      const d = pageIndexForOffset(o, lw, pw);
-      if (d !== lastPageRef.current) {
-        lastPageRef.current = d;
-        setActivePage(d);
-      }
-
       rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -533,118 +455,7 @@ function RecommendationsAutoCarousel({
     return () => {
       cancelAnimationFrame(rafRef.current);
     };
-  }, [paused, itemIds]);
-
-  const animateToPage = useCallback(
-    (pageIndex: number) => {
-      stopAuto();
-      cancelDotAnim();
-
-      const lw = loopWidthRef.current;
-      const pw = pageWidthRef.current;
-      const pc = pageCountForLoop(lw, pw);
-      if (pageIndex < 0 || pageIndex >= pc || pw <= 0) return;
-      const target = pageStartOffset(pageIndex, pw);
-      const from = offsetRef.current;
-
-      const snapToTarget = () => {
-        offsetRef.current = wrapOffsetInLoop(target, lw);
-        lastPageRef.current = pageIndex;
-        setActivePage(pageIndex);
-        applyTransform();
-      };
-
-      if (reducedMotionRef.current) {
-        snapToTarget();
-        return;
-      }
-
-      const segments = shortestPathSegments(from, target, lw);
-      const totalDist = segments.reduce((acc, s) => acc + Math.abs(s.to - s.from), 0);
-      if (totalDist < 0.5) {
-        snapToTarget();
-        return;
-      }
-
-      const runSegment = (segIndex: number) => {
-        if (segIndex >= segments.length) {
-          snapToTarget();
-          return;
-        }
-
-        const seg = segments[segIndex]!;
-        const dist = Math.abs(seg.to - seg.from);
-        if (dist < 0.5) {
-          if (segIndex === segments.length - 1) {
-            snapToTarget();
-          } else {
-            offsetRef.current = seg.to;
-            applyTransform();
-            const next = segments[segIndex + 1]!;
-            if (seg.to === 0 && next.from === lw) {
-              offsetRef.current = lw;
-              applyTransform();
-            }
-            runSegment(segIndex + 1);
-          }
-          return;
-        }
-
-        const duration = durationMsForDistance(dist);
-        const t0 = performance.now();
-
-        const step = (now: number) => {
-          const elapsed = now - t0;
-          const u = Math.min(1, elapsed / duration);
-          const e = easeInOutCubic(u);
-          const pos = seg.from + (seg.to - seg.from) * e;
-          offsetRef.current = pos;
-          const trackEl = trackRef.current;
-          if (trackEl) {
-            trackEl.style.transform = `translate3d(${-pos}px,0,0)`;
-          }
-
-          const lw2 = loopWidthRef.current;
-          const pw2 = pageWidthRef.current;
-          const dIdx = pageIndexForOffset(pos, lw2, pw2);
-          if (dIdx !== lastPageRef.current) {
-            lastPageRef.current = dIdx;
-            setActivePage(dIdx);
-          }
-
-          if (u < 1) {
-            dotAnimRafRef.current = requestAnimationFrame(step);
-          } else {
-            offsetRef.current = seg.to;
-            applyTransform();
-            if (segIndex < segments.length - 1) {
-              const next = segments[segIndex + 1]!;
-              if (seg.to === 0 && next.from === lw) {
-                offsetRef.current = lw;
-                applyTransform();
-              }
-              runSegment(segIndex + 1);
-            } else {
-              offsetRef.current = wrapOffsetInLoop(seg.to, lw);
-              lastPageRef.current = pageIndex;
-              setActivePage(pageIndex);
-              applyTransform();
-              dotAnimRafRef.current = 0;
-            }
-          }
-        };
-
-        dotAnimRafRef.current = requestAnimationFrame(step);
-      };
-
-      runSegment(0);
-    },
-    [applyTransform, cancelDotAnim, stopAuto]
-  );
-
-  const handleDotClick = (pageIndex: number) => {
-    animateToPage(pageIndex);
-  };
+  }, [paused, isVisible, itemIds]);
 
   if (items.length === 0) return null;
 
@@ -668,26 +479,6 @@ function RecommendationsAutoCarousel({
           {items.map((item) => renderSlide(item, "a"))}
           {items.map((item) => renderSlide(item, "b"))}
         </div>
-      </div>
-      <div
-        className="flex flex-wrap justify-center gap-2"
-        role="group"
-        aria-label={t("search.recommendationsNav")}
-      >
-        {Array.from({ length: pageCount }, (_, i) => (
-          <button
-            key={`rec-dot-${mediaType}-p${i}`}
-            type="button"
-            aria-current={i === activePage ? "true" : undefined}
-            aria-label={t("search.recommendationsDotLabel", { index: String(i + 1) })}
-            className={`h-2 w-2 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-dark)] ${
-              i === activePage
-                ? "bg-[var(--color-lightest)]"
-                : "bg-[var(--color-mid)] hover:bg-[var(--color-light)]"
-            }`}
-            onClick={() => handleDotClick(i)}
-          />
-        ))}
       </div>
     </>
   );

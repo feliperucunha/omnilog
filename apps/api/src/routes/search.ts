@@ -15,14 +15,24 @@ import {
   getTvRecommendationsMerged,
   getPopularMovies,
   getPopularTv,
+  getTrendingMovies,
+  getTrendingTv,
+  getPopularMoviesNow,
+  getPopularTvNow,
+  getNowPlayingMovies,
+  getOnTheAirTv,
 } from "../services/tmdb.js";
 import {
   searchGames,
   getGamesRecommendationsFromSeedsViaGenres,
   getPopularGames,
+  getTrendingGames,
+  getNewReleasesGames,
 } from "../services/rawg.js";
 import { searchBooks } from "../services/openLibrary.js";
-import { searchAnime, searchManga, getAnimeRecommendationsForId, getTopAnimeByScore } from "../services/jikan.js";
+import { searchAnime, searchManga, getAnimeRecommendationsForId, getTopAnimeByScore, getTopMangaByScore, getPopularAnime, getPopularManga, getAiringAnime } from "../services/jikan.js";
+import { getHotBoardGames } from "../services/bgg.js";
+import type { BoardGameProvider, BrowseRail, BrowseResponse } from "@geeklogs/shared";
 import { searchBoardGames } from "../services/bgg.js";
 import { searchBoardGamesLudopedia } from "../services/ludopedia.js";
 import { searchComics } from "../services/comicvine.js";
@@ -137,6 +147,328 @@ async function getRecentSeedIds(userId: string, mediaType: string, maxSeeds: num
   return seeds;
 }
 
+const BROWSE_RAIL_MAX = 12;
+
+type RecommendationsPayload =
+  | { results: SearchResult[]; personalization: "from_logs" | "popular" | "none" }
+  | { results: SearchResult[]; personalization: "none"; requiresApiKey: string; link: string; tutorial: string };
+
+interface RecommendationCtx {
+  type: MediaType;
+  user?: { userId: string };
+  keys?: NonNullable<Awaited<ReturnType<typeof getUserKeys>>>;
+  skipApiKeyUX: boolean;
+  boardGameProvider?: BoardGameProvider;
+  sort?: string;
+}
+
+/**
+ * Build the "recommended" (personalized + popular top-up) rail for a media type.
+ * Shared by GET /search/recommendations and GET /search/browse. Options may include
+ * requiresApiKey/link/tutorial when the provider needs a missing key.
+ */
+async function buildRecommendationsPayload(ctx: RecommendationCtx): Promise<RecommendationsPayload> {
+  const { type, user, keys, skipApiKeyUX, boardGameProvider } = ctx;
+  const tmdbMeta = API_KEY_META.tmdb;
+  const rawgMeta = API_KEY_META.rawg;
+
+  if (type === "comics") {
+    return { results: [], personalization: "none" };
+  }
+
+  const forTypeLogs = () =>
+    prisma.log.findMany({
+      where: { userId: user!.userId, mediaType: type },
+      select: { genres: true, mechanics: true, grade: true, status: true, affinityContext: true },
+      orderBy: { updatedAt: "desc" },
+      take: 120,
+    });
+
+  switch (type) {
+    case "movies": {
+      const userKey = keys?.tmdbApiKey ?? null;
+      const hasKey = !!(userKey ?? process.env.TMDB_API_KEY);
+      if (!skipApiKeyUX && !hasKey) {
+        return { results: [], personalization: "none", requiresApiKey: "tmdb", link: tmdbMeta.link, tutorial: tmdbMeta.tutorial };
+      }
+      const exclude = user ? await getLoggedExternalIds(user.userId, "movies") : new Set<string>();
+      const seeds = user ? await getRecentSeedIds(user.userId, "movies", RECOMMENDATION_SEEDS_MAX) : [];
+      let fromLogs = false;
+      let results =
+        seeds.length > 0
+          ? await collectFromSeeds(seeds, (id) => getMovieRecommendationsMerged(id, userKey, 20), exclude, RECOMMENDATIONS_MAX)
+          : [];
+      if (results.length > 0) fromLogs = true;
+      results = await topUpFromPopular(results, () => getPopularMovies(userKey, RECOMMENDATIONS_MAX), exclude, RECOMMENDATIONS_MAX);
+      results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
+      return { results, personalization: fromLogs ? "from_logs" : "popular" };
+    }
+    case "tv": {
+      const userKey = keys?.tmdbApiKey ?? null;
+      const hasKey = !!(userKey ?? process.env.TMDB_API_KEY);
+      if (!skipApiKeyUX && !hasKey) {
+        return {
+          results: [],
+          personalization: "none",
+          requiresApiKey: "tmdb",
+          link: tmdbMeta.link,
+          tutorial: tmdbMeta.tutorial,
+        };
+      }
+      const exclude = user ? await getLoggedExternalIds(user.userId, "tv") : new Set<string>();
+      const seeds = user ? await getRecentSeedIds(user.userId, "tv", RECOMMENDATION_SEEDS_MAX) : [];
+      let fromLogs = false;
+      let results =
+        seeds.length > 0
+          ? await collectFromSeeds(seeds, (id) => getTvRecommendationsMerged(id, userKey, 20), exclude, RECOMMENDATIONS_MAX)
+          : [];
+      if (results.length > 0) fromLogs = true;
+      results = await topUpFromPopular(results, () => getPopularTv(userKey, RECOMMENDATIONS_MAX), exclude, RECOMMENDATIONS_MAX);
+      results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
+      return { results, personalization: fromLogs ? "from_logs" : "popular" };
+    }
+    case "games": {
+      const userKey = keys?.rawgApiKey ?? null;
+      const hasKey = !!(userKey ?? process.env.RAWG_API_KEY);
+      if (!skipApiKeyUX && !hasKey) {
+        return {
+          results: [],
+          personalization: "none",
+          requiresApiKey: "rawg",
+          link: rawgMeta.link,
+          tutorial: rawgMeta.tutorial,
+        };
+      }
+      const exclude = user ? await getLoggedExternalIds(user.userId, "games") : new Set<string>();
+      const seeds = user ? await getRecentSeedIds(user.userId, "games", RECOMMENDATION_SEEDS_MAX) : [];
+      let fromLogs = false;
+      let results =
+        seeds.length > 0
+          ? await getGamesRecommendationsFromSeedsViaGenres(seeds, exclude, RECOMMENDATIONS_MAX, userKey, RECOMMENDATION_SEEDS_MAX)
+          : [];
+      if (results.length > 0) fromLogs = true;
+      results = await topUpFromPopular(results, () => getPopularGames(userKey, RECOMMENDATIONS_MAX), exclude, RECOMMENDATIONS_MAX);
+      results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
+      return { results, personalization: fromLogs ? "from_logs" : "popular" };
+    }
+    case "anime": {
+      const titlePreference = resolveAnimeMangaTitleLanguage(keys?.animeMangaTitleLanguage);
+      const exclude = user ? await getLoggedExternalIds(user.userId, "anime") : new Set<string>();
+      const seeds = user ? await getRecentSeedIds(user.userId, "anime", RECOMMENDATION_SEEDS_MAX) : [];
+      let fromLogs = false;
+      let results =
+        seeds.length > 0
+          ? await collectFromSeeds(seeds, (id) => getAnimeRecommendationsForId(id, 20, titlePreference), exclude, RECOMMENDATIONS_MAX)
+          : [];
+      if (results.length > 0) fromLogs = true;
+      results = await topUpFromPopular(results, () => getTopAnimeByScore(RECOMMENDATIONS_MAX, titlePreference), exclude, RECOMMENDATIONS_MAX);
+      results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
+      return { results, personalization: fromLogs ? "from_logs" : "popular" };
+    }
+    case "books": {
+      const exclude = user ? await getLoggedExternalIds(user.userId, "books") : new Set<string>();
+      const logs = user ? await forTypeLogs() : [];
+      const sortParam = ctx.sort;
+      const allowedSorts = SEARCH_SORT_OPTIONS.books.map((o) => o.value);
+      const sort = sortParam && allowedSorts.includes(sortParam) ? sortParam : undefined;
+      const outcome = await fetchBookRecommendationsMerged({
+        logs,
+        exclude,
+        maxResults: RECOMMENDATIONS_MAX,
+        sort,
+        maxSearchCalls: 2,
+      });
+      const results = sortRecommendationsByScoreDesc(outcome.results).slice(0, RECOMMENDATIONS_MAX);
+      return { results, personalization: outcome.personalization };
+    }
+    case "manga": {
+      const titlePreference = resolveAnimeMangaTitleLanguage(keys?.animeMangaTitleLanguage);
+      const exclude = user ? await getLoggedExternalIds(user.userId, "manga") : new Set<string>();
+      const logs = user
+        ? await prisma.log.findMany({
+            where: { userId: user.userId, mediaType: "manga" },
+            select: { genres: true, affinityContext: true, grade: true, status: true },
+            orderBy: { updatedAt: "desc" },
+            take: 120,
+          })
+        : [];
+      const sortParam = ctx.sort;
+      const allowedSorts = SEARCH_SORT_OPTIONS.manga.map((o) => o.value);
+      const sort = sortParam && allowedSorts.includes(sortParam) ? sortParam : undefined;
+      const outcome = await fetchMangaRecommendationsMerged({
+        logs,
+        exclude,
+        maxResults: RECOMMENDATIONS_MAX,
+        sort,
+        maxSearchCalls: 2,
+        titlePreference,
+      });
+      const results = sortRecommendationsByScoreDesc(outcome.results).slice(0, RECOMMENDATIONS_MAX);
+      return { results, personalization: outcome.personalization };
+    }
+    case "boardgames": {
+      const bggMeta = API_KEY_META.bgg;
+      const ludopediaMeta = API_KEY_META.ludopedia;
+      const provider =
+        boardGameProvider ??
+        (keys?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg");
+      const userBgg = keys?.bggApiToken ?? null;
+      const userLudo = keys?.ludopediaApiToken ?? null;
+      const hasKey =
+        skipApiKeyUX ||
+        (provider === "bgg" ? !!(userBgg ?? process.env.BGG_API_TOKEN) : !!(userLudo ?? process.env.LUDOPEDIA_API_TOKEN));
+      if (!hasKey) {
+        const meta = provider === "bgg" ? bggMeta : ludopediaMeta;
+        return {
+          results: [],
+          personalization: "none",
+          requiresApiKey: provider,
+          link: meta.link,
+          tutorial: meta.tutorial,
+        };
+      }
+      const exclude = user ? await getLoggedExternalIds(user.userId, "boardgames") : new Set<string>();
+      const logs = user ? await prisma.log.findMany({
+        where: { userId: user.userId, mediaType: "boardgames" },
+        select: { genres: true, mechanics: true, grade: true, status: true, affinityContext: true },
+        orderBy: { updatedAt: "desc" },
+        take: 120,
+      }) : [];
+      const token =
+        provider === "bgg"
+          ? preferEnvApiToken(process.env.BGG_API_TOKEN, userBgg)
+          : preferEnvApiToken(process.env.LUDOPEDIA_API_TOKEN, userLudo);
+      const sortParam = ctx.sort;
+      const allowedSorts = SEARCH_SORT_OPTIONS.boardgames.map((o) => o.value);
+      const sort = sortParam && allowedSorts.includes(sortParam) ? sortParam : undefined;
+      const outcome = await fetchBoardGameRecommendationsMerged({
+        logs,
+        exclude,
+        maxResults: RECOMMENDATIONS_MAX,
+        provider,
+        apiToken: token,
+        sort,
+        bggMeta,
+        ludopediaMeta,
+        maxSearchCalls: 2,
+      });
+      if ("requiresApiKey" in outcome) {
+        return {
+          results: [],
+          personalization: "none",
+          requiresApiKey: outcome.requiresApiKey,
+          link: outcome.link,
+          tutorial: outcome.tutorial,
+        };
+      }
+      const boardResults = sortRecommendationsByScoreDesc(outcome.results).slice(0, RECOMMENDATIONS_MAX);
+      return { results: boardResults, personalization: outcome.personalization };
+    }
+    default:
+      return { results: [], personalization: "none" };
+  }
+}
+
+/** Rails available from each provider for the empty-search browse carousels. */
+async function buildBrowseRails(ctx: RecommendationCtx): Promise<{ rails: BrowseRail[]; requiresApiKey?: string; link?: string; tutorial?: string }> {
+  const { type, user, keys, skipApiKeyUX, boardGameProvider } = ctx;
+  const tmdbMeta = API_KEY_META.tmdb;
+  const rawgMeta = API_KEY_META.rawg;
+  const rails: BrowseRail[] = [];
+  const exclude = user ? await getLoggedExternalIds(user.userId, type) : new Set<string>();
+
+  const filtered = (list: SearchResult[]): SearchResult[] =>
+    list.filter((r) => !exclude.has(r.id)).slice(0, BROWSE_RAIL_MAX);
+
+  const singleNotFound = (provider: "tmdb" | "rawg"): { requiresApiKey?: string; link?: string; tutorial?: string } | undefined => {
+    const userKey = provider === "tmdb" ? keys?.tmdbApiKey : keys?.rawgApiKey;
+    const hasKey = provider === "tmdb" ? !!(userKey ?? process.env.TMDB_API_KEY) : !!(userKey ?? process.env.RAWG_API_KEY);
+    if (!skipApiKeyUX && !hasKey) {
+      const meta = provider === "tmdb" ? tmdbMeta : rawgMeta;
+      return { requiresApiKey: provider, link: meta.link, tutorial: meta.tutorial };
+    }
+    return undefined;
+  };
+
+  switch (type) {
+    case "movies": {
+      const miss = singleNotFound("tmdb");
+      if (miss) return { rails: [], ...miss };
+      const userKey = keys?.tmdbApiKey ?? null;
+      const [trending, popular, topRated, nowPlaying] = await Promise.all([
+        getTrendingMovies(userKey, BROWSE_RAIL_MAX),
+        getPopularMoviesNow(userKey, BROWSE_RAIL_MAX),
+        getPopularMovies(userKey, BROWSE_RAIL_MAX),
+        getNowPlayingMovies(userKey, BROWSE_RAIL_MAX),
+      ]);
+      if (trending.length) rails.push({ key: "trending", results: filtered(trending) });
+      if (popular.length) rails.push({ key: "popular", results: filtered(popular) });
+      if (topRated.length) rails.push({ key: "topRated", results: filtered(topRated) });
+      if (nowPlaying.length) rails.push({ key: "newReleases", results: filtered(nowPlaying) });
+      return { rails };
+    }
+    case "tv": {
+      const miss = singleNotFound("tmdb");
+      if (miss) return { rails: [], ...miss };
+      const userKey = keys?.tmdbApiKey ?? null;
+      const [trending, popular, topRated, onTheAir] = await Promise.all([
+        getTrendingTv(userKey, BROWSE_RAIL_MAX),
+        getPopularTvNow(userKey, BROWSE_RAIL_MAX),
+        getPopularTv(userKey, BROWSE_RAIL_MAX),
+        getOnTheAirTv(userKey, BROWSE_RAIL_MAX),
+      ]);
+      if (trending.length) rails.push({ key: "trending", results: filtered(trending) });
+      if (popular.length) rails.push({ key: "popular", results: filtered(popular) });
+      if (topRated.length) rails.push({ key: "topRated", results: filtered(topRated) });
+      if (onTheAir.length) rails.push({ key: "newReleases", results: filtered(onTheAir) });
+      return { rails };
+    }
+    case "games": {
+      const miss = singleNotFound("rawg");
+      if (miss) return { rails: [], ...miss };
+      const userKey = keys?.rawgApiKey ?? null;
+      const [trending, topRated, newReleases] = await Promise.all([
+        getTrendingGames(userKey, BROWSE_RAIL_MAX),
+        getPopularGames(userKey, BROWSE_RAIL_MAX),
+        getNewReleasesGames(userKey, BROWSE_RAIL_MAX),
+      ]);
+      if (trending.length) rails.push({ key: "trending", results: filtered(trending) });
+      if (topRated.length) rails.push({ key: "topRated", results: filtered(topRated) });
+      if (newReleases.length) rails.push({ key: "newReleases", results: filtered(newReleases) });
+      return { rails };
+    }
+    case "anime": {
+      const titlePreference = resolveAnimeMangaTitleLanguage(keys?.animeMangaTitleLanguage);
+      const [trending, topRated, airing] = await Promise.all([
+        getPopularAnime(BROWSE_RAIL_MAX, titlePreference),
+        getTopAnimeByScore(BROWSE_RAIL_MAX, titlePreference),
+        getAiringAnime(BROWSE_RAIL_MAX, titlePreference),
+      ]);
+      if (trending.length) rails.push({ key: "trending", results: filtered(trending) });
+      if (topRated.length) rails.push({ key: "topRated", results: filtered(topRated) });
+      if (airing.length) rails.push({ key: "newReleases", results: filtered(airing) });
+      return { rails };
+    }
+    case "manga": {
+      const titlePreference = resolveAnimeMangaTitleLanguage(keys?.animeMangaTitleLanguage);
+      const [trending, topRated] = await Promise.all([
+        getPopularManga(BROWSE_RAIL_MAX, titlePreference),
+        getTopMangaByScore(BROWSE_RAIL_MAX, titlePreference),
+      ]);
+      if (trending.length) rails.push({ key: "trending", results: filtered(trending) });
+      if (topRated.length) rails.push({ key: "topRated", results: filtered(topRated) });
+      return { rails };
+    }
+    case "boardgames": {
+      const hot = await getHotBoardGames(BROWSE_RAIL_MAX);
+      if (hot.length) rails.push({ key: "hot", results: filtered(hot) });
+      return { rails };
+    }
+    default:
+      return { rails };
+  }
+}
+
 const recommendationsQuerySchema = z.object({
   type: z.enum(MEDIA_TYPES as unknown as [string, ...string[]]),
   boardGameProvider: z.enum(["bgg", "ludopedia"]).optional(),
@@ -160,295 +492,17 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
   const type = parsed.data.type as MediaType;
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
   const skipApiKeyUX = await isDisableApiKeyRequirementsEnabled();
-  const tmdbMeta = API_KEY_META.tmdb;
-  const rawgMeta = API_KEY_META.rawg;
-
-  const unsupported: MediaType[] = ["comics"];
-  if ((unsupported as string[]).includes(type)) {
-    res.json({ results: [], personalization: "none" as const });
-    return;
-  }
 
   try {
-    switch (type) {
-      case "movies": {
-        const userKey = keys?.tmdbApiKey ?? null;
-        const hasKey = !!(userKey ?? process.env.TMDB_API_KEY);
-        if (!skipApiKeyUX && !hasKey) {
-          res.json({
-            results: [],
-            personalization: "none" as const,
-            requiresApiKey: "tmdb" as const,
-            link: tmdbMeta.link,
-            tutorial: tmdbMeta.tutorial,
-          });
-          return;
-        }
-        const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "movies") : new Set<string>();
-        const seeds = req.user ? await getRecentSeedIds(req.user.userId, "movies", RECOMMENDATION_SEEDS_MAX) : [];
-        let fromLogs = false;
-        let results =
-          seeds.length > 0
-            ? await collectFromSeeds(
-                seeds,
-                (id) => getMovieRecommendationsMerged(id, userKey, 20),
-                exclude,
-                RECOMMENDATIONS_MAX
-              )
-            : [];
-        if (results.length > 0) fromLogs = true;
-        results = await topUpFromPopular(
-          results,
-          () => getPopularMovies(userKey, RECOMMENDATIONS_MAX),
-          exclude,
-          RECOMMENDATIONS_MAX
-        );
-        results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
-        res.json({
-          results,
-          personalization: fromLogs ? ("from_logs" as const) : ("popular" as const),
-        });
-        return;
-      }
-      case "tv": {
-        const userKey = keys?.tmdbApiKey ?? null;
-        const hasKey = !!(userKey ?? process.env.TMDB_API_KEY);
-        if (!skipApiKeyUX && !hasKey) {
-          res.json({
-            results: [],
-            personalization: "none" as const,
-            requiresApiKey: "tmdb" as const,
-            link: tmdbMeta.link,
-            tutorial: tmdbMeta.tutorial,
-          });
-          return;
-        }
-        const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "tv") : new Set<string>();
-        const seeds = req.user ? await getRecentSeedIds(req.user.userId, "tv", RECOMMENDATION_SEEDS_MAX) : [];
-        let fromLogs = false;
-        let results =
-          seeds.length > 0
-            ? await collectFromSeeds(
-                seeds,
-                (id) => getTvRecommendationsMerged(id, userKey, 20),
-                exclude,
-                RECOMMENDATIONS_MAX
-              )
-            : [];
-        if (results.length > 0) fromLogs = true;
-        results = await topUpFromPopular(
-          results,
-          () => getPopularTv(userKey, RECOMMENDATIONS_MAX),
-          exclude,
-          RECOMMENDATIONS_MAX
-        );
-        results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
-        res.json({
-          results,
-          personalization: fromLogs ? ("from_logs" as const) : ("popular" as const),
-        });
-        return;
-      }
-      case "games": {
-        const userKey = keys?.rawgApiKey ?? null;
-        const hasKey = !!(userKey ?? process.env.RAWG_API_KEY);
-        if (!skipApiKeyUX && !hasKey) {
-          res.json({
-            results: [],
-            personalization: "none" as const,
-            requiresApiKey: "rawg" as const,
-            link: rawgMeta.link,
-            tutorial: rawgMeta.tutorial,
-          });
-          return;
-        }
-        const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "games") : new Set<string>();
-        const seeds = req.user ? await getRecentSeedIds(req.user.userId, "games", RECOMMENDATION_SEEDS_MAX) : [];
-        let fromLogs = false;
-        let results =
-          seeds.length > 0
-            ? await getGamesRecommendationsFromSeedsViaGenres(
-                seeds,
-                exclude,
-                RECOMMENDATIONS_MAX,
-                userKey,
-                RECOMMENDATION_SEEDS_MAX
-              )
-            : [];
-        if (results.length > 0) fromLogs = true;
-        results = await topUpFromPopular(
-          results,
-          () => getPopularGames(userKey, RECOMMENDATIONS_MAX),
-          exclude,
-          RECOMMENDATIONS_MAX
-        );
-        results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
-        res.json({
-          results,
-          personalization: fromLogs ? ("from_logs" as const) : ("popular" as const),
-        });
-        return;
-      }
-      case "anime": {
-        const titlePreference = resolveAnimeMangaTitleLanguage(keys?.animeMangaTitleLanguage);
-        const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "anime") : new Set<string>();
-        const seeds = req.user ? await getRecentSeedIds(req.user.userId, "anime", RECOMMENDATION_SEEDS_MAX) : [];
-        let fromLogs = false;
-        let results =
-          seeds.length > 0
-            ? await collectFromSeeds(
-                seeds,
-                (id) => getAnimeRecommendationsForId(id, 20, titlePreference),
-                exclude,
-                RECOMMENDATIONS_MAX
-              )
-            : [];
-        if (results.length > 0) fromLogs = true;
-        results = await topUpFromPopular(
-          results,
-          () => getTopAnimeByScore(RECOMMENDATIONS_MAX, titlePreference),
-          exclude,
-          RECOMMENDATIONS_MAX
-        );
-        results = sortRecommendationsByScoreDesc(results).slice(0, RECOMMENDATIONS_MAX);
-        res.json({
-          results,
-          personalization: fromLogs ? ("from_logs" as const) : ("popular" as const),
-        });
-        return;
-      }
-      case "books": {
-        const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "books") : new Set<string>();
-        const logs =
-          req.user != null
-            ? await prisma.log.findMany({
-                where: { userId: req.user.userId, mediaType: "books" },
-                select: { genres: true, affinityContext: true, grade: true, status: true },
-                orderBy: { updatedAt: "desc" },
-                take: 120,
-              })
-            : [];
-        const sortParam = parsed.data.sort;
-        const allowedSorts = SEARCH_SORT_OPTIONS.books.map((o) => o.value);
-        const sort = sortParam && allowedSorts.includes(sortParam) ? sortParam : undefined;
-        const outcome = await fetchBookRecommendationsMerged({
-          logs,
-          exclude,
-          maxResults: RECOMMENDATIONS_MAX,
-          sort,
-          maxSearchCalls: 2,
-        });
-        const bookResults = sortRecommendationsByScoreDesc(outcome.results).slice(0, RECOMMENDATIONS_MAX);
-        res.json({
-          results: bookResults,
-          personalization: outcome.personalization,
-        });
-        return;
-      }
-      case "manga": {
-        const titlePreference = resolveAnimeMangaTitleLanguage(keys?.animeMangaTitleLanguage);
-        const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "manga") : new Set<string>();
-        const logs =
-          req.user != null
-            ? await prisma.log.findMany({
-                where: { userId: req.user.userId, mediaType: "manga" },
-                select: { genres: true, affinityContext: true, grade: true, status: true },
-                orderBy: { updatedAt: "desc" },
-                take: 120,
-              })
-            : [];
-        const sortParam = parsed.data.sort;
-        const allowedSorts = SEARCH_SORT_OPTIONS.manga.map((o) => o.value);
-        const sort = sortParam && allowedSorts.includes(sortParam) ? sortParam : undefined;
-        const outcome = await fetchMangaRecommendationsMerged({
-          logs,
-          exclude,
-          maxResults: RECOMMENDATIONS_MAX,
-          sort,
-          maxSearchCalls: 2,
-          titlePreference,
-        });
-        const mangaResults = sortRecommendationsByScoreDesc(outcome.results).slice(0, RECOMMENDATIONS_MAX);
-        res.json({
-          results: mangaResults,
-          personalization: outcome.personalization,
-        });
-        return;
-      }
-      case "boardgames": {
-        const bggMeta = API_KEY_META.bgg;
-        const ludopediaMeta = API_KEY_META.ludopedia;
-        const boardProvider =
-          parsed.data.boardGameProvider ??
-          (keys?.boardGameProvider === "ludopedia" ? "ludopedia" : "bgg");
-        const userBgg = keys?.bggApiToken ?? null;
-        const userLudo = keys?.ludopediaApiToken ?? null;
-        const hasKey =
-          skipApiKeyUX ||
-          (boardProvider === "bgg"
-            ? !!(userBgg ?? process.env.BGG_API_TOKEN)
-            : !!(userLudo ?? process.env.LUDOPEDIA_API_TOKEN));
-        if (!hasKey) {
-          const meta = boardProvider === "bgg" ? bggMeta : ludopediaMeta;
-          res.json({
-            results: [],
-            personalization: "none" as const,
-            requiresApiKey: boardProvider,
-            link: meta.link,
-            tutorial: meta.tutorial,
-          });
-          return;
-        }
-        const exclude = req.user ? await getLoggedExternalIds(req.user.userId, "boardgames") : new Set<string>();
-        const logs =
-          req.user != null
-            ? await prisma.log.findMany({
-                where: { userId: req.user.userId, mediaType: "boardgames" },
-                select: { genres: true, mechanics: true, grade: true, status: true, affinityContext: true },
-                orderBy: { updatedAt: "desc" },
-                take: 120,
-              })
-            : [];
-        const token =
-          boardProvider === "bgg"
-            ? preferEnvApiToken(process.env.BGG_API_TOKEN, userBgg)
-            : preferEnvApiToken(process.env.LUDOPEDIA_API_TOKEN, userLudo);
-        const sortParam = parsed.data.sort;
-        const allowedSorts = SEARCH_SORT_OPTIONS.boardgames.map((o) => o.value);
-        const sort = sortParam && allowedSorts.includes(sortParam) ? sortParam : undefined;
-        const outcome = await fetchBoardGameRecommendationsMerged({
-          logs,
-          exclude,
-          maxResults: RECOMMENDATIONS_MAX,
-          provider: boardProvider,
-          apiToken: token,
-          sort,
-          bggMeta,
-          ludopediaMeta,
-          maxSearchCalls: 2,
-        });
-        if ("requiresApiKey" in outcome) {
-          res.json({
-            results: [],
-            personalization: "none" as const,
-            requiresApiKey: outcome.requiresApiKey,
-            link: outcome.link,
-            tutorial: outcome.tutorial,
-          });
-          return;
-        }
-        const boardResults = sortRecommendationsByScoreDesc(outcome.results).slice(0, RECOMMENDATIONS_MAX);
-        res.json({
-          results: boardResults,
-          personalization: outcome.personalization,
-        });
-        return;
-      }
-      default: {
-        res.json({ results: [], personalization: "none" as const });
-        return;
-      }
-    }
+    const payload = await buildRecommendationsPayload({
+      type,
+      user: req.user,
+      keys,
+      skipApiKeyUX,
+      boardGameProvider: parsed.data.boardGameProvider,
+      sort: parsed.data.sort,
+    });
+    res.json(payload);
   } catch (err) {
     if (err instanceof InvalidApiKeyError) {
       if (skipApiKeyUX) {
@@ -477,6 +531,64 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
     }
     console.error("Recommendations error:", err);
     res.status(502).json({ error: "Recommendations failed" });
+  }
+});
+
+/** Netflix-style carousels for the blank search state. Does not consume free-search quota. */
+searchRouter.get("/browse", async (req: AuthenticatedRequest, res) => {
+  const parsed = recommendationsQuerySchema.safeParse({
+    type: req.query.type,
+    boardGameProvider: req.query.boardGameProvider,
+  });
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid type" });
+    return;
+  }
+  const type = parsed.data.type as MediaType;
+  const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
+  const skipApiKeyUX = await isDisableApiKeyRequirementsEnabled();
+
+  try {
+    const { rails, requiresApiKey, link, tutorial } = await buildBrowseRails({
+      type,
+      user: req.user,
+      keys,
+      skipApiKeyUX,
+      boardGameProvider: parsed.data.boardGameProvider,
+    });
+    res.json({
+      type,
+      rails,
+      ...(requiresApiKey ? { requiresApiKey, link, tutorial } : {}),
+    } satisfies BrowseResponse);
+  } catch (err) {
+    if (err instanceof InvalidApiKeyError) {
+      if (skipApiKeyUX) {
+        console.error("Browse error (INVALID_API_KEY UX disabled by feature flag):", err);
+        res.status(502).json({ error: "Browse failed" });
+        return;
+      }
+      const userHadKey =
+        err.provider === "tmdb"
+          ? !!keys?.tmdbApiKey
+          : err.provider === "rawg"
+            ? !!keys?.rawgApiKey
+            : err.provider === "bgg"
+              ? !!keys?.bggApiToken
+              : err.provider === "ludopedia"
+                ? !!keys?.ludopediaApiToken
+                : false;
+      if (userHadKey) {
+        res.status(400).json({
+          error: "Invalid API key",
+          code: "INVALID_API_KEY",
+          provider: err.provider,
+        });
+        return;
+      }
+    }
+    console.error("Browse error:", err);
+    res.status(502).json({ error: "Browse failed" });
   }
 });
 

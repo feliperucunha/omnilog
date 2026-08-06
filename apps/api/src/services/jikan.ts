@@ -477,3 +477,90 @@ export async function getTopAnimeByScore(
 
 /** @deprecated Use getTopAnimeByScore for rating-ordered lists. */
 export const getTopAnimePopular = getTopAnimeByScore;
+
+/** Most members / most popular anime (popular rail, by MAL membership). */
+export async function getPopularAnime(
+  max = 12,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<SearchResult[]> {
+  const res = await jikanFetch(`${BASE}/anime?order_by=members&sort=desc&limit=${max}`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    data?: Array<{
+      mal_id: number;
+      title?: string;
+      title_english?: string | null;
+      title_japanese?: string | null;
+      year?: number;
+      score?: number;
+      images?: { jpg?: { image_url?: string } };
+    }>;
+  };
+  return (data.data ?? []).map((item) => ({
+    id: String(item.mal_id),
+    title: jikanDisplayTitle(item, preference),
+    image: item.images?.jpg?.image_url ?? null,
+    year: item.year != null ? String(item.year) : null,
+    subtitle: null,
+    score: typeof item.score === "number" && item.score > 0 ? item.score : null,
+  }));
+}
+
+/** Anime currently airing this season (new releases rail). */
+export async function getAiringAnime(
+  max = 12,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<SearchResult[]> {
+  const res = await jikanFetch(`${BASE}/seasons/now?limit=${max}`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    data?: Array<{
+      mal_id: number;
+      title?: string;
+      title_english?: string | null;
+      title_japanese?: string | null;
+      year?: number;
+      score?: number;
+      images?: { jpg?: { image_url?: string } };
+    }>;
+  };
+  return (data.data ?? []).map((item) => ({
+    id: String(item.mal_id),
+    title: jikanDisplayTitle(item, preference),
+    image: item.images?.jpg?.image_url ?? null,
+    year: item.year != null ? String(item.year) : null,
+    subtitle: null,
+    score: typeof item.score === "number" && item.score > 0 ? item.score : null,
+  }));
+}
+
+/** Most members / most popular manga (popular rail, by MAL membership). */
+export async function getPopularManga(
+  max = 12,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<SearchResult[]> {
+  const res = await jikanFetch(`${BASE}/manga?order_by=members&sort=desc&limit=${max}`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    data?: Array<{
+      mal_id: number;
+      title?: string;
+      title_english?: string | null;
+      title_japanese?: string | null;
+      published?: { from?: string };
+      score?: number;
+      images?: { jpg?: { image_url?: string } };
+    }>;
+  };
+  return (data.data ?? []).map((item) => {
+    const year = item.published?.from ? item.published.from.slice(0, 4) : null;
+    return {
+      id: String(item.mal_id),
+      title: jikanDisplayTitle(item, preference),
+      image: item.images?.jpg?.image_url ?? null,
+      year: year ?? null,
+      subtitle: null,
+      score: typeof item.score === "number" && item.score > 0 ? item.score : null,
+    };
+  });
+}

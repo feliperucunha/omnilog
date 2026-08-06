@@ -559,7 +559,7 @@
     "summaryHoursItems_other": "{{count}} elementos con tiempo registrado",
     "pagesReadTitle": "Páginas leídas",
     "pagesReadSub": "Total de páginas registradas en esta categoría",
-    "byGameWeight": "Por peso",
+    "byGameWeight": "Board games por peso",
     "weightFilterLabel": "Filtro del gráfico de peso",
     "weightFilterAll": "Todos",
     "weightFilterInCollection": "En la colección",
@@ -660,9 +660,12 @@
     "recommendationsTitle": "Recomendado para ti",
     "recommendationsExpand": "Mostrar recomendaciones",
     "recommendationsCollapse": "Ocultar recomendaciones",
-    "recommendationsNav": "Carrusel de recomendaciones",
-    "recommendationsDotLabel": "Ir a la página {{index}}",
-    "recommendationsEmpty": "No hay recomendaciones por ahora. Registra algunos títulos o busca juegos que te gusten."
+    "recommendationsEmpty": "No hay recomendaciones por ahora. Registra algunos títulos o busca juegos que te gusten.",
+    "browseTrending": "Tendencias ahora",
+    "browseTopRated": "Mejor valorados",
+    "browsePopular": "Más vistos",
+    "browseNewReleases": "Nuevos lanzamientos",
+    "browseHot": "Populares ahora"
   },
   "searchSort": {
     "relevance": "Relevancia",

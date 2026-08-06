@@ -92,6 +92,8 @@ import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import {
   DeltaChip,
   Sparkline,
+  MomentumSkeleton,
+  SparklineSkeleton,
   momentumFromStatsEntries,
   type MomentumData,
 } from "@/components/statistics/StatisticsMomentum";
@@ -509,6 +511,8 @@ function OverviewStatCard(props: {
   momentum?: MomentumData;
   /** Localized accessibility label for the delta chip. */
   momentumAria?: (delta: number) => string;
+  /** Show a pulse placeholder while the momentum series is still loading. */
+  momentumLoading?: boolean;
 }) {
   return <MomentumCard {...props} />;
 }
@@ -623,6 +627,7 @@ export function Statistics() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [summary, setSummary] = useState<LogStatsSummary | null>(null);
   const [summaryByMonth, setSummaryByMonth] = useState<LogStatsSummaryByMonth[]>([]);
+  const [summaryByMonthLoading, setSummaryByMonthLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [statsGroup, setStatsGroup] = useState<StatsGroup>("category");
   const [stats, setStats] = useState<StatsEntry[]>([]);
@@ -1245,7 +1250,10 @@ export function Statistics() {
       "GET",
       summaryByMonthPath
     );
-    if (summaryByMonthCached) setSummaryByMonth(summaryByMonthCached.data.data ?? []);
+    if (summaryByMonthCached) {
+      setSummaryByMonth(summaryByMonthCached.data.data ?? []);
+      setSummaryByMonthLoading(false);
+    }
     void apiFetchSWR<{ data: LogStatsSummaryByMonth[] }>(summaryByMonthPath, {
       ttlMs: HEAVY_PAGE_TTL_MS,
       onUpdate: (res) => setSummaryByMonth((res as { data: LogStatsSummaryByMonth[] }).data ?? []),
@@ -1255,7 +1263,8 @@ export function Statistics() {
       })
       .catch(() => {
         if (!summaryByMonthCached) setSummaryByMonth([]);
-      });
+      })
+      .finally(() => setSummaryByMonthLoading(false));
   }, [isPro, tzOffsetMinutes, statsMediaQuery]);
 
   useEffect(() => {
@@ -1827,6 +1836,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
               value={(summaryData.totalPagesRead ?? 0).toLocaleString(locale)}
               momentum={overviewMomentum.pages}
               momentumAria={momentumAria}
+              momentumLoading={pagesOverTimeLoading}
             />
           )}
           {showBoardGamesWonHighlight && (
@@ -1836,6 +1846,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
               value={(summaryData.boardGamesWon ?? 0).toLocaleString(locale)}
               momentum={overviewMomentum.boardGamesWon}
               momentumAria={momentumAria}
+              momentumLoading={summaryByMonthLoading}
             />
           )}
           <OverviewStatCard
@@ -1844,6 +1855,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
             value={summaryData.totalLogs}
             momentum={overviewMomentum.totalLogs}
             momentumAria={momentumAria}
+            momentumLoading={summaryByMonthLoading}
           />
           <OverviewStatCard
             icon={CircleCheck}
@@ -1851,6 +1863,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
             value={summaryData.completedLogs}
             momentum={overviewMomentum.completed}
             momentumAria={momentumAria}
+            momentumLoading={summaryByMonthLoading}
           />
           <OverviewStatCard
             icon={Clock}
@@ -1858,6 +1871,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
             value={summaryData.totalContentHours.toFixed(1)}
             momentum={overviewMomentum.hours}
             momentumAria={momentumAria}
+            momentumLoading={summaryByMonthLoading}
           />
           <OverviewStatCard
             icon={Star}
@@ -1865,6 +1879,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
             value={summaryData.reviewedLogs}
             momentum={overviewMomentum.reviewed}
             momentumAria={momentumAria}
+            momentumLoading={summaryByMonthLoading}
           />
           <OverviewStatCard
             icon={Scale}
@@ -2158,9 +2173,11 @@ const summaryData = summary ?? EMPTY_SUMMARY;
               <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
             )}
             <span>{t("statistics.pagesOverTime")}</span>
-            {overviewMomentum.pages?.delta != null && (
+            {pagesOverTimeLoading ? (
+              <MomentumSkeleton className="ml-auto" />
+            ) : overviewMomentum.pages?.delta != null ? (
               <DeltaChip delta={overviewMomentum.pages.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.pages.delta)} />
-            )}
+            ) : null}
           </button>
           {!pagesOverTimeCollapsed && (
             <section aria-label={t("statistics.pagesOverTime")} className="min-w-0 w-full">
@@ -2179,9 +2196,11 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                       triggerClassName="w-full min-w-0"
                     />
                   )}
-                  {overviewMomentum.pages?.series && overviewMomentum.pages.series.length > 1 && (
+                  {pagesOverTimeLoading ? (
+                    <SparklineSkeleton width={120} height={28} className="hidden sm:block" />
+                  ) : overviewMomentum.pages?.series && overviewMomentum.pages.series.length > 1 ? (
                     <Sparkline points={overviewMomentum.pages.series} width={120} height={28} className="hidden sm:block" />
-                  )}
+                  ) : null}
                 </div>
                 {pagesOverTimeStats.length > 0 && (
                   <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -2269,9 +2288,11 @@ const summaryData = summary ?? EMPTY_SUMMARY;
               <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
             )}
             <span>{t("statistics.episodesOverTime")}</span>
-            {overviewMomentum.episodes?.delta != null && (
+            {episodesOverTimeLoading ? (
+              <MomentumSkeleton className="ml-auto" />
+            ) : overviewMomentum.episodes?.delta != null ? (
               <DeltaChip delta={overviewMomentum.episodes.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.episodes.delta)} />
-            )}
+            ) : null}
           </button>
           {!episodesOverTimeCollapsed && (
             <section aria-label={t("statistics.episodesOverTime")} className="min-w-0 w-full">
@@ -2290,9 +2311,11 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                       triggerClassName="w-full min-w-0"
                     />
                   )}
-                  {overviewMomentum.episodes?.series && overviewMomentum.episodes.series.length > 1 && (
+                  {episodesOverTimeLoading ? (
+                    <SparklineSkeleton width={120} height={28} className="hidden sm:block" />
+                  ) : overviewMomentum.episodes?.series && overviewMomentum.episodes.series.length > 1 ? (
                     <Sparkline points={overviewMomentum.episodes.series} width={120} height={28} className="hidden sm:block" />
-                  )}
+                  ) : null}
                 </div>
                 {episodesOverTimeStats.length > 0 && (
                   <div className="flex h-14 min-w-0 items-end gap-1" aria-hidden>
@@ -2629,12 +2652,18 @@ const summaryData = summary ?? EMPTY_SUMMARY;
               <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
             )}
             <span>{t("statistics.sectionChartsTitle")}</span>
-            {genreGraphMode === "genre" && overviewMomentum.genre?.delta != null && (
-              <DeltaChip delta={overviewMomentum.genre.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.genre.delta)} />
-            )}
-            {genreGraphMode === "statusOverTime" && overviewMomentum.completed?.delta != null && (
-              <DeltaChip delta={overviewMomentum.completed.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.completed.delta)} />
-            )}
+            {genreGraphMode === "genre" &&
+              (genreStatsLoading ? (
+                <MomentumSkeleton className="ml-auto" />
+              ) : overviewMomentum.genre?.delta != null ? (
+                <DeltaChip delta={overviewMomentum.genre.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.genre.delta)} />
+              ) : null)}
+            {genreGraphMode === "statusOverTime" &&
+              (statusOverTimeLoading ? (
+                <MomentumSkeleton className="ml-auto" />
+              ) : overviewMomentum.completed?.delta != null ? (
+                <DeltaChip delta={overviewMomentum.completed.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.completed.delta)} />
+              ) : null)}
           </button>
           {!chartsCollapsed && (
         <Card
@@ -2904,9 +2933,11 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                 <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
               )}
               <span>{t("dashboard.statsTitle")}</span>
-              {overviewMomentum.hours?.delta != null && (
+              {(statsGroup === "month" ? statsLoading : summaryByMonthLoading) ? (
+                <MomentumSkeleton className="ml-auto" />
+              ) : overviewMomentum.hours?.delta != null ? (
                 <DeltaChip delta={overviewMomentum.hours.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.hours.delta)} />
-              )}
+              ) : null}
             </button>
             {!statsCollapsed && (
               <>

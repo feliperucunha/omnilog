@@ -75,6 +75,10 @@ export {
   COMPLETED_STATUSES,
   SEARCH_SORT_OPTIONS,
   SEARCH_RESULTS_PAGE_SIZE,
+  BROWSE_RAIL_KEYS,
+  type BrowseRail,
+  type BrowseRailKey,
+  type BrowseResponse,
 } from "./types.js";
 export type { ProfileVisibility } from "./profileVisibility.js";
 export {

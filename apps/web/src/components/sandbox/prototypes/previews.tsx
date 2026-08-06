@@ -16,6 +16,8 @@ import { ReviewTemplate, ReviewDrafts } from "./review";
 import { OnboardRamp, OnboardSpotlight, OnboardTaste } from "./onboarding";
 import { ListingGallery, ListingSeller, ListingManager } from "./marketdetail";
 import { InfoFaq, InfoContext, InfoTrust } from "./info";
+import { FilterSheet, FilterBar, FilterRail } from "./filters";
+import { DrawerSnapped, DrawerSteps, DrawerFloat } from "./drawers";
 
 /** Full interactive desktop+mobile implementations, keyed by option id. */
 export const PREVIEWS: Record<string, ReactNode> = {
@@ -65,4 +67,10 @@ export const PREVIEWS: Record<string, ReactNode> = {
   "info-a": <InfoFaq />,
   "info-b": <InfoContext />,
   "info-c": <InfoTrust />,
+  "filters-a": <FilterSheet />,
+  "filters-b": <FilterBar />,
+  "filters-c": <FilterRail />,
+  "drawers-a": <DrawerSnapped />,
+  "drawers-b": <DrawerSteps />,
+  "drawers-c": <DrawerFloat />,
 };

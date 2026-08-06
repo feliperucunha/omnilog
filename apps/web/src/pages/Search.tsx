@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   MEDIA_TYPES,
   SEARCH_SORT_OPTIONS,
+  type BrowseRail,
+  type BrowseResponse,
   type Log,
   type MediaType,
   type SearchResult,
@@ -22,7 +24,7 @@ import {
 } from "@/lib/api";
 import { buildDefaultLogsListPath } from "@/lib/logsPageCache";
 import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
-import { SearchSkeleton } from "@/components/skeletons";
+import { SearchSkeleton, BrowseRailSkeleton } from "@/components/skeletons";
 import { SearchResultCard } from "@/components/SearchResultCard";
 import { LogViewSelector } from "@/components/LogViewSelector";
 import { useLogViewPreference } from "@/hooks/useLogViewPreference";
@@ -54,7 +56,7 @@ import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { skipApiKeyMissingUi } from "@/lib/featureFlags";
 import type { BoardGameProvider } from "@geeklogs/shared";
 import { Link } from "react-router-dom";
-import { ChevronDown, Loader2, UserCheck } from "lucide-react";
+import { UserCheck } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
@@ -62,7 +64,6 @@ import { SearchRecommendationsCarousel } from "@/components/SearchRecommendation
 import { ApiKeyPrompt, type ApiKeyProvider } from "@/components/ApiKeyPrompt";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import * as storage from "@/lib/storage";
-import { paperShadow } from "@/lib/paperShadow";
 import { cn } from "@/lib/utils";
 import { decodeSearchResultForDisplay } from "@/lib/decodeDisplayFields";
 import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
@@ -229,10 +230,23 @@ export function Search() {
     }
   );
   const [recRefreshNonce, setRecRefreshNonce] = useState(0);
-  const [recommendationsSectionOpen, setRecommendationsSectionOpen] = useState(
-    () => pageCache?.recommendationsSectionOpen ?? !pageCache?.hasSearched
+  const [browseByMediaType, setBrowseByMediaType] = useState<Partial<Record<MediaType, BrowseRail[]>>>(
+    () => pageCache?.browseByMediaType ?? {}
   );
-  const recommendationsLockedRef = useRef(Boolean(pageCache?.hasSearched));
+  const [browseMetaByMediaType, setBrowseMetaByMediaType] = useState<Partial<Record<MediaType, RecMeta>>>(
+    () => pageCache?.browseMetaByMediaType ?? {}
+  );
+  const [browseLoadingByMediaType, setBrowseLoadingByMediaType] = useState<Partial<Record<MediaType, boolean>>>(
+    () => {
+      if (!pageCache?.browseByMediaType) return {};
+      const out: Partial<Record<MediaType, boolean>> = {};
+      for (const type of Object.keys(pageCache.browseByMediaType) as MediaType[]) {
+        out[type] = false;
+      }
+      return out;
+    }
+  );
+  const [browseRefreshNonce, setBrowseRefreshNonce] = useState(0);
   /** Desktop: map vertical wheel to horizontal scroll (mobile uses native touch; unchanged). */
   const { token } = useAuth();
   const { me, loading: meLoading } = useMe();
@@ -243,6 +257,10 @@ export function Search() {
   const currentRecMeta = recMetaByMediaType[mediaType];
   const currentRecRequiresApiKey = currentRecMeta?.requiresApiKey;
   const currentRecLoading = recLoadingByMediaType[mediaType] ?? false;
+  const currentBrowseRails = browseByMediaType[mediaType] ?? [];
+  const currentBrowseMeta = browseMetaByMediaType[mediaType];
+  const currentBrowseRequiresApiKey = currentBrowseMeta?.requiresApiKey;
+  const currentBrowseLoading = browseLoadingByMediaType[mediaType] ?? false;
 
   useEffect(() => {
     if (stateMediaType) setSearchFilter(stateMediaType);
@@ -311,8 +329,6 @@ export function Search() {
   const runSearch = useCallback(
     async (q: string, typeOverride?: SearchFilterParam, sortOverride?: string) => {
       if (!q.trim()) return;
-      recommendationsLockedRef.current = true;
-      setRecommendationsSectionOpen(false);
       const filter = typeOverride ?? searchFilter;
       const sort = sortOverride ?? sortBy;
       if (filter === SEARCH_USERS_TYPE) {
@@ -391,7 +407,8 @@ export function Search() {
       userResults,
       recByMediaType,
       recMetaByMediaType,
-      recommendationsSectionOpen,
+      browseByMediaType,
+      browseMetaByMediaType,
     });
   }, [
     hasSearched,
@@ -403,7 +420,8 @@ export function Search() {
     userResults,
     recByMediaType,
     recMetaByMediaType,
-    recommendationsSectionOpen,
+    browseByMediaType,
+    browseMetaByMediaType,
     loading,
   ]);
 
@@ -508,6 +526,59 @@ export function Search() {
     };
   }, [mediaType, searchFilter, token, recRefreshNonce, me, boardGameProvider, recByMediaType, recMetaByMediaType]);
 
+  useEffect(() => {
+    if (searchFilter === SEARCH_USERS_TYPE || !RECOMMENDATION_MEDIA_TYPES.includes(mediaType)) {
+      return;
+    }
+    const type = mediaType;
+    const hasCachedBrowse =
+      (browseByMediaType[type]?.length ?? 0) > 0 || browseMetaByMediaType[type]?.requiresApiKey != null;
+    if (browseRefreshNonce === 0 && hasCachedBrowse) {
+      return;
+    }
+    let cancelled = false;
+    setBrowseLoadingByMediaType((prev) => ({ ...prev, [type]: true }));
+    const params = new URLSearchParams({
+      type,
+      viewer: token ? "auth" : "guest",
+    });
+    if (type === "boardgames") {
+      params.set("boardGameProvider", boardGameProvider);
+    }
+    apiFetchCached<BrowseResponse>(`/search/browse?${params.toString()}`, {
+      ttlMs: 5 * 60 * 1000,
+    })
+      .then((data) => {
+        if (cancelled) return;
+        setBrowseByMediaType((prev) => ({
+          ...prev,
+          [type]: (data.rails ?? []).map((rail) => ({
+            key: rail.key,
+            results: (rail.results ?? []).map(decodeSearchResultForDisplay),
+          })),
+        }));
+        setBrowseMetaByMediaType((prev) => ({
+          ...prev,
+          [type]: {
+            requiresApiKey: data.requiresApiKey,
+            link: data.link,
+            tutorial: data.tutorial,
+          },
+        }));
+      })
+      .catch(() => {
+        // Keep cached browse rails for this category on error.
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBrowseLoadingByMediaType((prev) => ({ ...prev, [type]: false }));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaType, searchFilter, token, browseRefreshNonce, me, boardGameProvider, browseByMediaType, browseMetaByMediaType]);
+
   const handleSearch = async (e: React.FormEvent) => {
     setHasSearched(true);
     e.preventDefault();
@@ -525,6 +596,10 @@ export function Search() {
       setRecMetaByMediaType({});
       setRecLoadingByMediaType({});
       setRecRefreshNonce((n) => n + 1);
+      setBrowseByMediaType({});
+      setBrowseMetaByMediaType({});
+      setBrowseLoadingByMediaType({});
+      setBrowseRefreshNonce((n) => n + 1);
     }
   });
 
@@ -633,111 +708,199 @@ export function Search() {
     searchFilter !== SEARCH_USERS_TYPE && RECOMMENDATION_MEDIA_TYPES.includes(mediaType);
 
   const recommendationsSection = showRecommendations ? (
-    <Card
-      className="relative z-10 flex w-full min-w-0 shrink-0 flex-col border-[var(--color-surface-border)] bg-[var(--color-dark)] p-0"
-      style={paperShadow}
-    >
-      <button
-        type="button"
-        className="flex w-full items-center gap-3 rounded-t-lg px-4 py-3 text-left transition-colors hover:bg-[var(--color-mid)]/10 sm:py-3.5"
-        onClick={() => {
-          if (recommendationsLockedRef.current) return;
-          setRecommendationsSectionOpen((o) => !o);
-        }}
-        aria-expanded={recommendationsSectionOpen}
-        aria-controls="search-recommendations-panel"
-        aria-labelledby="search-recommendations-heading"
+    <div className="flex flex-col gap-2">
+      <h2
+        id="search-recommendations-heading"
+        className="min-w-0 text-sm font-semibold text-[var(--color-lightest)]"
       >
-        <h2
-          id="search-recommendations-heading"
-          className="min-w-0 flex-1 text-base font-semibold text-[var(--color-lightest)] sm:text-lg"
-        >
-          <OverflowMarquee>{t("search.recommendationsTitle")}</OverflowMarquee>
-        </h2>
-        {currentRecLoading && currentRecResults.length === 0 && !recommendationsSectionOpen && (
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--btn-gradient-start)]" aria-hidden />
-        )}
-        <ChevronDown
-          className={cn(
-            "h-5 w-5 shrink-0 text-[var(--color-light)] transition-transform duration-200",
-            recommendationsSectionOpen && "rotate-180"
-          )}
-          aria-hidden
+        {t("search.recommendationsTitle")}
+      </h2>
+      {currentRecLoading && currentRecResults.length === 0 && (
+        <BrowseRailSkeleton />
+      )}
+      {currentRecResults.length > 0 && (
+        <SearchRecommendationsCarousel
+          items={currentRecResults}
+          mediaType={mediaType}
+          boardGameProvider={boardGameProvider}
+          token={token}
+          logsByExternalId={logsByExternalId}
+          onItemOpen={(id) => openItemDetail(mediaType, id)}
         />
-        <span className="sr-only">
-          {recommendationsSectionOpen ? t("search.recommendationsCollapse") : t("search.recommendationsExpand")}
-        </span>
-      </button>
-      <AnimatePresence initial={false}>
-        {recommendationsSectionOpen && (
-          <motion.div
-            id="search-recommendations-panel"
-            role="region"
-            aria-labelledby="search-recommendations-heading"
-            className="flex flex-col gap-3 overflow-hidden border-t border-[var(--color-surface-border)] px-4 pb-4 pt-3"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          >
-          {currentRecLoading && currentRecResults.length === 0 && (
-            <div
-              className="h-36 w-full animate-pulse rounded-lg bg-[var(--color-mid)]/20 sm:h-40"
-              aria-hidden
-            />
-          )}
-          {currentRecResults.length > 0 && (
+      )}
+      {!currentRecLoading &&
+        currentRecResults.length === 0 &&
+        currentRecRequiresApiKey &&
+        !skipApiKeyReq && (
+          <ApiKeyPrompt
+            provider={currentRecRequiresApiKey as ApiKeyProvider}
+            name={
+              API_KEY_META[currentRecRequiresApiKey as ApiKeyProvider]?.name ??
+              currentRecRequiresApiKey
+            }
+            link={
+              currentRecMeta?.link ??
+              API_KEY_META[currentRecRequiresApiKey as ApiKeyProvider]?.link ??
+              ""
+            }
+            tutorial={
+              currentRecMeta?.tutorial ??
+              API_KEY_META[currentRecRequiresApiKey as ApiKeyProvider]?.tutorial ??
+              ""
+            }
+            onSaved={() => {
+              invalidateApiCache("/search/recommendations");
+              invalidateApiCache("/search/browse");
+              setRecMetaByMediaType((prev) => ({ ...prev, [mediaType]: {} }));
+              setRecRefreshNonce((n) => n + 1);
+              setBrowseMetaByMediaType((prev) => ({ ...prev, [mediaType]: {} }));
+              setBrowseRefreshNonce((n) => n + 1);
+            }}
+          />
+        )}
+      {!currentRecLoading &&
+        currentRecResults.length === 0 &&
+        (!currentRecRequiresApiKey || skipApiKeyReq) && (
+          <p className="text-sm text-[var(--color-light)]">{t("search.recommendationsEmpty")}</p>
+        )}
+    </div>
+  ) : null;
+
+  const browseSection = showRecommendations ? (
+    <div className="flex flex-col gap-5">
+      {currentBrowseLoading && currentBrowseRails.length === 0 && (
+        <>
+          <BrowseRailSkeleton />
+          <BrowseRailSkeleton />
+          <BrowseRailSkeleton />
+          <BrowseRailSkeleton />
+        </>
+      )}
+      {currentBrowseRails.map((rail) => {
+        if (rail.results.length === 0) return null;
+        const railTitle =
+          rail.key === "trending"
+            ? t("search.browseTrending")
+            : rail.key === "popular"
+              ? t("search.browsePopular")
+              : rail.key === "topRated"
+                ? t("search.browseTopRated")
+                : rail.key === "newReleases"
+                  ? t("search.browseNewReleases")
+                  : rail.key === "hot"
+                    ? t("search.browseHot")
+                    : rail.key;
+        return (
+          <div key={rail.key} className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold text-[var(--color-lightest)]">{railTitle}</h3>
             <SearchRecommendationsCarousel
-              items={currentRecResults}
+              items={rail.results}
               mediaType={mediaType}
               boardGameProvider={boardGameProvider}
               token={token}
               logsByExternalId={logsByExternalId}
               onItemOpen={(id) => openItemDetail(mediaType, id)}
             />
-          )}
-          {!currentRecLoading &&
-            currentRecResults.length === 0 &&
-            currentRecRequiresApiKey &&
-            !skipApiKeyReq && (
-              <ApiKeyPrompt
-                provider={currentRecRequiresApiKey as ApiKeyProvider}
-                name={
-                  API_KEY_META[currentRecRequiresApiKey as ApiKeyProvider]?.name ??
-                  currentRecRequiresApiKey
-                }
-                link={
-                  currentRecMeta?.link ??
-                  API_KEY_META[currentRecRequiresApiKey as ApiKeyProvider]?.link ??
-                  ""
-                }
-                tutorial={
-                  currentRecMeta?.tutorial ??
-                  API_KEY_META[currentRecRequiresApiKey as ApiKeyProvider]?.tutorial ??
-                  ""
-                }
-                onSaved={() => {
-                  invalidateApiCache("/search/recommendations");
-                  setRecMetaByMediaType((prev) => ({ ...prev, [mediaType]: {} }));
-                  setRecRefreshNonce((n) => n + 1);
-                }}
-              />
-            )}
-          {!currentRecLoading &&
-            currentRecResults.length === 0 &&
-            (!currentRecRequiresApiKey || skipApiKeyReq) && (
-              <p className="text-sm text-[var(--color-light)]">{t("search.recommendationsEmpty")}</p>
-            )}
-          </motion.div>
+          </div>
+        );
+      })}
+      {!currentBrowseLoading &&
+        currentBrowseRails.length === 0 &&
+        currentBrowseRequiresApiKey &&
+        !skipApiKeyReq && (
+          <ApiKeyPrompt
+            provider={currentBrowseRequiresApiKey as ApiKeyProvider}
+            name={
+              API_KEY_META[currentBrowseRequiresApiKey as ApiKeyProvider]?.name ??
+              currentBrowseRequiresApiKey
+            }
+            link={
+              currentBrowseMeta?.link ??
+              API_KEY_META[currentBrowseRequiresApiKey as ApiKeyProvider]?.link ??
+              ""
+            }
+            tutorial={
+              currentBrowseMeta?.tutorial ??
+              API_KEY_META[currentBrowseRequiresApiKey as ApiKeyProvider]?.tutorial ??
+              ""
+            }
+            onSaved={() => {
+              invalidateApiCache("/search/recommendations");
+              invalidateApiCache("/search/browse");
+              setRecMetaByMediaType((prev) => ({ ...prev, [mediaType]: {} }));
+              setRecRefreshNonce((n) => n + 1);
+              setBrowseMetaByMediaType((prev) => ({ ...prev, [mediaType]: {} }));
+              setBrowseRefreshNonce((n) => n + 1);
+            }}
+          />
         )}
-        </AnimatePresence>
-    </Card>
+    </div>
   ) : null;
 
+  const searchFormContent = (
+    <motion.div layout transition={{ type: "spring", stiffness: 300, damping: 35 }} className="flex flex-col gap-4">
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <UnifiedSearchBar
+            ref={searchInputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={
+              searchFilter === SEARCH_USERS_TYPE
+                ? t("search.usersPlaceholder")
+                : t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })
+            }
+            autoFocus={!hasSearched}
+            inputAriaLabel={t("search.search")}
+            clearAriaLabel={t("search.clearSearch")}
+            submitAriaLabel={t("search.search")}
+            showClear={query.trim() !== ""}
+            onClear={() => {
+              setQuery("");
+              setHasSearched(false);
+              setResults([]);
+              setUserResults([]);
+              searchInputRef.current?.focus();
+            }}
+            disableSubmitWhenEmpty
+            loading={loading}
+          />
+        </div>
+        {hasSearched && searchFilter !== SEARCH_USERS_TYPE && (
+          <LogViewSelector value={searchLogView} onValueChange={setSearchLogView} />
+        )}
+      </div>
+      {hasSearched && searchFilter !== SEARCH_USERS_TYPE && (
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-4">
+          <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 sm:min-w-[12rem]">
+            <Select
+              value={sortBy}
+              onValueChange={(v) => {
+                setSortBy(v);
+                if (query.trim()) runSearch(query, undefined, v);
+              }}
+              options={SEARCH_SORT_OPTIONS[mediaType].map((opt) => ({
+                value: opt.value,
+                label: t(opt.labelKey),
+              }))}
+              className="min-w-0 w-full sm:max-w-lg sm:flex-1"
+              triggerClassName="h-9 min-w-0 w-full max-w-none"
+              aria-label={t("search.sortBy")}
+            />
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+
+  const searchBarTop = (
+    <form onSubmit={handleSearch} className="w-full">
+      {searchFormContent}
+    </form>
+  );
+
   return (
-    <div
-      className={`relative flex flex-col gap-6 flex-1 min-h-0 min-w-0 overflow-x-hidden ${hasSearched ? "w-full" : ""}`}
-    >
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center gap-2 overflow-hidden" aria-hidden>
         <Logo alt="" className="h-24 w-auto max-w-[90vw] opacity-20 sm:h-40 md:h-48 md:pr-4" />
         <div className=" flex flex-col items-center">
@@ -750,73 +913,11 @@ export function Search() {
         </div>
       </div>
 
-      <div className="relative z-10 flex flex-col gap-6 flex-1 min-h-0">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col gap-6">
       {!hasSearched && recommendationsSection}
+      {!hasSearched && browseSection}
 
-      <motion.div
-        className={hasSearched ? "shrink-0 w-full" : "flex-1 flex flex-col justify-end items-center min-h-0"}
-        layout
-        transition={{ type: "spring", stiffness: 300, damping: 35 }}
-      >
-        <form onSubmit={handleSearch} className={hasSearched ? "w-full" : "w-full max-w-xl"}>
-          <motion.div
-            layout
-            transition={{ type: "spring", stiffness: 300, damping: 35 }}
-            className={hasSearched ? "flex flex-col gap-4 w-full" : "flex flex-col gap-4"}
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <UnifiedSearchBar
-                  ref={searchInputRef}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={
-                    searchFilter === SEARCH_USERS_TYPE
-                      ? t("search.usersPlaceholder")
-                      : t("search.searchPlaceholder", { type: t(`nav.${mediaType}`).toLowerCase() })
-                  }
-                  autoFocus={!hasSearched}
-                  inputAriaLabel={t("search.search")}
-                  clearAriaLabel={t("search.clearSearch")}
-                  submitAriaLabel={t("search.search")}
-                  showClear={query.trim() !== ""}
-                  onClear={() => {
-                    setQuery("");
-                    searchInputRef.current?.focus();
-                  }}
-                  disableSubmitWhenEmpty
-                  loading={loading}
-                />
-              </div>
-              {hasSearched && searchFilter !== SEARCH_USERS_TYPE && (
-                <LogViewSelector value={searchLogView} onValueChange={setSearchLogView} />
-              )}
-            </div>
-            {hasSearched && searchFilter !== SEARCH_USERS_TYPE && (
-              <div className="flex w-full min-w-0 flex-wrap items-center gap-4">
-                <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 sm:min-w-[12rem]">
-                  <Select
-                    value={sortBy}
-                    onValueChange={(v) => {
-                      setSortBy(v);
-                      if (query.trim()) runSearch(query, undefined, v);
-                    }}
-                    options={SEARCH_SORT_OPTIONS[mediaType].map((opt) => ({
-                      value: opt.value,
-                      label: t(opt.labelKey),
-                    }))}
-                    className="min-w-0 w-full sm:max-w-lg sm:flex-1"
-                    triggerClassName="h-9 min-w-0 w-full max-w-none"
-                    aria-label={t("search.sortBy")}
-                  />
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </form>
-      </motion.div>
-
-      {hasSearched && recommendationsSection}
+      {hasSearched && searchBarTop}
 
       {hasSearched && loading && (
         <motion.div
@@ -956,6 +1057,17 @@ export function Search() {
       )}
 
       </div>
+
+      {!hasSearched && (
+        <div
+          className="sticky bottom-[max(5.5rem,calc(4.75rem+env(safe-area-inset-bottom)))] z-30 mt-6 flex min-w-0 justify-center rounded-2xl px-2 py-2 backdrop-blur-md md:bottom-[max(1.5rem,env(safe-area-inset-bottom))] md:px-4 md:py-2.5"
+          style={{ background: "linear-gradient(to top, var(--color-dark) 40%, color-mix(in srgb, var(--color-dark) 75%, transparent))" }}
+        >
+          <form onSubmit={handleSearch} className="w-full max-w-xl">
+            {searchFormContent}
+          </form>
+        </div>
+      )}
 
       <OnboardingSpotlight
         storageKey={ONBOARDING_SPOTLIGHT_KEYS.searchCategory}

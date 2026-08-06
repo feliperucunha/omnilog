@@ -142,3 +142,35 @@ export function momentumFromStatsEntries(
   const delta = deltaFromSeries(short);
   return delta == null ? undefined : { delta, series: short };
 }
+
+/** Pulse placeholder squeezed into a delta pill — shown while momentum is still loading. */
+export function MomentumSkeleton({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-5 w-12 shrink-0 animate-pulse rounded-full bg-[var(--color-mid)]/25",
+        className
+      )}
+      aria-hidden
+    />
+  );
+}
+
+/** Pulse placeholder for a sparkline — shown while momentum is still loading. */
+export function SparklineSkeleton({
+  width = 120,
+  height = 28,
+  className,
+}: {
+  width?: number;
+  height?: number;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn("block animate-pulse rounded bg-[var(--color-mid)]/20", className)}
+      style={{ width, height }}
+      aria-hidden
+    />
+  );
+}

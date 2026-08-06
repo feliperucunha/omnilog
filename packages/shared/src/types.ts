@@ -91,6 +91,23 @@ export interface SearchResult {
   pagesCount?: number | null;
 }
 
+/** Available rails (Netflix-style carousels) for the empty-search browse endpoint. */
+export const BROWSE_RAIL_KEYS = ["trending", "topRated", "popular", "newReleases", "hot"] as const;
+export type BrowseRailKey = (typeof BROWSE_RAIL_KEYS)[number];
+
+export interface BrowseRail {
+  key: BrowseRailKey;
+  results: SearchResult[];
+}
+
+export interface BrowseResponse {
+  type: MediaType;
+  rails: BrowseRail[];
+  requiresApiKey?: string;
+  link?: string;
+  tutorial?: string;
+}
+
 /** Sort option for search: value sent to API, labelKey for i18n (e.g. searchSort.titleAsc). */
 export interface SearchSortOption {
   value: string;

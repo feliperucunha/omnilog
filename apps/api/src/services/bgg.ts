@@ -343,3 +343,24 @@ export async function searchBoardGames(
   const sorted = sortSearchResults(results, sort) as typeof results;
   return { results: sorted };
 }
+
+/** BGG `/hot` list (no API token needed). Returns id/title/image/rank for the "hot" rail. */
+export async function getHotBoardGames(max = 12): Promise<SearchResult[]> {
+  const res = await bggFetch(`${BASE}/hot?type=boardgame`, { headers: bggHeaders(null) });
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("bgg");
+  if (!res.ok) return [];
+  const xml = await res.text();
+  const parser = new XMLParser({ ignoreAttributes: false });
+  const parsed = parser.parse(xml) as {
+    items?: { item?: Array<{ "@_id": string; name?: { "@_value": string } | Array<{ "@_value"?: string }>; thumbnail?: string | { "#text"?: string } }> };
+  };
+  const items = parsed.items?.item;
+  const list = Array.isArray(items) ? items : items ? [items] : [];
+  return list.slice(0, max).map((item) => ({
+    id: String(item["@_id"]),
+    title: decodeHtmlEntities((Array.isArray(item.name) ? item.name[0]?.["@_value"] : item.name?.["@_value"]) ?? "Unknown"),
+    image: bggExtractImageUrl(item.thumbnail),
+    year: null,
+    subtitle: null,
+  }));
+}

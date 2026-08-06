@@ -1,4 +1,4 @@
-import type { MediaType, SearchResult } from "@geeklogs/shared";
+import type { BrowseRail, MediaType, SearchResult } from "@geeklogs/shared";
 import type { SearchFilterParam, SearchUrlState } from "@/lib/searchNavigation";
 
 export type SearchPageRecMeta = {
@@ -24,7 +24,8 @@ export type SearchPageCacheSnapshot = {
   userResults: SearchPageUserResult[];
   recByMediaType: Partial<Record<MediaType, SearchResult[]>>;
   recMetaByMediaType: Partial<Record<MediaType, SearchPageRecMeta>>;
-  recommendationsSectionOpen: boolean;
+  browseByMediaType: Partial<Record<MediaType, BrowseRail[]>>;
+  browseMetaByMediaType: Partial<Record<MediaType, SearchPageRecMeta>>;
 };
 
 let snapshot: SearchPageCacheSnapshot | null = null;

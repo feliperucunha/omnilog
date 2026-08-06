@@ -323,6 +323,47 @@ function mapTvListItem(item: {
   };
 }
 
+/** TMDB daily/weekly trending movies (for browse "trending" rail). */
+export async function getTrendingMovies(apiKey?: string | null, max = 12): Promise<SearchResult[]> {  const key = getKey(apiKey);
+  if (!key) return [];
+  const res = await tmdbFetch(
+    `${BASE}/trending/movie/week?api_key=${key}`
+  );
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    results?: Array<{
+      id: number;
+      title?: string;
+      release_date?: string;
+      poster_path?: string | null;
+      vote_average?: number;
+    }>;
+  };
+  return (data.results ?? []).slice(0, max).map(mapMovieListItem);
+}
+
+/** TMDB trending TV list (for browse "trending" rail). */
+export async function getTrendingTv(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const res = await tmdbFetch(
+    `${BASE}/trending/tv/week?api_key=${key}`
+  );
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    results?: Array<{
+      id: number;
+      name?: string;
+      first_air_date?: string;
+      poster_path?: string | null;
+      vote_average?: number;
+    }>;
+  };
+  return (data.results ?? []).slice(0, max).map(mapTvListItem);
+}
+
 /** Merge TMDB recommendations + similar; dedupe by id. */
 export async function getMovieRecommendationsMerged(
   movieId: string,
@@ -422,6 +463,82 @@ export async function getPopularTv(apiKey?: string | null, max = 12): Promise<Se
   const res = await tmdbFetch(
     `${BASE}/discover/tv?api_key=${key}&sort_by=vote_average.desc&vote_count.gte=${TMDB_DISCOVER_MIN_VOTES_TV}&language=en-US&page=1`
   );
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    results?: Array<{
+      id: number;
+      name?: string;
+      first_air_date?: string;
+      poster_path?: string | null;
+      vote_average?: number;
+    }>;
+  };
+  return (data.results ?? []).slice(0, max).map(mapTvListItem);
+}
+
+/** TMDB "popular" (most viewed) movies — distinct from the discover top-rated list. */
+export async function getPopularMoviesNow(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const res = await tmdbFetch(`${BASE}/movie/popular?api_key=${key}&language=en-US&page=1`);
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    results?: Array<{
+      id: number;
+      title?: string;
+      release_date?: string;
+      poster_path?: string | null;
+      vote_average?: number;
+    }>;
+  };
+  return (data.results ?? []).slice(0, max).map(mapMovieListItem);
+}
+
+/** TMDB "popular" (most viewed) TV — distinct from the discover top-rated list. */
+export async function getPopularTvNow(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const res = await tmdbFetch(`${BASE}/tv/popular?api_key=${key}&language=en-US&page=1`);
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    results?: Array<{
+      id: number;
+      name?: string;
+      first_air_date?: string;
+      poster_path?: string | null;
+      vote_average?: number;
+    }>;
+  };
+  return (data.results ?? []).slice(0, max).map(mapTvListItem);
+}
+
+/** TMDB "now playing" movies (new releases rail). */
+export async function getNowPlayingMovies(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const res = await tmdbFetch(`${BASE}/movie/now_playing?api_key=${key}&language=en-US&page=1`);
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    results?: Array<{
+      id: number;
+      title?: string;
+      release_date?: string;
+      poster_path?: string | null;
+      vote_average?: number;
+    }>;
+  };
+  return (data.results ?? []).slice(0, max).map(mapMovieListItem);
+}
+
+/** TMDB "on the air" TV shows (currently airing rail). */
+export async function getOnTheAirTv(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
+  const key = getKey(apiKey);
+  if (!key) return [];
+  const res = await tmdbFetch(`${BASE}/tv/on_the_air?api_key=${key}&language=en-US&page=1`);
   if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("tmdb");
   if (!res.ok) return [];
   const data = (await res.json()) as {

@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DeltaChip, Sparkline, type MomentumData } from "./StatisticsMomentum";
+import {
+  DeltaChip,
+  Sparkline,
+  MomentumSkeleton,
+  SparklineSkeleton,
+  type MomentumData,
+} from "./StatisticsMomentum";
 
 /**
  * Small data-vis primitives shared across survey/stats widgets,
@@ -96,6 +102,7 @@ export function MomentumCard({
   sub,
   momentum,
   momentumAria,
+  momentumLoading,
   valueClassName,
   className,
 }: {
@@ -106,9 +113,12 @@ export function MomentumCard({
   momentum?: MomentumData;
   /** Localized accessibility label for the delta chip. */
   momentumAria?: (delta: number) => string;
+  /** Show a skeleton in place of the delta/sparkline while momentum is still loading. */
+  momentumLoading?: boolean;
   valueClassName?: string;
   className?: string;
 }) {
+  const showSpark = momentum?.series && momentum.series.length > 1;
   return (
     <div
       className={cn(
@@ -120,9 +130,11 @@ export function MomentumCard({
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--btn-gradient-start)]/15 text-[var(--btn-gradient-start)]">
           <Icon className="size-3.5" aria-hidden />
         </span>
-        {momentum?.delta != null && (
+        {momentum?.delta != null ? (
           <DeltaChip delta={momentum.delta} ariaLabel={momentumAria?.(momentum.delta)} />
-        )}
+        ) : momentumLoading ? (
+          <MomentumSkeleton />
+        ) : null}
       </div>
       <div className="flex items-end justify-between gap-2">
         <div className="min-w-0">
@@ -139,9 +151,11 @@ export function MomentumCard({
           </p>
           {sub ? <div className="mt-0.5 text-[10px] leading-snug text-[var(--color-light)]">{sub}</div> : null}
         </div>
-        {momentum?.series && momentum.series.length > 1 && (
-          <Sparkline points={momentum.series} width={64} height={28} />
-        )}
+        {showSpark ? (
+          <Sparkline points={momentum!.series!} width={64} height={28} />
+        ) : momentumLoading ? (
+          <SparklineSkeleton width={64} height={28} />
+        ) : null}
       </div>
     </div>
   );
@@ -229,7 +243,7 @@ export function MomentumBreakdownRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-w-0 items-center gap-2.5 rounded-lg py-1.5 text-left transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] max-md:min-h-[44px]"
+      className="flex min-w-0 items-center gap-2.5 rounded-lg py-0.5 text-left transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] max-md:min-h-[44px]"
     >
       {inner}
     </button>
