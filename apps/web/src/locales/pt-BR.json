@@ -686,7 +686,11 @@
     "browseTopRated": "Mais bem avaliados",
     "browsePopular": "Mais vistos",
     "browseNewReleases": "Novos lançamentos",
-    "browseHot": "Em alta"
+    "browseHot": "Em alta",
+    "quickActionLabel": "Ações rápidas",
+    "quickReviewItem": "Avaliar e ver detalhes",
+    "quickStatusLoading": "Atualizando status…",
+    "quickStatusSuccess": "Salvo — {{title}} marcado como {{status}}"
   },
   "searchSort": {
     "relevance": "Relevância",

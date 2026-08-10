@@ -4,6 +4,7 @@ import { BookPagesBadge } from "@/components/BookPagesBadge";
 import { GenreBadges } from "@/components/GenreBadges";
 import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
+import { SearchResultQuickActions } from "@/components/SearchResultQuickActions";
 import { StarRating } from "@/components/StarRating";
 import { tapScale, tapTransition } from "@/lib/animations";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
@@ -86,7 +87,7 @@ export function SearchResultCard({
   const badgeSize = isCompact || isGrid ? "text-[8px] sm:text-[9px]" : "text-[9px] sm:text-[10px]";
 
   return (
-    <motion.div whileTap={tapScale} transition={tapTransition} className={SEARCH_RESULT_CARD_SHELL}>
+    <motion.div whileTap={tapScale} transition={tapTransition} className={cn(SEARCH_RESULT_CARD_SHELL, "relative")}>
       <button
         type="button"
         onClick={onOpen}
@@ -179,6 +180,18 @@ export function SearchResultCard({
           )}
         </div>
       </button>
+      {token && (
+        <div className="absolute right-1.5 top-1.5 z-20">
+          <SearchResultQuickActions
+            item={item}
+            mediaType={mediaType}
+            userLog={userLog}
+            boardGameProvider={boardGameProvider}
+            onOpenItem={onOpen}
+            t={t}
+          />
+        </div>
+      )}
     </motion.div>
   );
 }
