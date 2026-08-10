@@ -908,6 +908,14 @@ export function LogForm(props: LogFormProps) {
                         if (isEdit && next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && "episodesCount" in props && props.episodesCount != null && props.episodesCount > 0) {
                           setEpisode(props.episodesCount);
                         }
+                        const editPagesCount =
+                          isEdit && "log" in props ? (log?.pagesCount ?? null) : null;
+                        if (isEdit && next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showReadingProgress && editPagesCount != null && editPagesCount > 0) {
+                          setPagesRead((prev) => {
+                            if (prev !== "" && prev >= editPagesCount) return prev;
+                            return editPagesCount;
+                          });
+                        }
                       }}
                       options={[
                         { value: "", label: "—" },

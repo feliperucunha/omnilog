@@ -213,6 +213,59 @@ function isCompleted(status: string | null | undefined): boolean {
   return status != null && (COMPLETED_STATUSES as readonly string[]).includes(status);
 }
 
+/** books only: representative page count (median across editions) fetched from the upstream API. */
+async function cachedBookPagesCount(externalId: string): Promise<number | null> {
+  const row = await prisma.itemDetailCache.findUnique({
+    where: { mediaType_externalId: { mediaType: "books", externalId } },
+    select: { pagesCount: true },
+  });
+  const pages = row?.pagesCount;
+  return typeof pages === "number" && pages > 0 ? pages : null;
+}
+
+/**
+ * Keeps a book's page counter in sync with its completed status:
+ *  - entering "read": pagesRead is raised up to the book's cached page count so
+ *    statistics add the whole book's pages as read;
+ *  - leaving "read": the auto-filled counter is zeroed unless the request
+ *    explicitly sets a pagesRead.
+ * Returns undefined when nothing should change.
+ */
+async function resolveBookPagesRead(args: {
+  mediaType: MediaType;
+  externalId: string;
+  status: string | null | undefined;
+  previousStatus: string | null | undefined;
+  statusProvided: boolean;
+  bodyPagesRead: number | null | undefined;
+  currentPagesRead: number | null;
+}): Promise<number | null | undefined> {
+  const {
+    mediaType,
+    externalId,
+    status,
+    previousStatus,
+    statusProvided,
+    bodyPagesRead,
+    currentPagesRead,
+  } = args;
+  if (isCompleted(status)) {
+    if (mediaType !== "books") {
+      return bodyPagesRead === undefined ? undefined : bodyPagesRead;
+    }
+    const pagesCount = await cachedBookPagesCount(externalId);
+    const base = bodyPagesRead !== undefined ? bodyPagesRead : currentPagesRead;
+    if (pagesCount === null) {
+      return bodyPagesRead === undefined ? undefined : bodyPagesRead;
+    }
+    return Math.max(base ?? 0, pagesCount);
+  }
+  if (statusProvided && isCompleted(previousStatus)) {
+    return bodyPagesRead === undefined ? null : bodyPagesRead;
+  }
+  return bodyPagesRead === undefined ? undefined : bodyPagesRead;
+}
+
 function isSpendTrackedMediaType(mt: MediaType): boolean {
   return (SPEND_TRACKED_MEDIA_TYPES as readonly string[]).includes(mt);
 }
@@ -2086,8 +2139,17 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       if (bodyMatchesPlayed !== undefined && mediaType === "boardgames") {
         updateData.matchesPlayed = bodyMatchesPlayed ?? null;
       }
-      if (bodyPagesRead !== undefined) {
-        updateData.pagesRead = bodyPagesRead;
+      {
+        const resolvedPagesRead = await resolveBookPagesRead({
+          mediaType,
+          externalId: sanitizedExternalId,
+          status: status ?? existing.status,
+          previousStatus: existing.status,
+          statusProvided: status !== undefined,
+          bodyPagesRead,
+          currentPagesRead: existing.pagesRead,
+        });
+        if (resolvedPagesRead !== undefined) updateData.pagesRead = resolvedPagesRead;
       }
       if (bodyGamePlatform !== undefined) {
         updateData.gamePlatform = sanitizedGamePlatform ?? null;
@@ -2159,6 +2221,15 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           return;
         }
       }
+      const newLogPagesRead = await resolveBookPagesRead({
+        mediaType,
+        externalId: sanitizedExternalId,
+        status,
+        previousStatus: null,
+        statusProvided: status !== undefined,
+        bodyPagesRead,
+        currentPagesRead: null,
+      });
       log = await prisma.log.create({
         data: {
           userId,
@@ -2178,7 +2249,7 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           episode: episode ?? null,
           chapter: chapter ?? null,
           volume: volume ?? null,
-          pagesRead: bodyPagesRead ?? null,
+          pagesRead: newLogPagesRead ?? null,
           gamePlatform: sanitizedGamePlatform ?? null,
           genres: genresJson,
           mechanics: mechanicsJson,
@@ -2630,7 +2701,18 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
   if (parsed.data.episode !== undefined) data.episode = parsed.data.episode;
   if (parsed.data.chapter !== undefined) data.chapter = parsed.data.chapter;
   if (parsed.data.volume !== undefined) data.volume = parsed.data.volume;
-  if (parsed.data.pagesRead !== undefined) data.pagesRead = parsed.data.pagesRead;
+  if (parsed.data.pagesRead !== undefined || parsed.data.status !== undefined) {
+    const resolvedPagesRead = await resolveBookPagesRead({
+      mediaType: log.mediaType as MediaType,
+      externalId: log.externalId,
+      status: parsed.data.status ?? log.status,
+      previousStatus: log.status,
+      statusProvided: parsed.data.status !== undefined,
+      bodyPagesRead: parsed.data.pagesRead,
+      currentPagesRead: log.pagesRead,
+    });
+    if (resolvedPagesRead !== undefined) data.pagesRead = resolvedPagesRead;
+  }
   if (parsed.data.gamePlatform !== undefined) {
     data.gamePlatform =
       parsed.data.gamePlatform == null

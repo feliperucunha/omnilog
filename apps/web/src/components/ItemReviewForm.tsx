@@ -877,6 +877,12 @@ export function ItemReviewForm({
                   if (next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && episodesCount != null && episodesCount > 0) {
                     setEpisode(episodesCount);
                   }
+                  if (next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showReadingProgress && pagesCount != null && pagesCount > 0) {
+                    setPagesRead((prev) => {
+                      if (prev !== "" && prev >= pagesCount) return prev;
+                      return pagesCount;
+                    });
+                  }
                 }}
                 options={[
                   { value: "", label: "—" },

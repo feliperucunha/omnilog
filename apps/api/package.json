@@ -15,7 +15,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed:badges": "tsx src/scripts/seedBadges.ts",
-    "db:recalculate-review-stats": "tsx src/scripts/recalculateReviewStats.ts"
+    "db:recalculate-review-stats": "tsx src/scripts/recalculateReviewStats.ts",
+    "db:backfill-read-book-pages": "tsx src/scripts/backfillReadBookPages.ts"
   },
   "dependencies": {
     "@geeklogs/shared": "workspace:*",
