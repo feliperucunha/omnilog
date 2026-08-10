@@ -38,10 +38,10 @@ export const LOG_STATUS_OPTIONS: Record<MediaType, readonly string[]> = {
   tv: ["completed", "watching", "plan to watch", "dropped"],
   boardgames: ["played", "plan to play"],
   games: ["completed", "plan to play", "dropped", "playing"],
-  books: ["read", "plan to read", "reading"],
+  books: ["read", "plan to read", "reading", "dropped"],
   anime: ["completed", "watching", "plan to watch", "dropped"],
-  manga: ["read", "plan to read", "reading"],
-  comics: ["read", "plan to read", "reading"],
+  manga: ["read", "plan to read", "reading", "dropped"],
+  comics: ["read", "plan to read", "reading", "dropped"],
 } as const;
 
 export type LogStatus = (typeof LOG_STATUS_OPTIONS)[MediaType][number];
