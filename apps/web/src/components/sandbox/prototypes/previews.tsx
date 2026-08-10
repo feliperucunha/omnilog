@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { DashboardA, DashboardB, DashboardC } from "./dashboardVersions";
 import { LogsPosters, LogsTable, LogsKanban } from "./logs";
-import { StatsModules, StatsMomentum } from "./statistics";
+import { StatsModules, StatsMomentum, StatsPace } from "./statistics";
 import { ItemHero, ItemSplit, ItemProgress } from "./item";
 import { SearchQuick, SearchBrowse, SearchGrouped } from "./search";
 import { SettingsSearchable, SettingsSheets, SettingsAccount } from "./settings";
@@ -29,6 +29,7 @@ export const PREVIEWS: Record<string, ReactNode> = {
   "logs-c": <LogsKanban />,
   "stats-a": <StatsMomentum />,
   "stats-b": <StatsModules />,
+  "stats-c": <StatsPace />,
   "item-a": <ItemHero />,
   "item-b": <ItemSplit />,
   "item-c": <ItemProgress />,

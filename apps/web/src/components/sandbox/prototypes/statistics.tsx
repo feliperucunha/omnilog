@@ -15,10 +15,12 @@ import {
   Dices,
   Gamepad2,
   Wallet,
+  Gauge,
+  MousePointerClick,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Donut, MiniBars, Sparkline, seededRand } from "../SandboxPrimitives";
-import { SectionLabel, MockTopNav } from "./kit";
+import { MockTopNav, SectionLabel } from "./kit";
 import { MEDIA_META } from "../sandboxData";
 
 type ModuleId = "hours" | "genres" | "streak" | "status" | "cal";
@@ -556,6 +558,279 @@ export function StatsMomentum() {
 
         <p className="pb-1 text-center text-[9px] text-[var(--color-light)]">
           Momentum = change vs the previous period
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Pace — single widget replacing the individual "x over time" cards.  */
+/* ------------------------------------------------------------------ */
+
+type PaceCategory = "all" | keyof typeof MEDIA_META;
+
+const PACE_CATEGORIES: PaceCategory[] = ["all", "movies", "tv", "games", "boardgames", "books"];
+
+const PACE_UNIT: Record<PaceCategory, string> = {
+  all: "items",
+  movies: "h",
+  tv: "h",
+  games: "h",
+  boardgames: "matches",
+  books: "pages",
+};
+
+const PACE_LABEL: Record<PaceCategory, string> = {
+  all: "Everything",
+  movies: "Movies",
+  tv: "TV",
+  games: "Games",
+  boardgames: "Board games",
+  books: "Books",
+};
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const YEARS = ["2024", "2025", "2026"];
+
+function pctDelta(prev: number, cur: number): number {
+  return Math.round(((cur - prev) / (prev || 1)) * 100);
+}
+
+/** SVG bars for the monthly increments of a category. */
+function PaceBars({
+  values,
+  labels,
+  color,
+  unit,
+}: {
+  values: number[];
+  labels: string[];
+  color: string;
+  unit: string;
+}) {
+  const max = Math.max(...values) || 1;
+  const W = 560;
+  const H = 150;
+  const BAND = W / values.length;
+  const BAR = Math.max(8, BAND * 0.55);
+  const GAP = (BAND - BAR) / 2;
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H + 22}`} className="w-full" role="img">
+        <defs>
+          <linearGradient id="pace-bar" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} />
+            <stop offset="100%" stopColor={color} stopOpacity={0.45} />
+          </linearGradient>
+        </defs>
+        {[0.25, 0.5, 0.75, 1].map((f) => (
+          <line
+            key={f}
+            x1={0}
+            x2={W}
+            y1={H - (H - 8) * f}
+            y2={H - (H - 8) * f}
+            stroke="var(--color-mid)"
+            strokeOpacity={0.18}
+            strokeDasharray="3 4"
+          />
+        ))}
+        {values.map((v, i) => {
+          const h = Math.max(4, (v / max) * (H - 8));
+          const x = i * BAND + GAP;
+          const y = H - h;
+          const label = labels[i] ?? "";
+          const textX = i * BAND + BAND / 2;
+          return (
+            <g key={i}>
+              <rect x={x} y={y} width={BAR} height={h} rx={3} fill="url(#pace-bar)" />
+              <title>{`${label}: ${v.toLocaleString()} ${unit}`}</title>
+              {v === max && (
+                <text x={textX} y={y - 6} textAnchor="middle" fontSize={11} fontWeight={700} fill={color}>
+                  {v.toLocaleString()}
+                </text>
+              )}
+              <text
+                x={textX}
+                y={H + 14}
+                textAnchor="middle"
+                fontSize={9}
+                fill="var(--color-light)"
+              >
+                {label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * beta "Pace" widget — one graph for every category showing the monthly
+ * increments of the selected category, replacing the separate pages /
+ * episodes / status over-time cards.
+ */
+export function StatsPace() {
+  const [category, setCategory] = useState<PaceCategory>("all");
+  const [period, setPeriod] = useState<"month" | "year">("month");
+
+  const series = useMemo(() => {
+    const mk = (seed: number, base: number, drift = 0) => {
+      const r = seededRand(seed);
+      return MONTHS.map((_, i) => {
+        const season = Math.round(Math.sin(i / 1.5) * base * 0.3);
+        return Math.max(1, base + Math.round(r() * base * 0.7) + season + (drift ? Math.round(i * 0.4) : 0));
+      });
+    };
+    return {
+      all: mk(11, 22, 1),
+      movies: mk(12, 8, 1),
+      tv: mk(13, 14, 1),
+      games: mk(14, 11, 1),
+      boardgames: mk(15, 6),
+      books: mk(16, 420),
+    } as Record<PaceCategory, number[]>;
+  }, []);
+
+  const monthKey = useMemo(() => pctDelta(series[category][10], series[category][11]), [category, series]);
+
+  const yearly = useMemo(() => {
+    const r = seededRand(90 + PACE_CATEGORIES.indexOf(category));
+    return YEARS.map(() => Math.round(r() * 3 + 2) * Math.round(series[category].reduce((a, b) => a + b, 0) / 12));
+  }, [category, series]);
+
+  const yearKey = useMemo(
+    () => pctDelta(yearly[yearly.length - 2], yearly[yearly.length - 1]),
+    [yearly]
+  );
+
+  const values = period === "month" ? series[category] : yearly;
+  const labels = period === "month" ? MONTHS : YEARS;
+  const total = values.reduce((a, b) => a + b, 0);
+  const delta = period === "month" ? monthKey : yearKey;
+  const meta = category !== "all" ? MEDIA_META[category] : null;
+  const color = meta ? `linear-gradient(90deg, ${meta.from}, ${meta.to})` : "var(--btn-gradient-start)";
+  const unit = PACE_UNIT[category];
+
+  return (
+    <div className="flex h-[42rem] flex-col bg-[var(--color-dark)]">
+      <MockTopNav title="Statistics" right={<Gauge className="size-4 text-[var(--color-light)]" aria-hidden />} />
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="flex items-center gap-1.5 text-sm font-bold text-[var(--color-lightest)]">
+            <Gauge className="size-4 text-[var(--btn-gradient-start)]" aria-hidden />
+            Pace
+          </p>
+          <div className="flex items-center gap-1.5">
+            {(["month", "year"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPeriod(p)}
+                className={cn(
+                  "rounded-lg px-2.5 py-1 text-[10px] font-semibold transition-colors",
+                  period === p
+                    ? "bg-[var(--btn-gradient-start)] text-white"
+                    : "border border-[var(--color-mid)]/30 text-[var(--color-light)]"
+                )}
+              >
+                {p === "month" ? "Month" : "Year"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {PACE_CATEGORIES.map((c) => {
+            const Icon = c === "all" ? Layers : MEDIA_META[c].icon;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCategory(c)}
+                className={cn(
+                  "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors",
+                  category === c
+                    ? "border-[var(--btn-gradient-start)] bg-[var(--btn-gradient-start)]/15 text-white"
+                    : "border-[var(--color-mid)]/50 bg-[var(--color-dark)] text-[var(--color-light)]"
+                )}
+              >
+                <Icon className="size-3.5" aria-hidden />
+                {PACE_LABEL[c]}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-col gap-2.5 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {meta ? (
+                <span
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                  style={{ background: `${meta.from}22`, color: meta.from }}
+                >
+                  <meta.icon className="size-3.5" aria-hidden />
+                </span>
+              ) : (
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--btn-gradient-start)]/15 text-[var(--btn-gradient-start)]">
+                  <Layers className="size-3.5" aria-hidden />
+                </span>
+              )}
+              <p className="text-xs font-semibold text-[var(--color-lightest)]">
+                {PACE_LABEL[category]}
+              </p>
+            </div>
+            <Delta value={delta} />
+          </div>
+
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold tabular-nums text-[var(--color-lightest)]">
+              {total.toLocaleString()}
+            </span>
+            <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
+              {unit} this {period}
+            </span>
+          </div>
+
+          <PaceBars values={values} labels={labels} color={color} unit={unit} />
+
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-mid)]/15 pt-2">
+            <p className="text-[9px] uppercase tracking-wide text-[var(--color-light)]">
+              {period === "month" ? "Monthly increments" : "Yearly increments"} · tap a column
+            </p>
+            <span className="flex items-center gap-1 rounded-full bg-[var(--color-mid)]/20 px-2 py-0.5 text-[9px] text-[var(--color-light)]">
+              <MousePointerClick className="size-3" aria-hidden />
+              best {Math.max(...values)}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <MomentumPanel title="Top month">
+            <p className="text-lg font-bold text-[var(--color-lightest)]">
+              {MONTHS[values.indexOf(Math.max(...values))]} · {Math.max(...values).toLocaleString()}
+            </p>
+          </MomentumPanel>
+          <MomentumPanel title="Avg / mo">
+            <p className="text-lg font-bold text-[var(--color-lightest)]">
+              {Math.round(total / values.length).toLocaleString()}
+            </p>
+          </MomentumPanel>
+          <MomentumPanel title="Delta vs prev">
+            <p className="text-lg font-bold text-[var(--color-lightest)]">
+              {delta >= 0 ? "+" : ""}
+              {delta}%
+            </p>
+          </MomentumPanel>
+        </div>
+
+        <p className="pb-1 text-center text-[9px] text-[var(--color-light)]">
+          Pace = one graph that fits every category
         </p>
       </div>
     </div>

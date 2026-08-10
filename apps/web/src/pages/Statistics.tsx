@@ -4,15 +4,22 @@ import { MotionLink } from "@/components/MotionLink";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { motion } from "framer-motion";
 import {
+  BookA,
+  BookMarked,
   BookOpen,
   ChevronDown,
   ChevronRight,
   CircleCheck,
+  Clapperboard,
   Clock,
+  Dices,
+  Gamepad2,
   Layers,
   Scale,
+  Sparkles,
   Star,
   Trophy,
+  Tv,
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -32,13 +39,14 @@ import {
   registerLogsPageCacheContext,
 } from "@/lib/logsPageCache";
 import {
+  StatisticsCategoryOverTimeSkeleton,
   StatisticsSummarySkeleton,
   StatisticsBarsSkeleton,
   StatisticsSpendByCategorySkeleton,
-  StatisticsCategoryOverTimeSkeleton,
   StatisticsRecentLogsSkeleton,
   StatisticsLibraryStatusSkeleton,
 } from "@/components/skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   BoardGameRecentStatsWidget,
   type RecentBoardGameStatEntry,
@@ -49,7 +57,7 @@ import { GenreBadges } from "@/components/GenreBadges";
 import { tapScale, tapTransition } from "@/lib/animations";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
 import { itemDetailPath } from "@/lib/itemRoutes";
-import { useLocale } from "@/contexts/LocaleContext";
+import { useLocale, type Locale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { useMe } from "@/contexts/MeContext";
@@ -91,13 +99,11 @@ import { ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import {
   DeltaChip,
-  Sparkline,
   MomentumSkeleton,
-  SparklineSkeleton,
   momentumFromStatsEntries,
   type MomentumData,
 } from "@/components/statistics/StatisticsMomentum";
-import { MomentumCard, MiniBars, Donut, MomentumBreakdownRow } from "@/components/statistics/StatisticsWidgets";
+import { MomentumCard, MiniBars, Donut, MomentumBreakdownRow, MomentumPanel } from "@/components/statistics/StatisticsWidgets";
 
 function formatMinorAsMoney(minor: number, currency: string): string {
   const d = currencyMinorDecimals(currency);
@@ -419,6 +425,50 @@ function StatsTimeSectionDivider({ label }: { label: string }) {
 const logsPeriodActivityBtnClass =
   "relative flex w-full items-center gap-3 rounded-lg py-1.5 text-left transition-colors first:pt-0 hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] max-md:min-h-[44px]";
 
+function SegmentedFilter<T extends string>({
+  value,
+  onSelect,
+  options,
+  ariaLabel,
+  className,
+}: {
+  value: T;
+  onSelect: (value: T) => void;
+  options: ReadonlyArray<{ value: T; label: string; disabled?: boolean }>;
+  ariaLabel?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn("flex flex-wrap items-center gap-1.5", className)}
+      role="group"
+      aria-label={ariaLabel}
+    >
+      {options.map((option) => {
+        const active = value === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onSelect(option.value)}
+            disabled={option.disabled}
+            className={cn(
+              "rounded-lg px-2.5 py-1 text-[10px] font-semibold transition-colors max-md:min-h-[36px]",
+              active
+                ? "bg-[var(--btn-gradient-start)] text-white"
+                : "border border-[var(--color-mid)]/30 text-[var(--color-light)]",
+              option.disabled && "cursor-not-allowed opacity-50"
+            )}
+            aria-pressed={active}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 type PurchasePeriod = "month" | "year" | "all";
 type BoardGameMatchesPeriod = "month" | "year";
 type BoardGameMatchesSort = "recent" | "mostPlayed" | "leastPlayed";
@@ -433,12 +483,12 @@ const STORAGE_KEY_GAME_PLATFORMS = "geeklogs.statistics.gamePlatformsCollapsed";
 const STORAGE_KEY_CALENDAR = "geeklogs.statistics.calendarCollapsed";
 const STORAGE_KEY_CHARTS = "geeklogs.statistics.chartsCollapsed";
 const STORAGE_KEY_GAME_WEIGHT = "geeklogs.statistics.gameWeightCollapsed";
-const STORAGE_KEY_PAGES_OVER_TIME = "geeklogs.statistics.pagesOverTimeCollapsed";
-const STORAGE_KEY_EPISODES_OVER_TIME = "geeklogs.statistics.episodesOverTimeCollapsed";
+const STORAGE_KEY_PACE = "geeklogs.statistics.paceCollapsed";
 
 type StatsGroup = "category" | "month" | "year";
 type GenreGraphMode = "genre" | "statusOverTime" | "byCategory";
 type StatusOverTimeGroup = "month" | "year";
+type PacePeriod = "month" | "year";
 interface StatsEntry {
   period: string;
   hours: number;
@@ -617,6 +667,131 @@ function CategoryOrderSkeletonStrip() {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Pace — single widget replacing the individual "x over time" cards.  */
+/* ------------------------------------------------------------------ */
+
+type PaceCategory = "all" | MediaType;
+
+/** Icon + gradient accent + unit (i18n key) per category for the Pace widget. */
+const PACE_CATEGORY_META: Record<
+  PaceCategory,
+  { icon: LucideIcon; from: string; to: string; unitKey: string }
+> = {
+  all: { icon: Layers, from: "#6366F1", to: "#EC4899", unitKey: "statistics.paceUnitItems" },
+  movies: { icon: Clapperboard, from: "#7C3AED", to: "#DB2777", unitKey: "statistics.paceUnitItems" },
+  tv: { icon: Tv, from: "#0284C7", to: "#06B6D4", unitKey: "statistics.paceUnitItems" },
+  anime: { icon: Sparkles, from: "#D946EF", to: "#F43F5E", unitKey: "statistics.paceUnitItems" },
+  games: { icon: Gamepad2, from: "#F59E0B", to: "#EF4444", unitKey: "statistics.paceUnitItems" },
+  boardgames: { icon: Dices, from: "#10B981", to: "#059669", unitKey: "statistics.paceUnitItems" },
+  books: { icon: BookOpen, from: "#8B5CF6", to: "#6366F1", unitKey: "statistics.paceUnitPages" },
+  manga: { icon: BookMarked, from: "#0EA5E9", to: "#10B981", unitKey: "statistics.paceUnitPages" },
+  comics: { icon: BookA, from: "#EF4444", to: "#F97316", unitKey: "statistics.paceUnitPages" },
+};
+
+/** Short axis label ("Jan", "2025") for a stats period key, matching the card's locale. */
+function formatPacePeriodLabel(period: string, granularity: PacePeriod, locale: Locale): string {
+  const tag = locale === "pt-BR" ? "pt-BR" : locale === "es" ? "es" : "en";
+  if (granularity === "year") return period;
+  const m = /^(\d{4})-(\d{2})$/.exec(period);
+  if (!m) return period;
+  const y = Number(m[1]);
+  const month = Number(m[2]);
+  if (!Number.isFinite(y) || month < 1 || month > 12) return period;
+  return new Intl.DateTimeFormat(tag, { month: "short", timeZone: "UTC" }).format(
+    new Date(Date.UTC(y, month - 1, 1))
+  );
+}
+
+/** SVG bars for the monthly/yearly increments of a category (hover tooltips + tap to drill down). */
+function PaceBars({
+  data,
+  from,
+  to,
+  unit,
+  onBarSelect,
+}: {
+  data: Array<{ period: string; label: string; value: number; count: number }>;
+  from: string;
+  to: string;
+  unit: string;
+  onBarSelect?: (index: number) => void;
+}) {
+  const max = Math.max(...data.map((d) => d.value)) || 1;
+  const W = 560;
+  const H = 150;
+  const BAND = W / data.length;
+  const BAR = Math.max(8, BAND * 0.55);
+  const GAP = (BAND - BAR) / 2;
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H + 22}`}
+      className="w-full"
+      role="img"
+      aria-label={data.map((d) => `${d.label}: ${d.value} ${unit}`).join(", ")}
+    >
+      <defs>
+        <linearGradient id="pace-bar" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={from} />
+          <stop offset="100%" stopColor={to} stopOpacity={0.45} />
+        </linearGradient>
+      </defs>
+      {[0.25, 0.5, 0.75, 1].map((f) => (
+        <line
+          key={f}
+          x1={0}
+          x2={W}
+          y1={H - (H - 8) * f}
+          y2={H - (H - 8) * f}
+          stroke="var(--color-mid)"
+          strokeOpacity={0.18}
+          strokeDasharray="3 4"
+        />
+      ))}
+      {data.map((d, i) => {
+        const h = Math.max(4, (d.value / max) * (H - 8));
+        const x = i * BAND + GAP;
+        const y = H - h;
+        const textX = i * BAND + BAND / 2;
+        const clickable = Boolean(onBarSelect) && d.count > 0;
+        return (
+          <g
+            key={d.period}
+            onClick={clickable ? () => onBarSelect?.(i) : undefined}
+            onKeyDown={
+              clickable
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onBarSelect?.(i);
+                    }
+                  }
+                : undefined
+            }
+            tabIndex={clickable ? 0 : -1}
+            role={clickable ? "button" : undefined}
+            aria-label={clickable ? d.label : undefined}
+            style={clickable ? { cursor: "pointer" } : undefined}
+          >
+            <rect x={x} y={y} width={BAR} height={h} rx={3} fill="url(#pace-bar)" />
+            <title>{`${d.label}: ${d.value.toLocaleString()} ${unit}`}</title>
+            <text
+              x={textX}
+              y={H + 14}
+              textAnchor="middle"
+              fontSize={9}
+              fill="var(--color-light)"
+            >
+              {d.label}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 export function Statistics() {
   const { t, locale } = useLocale();
   const { me } = useMe();
@@ -654,12 +829,9 @@ export function Statistics() {
   const [boardGameWeightScope, setBoardGameWeightScope] = useState<
     "all" | "planToPlay" | "played" | "inCollection" | "wantToBuy"
   >("all");
-  const [pagesOverTimeGroup, setPagesOverTimeGroup] = useState<StatusOverTimeGroup>("month");
-  const [pagesOverTimeStats, setPagesOverTimeStats] = useState<StatsEntry[]>([]);
-  const [pagesOverTimeLoading, setPagesOverTimeLoading] = useState(true);
-  const [episodesOverTimeGroup, setEpisodesOverTimeGroup] = useState<StatusOverTimeGroup>("month");
-  const [episodesOverTimeStats, setEpisodesOverTimeStats] = useState<StatsEntry[]>([]);
-  const [episodesOverTimeLoading, setEpisodesOverTimeLoading] = useState(true);
+  const [pacePeriod, setPacePeriod] = useState<PacePeriod>("month");
+  const [paceStats, setPaceStats] = useState<StatsEntry[]>([]);
+  const [paceLoading, setPaceLoading] = useState(true);
   const [statsCollapsed, setStatsCollapsedState] = useState(false);
   const [recentLogsCollapsed, setRecentLogsCollapsedState] = useState(false);
   const [summaryCollapsed, setSummaryCollapsedState] = useState(false);
@@ -670,8 +842,7 @@ export function Statistics() {
   const [calendarCollapsed, setCalendarCollapsedState] = useState(false);
   const [chartsCollapsed, setChartsCollapsedState] = useState(false);
   const [gameWeightCollapsed, setGameWeightCollapsedState] = useState(false);
-  const [pagesOverTimeCollapsed, setPagesOverTimeCollapsedState] = useState(false);
-  const [episodesOverTimeCollapsed, setEpisodesOverTimeCollapsedState] = useState(false);
+  const [paceCollapsed, setPaceCollapsedState] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
   const [recapPickerOpen, setRecapPickerOpen] = useState(false);
   const [recapView, setRecapView] = useState<{ title: string; logs: Log[] } | null>(null);
@@ -724,9 +895,8 @@ export function Statistics() {
       storage.getItem(STORAGE_KEY_CALENDAR),
       storage.getItem(STORAGE_KEY_CHARTS),
       storage.getItem(STORAGE_KEY_GAME_WEIGHT),
-      storage.getItem(STORAGE_KEY_PAGES_OVER_TIME),
-      storage.getItem(STORAGE_KEY_EPISODES_OVER_TIME),
-    ]).then(([statsVal, recentVal, summaryVal, libraryStatusVal, purchaseVal, boardGameMatchesVal, gamePlatformsVal, calendarVal, chartsVal, gameWeightVal, pagesOverTimeVal, episodesOverTimeVal]) => {
+      storage.getItem(STORAGE_KEY_PACE),
+    ]).then(([statsVal, recentVal, summaryVal, libraryStatusVal, purchaseVal, boardGameMatchesVal, gamePlatformsVal, calendarVal, chartsVal, gameWeightVal, paceVal]) => {
       if (cancelled) return;
       if (statsVal === "true") setStatsCollapsedState(true);
       if (recentVal === "true") setRecentLogsCollapsedState(true);
@@ -738,8 +908,7 @@ export function Statistics() {
       if (calendarVal === "true") setCalendarCollapsedState(true);
       if (chartsVal === "true") setChartsCollapsedState(true);
       if (gameWeightVal === "true") setGameWeightCollapsedState(true);
-      if (pagesOverTimeVal === "true") setPagesOverTimeCollapsedState(true);
-      if (episodesOverTimeVal === "true") setEpisodesOverTimeCollapsedState(true);
+      if (paceVal === "true") setPaceCollapsedState(true);
     });
     return () => {
       cancelled = true;
@@ -796,14 +965,9 @@ export function Statistics() {
     void storage.setItem(STORAGE_KEY_GAME_WEIGHT, String(value));
   }, []);
 
-  const setPagesOverTimeCollapsed = useCallback((value: boolean) => {
-    setPagesOverTimeCollapsedState(value);
-    void storage.setItem(STORAGE_KEY_PAGES_OVER_TIME, String(value));
-  }, []);
-
-  const setEpisodesOverTimeCollapsed = useCallback((value: boolean) => {
-    setEpisodesOverTimeCollapsedState(value);
-    void storage.setItem(STORAGE_KEY_EPISODES_OVER_TIME, String(value));
+  const setPaceCollapsed = useCallback((value: boolean) => {
+    setPaceCollapsedState(value);
+    void storage.setItem(STORAGE_KEY_PACE, String(value));
   }, []);
 
   const collapsibleSectionBtnClass =
@@ -917,29 +1081,15 @@ export function Statistics() {
     }
   }, [boardGameWeightScope, statsMediaQuery]);
 
-  const fetchPagesOverTimeStats = useCallback(
-    async (group: "pagesReadByMonth" | "pagesReadByYear") => {
-      const path = `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
-      await loadWithSWR<{ data: StatsEntry[] }>(
-        path,
-        (res) => setPagesOverTimeStats(res.data ?? []),
-        { setLoading: setPagesOverTimeLoading, onError: () => setPagesOverTimeStats([]) }
-      );
-    },
-    [tzOffsetMinutes, statsMediaQuery]
-  );
-
-  const fetchEpisodesOverTimeStats = useCallback(
-    async (group: "episodesByMonth" | "episodesByYear") => {
-      const path = `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
-      await loadWithSWR<{ data: StatsEntry[] }>(
-        path,
-        (res) => setEpisodesOverTimeStats(res.data ?? []),
-        { setLoading: setEpisodesOverTimeLoading, onError: () => setEpisodesOverTimeStats([]) }
-      );
-    },
-    [tzOffsetMinutes, statsMediaQuery]
-  );
+  const fetchPace = useCallback(async () => {
+    const apiGroup = !isPro ? "paceByMonth" : pacePeriod === "year" ? "paceByYear" : "paceByMonth";
+    const path = `/logs/stats?group=${apiGroup}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
+    await loadWithSWR<{ data: StatsEntry[] }>(
+      path,
+      (res) => setPaceStats(res.data ?? []),
+      { setLoading: setPaceLoading, onError: () => setPaceStats([]) }
+    );
+  }, [isPro, pacePeriod, tzOffsetMinutes, statsMediaQuery]);
 
   type PurchaseSpendingResponse = {
     data: Record<string, Record<string, number>>;
@@ -1000,6 +1150,10 @@ export function Statistics() {
   }, [fetchRecentBoardGames]);
 
   useEffect(() => {
+    void fetchPace();
+  }, [fetchPace]);
+
+  useEffect(() => {
     if (genreGraphMode === "statusOverTime") {
       const apiGroup =
         !isPro ? "completedByMonth" : statusOverTimeGroup === "year" ? "completedByYear" : "completedByMonth";
@@ -1025,35 +1179,16 @@ export function Statistics() {
   }, [categoryFilter, fetchBoardGameWeightStats]);
 
   useEffect(() => {
-    const isReading =
-      categoryFilter === "all" ||
-      categoryFilter === "books" ||
-      categoryFilter === "manga" ||
-      categoryFilter === "comics";
-    if (!isReading) {
-      setPagesOverTimeStats([]);
-      setPagesOverTimeLoading(false);
-      return;
-    }
-    const apiGroup =
-      !isPro ? "pagesReadByMonth" : pagesOverTimeGroup === "year" ? "pagesReadByYear" : "pagesReadByMonth";
-    void fetchPagesOverTimeStats(apiGroup);
-  }, [isPro, categoryFilter, pagesOverTimeGroup, fetchPagesOverTimeStats]);
+    if (!isPro && pacePeriod !== "month") setPacePeriod("month");
+  }, [isPro, pacePeriod]);
 
   useEffect(() => {
-    if (categoryFilter !== "all" && categoryFilter !== "tv") {
-      setEpisodesOverTimeStats([]);
-      setEpisodesOverTimeLoading(false);
-      return;
-    }
-    const apiGroup =
-      !isPro
-        ? "episodesByMonth"
-        : episodesOverTimeGroup === "year"
-          ? "episodesByYear"
-          : "episodesByMonth";
-    void fetchEpisodesOverTimeStats(apiGroup);
-  }, [isPro, categoryFilter, episodesOverTimeGroup, fetchEpisodesOverTimeStats]);
+    if (!isPro && statusOverTimeGroup !== "month") setStatusOverTimeGroup("month");
+  }, [isPro, statusOverTimeGroup]);
+
+  useEffect(() => {
+    if (!isPro && categoryOverTimeGroup !== "month") setCategoryOverTimeGroup("month");
+  }, [isPro, categoryOverTimeGroup]);
 
   useEffect(() => {
     if (!isPro && purchasePeriod !== "month") setPurchasePeriod("month");
@@ -1066,22 +1201,6 @@ export function Statistics() {
   useEffect(() => {
     if (!isPro && statsGroup !== "category") setStatsGroup("category");
   }, [isPro, statsGroup]);
-
-  useEffect(() => {
-    if (!isPro && statusOverTimeGroup !== "month") setStatusOverTimeGroup("month");
-  }, [isPro, statusOverTimeGroup]);
-
-  useEffect(() => {
-    if (!isPro && categoryOverTimeGroup !== "month") setCategoryOverTimeGroup("month");
-  }, [isPro, categoryOverTimeGroup]);
-
-  useEffect(() => {
-    if (!isPro && pagesOverTimeGroup !== "month") setPagesOverTimeGroup("month");
-  }, [isPro, pagesOverTimeGroup]);
-
-  useEffect(() => {
-    if (!isPro && episodesOverTimeGroup !== "month") setEpisodesOverTimeGroup("month");
-  }, [isPro, episodesOverTimeGroup]);
 
   useEffect(() => {
     void fetchPurchaseSpending();
@@ -1434,6 +1553,7 @@ export function Statistics() {
     void fetchGenreStats();
     void fetchGamePlatformStats();
     void fetchRecentBoardGames();
+    void fetchPace();
     void fetchPurchaseSpending();
     if (genreGraphMode === "statusOverTime") {
       const apiGroup =
@@ -1448,44 +1568,22 @@ export function Statistics() {
     if (categoryFilter === "all" || categoryFilter === "boardgames") {
       void fetchBoardGameWeightStats();
     }
-    if (
-      categoryFilter === "all" ||
-      categoryFilter === "books" ||
-      categoryFilter === "manga" ||
-      categoryFilter === "comics"
-    ) {
-      const apiGroup =
-        !isPro ? "pagesReadByMonth" : pagesOverTimeGroup === "year" ? "pagesReadByYear" : "pagesReadByMonth";
-      void fetchPagesOverTimeStats(apiGroup);
-    }
-    if (categoryFilter === "all" || categoryFilter === "tv") {
-      const apiGroup =
-        !isPro
-          ? "episodesByMonth"
-          : episodesOverTimeGroup === "year"
-            ? "episodesByYear"
-            : "episodesByMonth";
-      void fetchEpisodesOverTimeStats(apiGroup);
-    }
     fetchLogs();
   }, [
     fetchStats,
     fetchGenreStats,
     fetchGamePlatformStats,
     fetchRecentBoardGames,
+    fetchPace,
     fetchPurchaseSpending,
     genreGraphMode,
     isPro,
     categoryFilter,
     statusOverTimeGroup,
     categoryOverTimeGroup,
-    pagesOverTimeGroup,
-    episodesOverTimeGroup,
     fetchStatusOverTimeStats,
     fetchCategoryOverTimeStats,
     fetchBoardGameWeightStats,
-    fetchPagesOverTimeStats,
-    fetchEpisodesOverTimeStats,
     fetchLogs,
   ]);
 
@@ -1548,18 +1646,56 @@ const summaryData = summary ?? EMPTY_SUMMARY;
         : monthSeries((m) => m.totalContentHours ?? 0)
     );
     const completed = momentumFromStatsEntries(monthSeries((m) => m.completedLogs));
-    const pages = momentumFromStatsEntries(pagesOverTimeStats);
-    const episodes = momentumFromStatsEntries(episodesOverTimeStats);
+    const pages = momentumFromStatsEntries(monthSeries((m) => m.totalPagesRead ?? 0));
     const genre = momentumFromStatsEntries(genreStats);
 
     const totalLogs = momentumFromStatsEntries(monthSeries((m) => m.totalLogs));
     const reviewed = momentumFromStatsEntries(monthSeries((m) => m.reviewedLogs));
     const boardGamesWon = momentumFromStatsEntries(monthSeries((m) => m.boardGamesWon ?? 0));
 
-    return { hours, completed, pages, episodes, genre, totalLogs, reviewed, boardGamesWon };
-  }, [stats, statsGroup, statusOverTimeStats, pagesOverTimeStats, episodesOverTimeStats, genreStats, summaryByMonth]);
+    return { hours, completed, pages, genre, totalLogs, reviewed, boardGamesWon };
+  }, [stats, statsGroup, genreStats, summaryByMonth]);
 
   const momentumAria = (delta: number) => t("statistics.momentumLabel", { delta: String(delta) });
+
+  const paceCategory = categoryFilter as PaceCategory;
+  const paceMeta = PACE_CATEGORY_META[paceCategory];
+  const paceUnit = t(paceMeta.unitKey);
+  const paceCategoryLabel = paceCategory === "all" ? t("statistics.filterAll") : t(`nav.${paceCategory}`);
+  const paceGranularity: PacePeriod = pacePeriod;
+  const paceSeries = useMemo(
+    () =>
+      paceStats.map(({ period, hours, count }) => ({
+        period,
+        label: formatPacePeriodLabel(period, paceGranularity, locale),
+        value: hours,
+        count: count ?? 0,
+      })),
+    [paceStats, paceGranularity, locale]
+  );
+  const paceTotal = paceSeries.reduce((a, s) => a + s.value, 0);
+  const paceMomentum = useMemo(() => momentumFromStatsEntries(paceStats), [paceStats]);
+  const paceBest = paceSeries.length > 0 ? Math.max(...paceSeries.map((s) => s.value), 1) : 0;
+  const paceTopEntry = [...paceSeries].sort((a, b) => b.value - a.value)[0];
+  const paceTopLabel = paceTopEntry
+    ? formatPacePeriodLabel(paceTopEntry.period, paceGranularity, locale)
+    : "—";
+  const paceAvg = paceSeries.length > 0 ? Math.round(paceTotal / paceSeries.length) : 0;
+
+  const handlePaceBarSelect = useCallback(
+    (index: number) => {
+      const entry = paceSeries[index];
+      if (!entry) return;
+      const timeLabel = formatStatsTimeAxisLabel(entry.period, paceGranularity, locale);
+      openLogsPeriodActivity(
+        entry.period,
+        pacePeriod,
+        t("statistics.activityInPeriod", { period: timeLabel }),
+        categoryFilter === "all" ? undefined : categoryFilter
+      );
+    },
+    [paceSeries, paceGranularity, pacePeriod, t, categoryFilter, openLogsPeriodActivity]
+  );
 
   const totalPurchaseItems = useMemo(() => {
     if (!purchaseItemCounts) return 0;
@@ -1608,8 +1744,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
   const showGamePlatformsWidget = isAllCategories || categoryFilter === "games";
   const showTimeConsumedWidget = isAllCategories;
   const showBoardGameWeightChart = isAllCategories || categoryFilter === "boardgames";
-  const showPagesOverTimeChart = isReadingCategory;
-  const showEpisodesOverTimeChart = isAllCategories || categoryFilter === "tv";
 
   const chartModeOptions = useMemo(
     () => [
@@ -1836,7 +1970,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
               value={(summaryData.totalPagesRead ?? 0).toLocaleString(locale)}
               momentum={overviewMomentum.pages}
               momentumAria={momentumAria}
-              momentumLoading={pagesOverTimeLoading}
+              momentumLoading={summaryByMonthLoading}
             />
           )}
           {showBoardGamesWonHighlight && (
@@ -1984,10 +2118,11 @@ const summaryData = summary ?? EMPTY_SUMMARY;
               <Card
                 className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3"
               >
-                <div className="grid min-w-0 shrink-0 grid-cols-1 gap-2 sm:grid-cols-2">
-                  <Select
+                <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2">
+                  <SegmentedFilter
                     value={boardGameMatchesPeriod}
-                    onValueChange={(v) => setBoardGameMatchesPeriod(v as BoardGameMatchesPeriod)}
+                    onSelect={(v) => setBoardGameMatchesPeriod(v)}
+                    ariaLabel={t("statistics.boardGameMatchesPeriodLabel")}
                     options={
                       isPro
                         ? [
@@ -1996,21 +2131,16 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                           ]
                         : [{ value: "month", label: t("statistics.purchasePeriodMonth") }]
                     }
-                    aria-label={t("statistics.boardGameMatchesPeriodLabel")}
-                    className="min-w-0 w-full"
-                    triggerClassName="w-full min-w-0"
                   />
-                  <Select
+                  <SegmentedFilter
                     value={boardGameMatchesSort}
-                    onValueChange={(v) => setBoardGameMatchesSort(v as BoardGameMatchesSort)}
+                    onSelect={(v) => setBoardGameMatchesSort(v)}
+                    ariaLabel={t("statistics.boardGameMatchesSortLabel")}
                     options={[
                       { value: "recent", label: t("statistics.boardGameMatchesSortRecent") },
                       { value: "mostPlayed", label: t("statistics.boardGameMatchesSortMostPlayed") },
                       { value: "leastPlayed", label: t("statistics.boardGameMatchesSortLeastPlayed") },
                     ]}
-                    aria-label={t("statistics.boardGameMatchesSortLabel")}
-                    className="min-w-0 w-full"
-                    triggerClassName="w-full min-w-0"
                   />
                 </div>
                 <BoardGameRecentStatsWidget
@@ -2072,13 +2202,10 @@ const summaryData = summary ?? EMPTY_SUMMARY;
           {!gameWeightCollapsed && (
             <section aria-label={t("statistics.byGameWeight")} className="min-w-0 w-full">
               <Card className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
-                <Select
+                <SegmentedFilter
                   value={boardGameWeightScope}
-                  onValueChange={(v) =>
-                    setBoardGameWeightScope(
-                      v as "all" | "planToPlay" | "played" | "inCollection" | "wantToBuy"
-                    )
-                  }
+                  onSelect={(v) => setBoardGameWeightScope(v)}
+                  ariaLabel={t("statistics.weightFilterLabel")}
                   options={[
                     { value: "all", label: t("statistics.weightFilterAll") },
                     { value: "planToPlay", label: t("status.planToPlay") },
@@ -2086,9 +2213,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                     { value: "inCollection", label: t("statistics.weightFilterInCollection") },
                     { value: "wantToBuy", label: t("itemReviewForm.wantToBuy") },
                   ]}
-                  aria-label={t("statistics.weightFilterLabel")}
-                  className="w-full min-w-0 sm:max-w-[220px]"
-                  triggerClassName="w-full min-w-0"
                 />
                 <div className="min-h-[12.5rem] min-w-0">
                   {boardGameWeightLoading && boardGameWeightStats.length === 0 ? (
@@ -2159,227 +2283,156 @@ const summaryData = summary ?? EMPTY_SUMMARY;
         </div>
       )}
 
-      {showPagesOverTimeChart && visibleTypesOrderReady && (
+      {visibleTypesOrderReady && (
         <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
           <button
             type="button"
-            onClick={() => setPagesOverTimeCollapsed(!pagesOverTimeCollapsed)}
+            onClick={() => setPaceCollapsed(!paceCollapsed)}
             className={collapsibleSectionBtnClass}
-            aria-expanded={!pagesOverTimeCollapsed}
+            aria-expanded={!paceCollapsed}
           >
-            {pagesOverTimeCollapsed ? (
+            {paceCollapsed ? (
               <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
             ) : (
               <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
             )}
-            <span>{t("statistics.pagesOverTime")}</span>
-            {pagesOverTimeLoading ? (
+            <span>{t("statistics.paceTitle")}</span>
+            {paceLoading ? (
               <MomentumSkeleton className="ml-auto" />
-            ) : overviewMomentum.pages?.delta != null ? (
-              <DeltaChip delta={overviewMomentum.pages.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.pages.delta)} />
+            ) : paceMomentum?.delta != null ? (
+              <DeltaChip delta={paceMomentum.delta} className="ml-auto" ariaLabel={momentumAria(paceMomentum.delta)} />
             ) : null}
           </button>
-          {!pagesOverTimeCollapsed && (
-            <section aria-label={t("statistics.pagesOverTime")} className="min-w-0 w-full">
+          {!paceCollapsed && (
+            <section aria-label={t("statistics.paceTitle")} className="min-w-0 w-full">
               <Card className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
-                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-                  {isPro && (
-                    <Select
-                      value={pagesOverTimeGroup}
-                      onValueChange={(v) => setPagesOverTimeGroup(v as StatusOverTimeGroup)}
-                      options={[
-                        { value: "month", label: t("dashboard.byMonth") },
-                        { value: "year", label: t("dashboard.byYear") },
-                      ]}
-                      aria-label={t("statistics.timeGranularityLabel")}
-                      className="w-full min-w-0 sm:max-w-[220px]"
-                      triggerClassName="w-full min-w-0"
-                    />
-                  )}
-                  {pagesOverTimeLoading ? (
-                    <SparklineSkeleton width={120} height={28} className="hidden sm:block" />
-                  ) : overviewMomentum.pages?.series && overviewMomentum.pages.series.length > 1 ? (
-                    <Sparkline points={overviewMomentum.pages.series} width={120} height={28} className="hidden sm:block" />
-                  ) : null}
-                </div>
-                {pagesOverTimeStats.length > 0 && (
-                  <div className="flex min-w-0 flex-1 flex-col gap-2">
-                    <div className="flex min-w-0 flex-wrap items-end justify-between gap-2">
-                      <span className="text-[11px] font-medium text-[var(--color-light)]">
-                        {t("dashboard.pagesRead")}
-                      </span>
-                    </div>
-                    <div className="flex h-24 min-w-0 items-end gap-1" aria-hidden>
-                      <MiniBars
-                        values={pagesOverTimeStats.map(({ hours }) => hours)}
-                        height={96}
-                        color="var(--btn-gradient-start)"
-                      />
-                    </div>
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 flex-wrap gap-1.5" role="group" aria-label={t("statistics.categoryFilter")}>
+                    {(["all" as PaceCategory, ...(visibleTypes as PaceCategory[])]).map((c) => {
+                      const m = PACE_CATEGORY_META[c];
+                      const Icon = m.icon;
+                      const active = categoryFilter === c;
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setCategoryFilter(c === "all" ? "all" : c)}
+                          className={cn(
+                            "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors max-md:min-h-[36px]",
+                            active
+                              ? "border-[var(--btn-gradient-start)] bg-[var(--btn-gradient-start)]/15 text-white"
+                              : "border-[var(--color-mid)]/50 bg-[var(--color-dark)] text-[var(--color-light)]"
+                          )}
+                          aria-pressed={active}
+                        >
+                          <Icon className="size-3.5" aria-hidden />
+                          {c === "all" ? t("statistics.filterAll") : t(`nav.${c}`)}
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
-                <div className="min-h-0 min-w-0">
-                  {pagesOverTimeLoading ? (
-                    <StatisticsBarsSkeleton rows={3} />
-                  ) : pagesOverTimeStats.length === 0 ? (
-                    <p className="flex min-h-[6rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
-                      {t("statistics.noPagesOverTimeYet")}
-                    </p>
-                  ) : (
-                    <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-3">
-                      {pagesOverTimeStats.map(({ period, hours, count }) => {
-                        const itemCount = count ?? 0;
-                        const timeLabel = formatStatsTimeAxisLabel(
-                          period,
-                          pagesOverTimeGroup === "year" ? "year" : "month",
-                          locale
-                        );
-                        const activityTitle = t("statistics.activityInPeriod", { period: timeLabel });
-                        return (
-                          <button
-                            key={period}
-                            type="button"
-                            disabled={itemCount === 0}
-                            onClick={() =>
-                              openLogsPeriodActivity(period, pagesOverTimeGroup, activityTitle)
-                            }
-                            aria-label={activityTitle}
-                            className="flex min-w-0 flex-col gap-0.5 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 px-2.5 py-2 text-left transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] disabled:cursor-default disabled:opacity-50"
-                          >
-                            <span className="min-w-0 truncate text-[10px] tabular-nums text-[var(--color-light)]">
-                              {timeLabel}
-                            </span>
-                            <span className="text-sm font-semibold tabular-nums text-[var(--color-text)]">
-                              {Math.round(hours).toLocaleString(locale)}
-                            </span>
-                            {itemCount > 0 && (
-                              <span className="text-[10px] tabular-nums text-[var(--color-light)]">
-                                {t(
-                                  itemCount === 1
-                                    ? "statistics.statItemsCount_one"
-                                    : "statistics.statItemsCount_other",
-                                  { count: String(itemCount) }
-                                )}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5" role="group" aria-label={t("statistics.timeGranularityLabel")}>
+                    {(["month", "year"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPacePeriod(p)}
+                        disabled={p === "year" && !isPro}
+                        className={cn(
+                          "rounded-lg px-2.5 py-1 text-[10px] font-semibold transition-colors max-md:min-h-[36px]",
+                          pacePeriod === p
+                            ? "bg-[var(--btn-gradient-start)] text-white"
+                            : "border border-[var(--color-mid)]/30 text-[var(--color-light)]",
+                          p === "year" && !isPro && "cursor-not-allowed opacity-50"
+                        )}
+                        aria-pressed={pacePeriod === p}
+                      >
+                        {p === "month" ? t("statistics.paceGranularityMonth") : t("statistics.paceGranularityYear")}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </Card>
-            </section>
-          )}
-        </div>
-      )}
 
-      {showEpisodesOverTimeChart && visibleTypesOrderReady && (
-        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setEpisodesOverTimeCollapsed(!episodesOverTimeCollapsed)}
-            className={collapsibleSectionBtnClass}
-            aria-expanded={!episodesOverTimeCollapsed}
-          >
-            {episodesOverTimeCollapsed ? (
-              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-            ) : (
-              <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
-            )}
-            <span>{t("statistics.episodesOverTime")}</span>
-            {episodesOverTimeLoading ? (
-              <MomentumSkeleton className="ml-auto" />
-            ) : overviewMomentum.episodes?.delta != null ? (
-              <DeltaChip delta={overviewMomentum.episodes.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.episodes.delta)} />
-            ) : null}
-          </button>
-          {!episodesOverTimeCollapsed && (
-            <section aria-label={t("statistics.episodesOverTime")} className="min-w-0 w-full">
-              <Card className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
-                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-                  {isPro && (
-                    <Select
-                      value={episodesOverTimeGroup}
-                      onValueChange={(v) => setEpisodesOverTimeGroup(v as StatusOverTimeGroup)}
-                      options={[
-                        { value: "month", label: t("dashboard.byMonth") },
-                        { value: "year", label: t("dashboard.byYear") },
-                      ]}
-                      aria-label={t("statistics.timeGranularityLabel")}
-                      className="w-full min-w-0 sm:max-w-[220px]"
-                      triggerClassName="w-full min-w-0"
-                    />
-                  )}
-                  {episodesOverTimeLoading ? (
-                    <SparklineSkeleton width={120} height={28} className="hidden sm:block" />
-                  ) : overviewMomentum.episodes?.series && overviewMomentum.episodes.series.length > 1 ? (
-                    <Sparkline points={overviewMomentum.episodes.series} width={120} height={28} className="hidden sm:block" />
-                  ) : null}
-                </div>
-                {episodesOverTimeStats.length > 0 && (
-                  <div className="flex h-14 min-w-0 items-end gap-1" aria-hidden>
-                    <MiniBars
-                      values={episodesOverTimeStats.map(({ hours }) => hours)}
-                      height={56}
-                      color="var(--btn-gradient-end)"
-                    />
+                <div className="flex min-w-0 flex-col gap-2.5 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                        style={{ background: `${paceMeta.from}22`, color: paceMeta.from }}
+                      >
+                        <paceMeta.icon className="size-3.5" aria-hidden />
+                      </span>
+                      <p className="text-xs font-semibold text-[var(--color-lightest)]">{paceCategoryLabel}</p>
+                    </div>
                   </div>
-                )}
-                <div className="min-h-0 min-w-0">
-                  {episodesOverTimeLoading ? (
+
+                  <div className="flex items-baseline gap-1.5">
+                    {paceLoading ? (
+                      <>
+                        <Skeleton className="h-8 w-20 rounded-md" />
+                        <Skeleton className="h-3 w-14 rounded-full" />
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-2xl font-bold tabular-nums text-[var(--color-lightest)]">
+                          {paceTotal.toLocaleString(locale)}
+                        </span>
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
+                          {t("statistics.paceUnitTotal", { unit: paceUnit })}
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {paceLoading ? (
                     <StatisticsBarsSkeleton rows={3} />
-                  ) : episodesOverTimeStats.length === 0 ? (
-                    <p className="flex min-h-[6rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
-                      {t("statistics.noEpisodesOverTimeYet")}
+                  ) : paceSeries.length === 0 ? (
+                    <p className="flex min-h-[10rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
+                      {t("statistics.paceEmpty")}
                     </p>
                   ) : (
-                    <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-3">
-                      {episodesOverTimeStats.map(({ period, hours, count }) => {
-                        const itemCount = count ?? 0;
-                        const timeLabel = formatStatsTimeAxisLabel(
-                          period,
-                          episodesOverTimeGroup === "year" ? "year" : "month",
-                          locale
-                        );
-                        const activityTitle = t("statistics.activityInPeriod", { period: timeLabel });
-                        return (
-                          <button
-                            key={period}
-                            type="button"
-                            disabled={itemCount === 0}
-                            onClick={() =>
-                              openLogsPeriodActivity(
-                                period,
-                                episodesOverTimeGroup,
-                                activityTitle,
-                                categoryFilter === "all" ? "tv" : undefined
-                              )
-                            }
-                            aria-label={activityTitle}
-                            className="flex min-w-0 flex-col gap-0.5 rounded-lg border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 px-2.5 py-2 text-left transition-colors hover:bg-[var(--color-mid)]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] disabled:cursor-default disabled:opacity-50"
-                          >
-                            <span className="min-w-0 truncate text-[10px] tabular-nums text-[var(--color-light)]">
-                              {timeLabel}
-                            </span>
-                            <span className="text-sm font-semibold tabular-nums text-[var(--color-text)]">
-                              {Math.round(hours).toLocaleString(locale)}
-                            </span>
-                            {itemCount > 0 && (
-                              <span className="text-[10px] tabular-nums text-[var(--color-light)]">
-                                {t(
-                                  itemCount === 1
-                                    ? "statistics.statItemsCount_one"
-                                    : "statistics.statItemsCount_other",
-                                  { count: String(itemCount) }
-                                )}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <>
+                      <PaceBars
+                        data={paceSeries}
+                        from={paceMeta.from}
+                        to={paceMeta.to}
+                        unit={paceUnit}
+                        onBarSelect={handlePaceBarSelect}
+                      />
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-mid)]/15 pt-2">
+                        <p className="text-[9px] uppercase tracking-wide text-[var(--color-light)]">
+                          {t(
+                            pacePeriod === "month"
+                              ? "statistics.paceIncrementsMonth"
+                              : "statistics.paceIncrementsYear"
+                          )}
+                          {" · "}
+                          {t("statistics.paceTapColumn")}
+                        </p>
+                        <span className="flex items-center gap-1 rounded-full bg-[var(--color-mid)]/20 px-2 py-0.5 text-[9px] text-[var(--color-light)]">
+                          {t("statistics.paceBest")} {paceBest.toLocaleString(locale)}
+                        </span>
+                      </div>
+                    </>
                   )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <MomentumPanel title={t(pacePeriod === "month" ? "statistics.paceTopMonth" : "statistics.paceTopYear")}>
+                    <p className="text-lg font-bold tabular-nums text-[var(--color-lightest)]">
+                      {paceTopLabel} · {paceBest.toLocaleString(locale)}
+                    </p>
+                  </MomentumPanel>
+                  <MomentumPanel title={t(pacePeriod === "month" ? "statistics.paceAvgMonth" : "statistics.paceAvgYear")}>
+                    <p className="text-lg font-bold tabular-nums text-[var(--color-lightest)]">
+                      {paceAvg.toLocaleString(locale)}
+                    </p>
+                  </MomentumPanel>
+                  <MomentumPanel title={t("statistics.paceDeltaPrev")}>
+                    <p className="text-lg font-bold tabular-nums text-[var(--color-lightest)]">
+                      {paceMomentum?.delta != null ? `${paceMomentum.delta >= 0 ? "+" : ""}${paceMomentum.delta}%` : "—"}
+                    </p>
+                  </MomentumPanel>
                 </div>
               </Card>
             </section>
@@ -2421,10 +2474,11 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                   )}
                 </p>
               )}
-              <div className="w-full min-w-0 sm:ml-auto sm:w-auto sm:max-w-[min(18rem,calc(100vw-2rem))] sm:shrink-0">
-                <Select
+              <div className="w-full min-w-0 sm:ml-auto sm:w-auto sm:shrink-0">
+                <SegmentedFilter
                   value={purchasePeriod}
-                  onValueChange={(v) => setPurchasePeriod(v as PurchasePeriod)}
+                  onSelect={(v) => setPurchasePeriod(v)}
+                  ariaLabel={t("statistics.purchasePeriodLabel")}
                   options={
                     isPro
                       ? [
@@ -2434,9 +2488,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                         ]
                       : [{ value: "month", label: t("statistics.purchasePeriodMonth") }]
                   }
-                  aria-label={t("statistics.purchasePeriodLabel")}
-                  className="w-full min-w-0"
-                  triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
                 />
               </div>
             </div>
@@ -2670,38 +2721,27 @@ const summaryData = summary ?? EMPTY_SUMMARY;
           className="min-w-0 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3 md:flex md:h-full md:min-h-0 md:flex-1 md:flex-col"
         >
           <div className="mb-3 flex min-w-0 shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <Select
+            <SegmentedFilter
               value={genreGraphMode}
-              onValueChange={(v) => setGenreGraphMode(v as GenreGraphMode)}
+              onSelect={(v) => setGenreGraphMode(v)}
+              ariaLabel={t("dashboard.byGenre")}
               options={chartModeOptions}
-              aria-label={t("dashboard.byGenre")}
-              className="w-full min-w-0 sm:max-w-[220px]"
-              triggerClassName="w-full min-w-0"
+              className="w-full min-w-0 sm:w-auto"
             />
-            {genreGraphMode === "statusOverTime" && isPro && (
-              <Select
-                value={statusOverTimeGroup}
-                onValueChange={(v) => setStatusOverTimeGroup(v as StatusOverTimeGroup)}
+            {genreGraphMode !== "genre" && isPro && (
+              <SegmentedFilter
+                value={genreGraphMode === "statusOverTime" ? statusOverTimeGroup : categoryOverTimeGroup}
+                onSelect={(v) =>
+                  genreGraphMode === "statusOverTime"
+                    ? setStatusOverTimeGroup(v)
+                    : setCategoryOverTimeGroup(v)
+                }
+                ariaLabel={t("statistics.timeGranularityLabel")}
                 options={[
                   { value: "month", label: t("dashboard.byMonth") },
                   { value: "year", label: t("dashboard.byYear") },
                 ]}
-                aria-label={t("statistics.timeGranularityLabel")}
-                className="w-full min-w-0 sm:w-auto sm:max-w-[min(18rem,calc(100vw-2rem))]"
-                triggerClassName="w-full min-w-0"
-              />
-            )}
-            {genreGraphMode === "byCategory" && isPro && (
-              <Select
-                value={categoryOverTimeGroup}
-                onValueChange={(v) => setCategoryOverTimeGroup(v as StatusOverTimeGroup)}
-                options={[
-                  { value: "month", label: t("dashboard.byMonth") },
-                  { value: "year", label: t("dashboard.byYear") },
-                ]}
-                aria-label={t("statistics.timeGranularityLabel")}
-                className="w-full min-w-0 sm:w-auto sm:max-w-[min(18rem,calc(100vw-2rem))]"
-                triggerClassName="w-full min-w-0"
+                className="w-full min-w-0 sm:w-auto"
               />
             )}
           </div>
@@ -2946,9 +2986,10 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                 >
                   <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
                     <div className="w-full min-w-0 shrink-0">
-                      <Select
+                      <SegmentedFilter
                         value={statsGroup}
-                        onValueChange={(v) => setStatsGroup(v as StatsGroup)}
+                        onSelect={(v) => setStatsGroup(v)}
+                        ariaLabel={t("dashboard.statsTitle")}
                         options={
                           isPro
                             ? [
@@ -2958,9 +2999,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                               ]
                             : [{ value: "category", label: t("dashboard.byCategory") }]
                         }
-                        aria-label={t("dashboard.statsTitle")}
-                        className="min-w-0 w-full md:max-w-[min(20rem,100%)]"
-                        triggerClassName="w-full min-w-0"
                       />
                     </div>
                     <div className="min-h-[12.5rem] min-w-0 flex-1">

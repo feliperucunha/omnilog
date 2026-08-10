@@ -802,7 +802,7 @@ logsRouter.delete("/:id/reaction", async (req: AuthenticatedRequest, res) => {
   res.status(204).end();
 });
 
-/** GET /logs/stats?group=summary|category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear|boardGameWeight|pagesReadByMonth|pagesReadByYear|episodesByMonth|episodesByYear&mediaType=optional - summary = account totals; category/month/year rows include { hours, count }; genre uses unique log counts per genre name */
+/** GET /logs/stats?group=summary|category|month|year|genre|completedByMonth|completedByYear|categoryByMonth|categoryByYear|boardGameWeight|pagesReadByMonth|pagesReadByYear|episodesByMonth|episodesByYear|paceByMonth|paceByYear&mediaType=optional - summary = account totals; category/month/year rows include { hours, count }; genre uses unique log counts per genre name; paceBy* = per-period increments (items added for every non-reading media, pages read for reading media) */
 logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const statsMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
@@ -837,6 +837,8 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     "pagesReadByYear",
     "episodesByMonth",
     "episodesByYear",
+    "paceByMonth",
+    "paceByYear",
     "month",
     "status",
   ]);
@@ -1420,6 +1422,52 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       granularity
     );
     res.json({ group, data: entries });
+    return;
+  }
+
+  if (group === "paceByMonth" || group === "paceByYear") {
+    // Single "Pace" widget increments. The natural metric depends on the selected category:
+    // every non-reading media (all/movies/tv/anime/games/boardgames) → items added
+    // (all statuses, bucketed by createdAt), reading media → pages read (completed logs).
+    const granularity = group === "paceByYear" ? "year" : "month";
+
+    let metric: "items" | "pages";
+    let paceWindowWhere: Prisma.LogWhereInput;
+    if (isReadingMediaType(statsMediaType)) {
+      metric = "pages";
+      paceWindowWhere = freeMonthRange
+        ? { completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+        : { completedAt: { not: null } };
+    } else {
+      metric = "items";
+      paceWindowWhere = freeMonthRange
+        ? { createdAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
+        : {};
+    }
+    const paceWindow = applyStatsMediaFilter(mergeLogWhere({ userId }, paceWindowWhere), statsMediaType);
+
+    const paceRows = await prisma.log.findMany({
+      where: paceWindow,
+      select: {
+        id: true,
+        createdAt: true,
+        completedAt: true,
+        pagesRead: true,
+      },
+    });
+
+    const increments: Array<{ at: Date; value: number }> = [];
+    if (metric === "items") {
+      for (const log of paceRows) {
+        increments.push({ at: log.createdAt, value: 1 });
+      }
+    } else {
+      for (const log of paceRows) {
+        if (log.pagesRead == null || log.pagesRead <= 0) continue;
+        increments.push({ at: log.completedAt as Date, value: log.pagesRead });
+      }
+    }
+    res.json({ group, metric, data: sumMetricByPeriod(increments, granularity) });
     return;
   }
 
