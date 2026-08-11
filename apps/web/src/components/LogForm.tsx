@@ -1186,6 +1186,7 @@ export function LogForm(props: LogFormProps) {
               drawerRequestCloseRef.current = requestClose;
             }}
             closeOnInteractOutside={!confirmDeleteOpen}
+            ignoreOutsideCloseForMs={450}
             mobileHeight="95%"
             className="flex max-h-[85dvh] w-full max-w-lg flex-col p-4 sm:p-6"
           >

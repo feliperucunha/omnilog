@@ -723,6 +723,12 @@
   },
   "mediaLogs": {
     "addOne": "Add one",
+    "addEpisode": "Add episode",
+    "addChapter": "Add chapter",
+    "addVolume": "Add volume",
+    "listForSale": "List for sale",
+    "removeLog": "Remove log",
+    "quickActionsLabel": "Quick actions",
     "noLogsFor": "No logs for {{label}} yet.",
     "noTitlesMatchSearch": "No titles match your search.",
     "searchAndAddOne": "Search and add one",

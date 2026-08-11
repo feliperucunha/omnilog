@@ -723,6 +723,12 @@
   },
   "mediaLogs": {
     "addOne": "Adicionar um",
+    "addEpisode": "Adicionar episódio",
+    "addChapter": "Adicionar capítulo",
+    "addVolume": "Adicionar volume",
+    "listForSale": "Anunciar",
+    "removeLog": "Excluir registro",
+    "quickActionsLabel": "Ações rápidas",
     "noLogsFor": "Nenhum registro de {{label}} ainda.",
     "noTitlesMatchSearch": "Nenhum título corresponde à busca.",
     "searchAndAddOne": "Busque e adicione um",

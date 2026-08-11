@@ -66,6 +66,12 @@ type DrawerContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.
    * (e.g. delete confirm) is open — otherwise Radix treats those interactions as "outside" the drawer.
    */
   closeOnInteractOutside?: boolean;
+  /**
+   * Ignore overlay / outside-pointer dismissals for this many ms after the drawer opens. Use when the
+   * drawer is mounted from a nested control (e.g. a dropdown item) whose tap gesture finishes with
+   * trailing pointer/click events that land on the freshly-mounted scrim and close the drawer instantly.
+   */
+  ignoreOutsideCloseForMs?: number;
 };
 
 function isDrawerFooter(child: React.ReactNode): boolean {
@@ -75,7 +81,7 @@ function isDrawerFooter(child: React.ReactNode): boolean {
 const DrawerContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   DrawerContentProps
->(({ className, children, onClose, onReady, onBeforeDismiss, overlayClassName, mobileHeight = "95%", closeOnInteractOutside = true, ...props }, ref) => {
+>(({ className, children, onClose, onReady, onBeforeDismiss, overlayClassName, mobileHeight = "95%", closeOnInteractOutside = true, ignoreOutsideCloseForMs = 0, ...props }, ref) => {
   const [dataStateRef, radixOpen] = useRadixDataStateOpenRef<HTMLDivElement>();
   /** Mobile drag: transform the sheet surface (Content) so box-shadow moves with the panel, not a stuck “shadow frame”. */
   const dragSurfaceRef = React.useRef<HTMLDivElement | null>(null);
@@ -91,6 +97,16 @@ const DrawerContent = React.forwardRef<
   const swipeStartYRef = React.useRef(0);
   const swipeStartTimeRef = React.useRef(0);
   const closeInFlightRef = React.useRef(false);
+  const ignoreUntilRef = React.useRef(0);
+
+  const outsideDismissLocked = React.useCallback(() => {
+    if (!closeOnInteractOutside || (ignoreOutsideCloseForMs ?? 0) <= 0) return false;
+    return performance.now() - ignoreUntilRef.current < (ignoreOutsideCloseForMs ?? 0);
+  }, [closeOnInteractOutside, ignoreOutsideCloseForMs]);
+
+  React.useEffect(() => {
+    if (radixOpen) ignoreUntilRef.current = performance.now();
+  }, [radixOpen]);
 
   const resetDragSurfaceStyles = React.useCallback(() => {
     const el = dragSurfaceRef.current;
@@ -299,8 +315,14 @@ const DrawerContent = React.forwardRef<
       <DialogOverlay
         ref={overlayRef}
         className={overlayClassName}
-        onClick={closeOnInteractOutside ? closeImmediately : undefined}
-        onPointerDown={closeOnInteractOutside ? closeImmediately : undefined}
+        onClick={() => {
+          if (outsideDismissLocked()) return;
+          if (closeOnInteractOutside) closeImmediately();
+        }}
+        onPointerDown={() => {
+          if (outsideDismissLocked()) return;
+          if (closeOnInteractOutside) closeImmediately();
+        }}
       />
       <DialogPrimitive.Content
         ref={mergedRef}
@@ -324,6 +346,10 @@ const DrawerContent = React.forwardRef<
             e.preventDefault();
             return;
           }
+          if (outsideDismissLocked()) {
+            e.preventDefault();
+            return;
+          }
           const target = e.target as HTMLElement;
           if (target.closest("[data-radix-select-content]") || target.closest("[data-dropdown-portal]")) {
             e.preventDefault();
@@ -334,6 +360,10 @@ const DrawerContent = React.forwardRef<
         }}
         onInteractOutside={(e) => {
           if (!closeOnInteractOutside) {
+            e.preventDefault();
+            return;
+          }
+          if (outsideDismissLocked()) {
             e.preventDefault();
             return;
           }

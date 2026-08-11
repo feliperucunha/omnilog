@@ -732,8 +732,9 @@ export function MediaLogs({
     if (completion) showLogComplete(completion);
   };
 
-  const handleIncrement = async (log: Log) => {
-    const { field, value } = getProgress(log);
+  const handleIncrement = async (log: Log, fieldOverride?: "episode" | "chapter" | "volume") => {
+    const field = fieldOverride ?? getProgress(log).field;
+    const value = log[field] ?? 0;
     const next = value + 1;
     setIncrementingId(log.id);
     const optimistic = decodeLogForDisplay({ ...log, [field]: next });
@@ -1456,6 +1457,7 @@ export function MediaLogs({
                       setLogEditTab(tab);
                       setEditingLog(lg);
                     }}
+                    onDelete={handleDelete}
                     t={t}
                   />
                 </div>

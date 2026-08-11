@@ -1,8 +1,20 @@
-import type { CSSProperties } from "react";
-import { Loader2, Pencil, Plus } from "lucide-react";
+import { useState, type CSSProperties } from "react";
+import { Loader2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
 import { MotionLink } from "@/components/MotionLink";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { BookPagesBadge } from "@/components/BookPagesBadge";
 import { DaysSinceBadge } from "@/components/DaysSinceBadge";
 import { GenreBadges } from "@/components/GenreBadges";
@@ -29,8 +41,6 @@ import {
   LOG_CARD_HEIGHT_EMBEDDED_GRID_COLLAPSED,
   LOG_CARD_IMAGE_COLUMN,
   LOG_CARD_IMAGE_COLUMN_GRID,
-  LOG_CARD_INCREMENT_BUTTON,
-  LOG_CARD_INCREMENT_BUTTON_GRID,
   LOG_CARD_REVIEW_MAX_WIDTH,
   LOG_CARD_TITLE,
   LOG_CARD_TITLE_GRID,
@@ -56,12 +66,8 @@ const SCORE_SOURCE_LABELS: Partial<Record<MediaType, string>> = {
 
 const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
 const CHAPTER_TYPES: MediaType[] = ["manga", "comics"];
-const VOLUME_TYPES: MediaType[] = ["books", "boardgames"];
 
 const REVIEW_PREVIEW_LENGTH = 120;
-
-const DENSE_INCREMENT_BUTTON =
-  "flex h-8 min-w-8 items-center justify-center gap-0.5 rounded-lg border-0 bg-[var(--color-darkest)] px-1.5 shadow-[var(--shadow-sm)] transition-[transform,box-shadow] hover:scale-[1.04] hover:shadow-[var(--shadow-md)] active:scale-[0.98] disabled:scale-100 disabled:opacity-50 [@media(hover:hover)]:hover:bg-[var(--btn-gradient-start)]";
 
 function getProgress(log: Log): { field: "episode" | "chapter" | "volume"; value: number; labelKey: string } {
   if (EPISODE_TYPES.includes(log.mediaType))
@@ -69,12 +75,6 @@ function getProgress(log: Log): { field: "episode" | "chapter" | "volume"; value
   if (CHAPTER_TYPES.includes(log.mediaType))
     return { field: "chapter", value: log.chapter ?? 0, labelKey: "itemReviewForm.chapter" };
   return { field: "volume", value: log.volume ?? 0, labelKey: "itemReviewForm.volume" };
-}
-
-function showIncrementForLog(log: Log, mediaType: MediaType, hasProgressButton: boolean): boolean {
-  if (!hasProgressButton) return false;
-  if (log.status != null && (COMPLETED_STATUSES as readonly string[]).includes(log.status)) return false;
-  return EPISODE_TYPES.includes(mediaType) || CHAPTER_TYPES.includes(mediaType) || VOLUME_TYPES.includes(mediaType);
 }
 
 function listBorderClass(log: Log, compact: boolean): string {
@@ -98,8 +98,9 @@ export type MediaLogCardProps = {
   incrementingId: string | null;
   expandedReviewLogId: string | null;
   onExpandReview: (logId: string | null) => void;
-  onIncrement: (log: Log) => void;
-  onEdit: (log: Log, tab: "review" | "matches") => void;
+  onIncrement: (log: Log, field: "episode" | "chapter" | "volume") => void;
+  onEdit: (log: Log, tab: "review" | "matches" | "market") => void;
+  onDelete?: (logId: string) => void | Promise<void>;
   t: TFunction;
 };
 
@@ -393,145 +394,233 @@ function LogReviewBlock({
   );
 }
 
+type QuickActionKey =
+  | "addMatch"
+  | "addEpisode"
+  | "addChapter"
+  | "addVolume"
+  | "editLog"
+  | "listForSale"
+  | "removeLog";
+
+const QUICK_ACTIONS_BY_TYPE: Record<MediaType, QuickActionKey[]> = {
+  boardgames: ["addMatch", "editLog", "listForSale", "removeLog"],
+  movies: ["editLog", "removeLog"],
+  tv: ["addEpisode", "editLog", "removeLog"],
+  games: ["editLog", "removeLog"],
+  books: ["editLog", "removeLog"],
+  anime: ["addEpisode", "editLog", "removeLog"],
+  manga: ["addChapter", "addVolume", "editLog", "removeLog"],
+  comics: ["editLog", "removeLog"],
+};
+
 function LogActions({
   log,
   readOnly,
   view,
   mediaType,
-  hasProgressButton,
   deletingId,
   incrementingId,
   onIncrement,
   onEdit,
+  onDelete,
   t,
 }: {
   log: Log;
   readOnly: boolean;
   view: LogViewMode;
   mediaType: MediaType;
-  hasProgressButton: boolean;
   deletingId: string | null;
   incrementingId: string | null;
-  onIncrement: (log: Log) => void;
-  onEdit: (log: Log, tab: "review" | "matches") => void;
+  onIncrement: (log: Log, field: "episode" | "chapter" | "volume") => void;
+  onEdit: (log: Log, tab: "review" | "matches" | "market") => void;
+  onDelete?: (logId: string) => void | Promise<void>;
   t: TFunction;
 }) {
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [deletingConfirm, setDeletingConfirm] = useState(false);
+
   if (readOnly) return null;
 
-  const showIncrement = showIncrementForLog(log, mediaType, hasProgressButton);
+  const actions = QUICK_ACTIONS_BY_TYPE[mediaType];
   const showMatch = mediaType === "boardgames" && log.status != null;
 
-  if (view === "compact") {
-    return (
-      <div className="flex shrink-0 items-center justify-end gap-1 border-t border-[var(--color-surface-border)]/80 p-1.5">
-        {showIncrement && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onIncrement(log);
-            }}
-            disabled={incrementingId === log.id || deletingId === log.id}
-            aria-label={t("mediaLogs.addOne")}
-            className={DENSE_INCREMENT_BUTTON}
-          >
-            {incrementingId === log.id ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--color-lightest)]" aria-hidden />
-            ) : (
-              <>
-                <Plus className="h-3.5 w-3.5 shrink-0 text-[var(--color-lightest)]" aria-hidden />
-                <span className="text-[10px] font-semibold tabular-nums text-[var(--color-lightest)]">1</span>
-              </>
-            )}
-          </button>
-        )}
-        {showMatch && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onEdit(log, "matches");
-            }}
-            disabled={deletingId === log.id}
-            aria-label={t("mediaLogs.addMatch")}
-            className={DENSE_INCREMENT_BUTTON}
-          >
-            <Plus className="h-3.5 w-3.5 shrink-0 text-[var(--color-lightest)]" aria-hidden />
-          </button>
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 rounded-lg text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)]"
-          onClick={() => onEdit(log, "review")}
-          disabled={deletingId === log.id}
-          aria-label={t("common.edit")}
-        >
-          <Pencil className="h-3.5 w-3.5" aria-hidden />
-        </Button>
-      </div>
-    );
-  }
+  const runAction = (key: QuickActionKey) => {
+    switch (key) {
+      case "addMatch":
+        onEdit(log, "matches");
+        break;
+      case "addEpisode":
+        onIncrement(log, "episode");
+        break;
+      case "addChapter":
+        onIncrement(log, "chapter");
+        break;
+      case "addVolume":
+        onIncrement(log, "volume");
+        break;
+      case "editLog":
+        onEdit(log, "review");
+        break;
+      case "listForSale":
+        onEdit(log, "market");
+        break;
+      case "removeLog":
+        setConfirmRemove(true);
+        break;
+    }
+  };
+
+  // Defer until the menu item's tap/click gesture is fully dispatched before mounting
+  // the drawer/dialog. On touch, the select that runs here is followed by the browser's
+  // compatibility pointer/mouse events (and the dropdown's own exit animation); if the
+  // overlay mounts synchronously, one of those trailing events lands on it and dismisses
+  // it instantly. Desktop mice have no such trailing phantom events.
+  const selectAction = (key: QuickActionKey) => {
+    window.setTimeout(() => {
+      runAction(key);
+    }, 0);
+  };
+
+  const actionLabel = (key: QuickActionKey): string => {
+    switch (key) {
+      case "addMatch":
+        return t("mediaLogs.addMatch");
+      case "addEpisode":
+        return t("mediaLogs.addEpisode");
+      case "addChapter":
+        return t("mediaLogs.addChapter");
+      case "addVolume":
+        return t("mediaLogs.addVolume");
+      case "editLog":
+        return t("common.edit");
+      case "listForSale":
+        return t("mediaLogs.listForSale");
+      case "removeLog":
+        return t("mediaLogs.removeLog");
+    }
+  };
+
+  const actionIcon = (key: QuickActionKey) => {
+    switch (key) {
+      case "addMatch":
+      case "addEpisode":
+      case "addChapter":
+      case "addVolume":
+        return <Plus className="h-4 w-4 shrink-0 text-[var(--color-light)]" aria-hidden />;
+      case "editLog":
+        return <Pencil className="h-4 w-4 shrink-0 text-[var(--color-light)]" aria-hidden />;
+      case "listForSale":
+        return <Tag className="h-4 w-4 shrink-0 text-[var(--color-light)]" aria-hidden />;
+      case "removeLog":
+        return <Trash2 className="h-4 w-4 shrink-0 text-red-400" aria-hidden />;
+    }
+  };
 
   const isGrid = view === "grid";
-
-  return (
-    <div className={isGrid ? LOG_CARD_ACTION_COLUMN_GRID : LOG_CARD_ACTION_COLUMN}>
-      {showIncrement && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onIncrement(log);
-          }}
-          disabled={incrementingId === log.id || deletingId === log.id}
-          aria-label={t("mediaLogs.addOne")}
-          className={isGrid ? LOG_CARD_INCREMENT_BUTTON_GRID : LOG_CARD_INCREMENT_BUTTON}
-        >
-          {incrementingId === log.id ? (
-            <Loader2 className={cn("animate-spin text-[var(--color-lightest)]", isGrid ? "h-3.5 w-3.5 md:h-3 md:w-3" : "h-4 w-4")} aria-hidden />
-          ) : (
-            <>
-              <Plus className={cn("shrink-0 text-[var(--color-lightest)]", isGrid ? "h-3.5 w-3.5 md:h-3 md:w-3" : "h-4 w-4")} aria-hidden />
-              <span className={cn("font-semibold tabular-nums text-[var(--color-lightest)]", isGrid ? "text-[10px] md:text-[9px]" : "text-xs")}>1</span>
-            </>
-          )}
-        </button>
-      )}
-      {showMatch && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onEdit(log, "matches");
-          }}
-          disabled={deletingId === log.id}
-          aria-label={t("mediaLogs.addMatch")}
-          className={isGrid ? LOG_CARD_INCREMENT_BUTTON_GRID : LOG_CARD_INCREMENT_BUTTON}
-        >
-          <Plus className={cn("shrink-0 text-[var(--color-lightest)]", isGrid ? "h-3.5 w-3.5 md:h-3 md:w-3" : "h-4 w-4")} aria-hidden />
-        </button>
-      )}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className={cn(
+  const containerClass = view === "compact"
+    ? "flex shrink-0 items-center justify-end gap-1 border-t border-[var(--color-surface-border)]/80 p-1.5"
+    : isGrid
+      ? LOG_CARD_ACTION_COLUMN_GRID
+      : LOG_CARD_ACTION_COLUMN;
+  const triggerClass =
+    view === "compact"
+      ? "h-8 w-8 rounded-lg text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)]"
+      : cn(
           isGrid ? LOG_CARD_EDIT_BUTTON_GRID : LOG_CARD_EDIT_BUTTON,
           "text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)] transition-colors"
-        )}
-        onClick={() => onEdit(log, "review")}
-        disabled={deletingId === log.id}
-        aria-label={t("common.edit")}
-      >
-        <Pencil className={cn(isGrid ? "h-3.5 w-3.5 md:h-3 md:w-3" : "h-4 w-4")} aria-hidden />
-      </Button>
-    </div>
+        );
+
+  return (
+    <>
+      <div className={containerClass}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={triggerClass}
+              disabled={deletingId === log.id}
+              aria-label={t("mediaLogs.quickActionsLabel")}
+            >
+              {incrementingId === log.id ? (
+                <Loader2 className={cn("animate-spin", isGrid ? "h-3.5 w-3.5 md:h-3 md:w-3" : "h-4 w-4")} aria-hidden />
+              ) : (
+                <Pencil className={cn(isGrid ? "h-3.5 w-3.5 md:h-3 md:w-3" : "h-4 w-4")} aria-hidden />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" sideOffset={6} className="min-w-[11rem]">
+            {actions.map((key) => {
+              if (key === "addMatch" && !showMatch) return null;
+              return (
+                <DropdownMenuItem
+                  key={key}
+                  disabled={deletingId === log.id || (incrementingId === log.id && key !== "removeLog")}
+                  onSelect={() => selectAction(key)}
+                >
+                  {actionIcon(key)}
+                  <span className="min-w-0 flex-1">{actionLabel(key)}</span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {onDelete && (
+        <Dialog open={confirmRemove} onOpenChange={(open) => !open && setConfirmRemove(false)}>
+          <DialogContent
+            variant="compact"
+            className="z-[60] sm:max-w-sm"
+            overlayClassName="z-[60]"
+            onClose={() => setConfirmRemove(false)}
+          >
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-[var(--color-lightest)]">{t("common.delete")}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-[var(--color-light)]">
+              {t("common.deleteLogConfirm")}
+            </p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setConfirmRemove(false)}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deletingConfirm}
+                onClick={async () => {
+                  setDeletingConfirm(true);
+                  try {
+                    await onDelete(log.id);
+                    setConfirmRemove(false);
+                  } catch {
+                    // Parent (e.g. MediaLogs) shows toast and rethrows on delete failure
+                  } finally {
+                    setDeletingConfirm(false);
+                  }
+                }}
+              >
+                {deletingConfirm ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                    {t("common.deleting")}
+                  </>
+                ) : (
+                  t("common.delete")
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
 
@@ -549,6 +638,7 @@ export function MediaLogCard({
   onExpandReview,
   onIncrement,
   onEdit,
+  onDelete,
   t,
 }: MediaLogCardProps) {
   const display = getLogCardDisplay(log);
@@ -625,11 +715,11 @@ export function MediaLogCard({
           readOnly={readOnly}
           view="compact"
           mediaType={mediaType}
-          hasProgressButton={hasProgressButton}
           deletingId={deletingId}
           incrementingId={incrementingId}
           onIncrement={onIncrement}
           onEdit={onEdit}
+          onDelete={onDelete}
           t={t}
         />
       </Card>
@@ -722,11 +812,11 @@ export function MediaLogCard({
         readOnly={readOnly}
         view={isGrid ? "grid" : "list"}
         mediaType={mediaType}
-        hasProgressButton={hasProgressButton}
         deletingId={deletingId}
         incrementingId={incrementingId}
         onIncrement={onIncrement}
         onEdit={onEdit}
+        onDelete={onDelete}
         t={t}
       />
     </Card>
