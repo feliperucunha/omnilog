@@ -18,6 +18,9 @@ export type LogActivityRow = {
   updatedAt: Date;
 };
 
+/** Subset used by effectiveCompletedAt (startedAt not required). */
+export type LogCompletedActivityRow = Pick<LogActivityRow, "status" | "completedAt" | "updatedAt">;
+
 /** Best date to attribute "started" activity when startedAt was never stored. */
 export function effectiveStartedAt(log: LogActivityRow): Date | null {
   if (log.startedAt) return log.startedAt;
@@ -26,7 +29,7 @@ export function effectiveStartedAt(log: LogActivityRow): Date | null {
 }
 
 /** Best date to attribute "finished" activity when completedAt was never stored. */
-export function effectiveCompletedAt(log: LogActivityRow): Date | null {
+export function effectiveCompletedAt(log: LogCompletedActivityRow): Date | null {
   if (log.status != null && COMPLETED_STATUS_LIST.includes(log.status)) {
     if (log.completedAt != null && log.completedAt.getTime() > log.updatedAt.getTime()) {
       return log.completedAt;
