@@ -29,7 +29,7 @@ import { ReviewPartialSaveButtons } from "@/components/ReviewPartialSaveButtons"
 import { SavedTvReviewsSection } from "@/components/SavedTvReviewsSection";
 import { GameLogFields } from "@/components/GameLogFields";
 import { ReadingProgressFields } from "@/components/ReadingProgressFields";
-import { dateInputToIso, isoToDateInput } from "@/lib/readingDates";
+import { dateInputToIso, isoToDateInput, applyStatusAutoDates, applyBookStatusPagesChange } from "@/lib/readingDates";
 import { cn } from "@/lib/utils";
 import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
@@ -893,7 +893,9 @@ export function LogForm(props: LogFormProps) {
                       value={status ?? ""}
                       onValueChange={(v) => {
                         const next = v || null;
+                        const prev = status;
                         setStatus(next);
+                        applyStatusAutoDates(next, prev, setStartedAtInput, setCompletedAtInput);
                         if (showBoardGameFields) {
                           if (next === "played") {
                             setMatchesPlayed((prev) => {
@@ -910,11 +912,8 @@ export function LogForm(props: LogFormProps) {
                         }
                         const editPagesCount =
                           isEdit && "log" in props ? (log?.pagesCount ?? null) : null;
-                        if (isEdit && next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showReadingProgress && editPagesCount != null && editPagesCount > 0) {
-                          setPagesRead((prev) => {
-                            if (prev !== "" && prev >= editPagesCount) return prev;
-                            return editPagesCount;
-                          });
+                        if (showReadingProgress && mediaType === "books") {
+                          applyBookStatusPagesChange(next, setPagesRead, editPagesCount);
                         }
                       }}
                       options={[

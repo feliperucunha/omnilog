@@ -448,11 +448,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       )}
       {reviewTrimmed !== "" && (
         <p
-          className={
-            nativeUi
-              ? "mb-3 text-xs leading-relaxed text-[var(--color-light)] whitespace-pre-wrap"
-              : "mb-3 line-clamp-3 text-[11px] leading-snug text-[var(--color-light)] whitespace-pre-wrap md:mb-4 md:line-clamp-4 md:text-[0.8125rem] md:leading-relaxed"
-          }
+          className="mb-3 line-clamp-[15] text-[11px] leading-snug text-[var(--color-light)] whitespace-pre-wrap md:mb-4 md:text-[0.8125rem] md:leading-relaxed"
         >
           {reviewTrimmed}
         </p>

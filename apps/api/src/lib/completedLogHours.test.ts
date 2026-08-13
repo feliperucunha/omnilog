@@ -130,6 +130,51 @@ describe("hoursFromCompletedLogForStats", () => {
       })
     ).toBeNull();
   });
+
+  it("uses updatedAt when status is read but completedAt is stale", () => {
+    const updated = d("2024-06-01T00:00:00.000Z");
+    expect(
+      hoursFromCompletedLogForStats({
+        completedAt: d("2020-01-01T00:00:00.000Z"),
+        contentHours: null,
+        startedAt: null,
+        mediaType: "books",
+        hoursToBeat: null,
+        matchesPlayed: null,
+        pagesRead: 300,
+        status: "read",
+        updatedAt: updated,
+      })
+    ).toBe(10);
+  });
+
+  it("estimates reading hours from pagesRead", () => {
+    expect(
+      hoursFromCompletedLogForStats({
+        completedAt: d("2024-01-01T00:00:00.000Z"),
+        contentHours: null,
+        startedAt: null,
+        mediaType: "books",
+        hoursToBeat: null,
+        matchesPlayed: null,
+        pagesRead: 150,
+      })
+    ).toBe(5);
+  });
+
+  it("returns 0 hours for completed reading log without pages or dates", () => {
+    expect(
+      hoursFromCompletedLogForStats({
+        completedAt: d("2024-01-01T00:00:00.000Z"),
+        contentHours: null,
+        startedAt: null,
+        mediaType: "manga",
+        hoursToBeat: null,
+        matchesPlayed: null,
+        pagesRead: null,
+      })
+    ).toBe(0);
+  });
 });
 
 describe("rollupHoursFromCompletedLogs", () => {

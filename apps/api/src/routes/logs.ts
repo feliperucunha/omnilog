@@ -224,12 +224,9 @@ async function cachedBookPagesCount(externalId: string): Promise<number | null> 
 }
 
 /**
- * Keeps a book's page counter in sync with its completed status:
- *  - entering "read": pagesRead is raised up to the book's cached page count so
- *    statistics add the whole book's pages as read;
- *  - leaving "read": the auto-filled counter is zeroed unless the request
- *    explicitly sets a pagesRead.
- * Returns undefined when nothing should change.
+ * Keeps reading progress page counters in sync with status:
+ *  - "read": books raise pagesRead to the cached edition page count (stats);
+ *  - any other status: pagesRead is cleared unless the request explicitly sets pagesRead.
  */
 async function resolveBookPagesRead(args: {
   mediaType: MediaType;
@@ -244,23 +241,26 @@ async function resolveBookPagesRead(args: {
     mediaType,
     externalId,
     status,
-    previousStatus,
     statusProvided,
     bodyPagesRead,
     currentPagesRead,
   } = args;
-  if (isCompleted(status)) {
-    if (mediaType !== "books") {
-      return bodyPagesRead === undefined ? undefined : bodyPagesRead;
-    }
-    const pagesCount = await cachedBookPagesCount(externalId);
-    const base = bodyPagesRead !== undefined ? bodyPagesRead : currentPagesRead;
-    if (pagesCount === null) {
-      return bodyPagesRead === undefined ? undefined : bodyPagesRead;
-    }
-    return Math.max(base ?? 0, pagesCount);
+  const isReadingMedia = (READING_MEDIA_TYPES as readonly string[]).includes(mediaType);
+  if (!isReadingMedia) {
+    return bodyPagesRead === undefined ? undefined : bodyPagesRead;
   }
-  if (statusProvided && isCompleted(previousStatus)) {
+  if (status === "read") {
+    if (mediaType === "books") {
+      const pagesCount = await cachedBookPagesCount(externalId);
+      const base = bodyPagesRead !== undefined ? bodyPagesRead : currentPagesRead;
+      if (pagesCount === null) {
+        return bodyPagesRead === undefined ? undefined : bodyPagesRead;
+      }
+      return Math.max(base ?? 0, pagesCount);
+    }
+    return bodyPagesRead === undefined ? undefined : bodyPagesRead;
+  }
+  if (statusProvided && status !== "read") {
     return bodyPagesRead === undefined ? null : bodyPagesRead;
   }
   return bodyPagesRead === undefined ? undefined : bodyPagesRead;
@@ -307,7 +307,15 @@ function applyStatsMediaFilter(where: Prisma.LogWhereInput, mediaType?: MediaTyp
 
 import { persistUserDefaultPurchaseCurrency } from "../lib/userPurchasePreference.js";
 import { parseGenresJson, serializeLog } from "../lib/serializeLog.js";
-import { attachItemEnrichment, attachItemEnrichmentSingle } from "../lib/itemDetailEnrichment.js";
+import { resolveLogStatusDates } from "../lib/logStatusDates.js";
+import {
+  activityInRangeWhere,
+  completedActivityWhere,
+  completedLogWhere,
+  effectiveCompletedAt,
+  effectiveStartedAt,
+} from "../lib/logActivityDates.js";
+import { attachItemEnrichmentSingle } from "../lib/itemDetailEnrichment.js";
 import { enrichLogsForClient } from "../lib/attachScopedReviews.js";
 import {
   computeGenreFacets,
@@ -854,8 +862,8 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     );
     const completedWhere = applyStatsMediaFilter(
       freeMonthRange
-        ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-        : { userId, completedAt: { not: null } },
+        ? mergeLogWhere({ userId }, completedLogWhere(freeMonthRange))
+        : mergeLogWhere({ userId }, completedLogWhere()),
       statsMediaType
     );
     const [rows, completedCount] = await Promise.all([
@@ -977,8 +985,8 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     );
     const completedCountWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
       freeMonthRange
-        ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-        : { userId, completedAt: { not: null } },
+        ? mergeLogWhere({ userId }, completedLogWhere(freeMonthRange))
+        : mergeLogWhere({ userId }, completedLogWhere()),
       statsMediaType
     );
     const reviewedWhere = applyStatsMediaFilter(
@@ -989,8 +997,8 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     );
     const completedForHoursWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
       freeMonthRange
-        ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-        : { userId, completedAt: { not: null } },
+        ? mergeLogWhere({ userId }, completedLogWhere(freeMonthRange))
+        : mergeLogWhere({ userId }, completedLogWhere()),
       statsMediaType
     );
 
@@ -1024,6 +1032,9 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
             mediaType: true,
             hoursToBeat: true,
             matchesPlayed: true,
+            pagesRead: true,
+            status: true,
+            updatedAt: true,
           },
         }),
         prisma.log.findMany({
@@ -1070,12 +1081,15 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       lifetimeNetByCurrency,
     };
     const highlightWhere = freeMonthWhere ?? undefined;
+    const pagesHighlightWhere = freeMonthRange
+      ? completedLogWhere(freeMonthRange)
+      : undefined;
     const taggedPlayedAtWhere = freeMonthRange
       ? { playedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
       : undefined;
     const boardGameWinsOpts = taggedPlayedAtWhere ? { taggedPlayedAtWhere } : undefined;
     if (!statsMediaType) {
-      summaryPayload.totalPagesRead = await sumAllPagesReadForStats(userId, highlightWhere);
+      summaryPayload.totalPagesRead = await sumAllPagesReadForStats(userId, pagesHighlightWhere);
       summaryPayload.boardGamesWon = await countBoardGameWinsForStats(
         userId,
         highlightWhere,
@@ -1086,7 +1100,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
         summaryPayload.totalPagesRead = await sumPagesReadForStats(
           userId,
           statsMediaType,
-          highlightWhere
+          pagesHighlightWhere
         );
       }
       if (statsMediaType === "boardgames") {
@@ -1109,7 +1123,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
 
     const completedMonthWhere = (range: { gte: Date; lte: Date }): Prisma.LogWhereInput =>
       applyStatsMediaFilter(
-        { userId, completedAt: { gte: range.gte, lte: range.lte } },
+        mergeLogWhere({ userId }, completedLogWhere(range)),
         statsMediaType
       );
 
@@ -1154,6 +1168,9 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
             mediaType: true,
             hoursToBeat: true,
             matchesPlayed: true,
+            pagesRead: true,
+            status: true,
+            updatedAt: true,
           },
         }),
         prisma.log.findMany({
@@ -1193,9 +1210,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
         totalContentHours: totalHours,
         netByCurrency,
       };
-      const monthHighlightWhere: Prisma.LogWhereInput = {
-        completedAt: { gte: range.gte, lte: range.lte },
-      };
+      const monthHighlightWhere: Prisma.LogWhereInput = completedLogWhere(range);
       if (!statsMediaType) {
         month.totalPagesRead = await sumAllPagesReadForStats(userId, monthHighlightWhere);
         month.boardGamesWon = await countBoardGameWinsForStats(userId, monthHighlightWhere, {
@@ -1282,17 +1297,18 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   if (group === "completedByMonth" || group === "completedByYear") {
     const completedTimeWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
       freeMonthRange
-        ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-        : { userId, completedAt: { not: null } },
+        ? mergeLogWhere({ userId }, completedLogWhere(freeMonthRange))
+        : mergeLogWhere({ userId }, completedLogWhere()),
       statsMediaType
     );
     const logs = await prisma.log.findMany({
       where: completedTimeWhere,
-      select: { completedAt: true },
+      select: { completedAt: true, status: true, updatedAt: true },
     });
     const byPeriod: Record<string, number> = {};
     for (const log of logs) {
-      const d = log.completedAt!;
+      const d = effectiveCompletedAt(log);
+      if (!d) continue;
       const key =
         group === "completedByYear"
           ? `${d.getUTCFullYear()}`
@@ -1309,17 +1325,18 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   if (group === "categoryByMonth" || group === "categoryByYear") {
     const catTimeWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
       freeMonthRange
-        ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-        : { userId, completedAt: { not: null } },
+        ? mergeLogWhere({ userId }, completedLogWhere(freeMonthRange))
+        : mergeLogWhere({ userId }, completedLogWhere()),
       statsMediaType
     );
     const logs = await prisma.log.findMany({
       where: catTimeWhere,
-      select: { completedAt: true, mediaType: true },
+      select: { completedAt: true, status: true, updatedAt: true, mediaType: true },
     });
     const byPeriodCategory: Record<string, Record<string, number>> = {};
     for (const log of logs) {
-      const d = log.completedAt!;
+      const d = effectiveCompletedAt(log);
+      if (!d) continue;
       const period =
         group === "categoryByYear"
           ? `${d.getUTCFullYear()}`
@@ -1374,23 +1391,27 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     const readingTypes = statsMediaType
       ? [statsMediaType]
       : [...READING_MEDIA_TYPES];
-    const pagesBase: Prisma.LogWhereInput = {
-      userId,
-      mediaType: { in: readingTypes },
-      pagesRead: { gt: 0 },
-      completedAt: freeMonthRange
-        ? { gte: freeMonthRange.gte, lte: freeMonthRange.lte }
-        : { not: null },
-    };
+    const pagesBase: Prisma.LogWhereInput = mergeLogWhere(
+      {
+        userId,
+        mediaType: { in: readingTypes },
+        pagesRead: { gt: 0 },
+      },
+      freeMonthRange ? completedLogWhere(freeMonthRange) : completedLogWhere()
+    );
     const logs = await prisma.log.findMany({
       where: pagesBase,
-      select: { completedAt: true, pagesRead: true },
+      select: { completedAt: true, status: true, updatedAt: true, pagesRead: true },
     });
     const granularity = group === "pagesReadByYear" ? "year" : "month";
     const entries = sumMetricByPeriod(
       logs
-        .filter((l): l is { completedAt: Date; pagesRead: number } => l.completedAt != null && l.pagesRead != null)
-        .map((l) => ({ at: l.completedAt, value: l.pagesRead })),
+        .map((l) => {
+          const at = effectiveCompletedAt(l);
+          if (at == null || l.pagesRead == null || l.pagesRead <= 0) return null;
+          return { at, value: l.pagesRead };
+        })
+        .filter((row): row is { at: Date; value: number } => row != null),
       granularity
     );
     res.json({ group, data: entries });
@@ -1402,23 +1423,27 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       res.json({ group, data: [] });
       return;
     }
-    const episodesBase: Prisma.LogWhereInput = {
-      userId,
-      mediaType: "tv",
-      episode: { gt: 0 },
-      completedAt: freeMonthRange
-        ? { gte: freeMonthRange.gte, lte: freeMonthRange.lte }
-        : { not: null },
-    };
+    const episodesBase: Prisma.LogWhereInput = mergeLogWhere(
+      {
+        userId,
+        mediaType: "tv",
+        episode: { gt: 0 },
+      },
+      freeMonthRange ? completedLogWhere(freeMonthRange) : completedLogWhere()
+    );
     const logs = await prisma.log.findMany({
       where: episodesBase,
-      select: { completedAt: true, episode: true },
+      select: { completedAt: true, status: true, updatedAt: true, episode: true },
     });
     const granularity = group === "episodesByYear" ? "year" : "month";
     const entries = sumMetricByPeriod(
       logs
-        .filter((l): l is { completedAt: Date; episode: number } => l.completedAt != null && l.episode != null)
-        .map((l) => ({ at: l.completedAt, value: l.episode })),
+        .map((l) => {
+          const at = effectiveCompletedAt(l);
+          if (at == null || l.episode == null || l.episode <= 0) return null;
+          return { at, value: l.episode };
+        })
+        .filter((row): row is { at: Date; value: number } => row != null),
       granularity
     );
     res.json({ group, data: entries });
@@ -1436,8 +1461,8 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     if (isReadingMediaType(statsMediaType)) {
       metric = "pages";
       paceWindowWhere = freeMonthRange
-        ? { completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-        : { completedAt: { not: null } };
+        ? completedLogWhere(freeMonthRange)
+        : completedLogWhere();
     } else {
       metric = "items";
       paceWindowWhere = freeMonthRange
@@ -1452,6 +1477,8 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
         id: true,
         createdAt: true,
         completedAt: true,
+        status: true,
+        updatedAt: true,
         pagesRead: true,
       },
     });
@@ -1464,7 +1491,9 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     } else {
       for (const log of paceRows) {
         if (log.pagesRead == null || log.pagesRead <= 0) continue;
-        increments.push({ at: log.completedAt as Date, value: log.pagesRead });
+        const at = effectiveCompletedAt(log);
+        if (!at) continue;
+        increments.push({ at, value: log.pagesRead });
       }
     }
     res.json({ group, metric, data: sumMetricByPeriod(increments, granularity) });
@@ -1473,8 +1502,8 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
 
   const hoursRollupWhere: Prisma.LogWhereInput = applyStatsMediaFilter(
     freeMonthRange
-      ? { userId, completedAt: { gte: freeMonthRange.gte, lte: freeMonthRange.lte } }
-      : { userId, completedAt: { not: null } },
+      ? mergeLogWhere({ userId }, completedLogWhere(freeMonthRange))
+      : mergeLogWhere({ userId }, completedLogWhere()),
     statsMediaType
   );
   const logs = await prisma.log.findMany({
@@ -1487,6 +1516,9 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       mediaType: true,
       hoursToBeat: true,
       matchesPlayed: true,
+      pagesRead: true,
+      status: true,
+      updatedAt: true,
     },
   });
   const logsWithSessionHours = await attachBoardGameSessionHours(logs);
@@ -1495,7 +1527,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   for (const log of logsWithSessionHours) {
     const hours = hoursFromCompletedLogForStats(log);
     if (hours === null) continue;
-    const completedAt = log.completedAt;
+    const completedAt = effectiveCompletedAt(log);
     if (!completedAt) continue;
     const key =
       group === "category"
@@ -1545,13 +1577,7 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
   const byDateMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
   const logs = await prisma.log.findMany({
     where: applyStatsMediaFilter(
-      {
-        userId,
-        OR: [
-          { completedAt: { gte: start, lte: end } },
-          { startedAt: { gte: start, lte: end } },
-        ],
-      },
+      mergeLogWhere({ userId }, activityInRangeWhere({ gte: start, lte: end })),
       byDateMediaType
     ),
     orderBy: [{ completedAt: "desc" }, { startedAt: "desc" }, { updatedAt: "desc" }],
@@ -1621,10 +1647,10 @@ logsRouter.get("/by-period", async (req: AuthenticatedRequest, res) => {
   const byPeriodMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
   const logs = await prisma.log.findMany({
     where: applyStatsMediaFilter(
-      {
-        userId,
-        completedAt: { gte: completedGte, lte: completedLte },
-      },
+      mergeLogWhere(
+        { userId },
+        completedLogWhere({ gte: completedGte, lte: completedLte })
+      ),
       byPeriodMediaType
     ),
     orderBy: [{ completedAt: "desc" }, { updatedAt: "desc" }],
@@ -1663,18 +1689,14 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
   const calendarMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
   const logs = await prisma.log.findMany({
     where: applyStatsMediaFilter(
-      {
-        userId,
-        OR: [
-          { startedAt: { gte: start, lte: end } },
-          { completedAt: { gte: start, lte: end } },
-        ],
-      },
+      mergeLogWhere({ userId }, activityInRangeWhere({ gte: start, lte: end })),
       calendarMediaType
     ),
     select: {
       startedAt: true,
       completedAt: true,
+      status: true,
+      updatedAt: true,
       image: true,
       title: true,
       externalId: true,
@@ -1710,15 +1732,17 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
     }
   };
   for (const log of logs) {
-    if (log.startedAt && log.startedAt >= start && log.startedAt <= end) {
-      const key = toKey(log.startedAt);
+    const started = effectiveStartedAt(log);
+    if (started && started >= start && started <= end) {
+      const key = toKey(started);
       dates[key] = (dates[key] ?? 0) + 1;
-      itemFor(key, log.startedAt.getTime(), log);
+      itemFor(key, started.getTime(), log);
     }
-    if (log.completedAt && log.completedAt >= start && log.completedAt <= end) {
-      const key = toKey(log.completedAt);
+    const completed = effectiveCompletedAt(log);
+    if (completed && completed >= start && completed <= end) {
+      const key = toKey(completed);
       dates[key] = (dates[key] ?? 0) + 1;
-      itemFor(key, log.completedAt.getTime(), log);
+      itemFor(key, completed.getTime(), log);
     }
   }
   const itemsClean: Record<string, CalendarDayItem> = {};
@@ -2019,22 +2043,16 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       ? sanitizeText(bodyGamePlatform, GAME_PLATFORM_MAX_LENGTH)
       : undefined;
   const now = new Date();
-  const createStartedAt =
-    bodyStartedAt !== undefined
-      ? bodyStartedAt == null
-        ? null
-        : parseManualLogDate(bodyStartedAt)
-      : isInProgress(status)
-        ? now
-        : null;
-  const createCompletedAt =
-    bodyCompletedAt !== undefined
-      ? bodyCompletedAt == null
-        ? null
-        : parseManualLogDate(bodyCompletedAt)
-      : isCompleted(status)
-        ? now
-        : null;
+  const { startedAt: createStartedAt, completedAt: createCompletedAt } = resolveLogStatusDates({
+    status,
+    previousStatus: null,
+    statusProvided: status !== undefined,
+    bodyStartedAt,
+    bodyCompletedAt,
+    existingStartedAt: null,
+    existingCompletedAt: null,
+    now,
+  });
   const grade = gradeInput ?? null;
   try {
     const existing = await prisma.log.findUnique({
@@ -2202,17 +2220,19 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
       if (bodyGamePlatform !== undefined) {
         updateData.gamePlatform = sanitizedGamePlatform ?? null;
       }
-      if (bodyStartedAt !== undefined) {
-        updateData.startedAt =
-          bodyStartedAt == null ? null : parseManualLogDate(bodyStartedAt);
-      } else if (isInProgress(status) && existing.startedAt == null) {
-        updateData.startedAt = now;
-      }
-      if (bodyCompletedAt !== undefined) {
-        updateData.completedAt =
-          bodyCompletedAt == null ? null : parseManualLogDate(bodyCompletedAt);
-      } else if (isCompleted(status)) {
-        updateData.completedAt = now;
+      {
+        const resolvedDates = resolveLogStatusDates({
+          status: status ?? existing.status,
+          previousStatus: existing.status,
+          statusProvided: status !== undefined,
+          bodyStartedAt,
+          bodyCompletedAt,
+          existingStartedAt: existing.startedAt,
+          existingCompletedAt: existing.completedAt,
+          now,
+        });
+        if (resolvedDates.startedAt !== undefined) updateData.startedAt = resolvedDates.startedAt;
+        if (resolvedDates.completedAt !== undefined) updateData.completedAt = resolvedDates.completedAt;
       }
       const prevSpendSnap = spendMonetarySnapshotFromLog(existing);
       const nextSpendSnap = spendMonetarySnapshotFromLog({
@@ -2289,8 +2309,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           review: sanitizedReview,
           listType: listType ?? null,
           status: status ?? null,
-          startedAt: createStartedAt,
-          completedAt: createCompletedAt,
+          startedAt: createStartedAt ?? null,
+          completedAt: createCompletedAt ?? null,
           contentHours: contentHours ?? null,
           hoursToBeat: hoursToBeat ?? null,
           season: season ?? null,
@@ -2725,24 +2745,19 @@ logsRouter.patch("/:id", async (req: AuthenticatedRequest, res) => {
   if (parsed.data.grade !== undefined) data.grade = parsed.data.grade;
   if (parsed.data.review !== undefined) data.review = sanitizeReview(parsed.data.review);
   if (parsed.data.listType !== undefined) data.listType = parsed.data.listType;
-  if (parsed.data.status !== undefined) {
-    data.status = parsed.data.status;
-    const now = new Date();
-    if (parsed.data.startedAt === undefined && isInProgress(parsed.data.status) && log.startedAt == null) {
-      data.startedAt = now;
-    }
-    if (parsed.data.completedAt === undefined && isCompleted(parsed.data.status)) {
-      data.completedAt = now;
-    }
-  }
-  if (parsed.data.startedAt !== undefined) {
-    data.startedAt =
-      parsed.data.startedAt == null ? null : parseManualLogDate(parsed.data.startedAt);
-  }
-  if (parsed.data.completedAt !== undefined) {
-    data.completedAt =
-      parsed.data.completedAt == null ? null : parseManualLogDate(parsed.data.completedAt);
-  }
+  if (parsed.data.status !== undefined) data.status = parsed.data.status;
+  const effectiveStatus = parsed.data.status !== undefined ? parsed.data.status : log.status;
+  const resolvedDates = resolveLogStatusDates({
+    status: effectiveStatus,
+    previousStatus: log.status,
+    statusProvided: parsed.data.status !== undefined,
+    bodyStartedAt: parsed.data.startedAt,
+    bodyCompletedAt: parsed.data.completedAt,
+    existingStartedAt: log.startedAt,
+    existingCompletedAt: log.completedAt,
+  });
+  if (resolvedDates.startedAt !== undefined) data.startedAt = resolvedDates.startedAt;
+  if (resolvedDates.completedAt !== undefined) data.completedAt = resolvedDates.completedAt;
   if (parsed.data.contentHours !== undefined) data.contentHours = parsed.data.contentHours;
   if (parsed.data.hoursToBeat !== undefined) data.hoursToBeat = parsed.data.hoursToBeat;
   if (parsed.data.season !== undefined) data.season = parsed.data.season;

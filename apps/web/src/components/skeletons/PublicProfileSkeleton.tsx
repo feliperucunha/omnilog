@@ -13,33 +13,15 @@ export function PublicProfileSkeleton() {
         </div>
       </div>
 
-      {/* Padded content: profile header, badges, section with MediaLogs */}
+      {/* Padded content: profile header + MediaLogs */}
       <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden px-4 md:px-6 pt-4 md:pt-6 pb-4 md:pb-6">
-        {/* Header: title + optional badges + buttons */}
+        {/* Header: title + optional follow */}
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-col gap-2">
-            <Skeleton className="h-8 w-48 rounded-md sm:h-9 sm:w-56" />
-            {/* Pinned highlights toggle (collapsed by default on real page) */}
-            <Skeleton className="h-6 w-40 max-w-full rounded-md" />
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Skeleton className="h-9 w-20 rounded-md" />
-            <Skeleton className="h-9 w-28 rounded-md" />
-          </div>
+          <Skeleton className="h-8 w-48 rounded-md sm:h-9 sm:w-56" />
+          <Skeleton className="h-9 w-20 shrink-0 rounded-md" />
         </div>
 
-        {/* Milestone badges section (collapsed by default on real page) */}
-        <section
-          aria-hidden
-          className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"
-        >
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <Skeleton className="h-7 w-32 rounded-md" />
-            <Skeleton className="h-5 w-5 shrink-0 rounded" />
-          </div>
-        </section>
-
-        {/* MediaLogs section: toolbar (filters + search, no bar/buttons) + cards */}
+        {/* MediaLogs section: toolbar + cards */}
         <section
           aria-hidden
           className="flex min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-[var(--color-category-border)] bg-[var(--color-category-bg)] p-4 shadow-[var(--shadow-category)]"

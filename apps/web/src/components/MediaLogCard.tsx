@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import { Loader2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
+import { Check, Loader2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
 import { MotionLink } from "@/components/MotionLink";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { BookPagesBadge } from "@/components/BookPagesBadge";
@@ -50,7 +51,7 @@ import { getStatusLabel } from "@/lib/statusLabel";
 import { formatBoardGameWeight } from "@/lib/boardGameWeight";
 import { tapScale, tapTransition } from "@/lib/animations";
 import type { MediaType, Log } from "@geeklogs/shared";
-import { COMPLETED_STATUSES } from "@geeklogs/shared";
+import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "@/contexts/LocaleContext";
 
@@ -96,9 +97,11 @@ export type MediaLogCardProps = {
   hasProgressButton: boolean;
   deletingId: string | null;
   incrementingId: string | null;
+  statusChangingId: string | null;
   expandedReviewLogId: string | null;
   onExpandReview: (logId: string | null) => void;
   onIncrement: (log: Log, field: "episode" | "chapter" | "volume") => void;
+  onStatusChange: (log: Log, status: string) => void | Promise<void>;
   onEdit: (log: Log, tab: "review" | "matches" | "market") => void;
   onDelete?: (logId: string) => void | Promise<void>;
   t: TFunction;
@@ -421,7 +424,9 @@ function LogActions({
   mediaType,
   deletingId,
   incrementingId,
+  statusChangingId,
   onIncrement,
+  onStatusChange,
   onEdit,
   onDelete,
   t,
@@ -432,7 +437,9 @@ function LogActions({
   mediaType: MediaType;
   deletingId: string | null;
   incrementingId: string | null;
+  statusChangingId: string | null;
   onIncrement: (log: Log, field: "episode" | "chapter" | "volume") => void;
+  onStatusChange: (log: Log, status: string) => void | Promise<void>;
   onEdit: (log: Log, tab: "review" | "matches" | "market") => void;
   onDelete?: (logId: string) => void | Promise<void>;
   t: TFunction;
@@ -444,6 +451,8 @@ function LogActions({
 
   const actions = QUICK_ACTIONS_BY_TYPE[mediaType];
   const showMatch = mediaType === "boardgames" && log.status != null;
+  const currentStatus = log.status ?? log.listType ?? null;
+  const busy = deletingId === log.id || incrementingId === log.id || statusChangingId === log.id;
 
   const runAction = (key: QuickActionKey) => {
     switch (key) {
@@ -541,10 +550,10 @@ function LogActions({
               variant="ghost"
               size="icon"
               className={triggerClass}
-              disabled={deletingId === log.id}
+              disabled={busy}
               aria-label={t("mediaLogs.quickActionsLabel")}
             >
-              {incrementingId === log.id ? (
+              {busy ? (
                 <Loader2 className={cn("animate-spin", isGrid ? "h-3.5 w-3.5 md:h-3 md:w-3" : "h-4 w-4")} aria-hidden />
               ) : (
                 <Pencil className={cn(isGrid ? "h-3.5 w-3.5 md:h-3 md:w-3" : "h-4 w-4")} aria-hidden />
@@ -557,11 +566,29 @@ function LogActions({
               return (
                 <DropdownMenuItem
                   key={key}
-                  disabled={deletingId === log.id || (incrementingId === log.id && key !== "removeLog")}
+                  disabled={busy && key !== "removeLog"}
                   onSelect={() => selectAction(key)}
                 >
                   {actionIcon(key)}
                   <span className="min-w-0 flex-1">{actionLabel(key)}</span>
+                </DropdownMenuItem>
+              );
+            })}
+            <DropdownMenuSeparator />
+            {LOG_STATUS_OPTIONS[mediaType].map((s) => {
+              const active = currentStatus === s;
+              return (
+                <DropdownMenuItem
+                  key={s}
+                  disabled={busy}
+                  onSelect={() => {
+                    window.setTimeout(() => {
+                      void onStatusChange(log, s);
+                    }, 0);
+                  }}
+                >
+                  <span className="min-w-0 flex-1">{getStatusLabel(t, s, mediaType)}</span>
+                  {active && <Check className="h-4 w-4 shrink-0 text-emerald-400" aria-hidden />}
                 </DropdownMenuItem>
               );
             })}
@@ -634,9 +661,11 @@ export function MediaLogCard({
   hasProgressButton,
   deletingId,
   incrementingId,
+  statusChangingId,
   expandedReviewLogId,
   onExpandReview,
   onIncrement,
+  onStatusChange,
   onEdit,
   onDelete,
   t,
@@ -717,7 +746,9 @@ export function MediaLogCard({
           mediaType={mediaType}
           deletingId={deletingId}
           incrementingId={incrementingId}
+          statusChangingId={statusChangingId}
           onIncrement={onIncrement}
+          onStatusChange={onStatusChange}
           onEdit={onEdit}
           onDelete={onDelete}
           t={t}
@@ -814,7 +845,9 @@ export function MediaLogCard({
         mediaType={mediaType}
         deletingId={deletingId}
         incrementingId={incrementingId}
+        statusChangingId={statusChangingId}
         onIncrement={onIncrement}
+        onStatusChange={onStatusChange}
         onEdit={onEdit}
         onDelete={onDelete}
         t={t}

@@ -80,6 +80,7 @@ export {
   type BrowseRailKey,
   type BrowseResponse,
 } from "./types.js";
+export { FINISHED_STATUSES, statusSetsStartedAt, statusSetsCompletedAt } from "./logStatusDates.js";
 export type { ProfileVisibility } from "./profileVisibility.js";
 export {
   DEFAULT_PROFILE_VISIBILITY,

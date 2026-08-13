@@ -8,7 +8,7 @@ import { SettingsSearchable, SettingsSheets, SettingsAccount } from "./settings"
 import { TiersCompare, TiersBenefit, TiersUsage } from "./plans";
 import { AuthSplit, AuthOnboard, AuthBrand } from "./auth";
 import { MarketCards, MarketRows, MarketMap } from "./market";
-import { ProfileFeed, ProfileGrid } from "./profile";
+import { PublicProfileA, PublicProfileB, PublicProfileC } from "./profile";
 import { LandingTour, LandingDemo, LandingStory } from "./landing";
 import { QuickAddNav, QuickAddContext } from "./quickadd";
 import { EditInline, EditWizard } from "./edit";
@@ -48,8 +48,9 @@ export const PREVIEWS: Record<string, ReactNode> = {
   "market-a": <MarketCards />,
   "market-b": <MarketRows />,
   "market-c": <MarketMap />,
-  "profile-b": <ProfileFeed />,
-  "profile-c": <ProfileGrid />,
+  "profile-a": <PublicProfileA />,
+  "profile-b": <PublicProfileB />,
+  "profile-c": <PublicProfileC />,
   "landing-a": <LandingTour />,
   "landing-b": <LandingDemo />,
   "landing-c": <LandingStory />,

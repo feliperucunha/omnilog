@@ -1,3 +1,6 @@
+/** Max review lines in LogCompleteModal (modal + share card); overflow shows ellipsis. */
+export const LOG_COMPLETE_REVIEW_MAX_LINES = 15;
+
 export type LogCompleteHeroLayout = "portrait" | "square" | "landscape";
 
 export type ImageNaturalSize = { width: number; height: number };
@@ -196,12 +199,12 @@ export function logCompleteShareTextLimits(
     else if (reviewLen <= 120) reviewLineClamp = 6;
     else if (reviewLen <= 200) reviewLineClamp = 8;
     else if (reviewLen <= 320) reviewLineClamp = 10;
-    else reviewLineClamp = 12;
+    else reviewLineClamp = LOG_COMPLETE_REVIEW_MAX_LINES;
   }
 
   if (longCopy) {
     titleLineClamp = Math.min(titleLineClamp, 3);
-    reviewLineClamp = Math.min(reviewLineClamp + 2, 12);
+    reviewLineClamp = Math.min(reviewLineClamp + 2, LOG_COMPLETE_REVIEW_MAX_LINES);
   } else {
     reviewLineClamp = Math.min(reviewLineClamp, 8);
   }

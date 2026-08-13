@@ -124,9 +124,9 @@ describe("logCompleteShareTextLimits", () => {
     expect(limits.reviewLineClamp).toBeGreaterThan(3);
   });
 
-  it("expands review clamp for long copy and caps at 12", () => {
+  it("expands review clamp for long copy and caps at 15", () => {
     const limits = logCompleteShareTextLimits("a".repeat(400), "Title");
-    expect(limits.reviewLineClamp).toBe(12);
+    expect(limits.reviewLineClamp).toBe(15);
     expect(limits.titleLineClamp).toBeLessThanOrEqual(3);
   });
 });

@@ -92,7 +92,7 @@ import { buildRecapTitle, recapBoundsForPeriod, type RecapPeriod } from "@/lib/r
 import { RecapView } from "@/components/RecapView";
 import * as storage from "@/lib/storage";
 import { currencyMinorDecimals } from "@/lib/moneyInput";
-import { formatStatsTimeAxisLabel } from "@/lib/formatStatsPeriod";
+import { formatStatsTimeAxisLabel, partitionStatsPeriods, sortStatsPeriodsDesc } from "@/lib/formatStatsPeriod";
 import { cn } from "@/lib/utils";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
@@ -878,6 +878,7 @@ export function Statistics() {
   } | null>(null);
   const [logsPeriodActivityLogs, setLogsPeriodActivityLogs] = useState<Log[]>([]);
   const [logsPeriodActivityLoading, setLogsPeriodActivityLoading] = useState(false);
+  const [logsChartShowOlderPeriods, setLogsChartShowOlderPeriods] = useState(false);
 
   const tzOffsetMinutes = useMemo(() => -new Date().getTimezoneOffset(), []);
   const isMobile = useIsMobile();
@@ -985,11 +986,6 @@ export function Statistics() {
   }, [categoryFilter]);
 
   const fetchStats = useCallback(async () => {
-    if (categoryFilter !== "all") {
-      setStats([]);
-      setStatsLoading(false);
-      return;
-    }
     const path = `/logs/stats?group=${statsGroup}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
     await loadWithSWR<{ data: StatsEntry[] }>(
       path,
@@ -1189,6 +1185,10 @@ export function Statistics() {
   useEffect(() => {
     if (!isPro && categoryOverTimeGroup !== "month") setCategoryOverTimeGroup("month");
   }, [isPro, categoryOverTimeGroup]);
+
+  useEffect(() => {
+    setLogsChartShowOlderPeriods(false);
+  }, [genreGraphMode, statusOverTimeGroup, categoryOverTimeGroup]);
 
   useEffect(() => {
     if (!isPro && purchasePeriod !== "month") setPurchasePeriod("month");
@@ -1626,7 +1626,43 @@ export function Statistics() {
     },
     {}
   );
-  const categoryOverTimePeriods = Object.keys(categoryOverTimeByPeriod).sort();
+  const categoryOverTimePeriods = useMemo(
+    () => sortStatsPeriodsDesc(Object.keys(categoryOverTimeByPeriod)),
+    [categoryOverTimeByPeriod]
+  );
+  const categoryOverTimePeriodPartition = useMemo(
+    () => partitionStatsPeriods(categoryOverTimePeriods, categoryOverTimeGroup, tzOffsetMinutes),
+    [categoryOverTimePeriods, categoryOverTimeGroup, tzOffsetMinutes]
+  );
+  const visibleCategoryOverTimePeriods = logsChartShowOlderPeriods
+    ? categoryOverTimePeriods
+    : categoryOverTimePeriodPartition.recent;
+  const statusOverTimeSorted = useMemo(
+    () => [...statusOverTimeStats].sort((a, b) => b.period.localeCompare(a.period)),
+    [statusOverTimeStats]
+  );
+  const statusOverTimePeriodPartition = useMemo(
+    () =>
+      partitionStatsPeriods(
+        statusOverTimeSorted.map((entry) => entry.period),
+        statusOverTimeGroup,
+        tzOffsetMinutes
+      ),
+    [statusOverTimeSorted, statusOverTimeGroup, tzOffsetMinutes]
+  );
+  const visibleStatusOverTimeStats = logsChartShowOlderPeriods
+    ? statusOverTimeSorted
+    : statusOverTimeSorted.filter((entry) =>
+        statusOverTimePeriodPartition.recent.includes(entry.period)
+      );
+  const logsChartHasOlderPeriods =
+    genreGraphMode === "byCategory"
+      ? categoryOverTimePeriodPartition.older.length > 0
+      : genreGraphMode === "statusOverTime"
+        ? statusOverTimePeriodPartition.older.length > 0
+        : false;
+  const logsChartOlderToggleGranularity =
+    genreGraphMode === "statusOverTime" ? statusOverTimeGroup : categoryOverTimeGroup;
 
 const summaryData = summary ?? EMPTY_SUMMARY;
 
@@ -2823,17 +2859,17 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                 </p>
               ) : (
                 <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
-                  {statusOverTimeStats.length > 0 && (
+                  {visibleStatusOverTimeStats.length > 0 && (
                     <div className="flex h-14 min-w-0 items-end gap-1" aria-hidden>
                       <MiniBars
-                        values={statusOverTimeStats.map(({ hours }) => hours)}
+                        values={visibleStatusOverTimeStats.map(({ hours }) => hours)}
                         height={56}
                         color="var(--btn-gradient-end)"
                       />
                     </div>
                   )}
                   <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-3">
-                  {statusOverTimeStats.map(({ period, hours, count }) => {
+                  {visibleStatusOverTimeStats.map(({ period, hours, count }) => {
                     const itemCount = count ?? hours;
                     const timeLabel = formatStatsTimeAxisLabel(
                       period,
@@ -2872,6 +2908,25 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                     );
                   })}
                   </div>
+                  {logsChartHasOlderPeriods && (
+                    <button
+                      type="button"
+                      onClick={() => setLogsChartShowOlderPeriods((open) => !open)}
+                      className="w-full rounded-lg border border-[var(--color-mid)]/25 bg-[var(--color-darkest)]/40 px-3 py-2 text-center text-xs font-medium text-[var(--color-light)] transition-colors hover:bg-[var(--color-mid)]/10 hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] max-md:min-h-[44px]"
+                    >
+                      {logsChartShowOlderPeriods
+                        ? t(
+                            logsChartOlderToggleGranularity === "year"
+                              ? "statistics.hideEarlierYears"
+                              : "statistics.hideEarlierMonths"
+                          )
+                        : t(
+                            logsChartOlderToggleGranularity === "year"
+                              ? "statistics.seeEarlierYears"
+                              : "statistics.seeEarlierMonths"
+                          )}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -2886,7 +2941,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                 </p>
               ) : (
                 <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
-                  {categoryOverTimePeriods.map((period) => {
+                  {visibleCategoryOverTimePeriods.map((period) => {
                     const timeLabel = formatStatsTimeAxisLabel(
                       period,
                       categoryOverTimeGroup === "year" ? "year" : "month",
@@ -2943,6 +2998,25 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                       </div>
                     );
                   })}
+                  {logsChartHasOlderPeriods && (
+                    <button
+                      type="button"
+                      onClick={() => setLogsChartShowOlderPeriods((open) => !open)}
+                      className="w-full rounded-lg border border-[var(--color-mid)]/25 bg-[var(--color-darkest)]/40 px-3 py-2 text-center text-xs font-medium text-[var(--color-light)] transition-colors hover:bg-[var(--color-mid)]/10 hover:text-[var(--color-lightest)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] max-md:min-h-[44px]"
+                    >
+                      {logsChartShowOlderPeriods
+                        ? t(
+                            logsChartOlderToggleGranularity === "year"
+                              ? "statistics.hideEarlierYears"
+                              : "statistics.hideEarlierMonths"
+                          )
+                        : t(
+                            logsChartOlderToggleGranularity === "year"
+                              ? "statistics.seeEarlierYears"
+                              : "statistics.seeEarlierMonths"
+                          )}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

@@ -305,6 +305,7 @@ export function MediaLogs({
   /** In-progress text in the search field. */
   const [categorySearchDraft, setCategorySearchDraft] = useState(() => initialFilters?.search ?? "");
   const [incrementingId, setIncrementingId] = useState<string | null>(null);
+  const [statusChangingId, setStatusChangingId] = useState<string | null>(null);
   const [exportingCategory, setExportingCategory] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
   /** Log id whose review is expanded in-card (no modal). */
@@ -755,6 +756,48 @@ export function MediaLogs({
       showErrorToast(t, "E008", { originalError: err });
     } finally {
       setIncrementingId(null);
+    }
+  };
+
+  const handleStatusChange = async (log: Log, status: string) => {
+    if (log.status === status || log.listType === status) return;
+    setStatusChangingId(log.id);
+    const toastId = `log-status-${log.id}`;
+    toast.loading(t("search.quickStatusLoading"), { id: toastId });
+    try {
+      const updated = await apiFetch<Log>(`/logs/${log.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      const normalized = decodeLogForDisplay(updated);
+      skipLogsInvalidatedRefetchRef.current = true;
+      setLogs((prev) => {
+        if (statusFilter && normalized.status !== statusFilter) {
+          return prev.filter((l) => l.id !== log.id);
+        }
+        const idx = prev.findIndex((l) => l.id === log.id);
+        if (idx >= 0) return prev.map((l) => (l.id === log.id ? normalized : l));
+        return prev;
+      });
+      if (!statusFilter || normalized.status === statusFilter) {
+        upsertLogInClientCaches(normalized);
+      } else {
+        removeLogFromClientCaches(log.id);
+      }
+      invalidateLogsAndItemsCache();
+      fetchStatusCounts();
+      toast.success(
+        t("search.quickStatusSuccess", {
+          title: log.title,
+          status: getStatusLabel(t, normalized.status ?? status, mediaType),
+        }),
+        { id: toastId }
+      );
+    } catch (err) {
+      showErrorToast(t, "E008", { originalError: err });
+      toast.dismiss(toastId);
+    } finally {
+      setStatusChangingId(null);
     }
   };
 
@@ -1450,9 +1493,11 @@ export function MediaLogs({
                     hasProgressButton={hasProgressButton}
                     deletingId={deletingId}
                     incrementingId={incrementingId}
+                    statusChangingId={statusChangingId}
                     expandedReviewLogId={expandedReviewLogId}
                     onExpandReview={setExpandedReviewLogId}
                     onIncrement={handleIncrement}
+                    onStatusChange={handleStatusChange}
                     onEdit={(lg, tab) => {
                       setLogEditTab(tab);
                       setEditingLog(lg);

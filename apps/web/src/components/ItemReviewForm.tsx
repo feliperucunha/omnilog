@@ -56,7 +56,7 @@ import { SavedTvReviewsSection } from "@/components/SavedTvReviewsSection";
 import { GameLogFields } from "@/components/GameLogFields";
 import { ReadingProgressFields } from "@/components/ReadingProgressFields";
 import { MarketListingSection } from "@/components/MarketListingSection";
-import { dateInputToIso, isoToDateInput } from "@/lib/readingDates";
+import { dateInputToIso, isoToDateInput, applyStatusAutoDates, applyBookStatusPagesChange } from "@/lib/readingDates";
 import { cn } from "@/lib/utils";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
@@ -862,7 +862,9 @@ export function ItemReviewForm({
                 value={status ?? ""}
                 onValueChange={(v) => {
                   const next = v || null;
+                  const prev = status;
                   setStatus(next);
+                  applyStatusAutoDates(next, prev, setStartedAtInput, setCompletedAtInput);
                   if (showBoardGameFields) {
                     if (next === "played") {
                       setMatchesPlayed((prev) => {
@@ -877,11 +879,8 @@ export function ItemReviewForm({
                   if (next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showSeasonEpisode && episodesCount != null && episodesCount > 0) {
                     setEpisode(episodesCount);
                   }
-                  if (next != null && (COMPLETED_STATUSES as readonly string[]).includes(next) && showReadingProgress && pagesCount != null && pagesCount > 0) {
-                    setPagesRead((prev) => {
-                      if (prev !== "" && prev >= pagesCount) return prev;
-                      return pagesCount;
-                    });
+                  if (showReadingProgress && mediaType === "books") {
+                    applyBookStatusPagesChange(next, setPagesRead, pagesCount);
                   }
                 }}
                 options={[
