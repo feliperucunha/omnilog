@@ -44,11 +44,10 @@ export const UnifiedSearchBar = React.forwardRef<HTMLInputElement, UnifiedSearch
     return (
       <div
         className={cn(
-          "flex w-full min-w-0 items-stretch overflow-hidden rounded-2xl border border-[var(--color-mid)]/55",
-          "bg-[var(--color-darkest)] shadow-[var(--shadow-md)]",
-          "transition-[border-color,box-shadow]",
+          "flex h-12 w-full min-w-0 max-md:min-h-[48px] items-center gap-1 overflow-hidden rounded-full border border-[var(--color-mid)]/55",
+          "bg-[var(--color-dark)] pl-4 pr-1.5",
+          "transition-[border-color]",
           "focus-within:border-[var(--btn-gradient-start)]/40",
-          "focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--btn-gradient-start)_18%,transparent),var(--shadow-md)]",
           className
         )}
       >
@@ -58,8 +57,8 @@ export const UnifiedSearchBar = React.forwardRef<HTMLInputElement, UnifiedSearch
           inputMode="search"
           enterKeyHint="search"
           className={cn(
-            "min-w-0 flex-1 rounded-none border-0 bg-transparent shadow-none",
-            "h-11 max-md:min-h-[44px] pl-4 pr-2 text-[var(--color-lightest)] max-md:text-base",
+            "min-h-0 min-w-0 flex-1 rounded-none border-0 bg-transparent shadow-none",
+            "h-full py-0 pl-0 pr-1 text-[var(--color-lightest)] max-md:text-base",
             "placeholder:text-[var(--color-light)]",
             "focus-visible:ring-0 focus-visible:ring-offset-0",
             inputClassName
@@ -69,14 +68,14 @@ export const UnifiedSearchBar = React.forwardRef<HTMLInputElement, UnifiedSearch
           aria-label={inputAriaLabel}
           {...inputProps}
         />
-        <div className="flex shrink-0 items-center gap-0.5 border-l border-[var(--color-mid)]/40 bg-[var(--color-mid)]/[0.06] px-1.5 py-1 sm:px-2">
+        <div className="flex shrink-0 items-center gap-0.5">
           {showClear && (
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={onClear}
               className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-xl text-[var(--color-light)]",
+                "flex size-10 shrink-0 items-center justify-center rounded-full text-[var(--color-light)]",
                 "transition-colors hover:bg-[var(--color-mid)]/35 hover:text-[var(--color-lightest)]",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] focus-visible:ring-offset-0"
               )}
@@ -89,9 +88,9 @@ export const UnifiedSearchBar = React.forwardRef<HTMLInputElement, UnifiedSearch
             type="submit"
             disabled={submitDisabled}
             className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-xl",
+              "flex size-10 shrink-0 items-center justify-center rounded-full",
               "text-[var(--color-lightest)] transition-[color,transform,background-color]",
-              "hover:bg-gradient-to-br hover:from-[var(--btn-gradient-start)]/18 hover:to-[var(--btn-gradient-end)]/12 active:scale-[0.96]",
+              "hover:bg-[var(--color-mid)]/35 active:scale-[0.96]",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--btn-gradient-start)]/60 focus-visible:ring-offset-0",
               "disabled:pointer-events-none disabled:text-[var(--color-light)]/35"
             )}

@@ -508,6 +508,40 @@ function reviewStatusBorderClass(r: ItemReview): string {
   return logStatusBorderClass(r.status ?? r.listType ?? null);
 }
 
+function itemReviewProfilePath(review: ItemReview, mediaType: MediaType): string | null {
+  const slug = review.reviewerUsername?.trim() || review.userId;
+  if (!slug) return null;
+  return `/${encodeURIComponent(slug)}?category=${encodeURIComponent(mediaType)}`;
+}
+
+function ItemReviewProfileLink({
+  review,
+  mediaType,
+  className,
+  children,
+}: {
+  review: ItemReview;
+  mediaType: MediaType;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const path = itemReviewProfilePath(review, mediaType);
+  if (!path) {
+    return <div className={className}>{children}</div>;
+  }
+  return (
+    <Link
+      to={path}
+      className={cn(
+        className,
+        "block rounded-md transition-colors hover:bg-[var(--color-mid)]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function ItemReviewAuthorRow({
   r,
   mediaType,
@@ -1125,23 +1159,29 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                           style={paperShadow}
                         >
                           <div className="flex flex-col gap-4 p-4 sm:p-5">
-                            <ItemReviewAuthorRow r={mainReview} mediaType={mediaType} t={t} />
+                            <ItemReviewProfileLink
+                              review={mainReview}
+                              mediaType={mediaType}
+                              className="-m-1 p-1"
+                            >
+                              <ItemReviewAuthorRow r={mainReview} mediaType={mediaType} t={t} />
 
-                            <div className="flex flex-col gap-4 border-b border-[var(--color-surface-border)]/60 pb-4">
-                              <ItemReviewMetaRow
-                                r={mainReview}
-                                locale={locale}
-                                t={t}
-                                mediaType={mediaType}
-                                scopedReviewsDisplay={scopedReviewsDisplay}
-                                showScopeBadge={!showRev}
-                              />
-                              {mainReview.review && (
-                                <p className="max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)]">
-                                  {mainReview.review}
-                                </p>
-                              )}
-                            </div>
+                              <div className="mt-4 flex flex-col gap-4 border-b border-[var(--color-surface-border)]/60 pb-4">
+                                <ItemReviewMetaRow
+                                  r={mainReview}
+                                  locale={locale}
+                                  t={t}
+                                  mediaType={mediaType}
+                                  scopedReviewsDisplay={scopedReviewsDisplay}
+                                  showScopeBadge={!showRev}
+                                />
+                                {mainReview.review && (
+                                  <p className="max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)]">
+                                    {mainReview.review}
+                                  </p>
+                                )}
+                              </div>
+                            </ItemReviewProfileLink>
 
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <ItemReviewReactionButtons
@@ -1182,25 +1222,27 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                                     key={partial.id}
                                     className="relative ml-1 border-l-2 border-[var(--color-mid)]/40 pl-4"
                                   >
-                                    <div className="flex flex-col gap-3">
-                                      <ItemReviewMetaRow
-                                        r={partial}
-                                        locale={locale}
-                                        t={t}
-                                        mediaType={mediaType}
-                                        scopedReviewsDisplay={scopedReviewsDisplay}
-                                      />
-                                      {partial.review && (
-                                        <p className="max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)]">
-                                          {partial.review}
-                                        </p>
-                                      )}
-                                      <ItemReviewReactionButtons
-                                        r={partial}
-                                        token={token}
-                                        onReactionChange={handleReviewReactionChange}
-                                      />
-                                    </div>
+                                    <ItemReviewProfileLink review={partial} mediaType={mediaType}>
+                                      <div className="flex flex-col gap-3 py-1">
+                                        <ItemReviewMetaRow
+                                          r={partial}
+                                          locale={locale}
+                                          t={t}
+                                          mediaType={mediaType}
+                                          scopedReviewsDisplay={scopedReviewsDisplay}
+                                        />
+                                        {partial.review && (
+                                          <p className="max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)]">
+                                            {partial.review}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </ItemReviewProfileLink>
+                                    <ItemReviewReactionButtons
+                                      r={partial}
+                                      token={token}
+                                      onReactionChange={handleReviewReactionChange}
+                                    />
                                   </div>
                                 ))}
                               </div>

@@ -1086,8 +1086,7 @@ export function Search() {
 
       {!hasSearched && (
         <div
-          className="sticky bottom-[max(5.5rem,calc(4.75rem+env(safe-area-inset-bottom)))] z-30 mt-6 flex min-w-0 justify-center rounded-2xl px-2 py-2 backdrop-blur-md md:bottom-[max(1.5rem,env(safe-area-inset-bottom))] md:px-4 md:py-2.5"
-          style={{ background: "linear-gradient(to top, var(--color-dark) 40%, color-mix(in srgb, var(--color-dark) 75%, transparent))" }}
+          className="sticky bottom-[max(5.5rem,calc(4.75rem+env(safe-area-inset-bottom)))] z-30 mt-6 flex min-w-0 justify-center px-4 py-2 md:bottom-[max(1.5rem,env(safe-area-inset-bottom))]"
         >
           <form onSubmit={handleSearch} className="w-full max-w-xl">
             {searchFormContent}

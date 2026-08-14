@@ -20,12 +20,13 @@ export const LOG_CARD_BODY_GAP_GRID = "gap-1 sm:gap-0.5 md:gap-0.5";
 export const LOG_CARD_TITLE_GRID = "text-xs font-semibold leading-snug md:text-[11px] md:leading-tight";
 
 export const LOG_CARD_ACTION_COLUMN_GRID =
-  "flex w-9 flex-shrink-0 flex-col justify-center gap-0.5 border-l border-[var(--color-surface-border)] p-1 md:w-8 md:p-0.5";
+  "flex w-12 min-w-[3rem] flex-shrink-0 flex-col justify-center gap-1 border-l border-[var(--color-surface-border)] bg-[var(--color-darkest)]/20 p-1.5 md:w-11 md:p-1";
 
 export const LOG_CARD_INCREMENT_BUTTON_GRID =
   "flex h-8 min-w-8 items-center justify-center gap-0.5 rounded-lg border-0 bg-[var(--color-darkest)] px-1.5 shadow-[var(--shadow-sm)] transition-[transform,box-shadow] hover:scale-[1.04] hover:shadow-[var(--shadow-md)] active:scale-[0.98] disabled:scale-100 disabled:opacity-50 [@media(hover:hover)]:hover:bg-[var(--btn-gradient-start)] sm:h-7 sm:min-w-7 md:h-6 md:min-w-6 md:px-1";
 
-export const LOG_CARD_EDIT_BUTTON_GRID = "h-8 w-8 rounded-lg sm:h-7 sm:w-7 md:h-6 md:w-6";
+export const LOG_CARD_EDIT_BUTTON_GRID =
+  "h-11 w-11 min-h-[44px] min-w-[44px] rounded-xl sm:h-10 sm:w-10 md:h-9 md:w-9 md:min-h-0 md:min-w-0";
 
 export const LOG_CARD_HEIGHT_EMBEDDED = "min-h-[160px] sm:min-h-[128px]";
 
@@ -43,12 +44,14 @@ export const LOG_CARD_TITLE = "text-sm font-semibold sm:text-sm";
 
 export const LOG_CARD_REVIEW_MAX_WIDTH = "max-w-[240px] sm:max-w-[192px]";
 
-export const LOG_CARD_ACTION_COLUMN = "flex flex-shrink-0 flex-col justify-center gap-2 border-l border-[var(--color-surface-border)] p-2 sm:gap-1.5 sm:p-1.5";
+export const LOG_CARD_ACTION_COLUMN =
+  "flex min-w-[3.25rem] flex-shrink-0 flex-col justify-center gap-2 border-l border-[var(--color-surface-border)] bg-[var(--color-darkest)]/20 p-2.5 sm:gap-1.5 sm:p-2";
 
 export const LOG_CARD_INCREMENT_BUTTON =
   "flex h-10 min-w-10 items-center justify-center gap-1 rounded-xl border-0 bg-[var(--color-darkest)] px-2.5 shadow-[var(--shadow-sm)] transition-[transform,box-shadow] hover:scale-[1.04] hover:shadow-[var(--shadow-md)] active:scale-[0.98] disabled:scale-100 disabled:opacity-50 [@media(hover:hover)]:hover:bg-[var(--btn-gradient-start)] [@media(hover:hover)]:hover:shadow-[0_0_0_2px_var(--btn-gradient-start)] sm:h-8 sm:min-w-8 sm:px-2";
 
-export const LOG_CARD_EDIT_BUTTON = "h-9 w-9 rounded-lg sm:h-8 sm:w-8";
+export const LOG_CARD_EDIT_BUTTON =
+  "h-11 w-11 min-h-[44px] min-w-[44px] rounded-xl sm:h-10 sm:w-10";
 
 export const LOG_LIST_CARD_GRID =
   "grid min-w-0 grid-cols-1 gap-3 sm:grid sm:gap-4 sm:grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))]";

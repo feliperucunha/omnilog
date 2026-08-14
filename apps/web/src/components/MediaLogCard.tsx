@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { Check, Loader2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
 import { MotionLink } from "@/components/MotionLink";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,45 @@ function getProgress(log: Log): { field: "episode" | "chapter" | "volume"; value
 function listBorderClass(log: Log, compact: boolean): string {
   if (compact) return "border border-[var(--color-mid)]/25";
   return logStatusRailClass(log.status);
+}
+
+/** Dashboard cards open the edit form; public profile cards still link to item detail. */
+function LogCardTapArea({
+  log,
+  readOnly,
+  onEdit,
+  className,
+  children,
+}: {
+  log: Log;
+  readOnly: boolean;
+  onEdit: (log: Log, tab: "review" | "matches" | "market") => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  if (readOnly) {
+    return <div className={className}>{children}</div>;
+  }
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onEdit(log, "review");
+    }
+  };
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onEdit(log, "review")}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        className,
+        "min-w-0 cursor-pointer text-left [touch-action:manipulation] active:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]"
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 function statusBadgeClass(log: Log): string {
@@ -534,7 +573,7 @@ function LogActions({
       : LOG_CARD_ACTION_COLUMN;
   const triggerClass =
     view === "compact"
-      ? "h-8 w-8 rounded-lg text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)]"
+      ? "h-11 w-11 min-h-[44px] min-w-[44px] rounded-xl text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)]"
       : cn(
           isGrid ? LOG_CARD_EDIT_BUTTON_GRID : LOG_CARD_EDIT_BUTTON,
           "text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)] transition-colors"
@@ -542,7 +581,11 @@ function LogActions({
 
   return (
     <>
-      <div className={containerClass}>
+      <div
+        className={containerClass}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -692,53 +735,78 @@ export function MediaLogCard({
             <Loader2 className="h-6 w-6 animate-spin text-[var(--color-light)]" />
           </div>
         )}
-        <MotionLink
-          to={itemDetailPath(log.mediaType, log.externalId)}
-          whileTap={tapScale}
-          transition={tapTransition}
-          className="relative block w-full shrink-0 overflow-hidden aspect-[2/3]"
+        <LogCardTapArea
+          log={log}
+          readOnly={readOnly}
+          onEdit={onEdit}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <ItemImage
-            src={log.image}
-            className="h-full w-full"
-            mediaType={log.mediaType}
-            boardGameSource={log.boardGameSource}
-          />
-          <LogImageOverlays log={log} t={t} compact grid={false} />
-        </MotionLink>
-        <div className="flex min-h-0 flex-1 flex-col gap-1 p-2">
-          <MotionLink
-            to={itemDetailPath(log.mediaType, log.externalId)}
-            whileTap={tapScale}
-            transition={tapTransition}
-            className="block min-w-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
-          >
-            <OverflowMarquee className="text-xs leading-snug">{log.title}</OverflowMarquee>
-          </MotionLink>
-          <LogMetaRow
-            log={log}
-            display={display}
-            scopeLabel={scopeLabel}
-            mediaType={mediaType}
-            showCollectionOwnershipFilters={showCollectionOwnershipFilters}
-            t={t}
-            compact
-            grid={false}
-          />
-          <LogProgressLine log={log} hasProgressButton={hasProgressButton} t={t} compact grid={false} />
-          <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
-            <LogReviewBlock
+          {readOnly ? (
+            <MotionLink
+              to={itemDetailPath(log.mediaType, log.externalId)}
+              whileTap={tapScale}
+              transition={tapTransition}
+              className="relative block w-full shrink-0 overflow-hidden aspect-[2/3]"
+            >
+              <ItemImage
+                src={log.image}
+                className="h-full w-full"
+                mediaType={log.mediaType}
+                boardGameSource={log.boardGameSource}
+              />
+              <LogImageOverlays log={log} t={t} compact grid={false} />
+            </MotionLink>
+          ) : (
+            <div className="relative block w-full shrink-0 overflow-hidden aspect-[2/3]">
+              <ItemImage
+                src={log.image}
+                className="h-full w-full"
+                mediaType={log.mediaType}
+                boardGameSource={log.boardGameSource}
+              />
+              <LogImageOverlays log={log} t={t} compact grid={false} />
+            </div>
+          )}
+          <div className="flex min-h-0 flex-1 flex-col gap-1 p-2">
+            {readOnly ? (
+              <MotionLink
+                to={itemDetailPath(log.mediaType, log.externalId)}
+                whileTap={tapScale}
+                transition={tapTransition}
+                className="block min-w-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
+              >
+                <OverflowMarquee className="text-xs leading-snug">{log.title}</OverflowMarquee>
+              </MotionLink>
+            ) : (
+              <div className="block min-w-0 font-semibold text-[var(--color-lightest)]">
+                <OverflowMarquee className="text-xs leading-snug">{log.title}</OverflowMarquee>
+              </div>
+            )}
+            <LogMetaRow
               log={log}
               display={display}
-              embedded={embedded}
+              scopeLabel={scopeLabel}
+              mediaType={mediaType}
+              showCollectionOwnershipFilters={showCollectionOwnershipFilters}
+              t={t}
               compact
               grid={false}
-              expandedReviewLogId={expandedReviewLogId}
-              onExpandReview={onExpandReview}
-              t={t}
             />
+            <LogProgressLine log={log} hasProgressButton={hasProgressButton} t={t} compact grid={false} />
+            <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+              <LogReviewBlock
+                log={log}
+                display={display}
+                embedded={embedded}
+                compact
+                grid={false}
+                expandedReviewLogId={expandedReviewLogId}
+                onExpandReview={onExpandReview}
+                t={t}
+              />
+            </div>
           </div>
-        </div>
+        </LogCardTapArea>
         <LogActions
           log={log}
           readOnly={readOnly}
@@ -777,67 +845,94 @@ export function MediaLogCard({
           <Loader2 className={cn("animate-spin text-[var(--color-light)]", isGrid ? "h-6 w-6" : "h-8 w-8")} />
         </div>
       )}
-      <MotionLink
-        to={itemDetailPath(log.mediaType, log.externalId)}
-        whileTap={tapScale}
-        transition={tapTransition}
-        className={isGrid ? LOG_CARD_IMAGE_COLUMN_GRID : LOG_CARD_IMAGE_COLUMN}
+      <LogCardTapArea
+        log={log}
+        readOnly={readOnly}
+        onEdit={onEdit}
+        className="flex min-w-0 flex-1 flex-row overflow-hidden"
       >
-        <div className="absolute inset-0 min-h-0">
-          <ItemImage
-            src={log.image}
-            className="h-full w-full min-h-0"
-            mediaType={log.mediaType}
-            boardGameSource={log.boardGameSource}
-          />
-        </div>
-        <LogImageOverlays log={log} t={t} compact={false} grid={isGrid} />
-      </MotionLink>
-      <div
-        className={cn(
-          "flex min-w-0 flex-1 flex-col overflow-hidden",
-          isGrid ? LOG_CARD_BODY_GAP_GRID : LOG_CARD_BODY_GAP,
-          isGrid ? LOG_CARD_BODY_PADDING_GRID : LOG_CARD_BODY_PADDING,
-          embedded && !isReviewExpanded && "min-h-0"
+        {readOnly ? (
+          <MotionLink
+            to={itemDetailPath(log.mediaType, log.externalId)}
+            whileTap={tapScale}
+            transition={tapTransition}
+            className={isGrid ? LOG_CARD_IMAGE_COLUMN_GRID : LOG_CARD_IMAGE_COLUMN}
+          >
+            <div className="absolute inset-0 min-h-0">
+              <ItemImage
+                src={log.image}
+                className="h-full w-full min-h-0"
+                mediaType={log.mediaType}
+                boardGameSource={log.boardGameSource}
+              />
+            </div>
+            <LogImageOverlays log={log} t={t} compact={false} grid={isGrid} />
+          </MotionLink>
+        ) : (
+          <div className={isGrid ? LOG_CARD_IMAGE_COLUMN_GRID : LOG_CARD_IMAGE_COLUMN}>
+            <div className="absolute inset-0 min-h-0">
+              <ItemImage
+                src={log.image}
+                className="h-full w-full min-h-0"
+                mediaType={log.mediaType}
+                boardGameSource={log.boardGameSource}
+              />
+            </div>
+            <LogImageOverlays log={log} t={t} compact={false} grid={isGrid} />
+          </div>
         )}
-      >
-        <MotionLink
-          to={itemDetailPath(log.mediaType, log.externalId)}
-          whileTap={tapScale}
-          transition={tapTransition}
-          className="block min-w-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
-        >
-          <OverflowMarquee className={isGrid ? LOG_CARD_TITLE_GRID : LOG_CARD_TITLE}>{log.title}</OverflowMarquee>
-        </MotionLink>
-        <LogMetaRow
-          log={log}
-          display={display}
-          scopeLabel={scopeLabel}
-          mediaType={mediaType}
-          showCollectionOwnershipFilters={showCollectionOwnershipFilters}
-          t={t}
-          compact={false}
-          grid={isGrid}
-        />
-        <LogProgressLine log={log} hasProgressButton={hasProgressButton} t={t} compact={false} grid={isGrid} />
         <div
           className={cn(
-            "flex min-h-0 flex-col items-start gap-1",
-            embedded && !isReviewExpanded && "flex-1 overflow-hidden"
+            "flex min-w-0 flex-1 flex-col overflow-hidden",
+            isGrid ? LOG_CARD_BODY_GAP_GRID : LOG_CARD_BODY_GAP,
+            isGrid ? LOG_CARD_BODY_PADDING_GRID : LOG_CARD_BODY_PADDING,
+            embedded && !isReviewExpanded && "min-h-0"
           )}
         >
-          <LogReviewBlock
+          {readOnly ? (
+            <MotionLink
+              to={itemDetailPath(log.mediaType, log.externalId)}
+              whileTap={tapScale}
+              transition={tapTransition}
+              className="block min-w-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
+            >
+              <OverflowMarquee className={isGrid ? LOG_CARD_TITLE_GRID : LOG_CARD_TITLE}>{log.title}</OverflowMarquee>
+            </MotionLink>
+          ) : (
+            <div className="block min-w-0 font-semibold text-[var(--color-lightest)]">
+              <OverflowMarquee className={isGrid ? LOG_CARD_TITLE_GRID : LOG_CARD_TITLE}>{log.title}</OverflowMarquee>
+            </div>
+          )}
+          <LogMetaRow
             log={log}
             display={display}
-            embedded={embedded}
+            scopeLabel={scopeLabel}
+            mediaType={mediaType}
+            showCollectionOwnershipFilters={showCollectionOwnershipFilters}
+            t={t}
             compact={false}
             grid={isGrid}
-            expandedReviewLogId={expandedReviewLogId}
-            onExpandReview={onExpandReview}
-            t={t}
           />
+          <LogProgressLine log={log} hasProgressButton={hasProgressButton} t={t} compact={false} grid={isGrid} />
+          <div
+            className={cn(
+              "flex min-h-0 flex-col items-start gap-1",
+              embedded && !isReviewExpanded && "flex-1 overflow-hidden"
+            )}
+          >
+            <LogReviewBlock
+              log={log}
+              display={display}
+              embedded={embedded}
+              compact={false}
+              grid={isGrid}
+              expandedReviewLogId={expandedReviewLogId}
+              onExpandReview={onExpandReview}
+              t={t}
+            />
+          </div>
         </div>
-      </div>
+      </LogCardTapArea>
       <LogActions
         log={log}
         readOnly={readOnly}
