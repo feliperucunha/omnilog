@@ -4,10 +4,9 @@ import { Capacitor } from "@capacitor/core";
 import { consumeAndroidOverlayBack } from "@/lib/androidOverlayBack";
 import { appUrlToInternalPath } from "@/lib/deepLink";
 import { openExternalUrl } from "@/lib/openExternalUrl";
-import { warmDashboardAndStatisticsCaches } from "@/lib/logsPageCache";
+import { scheduleIdleDashboardWarm } from "@/lib/logsPageCache";
 import { useMe } from "@/contexts/MeContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
-import { tierHasProFeatures } from "@/lib/userTier";
 
 /**
  * Native shell integration: Android back, deep links, resume refresh, external links, keyboard resize.
@@ -21,9 +20,8 @@ export function CapacitorAndroidIntegration() {
   }, []);
 
   const navigate = useNavigate();
-  const { refetch: refetchMe, me } = useMe();
+  const { refetch: refetchMe } = useMe();
   const { visibleTypes } = useVisibleMediaTypes();
-  const isPro = tierHasProFeatures(me?.tier);
 
   /** iOS: programmatic resize mode (Android uses `Keyboard.resizeOnFullScreen` in capacitor.config). */
   useEffect(() => {
@@ -106,7 +104,7 @@ export function CapacitorAndroidIntegration() {
       const h = await App.addListener("resume", () => {
         void refetchMe();
         if (visibleTypes.length > 0) {
-          warmDashboardAndStatisticsCaches(visibleTypes, -new Date().getTimezoneOffset(), isPro);
+          scheduleIdleDashboardWarm(visibleTypes);
         }
       });
       if (cancelled) {
@@ -120,7 +118,7 @@ export function CapacitorAndroidIntegration() {
       cancelled = true;
       void handle?.remove();
     };
-  }, [refetchMe, visibleTypes, isPro]);
+  }, [refetchMe, visibleTypes]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;

@@ -8,7 +8,6 @@ import {
   SEARCH_SORT_OPTIONS,
   type BrowseRail,
   type BrowseResponse,
-  type Log,
   type MediaType,
   type SearchResult,
 } from "@geeklogs/shared";
@@ -21,7 +20,7 @@ import {
   invalidateApiCache,
   LOGS_INVALIDATED_EVENT,
 } from "@/lib/api";
-import { fetchAllLogsForMediaType } from "@/lib/logsPageCache";
+import { fetchLogsIndex, type LogIndexEntry } from "@/lib/logsPageCache";
 import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import { SearchSkeleton, BrowseRailSkeleton } from "@/components/skeletons";
 import { SearchResultCard } from "@/components/SearchResultCard";
@@ -64,7 +63,8 @@ import { ApiKeyPrompt, type ApiKeyProvider } from "@/components/ApiKeyPrompt";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import * as storage from "@/lib/storage";
 import { cn } from "@/lib/utils";
-import { decodeSearchResultForDisplay, decodeLogForDisplay } from "@/lib/decodeDisplayFields";
+import { decodeSearchResultForDisplay } from "@/lib/decodeDisplayFields";
+import { isAbortError } from "@/lib/abortUtils";
 import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
@@ -206,7 +206,7 @@ export function Search() {
   useEffect(() => {
     void storage.getItem(FREE_SEARCH_USAGE_STORAGE_KEY);
   }, []);
-  const [logsByExternalId, setLogsByExternalId] = useState<Map<string, Log>>(new Map());
+  const [logsByExternalId, setLogsByExternalId] = useState<Map<string, LogIndexEntry>>(new Map());
   const [recByMediaType, setRecByMediaType] = useState<Partial<Record<MediaType, SearchResult[]>>>(
     () => pageCache?.recByMediaType ?? {}
   );
@@ -467,20 +467,18 @@ export function Search() {
       setLogsByExternalId(new Map());
       return;
     }
-    let cancelled = false;
-    void fetchAllLogsForMediaType(mediaType)
+    const controller = new AbortController();
+    void fetchLogsIndex(mediaType, { signal: controller.signal })
       .then((logs) => {
-        if (cancelled) return;
-        const map = new Map<string, Log>();
-        for (const log of logs) map.set(log.externalId, decodeLogForDisplay(log));
+        const map = new Map<string, LogIndexEntry>();
+        for (const log of logs) map.set(log.externalId, log);
         setLogsByExternalId(map);
       })
-      .catch(() => {
-        if (!cancelled) setLogsByExternalId(new Map());
+      .catch((err) => {
+        if (isAbortError(err) || controller.signal.aborted) return;
+        setLogsByExternalId(new Map());
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [token, mediaType, searchFilter]);
 
   useEffect(() => {
@@ -502,7 +500,7 @@ export function Search() {
     if (recRefreshNonce === 0 && hasCachedRec) {
       return;
     }
-    let cancelled = false;
+    const controller = new AbortController();
     setRecLoadingByMediaType((prev) => ({ ...prev, [type]: true }));
     const params = new URLSearchParams({
       type,
@@ -513,9 +511,10 @@ export function Search() {
     }
     apiFetchCached<RecommendationsResponse>(`/search/recommendations?${params.toString()}`, {
       ttlMs: 5 * 60 * 1000,
+      signal: controller.signal,
     })
       .then((data) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setRecByMediaType((prev) => ({
           ...prev,
           [type]: (data.results ?? []).map(decodeSearchResultForDisplay),
@@ -530,19 +529,17 @@ export function Search() {
         }));
         setRecLoadedByMediaType((prev) => ({ ...prev, [type]: true }));
       })
-      .catch(() => {
-        // Keep cached recommendations for this category on error.
-        if (!cancelled) {
-          setRecLoadedByMediaType((prev) => ({ ...prev, [type]: true }));
-        }
+      .catch((err) => {
+        if (isAbortError(err) || controller.signal.aborted) return;
+        setRecLoadedByMediaType((prev) => ({ ...prev, [type]: true }));
       })
       .finally(() => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setRecLoadingByMediaType((prev) => ({ ...prev, [type]: false }));
         }
       });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [mediaType, searchFilter, token, recRefreshNonce, boardGameProvider, recLoadedByMediaType]);
 
@@ -555,7 +552,7 @@ export function Search() {
     if (browseRefreshNonce === 0 && hasCachedBrowse) {
       return;
     }
-    let cancelled = false;
+    const controller = new AbortController();
     setBrowseLoadingByMediaType((prev) => ({ ...prev, [type]: true }));
     const params = new URLSearchParams({
       type,
@@ -566,9 +563,10 @@ export function Search() {
     }
     apiFetchCached<BrowseResponse>(`/search/browse?${params.toString()}`, {
       ttlMs: 5 * 60 * 1000,
+      signal: controller.signal,
     })
       .then((data) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setBrowseByMediaType((prev) => ({
           ...prev,
           [type]: (data.rails ?? []).map((rail) => ({
@@ -586,19 +584,17 @@ export function Search() {
         }));
         setBrowseLoadedByMediaType((prev) => ({ ...prev, [type]: true }));
       })
-      .catch(() => {
-        // Keep cached browse rails for this category on error.
-        if (!cancelled) {
-          setBrowseLoadedByMediaType((prev) => ({ ...prev, [type]: true }));
-        }
+      .catch((err) => {
+        if (isAbortError(err) || controller.signal.aborted) return;
+        setBrowseLoadedByMediaType((prev) => ({ ...prev, [type]: true }));
       })
       .finally(() => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setBrowseLoadingByMediaType((prev) => ({ ...prev, [type]: false }));
         }
       });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [mediaType, searchFilter, token, browseRefreshNonce, boardGameProvider, browseLoadedByMediaType]);
 

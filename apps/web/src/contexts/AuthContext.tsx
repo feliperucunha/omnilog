@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useLocation } from "react-router-dom";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, seedCachedGet } from "@/lib/api";
 import { resetSessionLogsCacheWarm } from "@/lib/logsPageCache";
 import * as storage from "@/lib/storage";
 import { clearAuthSession } from "@/lib/storage";
@@ -95,12 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // ignore corrupt cache; validate via /me below
           }
           try {
-            const data = await apiFetch<{ user: User }>("/me", {
+            const data = await apiFetch<{ user: User } & Record<string, unknown>>("/me", {
               skipAuthRedirect: true,
               timeout: 60_000,
+              priority: "high",
             });
             if (cancelled) return;
             if (data?.user) {
+              seedCachedGet("/me", data, 30_000);
               const user = { ...data.user, onboarded: data.user.onboarded ?? true };
               await storage.setItem(TOKEN_KEY, token);
               await storage.setItem(USER_KEY, JSON.stringify(user));
@@ -125,13 +127,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       const attempt = (retryCount: number) => {
-        apiFetch<{ user: User }>("/me", {
+        apiFetch<{ user: User } & Record<string, unknown>>("/me", {
           skipAuthRedirect: true,
           timeout: 60_000,
+          priority: "high",
         })
           .then((data) => {
             if (cancelled) return;
             if (data?.user) {
+              seedCachedGet("/me", data, 30_000);
               setState({
                 token: COOKIE_SESSION,
                 user: { ...data.user, onboarded: data.user.onboarded ?? true },

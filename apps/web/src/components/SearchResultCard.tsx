@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import type { BoardGameProvider, Log, MediaType, SearchResult } from "@geeklogs/shared";
+import type { BoardGameProvider, MediaType, SearchResult } from "@geeklogs/shared";
 import { BookPagesBadge } from "@/components/BookPagesBadge";
 import { GenreBadges } from "@/components/GenreBadges";
 import { ItemImage } from "@/components/ItemImage";
@@ -23,6 +23,7 @@ import type { LogViewMode } from "@/lib/logViewPreference";
 import { gradeToStars } from "@/lib/gradeStars";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { searchResultLogIndicators } from "@/lib/searchResultLogIndicators";
+import type { LogIndexEntry } from "@/lib/logsPageCache";
 import type { TFunction } from "@/contexts/LocaleContext";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +32,7 @@ type SearchResultCardProps = {
   mediaType: MediaType;
   view: LogViewMode;
   token: string | null;
-  userLog?: Log;
+  userLog?: LogIndexEntry;
   boardGameProvider: BoardGameProvider;
   onOpen: () => void;
   t: TFunction;

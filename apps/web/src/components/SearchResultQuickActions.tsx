@@ -38,7 +38,7 @@ export function SearchResultQuickActions({
 }: {
   item: SearchResult;
   mediaType: MediaType;
-  userLog?: Log;
+  userLog?: Pick<Log, "id" | "status" | "listType">;
   boardGameProvider: BoardGameProvider;
   onOpenItem: () => void;
   t: TFunction;

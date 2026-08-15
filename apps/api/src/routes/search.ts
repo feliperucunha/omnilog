@@ -45,7 +45,7 @@ import { fetchBookRecommendationsMerged } from "../services/bookRecommendations.
 import { fetchMangaRecommendationsMerged } from "../services/mangaRecommendations.js";
 import { sortRecommendationsByScoreDesc } from "../lib/recommendationsSort.js";
 import { createRouteTimer } from "../lib/routeTiming.js";
-import { normalizeSearchQueryKey, withSearchResultsCache } from "../lib/responseCache.js";
+import { normalizeSearchQueryKey, withSearchResultsCache, withCachedSearchPayload } from "../lib/responseCache.js";
 
 export const searchRouter = Router();
 
@@ -492,16 +492,29 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
   const type = parsed.data.type as MediaType;
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
   const skipApiKeyUX = await isDisableApiKeyRequirementsEnabled();
+  const viewer = req.user?.userId ?? "guest";
+  const titleLang = keys
+    ? resolveAnimeMangaTitleLanguage(keys.animeMangaTitleLanguage)
+    : "";
+  const queryKey = JSON.stringify({
+    kind: "recs",
+    viewer,
+    board: parsed.data.boardGameProvider ?? "",
+    sort: parsed.data.sort ?? "",
+    titleLang,
+  });
 
   try {
-    const payload = await buildRecommendationsPayload({
-      type,
-      user: req.user,
-      keys,
-      skipApiKeyUX,
-      boardGameProvider: parsed.data.boardGameProvider,
-      sort: parsed.data.sort,
-    });
+    const { data: payload } = await withCachedSearchPayload(prisma, type, queryKey, () =>
+      buildRecommendationsPayload({
+        type,
+        user: req.user,
+        keys,
+        skipApiKeyUX,
+        boardGameProvider: parsed.data.boardGameProvider,
+        sort: parsed.data.sort,
+      })
+    );
     res.json(payload);
   } catch (err) {
     if (err instanceof InvalidApiKeyError) {
@@ -547,20 +560,33 @@ searchRouter.get("/browse", async (req: AuthenticatedRequest, res) => {
   const type = parsed.data.type as MediaType;
   const keys = req.user ? await getUserKeys(req.user.userId) : undefined;
   const skipApiKeyUX = await isDisableApiKeyRequirementsEnabled();
+  const viewer = req.user?.userId ?? "guest";
+  const titleLang = keys
+    ? resolveAnimeMangaTitleLanguage(keys.animeMangaTitleLanguage)
+    : "";
+  const queryKey = JSON.stringify({
+    kind: "browse",
+    viewer,
+    board: parsed.data.boardGameProvider ?? "",
+    titleLang,
+  });
 
   try {
-    const { rails, requiresApiKey, link, tutorial } = await buildBrowseRails({
-      type,
-      user: req.user,
-      keys,
-      skipApiKeyUX,
-      boardGameProvider: parsed.data.boardGameProvider,
+    const { data } = await withCachedSearchPayload(prisma, type, queryKey, async () => {
+      const { rails, requiresApiKey, link, tutorial } = await buildBrowseRails({
+        type,
+        user: req.user,
+        keys,
+        skipApiKeyUX,
+        boardGameProvider: parsed.data.boardGameProvider,
+      });
+      return {
+        type,
+        rails,
+        ...(requiresApiKey ? { requiresApiKey, link, tutorial } : {}),
+      } satisfies BrowseResponse;
     });
-    res.json({
-      type,
-      rails,
-      ...(requiresApiKey ? { requiresApiKey, link, tutorial } : {}),
-    } satisfies BrowseResponse);
+    res.json(data);
   } catch (err) {
     if (err instanceof InvalidApiKeyError) {
       if (skipApiKeyUX) {
@@ -992,3 +1018,28 @@ searchRouter.get("/users", async (req: AuthenticatedRequest, res) => {
     })),
   });
 });
+
+const GUEST_BROWSE_PREWARM_TYPES: MediaType[] = ["movies", "tv", "games", "anime"];
+
+/** Fill SearchResponseCache for anonymous browse rails so the first visitor is not the cache filler. */
+export async function prewarmGuestSearchRails(): Promise<void> {
+  const skipApiKeyUX = await isDisableApiKeyRequirementsEnabled();
+  const queryKey = JSON.stringify({ kind: "browse", viewer: "guest", board: "", titleLang: "" });
+  for (const type of GUEST_BROWSE_PREWARM_TYPES) {
+    try {
+      await withCachedSearchPayload(prisma, type, queryKey, async () => {
+        const { rails, requiresApiKey, link, tutorial } = await buildBrowseRails({
+          type,
+          skipApiKeyUX,
+        });
+        return {
+          type,
+          rails,
+          ...(requiresApiKey ? { requiresApiKey, link, tutorial } : {}),
+        } satisfies BrowseResponse;
+      });
+    } catch (err) {
+      console.error(`guest browse prewarm failed (${type}):`, err);
+    }
+  }
+}

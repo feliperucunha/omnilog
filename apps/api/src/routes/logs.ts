@@ -443,6 +443,28 @@ logsRouter.get("/status-counts", async (req: AuthenticatedRequest, res) => {
   res.json({ data: { total, byStatus, byGenre } });
 });
 
+/** Slim index for Search in-list matching (status rail/badge) without paging full log bodies. */
+logsRouter.get("/index", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const mediaType = req.query.mediaType as MediaType | undefined;
+  if (!mediaType || !MEDIA_TYPES.includes(mediaType)) {
+    res.status(400).json({ error: "mediaType required and must be a valid media type" });
+    return;
+  }
+  const rows = await prisma.log.findMany({
+    where: { userId, mediaType },
+    select: {
+      id: true,
+      externalId: true,
+      status: true,
+      listType: true,
+      grade: true,
+      mediaType: true,
+    },
+  });
+  res.json(rows);
+});
+
 logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const mediaType = req.query.mediaType as MediaType | undefined;

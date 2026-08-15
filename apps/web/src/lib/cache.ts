@@ -2,7 +2,23 @@
  * In-memory client cache for GET requests. Supports stale-while-revalidate reads.
  */
 
+import { loadPersistedGetCache, scheduleDeletePersistedKeysMatching, schedulePersistGetEntry } from "./persistClientCache.js";
+
 const cache = new Map<string, { data: unknown; expiresAt: number; storedAt: number }>();
+
+void loadPersistedGetCache().then((rows) => {
+  const now = Date.now();
+  for (const row of rows) {
+    if (!row.key || cache.has(row.key)) continue;
+    // Keep stale entries so SWR can paint immediately after reload.
+    if (now - row.storedAt > 7 * 24 * 60 * 60 * 1000) continue;
+    cache.set(row.key, {
+      data: row.data,
+      expiresAt: row.expiresAt,
+      storedAt: row.storedAt,
+    });
+  }
+});
 
 export const DEFAULT_TTL_MS = 2 * 60 * 1000;
 export const HEAVY_PAGE_TTL_MS = 30 * 60 * 1000;
@@ -36,17 +52,20 @@ export function setCached<T>(
 ): void {
   const key = cacheKey(method, path);
   const now = Date.now();
-  cache.set(key, {
+  const entry = {
     data,
     expiresAt: now + ttlMs,
     storedAt: now,
-  });
+  };
+  cache.set(key, entry);
+  schedulePersistGetEntry({ key, ...entry });
 }
 
 export function invalidateByPrefix(prefix: string): void {
   for (const key of cache.keys()) {
     if (key.includes(prefix)) cache.delete(key);
   }
+  scheduleDeletePersistedKeysMatching(prefix);
 }
 
 /** Keep entries for instant UI; readers using getCachedEntry still see data while SWR revalidates. */
@@ -61,6 +80,7 @@ export function markStaleByPrefix(prefix: string): void {
 
 export function invalidateAll(): void {
   cache.clear();
+  scheduleDeletePersistedKeysMatching("");
 }
 
 export function updateCachedEntriesMatching(

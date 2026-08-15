@@ -59,6 +59,8 @@ import {
   invalidateByPrefix,
   markStaleByPrefix,
 } from "./cache.js";
+import { combineAbortSignals, isAbortError, isCallerAborted } from "./abortUtils.js";
+import { shouldUseLowPriorityLane, withLowPriorityGetSlot, type FetchPriority } from "./fetchQueue.js";
 
 import { clearAuthSession, getItemSync } from "./storage.js";
 import { isPublicAuthPath } from "./authSession.js";
@@ -230,7 +232,8 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isRetryableAfterError(err: unknown): boolean {
+function isRetryableAfterError(err: unknown, callerSignal?: AbortSignal): boolean {
+  if (isCallerAborted(callerSignal, err)) return false;
   if (err instanceof InvalidApiKeyError || err instanceof ApiValidationError) return false;
   if (err instanceof ApiError) {
     if (err.loadingErrorCode === LoadingErrorCodeEnum.VERSION_MISMATCH) return false;
@@ -239,7 +242,7 @@ function isRetryableAfterError(err: unknown): boolean {
     if (err.message === HTML_RESPONSE_MESSAGE) return true;
     return false;
   }
-  if (err instanceof Error && err.name === "AbortError") return true;
+  if (isAbortError(err)) return true;
   if (err instanceof TypeError) return true;
   return false;
 }
@@ -300,6 +303,12 @@ export interface ApiFetchOptions extends RequestInit {
   timeout?: number;
   /** When true, do not redirect to /login on 401 (e.g. for session restore or logout). */
   skipAuthRedirect?: boolean;
+  /** Low-priority GETs wait behind a small concurrency lane (prefetch / cache warm). */
+  priority?: FetchPriority;
+}
+
+export function seedCachedGet<T>(path: string, data: T, ttlMs: number = DEFAULT_TTL_MS): void {
+  setCached("GET", path, data, ttlMs);
 }
 
 /** One fetch attempt; does not fire cold-start callbacks (retries may run first). */
@@ -308,16 +317,18 @@ async function performSingleFetchAttempt<T>(
   options: ApiFetchOptions | undefined,
   timeoutMs: number
 ): Promise<T> {
-  const { timeout: _t, skipAuthRedirect, ...fetchOptions } = options ?? {};
+  const { timeout: _t, skipAuthRedirect, priority: _p, signal: callerSignal, ...fetchOptions } =
+    options ?? {};
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+  const signal = combineAbortSignals([callerSignal ?? undefined, timeoutController.signal]);
 
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       ...fetchOptions,
       credentials: "include",
-      signal: controller.signal,
+      signal,
       headers: { ...getAuthHeaders(), ...fetchOptions.headers },
     });
     clearTimeout(timeoutId);
@@ -388,32 +399,50 @@ async function performSingleFetchAttempt<T>(
 }
 
 async function fetchInternal<T>(path: string, options?: ApiFetchOptions): Promise<T> {
-  const timeoutMs = options?.timeout ?? DEFAULT_TIMEOUT_MS;
-  let lastError: unknown;
-  for (let attempt = 0; attempt < MAX_FETCH_ATTEMPTS; attempt++) {
-    try {
-      const result = await performSingleFetchAttempt<T>(path, options, timeoutMs);
-      fireFirstApiResponseOnce();
-      return result;
-    } catch (e) {
-      lastError = e;
-      const canRetry = attempt < MAX_FETCH_ATTEMPTS - 1 && isRetryableAfterError(e);
-      if (!canRetry) {
-        fireFirstApiErrorFromCaught(e);
-        if (e instanceof Error && e.name === "AbortError") {
-          throw new Error(MSG.tookTooLong);
-        }
-        throw e;
-      }
-      const delayMs = RETRY_BACKOFF_MS[attempt] ?? RETRY_BACKOFF_MS[RETRY_BACKOFF_MS.length - 1];
-      await sleep(delayMs);
+  const run = async (): Promise<T> => {
+    const timeoutMs = options?.timeout ?? DEFAULT_TIMEOUT_MS;
+    const callerSignal = options?.signal ?? undefined;
+    if (callerSignal?.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
     }
+    let lastError: unknown;
+    for (let attempt = 0; attempt < MAX_FETCH_ATTEMPTS; attempt++) {
+      try {
+        const result = await performSingleFetchAttempt<T>(path, options, timeoutMs);
+        fireFirstApiResponseOnce();
+        return result;
+      } catch (e) {
+        lastError = e;
+        if (isCallerAborted(callerSignal, e)) {
+          throw e instanceof Error ? e : new DOMException("The operation was aborted.", "AbortError");
+        }
+        const canRetry = attempt < MAX_FETCH_ATTEMPTS - 1 && isRetryableAfterError(e, callerSignal);
+        if (!canRetry) {
+          fireFirstApiErrorFromCaught(e);
+          if (isAbortError(e)) {
+            throw new Error(MSG.tookTooLong);
+          }
+          throw e;
+        }
+        const delayMs = RETRY_BACKOFF_MS[attempt] ?? RETRY_BACKOFF_MS[RETRY_BACKOFF_MS.length - 1];
+        await sleep(delayMs);
+        if (callerSignal?.aborted) {
+          throw new DOMException("The operation was aborted.", "AbortError");
+        }
+      }
+    }
+    fireFirstApiErrorFromCaught(lastError);
+    if (isAbortError(lastError)) {
+      throw new Error(MSG.tookTooLong);
+    }
+    throw lastError;
+  };
+
+  const method = (options?.method ?? "GET").toUpperCase();
+  if (method === "GET" && shouldUseLowPriorityLane(options?.priority)) {
+    return withLowPriorityGetSlot(run);
   }
-  fireFirstApiErrorFromCaught(lastError);
-  if (lastError instanceof Error && lastError.name === "AbortError") {
-    throw new Error(MSG.tookTooLong);
-  }
-  throw lastError;
+  return run();
 }
 
 async function performSinglePublicFetchAttempt<T>(path: string, options?: RequestInit): Promise<T> {

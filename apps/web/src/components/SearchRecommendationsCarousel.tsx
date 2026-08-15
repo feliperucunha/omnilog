@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { motion } from "framer-motion";
-import type { BoardGameProvider, Log, MediaType, SearchResult } from "@geeklogs/shared";
+import type { BoardGameProvider, MediaType, SearchResult } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { searchResultLogIndicators } from "@/lib/searchResultLogIndicators";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -19,6 +19,7 @@ import { GenreBadges } from "@/components/GenreBadges";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { getLogCardDisplay } from "@/lib/logDisplay";
+import type { LogIndexEntry } from "@/lib/logsPageCache";
 import { RECOMMENDATION_CARD_BODY, RECOMMENDATION_CARD_WIDTH } from "@/lib/logCardLayout";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
 import { tapScale, tapTransition } from "@/lib/animations";
@@ -43,7 +44,7 @@ export interface SearchRecommendationsCarouselProps {
   /** Used for BGG landscape box art in portrait frames. */
   boardGameProvider?: BoardGameProvider;
   token: string | null;
-  logsByExternalId: Map<string, Log>;
+  logsByExternalId: Map<string, LogIndexEntry>;
   onItemOpen: (id: string) => void;
 }
 

@@ -9,7 +9,7 @@ import { authRouter } from "./routes/auth.js";
 import { itemsRouter } from "./routes/items.js";
 import { logsRouter } from "./routes/logs.js";
 import { meRouter } from "./routes/me.js";
-import { searchRouter } from "./routes/search.js";
+import { searchRouter, prewarmGuestSearchRails } from "./routes/search.js";
 import { settingsRouter } from "./routes/settings.js";
 import { marketRouter } from "./routes/market.js";
 import { geocodeRouter } from "./routes/geocode.js";
@@ -166,6 +166,10 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
+
+  setTimeout(() => {
+    void prewarmGuestSearchRails().then(() => console.log("Guest search browse rails prewarmed."));
+  }, 8_000);
 
   // Ensure badge definitions exist (no manual seed command needed)
   void prisma.badge

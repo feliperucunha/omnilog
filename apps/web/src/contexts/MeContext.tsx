@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetchSWR, ApiError, invalidateApiCache } from "@/lib/api";
+import { apiFetchSWR, ApiError, getCachedEntry, invalidateApiCache } from "@/lib/api";
 import type { ProfileVisibility } from "@geeklogs/shared";
 
 export interface MeResponse {
@@ -61,27 +61,48 @@ interface MeContextValue {
 
 const MeContext = createContext<MeContextValue | null>(null);
 
+function searchIdentityKey(me: MeResponse): string {
+  return JSON.stringify({
+    disableApiKeyRequirements: me.featureFlags?.disableApiKeyRequirements ?? false,
+    apiKeys: me.apiKeys,
+    boardGameProvider: me.boardGameProvider,
+    animeMangaTitleLanguage: me.animeMangaTitleLanguage,
+  });
+}
+
 export function MeProvider({ children }: { children: ReactNode }) {
   const { token, initializing } = useAuth();
-  const [me, setMe] = useState<MeResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const wasLoadingRef = useRef(false);
+  const cachedMe = getCachedEntry<MeResponse>("GET", "/me");
+  const [me, setMe] = useState<MeResponse | null>(() => cachedMe?.data ?? null);
+  const [loading, setLoading] = useState(() => !cachedMe);
+  const searchIdentityRef = useRef<string | null>(
+    cachedMe?.data ? searchIdentityKey(cachedMe.data) : null
+  );
 
   const refetch = useCallback(async () => {
     if (!token) {
       setMe(null);
       setLoading(false);
+      searchIdentityRef.current = null;
       return;
     }
-    setLoading(true);
+    const existing = getCachedEntry<MeResponse>("GET", "/me");
+    if (!existing) setLoading(true);
     try {
       const { data } = await apiFetchSWR<MeResponse>("/me", {
         ttlMs: 30_000,
         skipAuthRedirect: true,
+        priority: "high",
       });
+      const nextKey = searchIdentityKey(data);
+      if (searchIdentityRef.current != null && searchIdentityRef.current !== nextKey) {
+        invalidateApiCache("/search");
+      }
+      searchIdentityRef.current = nextKey;
       setMe(data);
     } catch (e) {
       setMe(null);
+      searchIdentityRef.current = null;
       // Only clear session on 401 (expired/invalid). Timeout or network error should not log the user out.
       if (e instanceof ApiError && e.statusCode === 401) {
         window.dispatchEvent(new CustomEvent("auth:logout"));
@@ -96,22 +117,11 @@ export function MeProvider({ children }: { children: ReactNode }) {
     if (!token) {
       setMe(null);
       setLoading(false);
+      searchIdentityRef.current = null;
       return;
     }
     refetch();
   }, [token, initializing, refetch]);
-
-  /** Bust client GET cache for search so recommendations/search responses match latest /me feature flags. */
-  useEffect(() => {
-    if (!token) {
-      wasLoadingRef.current = false;
-      return;
-    }
-    if (wasLoadingRef.current && !loading) {
-      invalidateApiCache("/search");
-    }
-    wasLoadingRef.current = loading;
-  }, [token, loading]);
 
   const value: MeContextValue = { me, refetch, loading };
 

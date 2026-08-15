@@ -37,6 +37,7 @@ import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import {
   loadWithSWR,
   registerLogsPageCacheContext,
+  warmStatisticsCaches,
 } from "@/lib/logsPageCache";
 import {
   StatisticsCategoryOverTimeSkeleton,
@@ -1127,6 +1128,7 @@ export function Statistics() {
       tzOffsetMinutes,
       isPro,
     });
+    warmStatisticsCaches(visibleTypes, tzOffsetMinutes, isPro);
   }, [visibleTypes, visibleTypesOrderReady, tzOffsetMinutes, isPro]);
 
   useEffect(() => {

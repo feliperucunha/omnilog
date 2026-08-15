@@ -14,9 +14,8 @@ import {
 import { updateCachedEntriesMatching } from "@/lib/cache.js";
 
 const LOGS_PAGE_SIZE = 24;
-const LOGS_INDEX_PAGE_SIZE = 100;
 const DEFAULT_SORT = "dateDesc";
-const MAX_FRIEND_FEED_PREFETCH = 50;
+const MAX_FRIEND_FEED_PREFETCH = 5;
 
 export const FOLLOWS_PATH = "/follows";
 export const MILESTONES_PATH = "/me/milestones/progress";
@@ -180,6 +179,29 @@ export function buildDefaultLogsListPath(mediaType: MediaType): string {
   return buildLogsListPath({ mediaType });
 }
 
+export type LogIndexEntry = {
+  id: string;
+  externalId: string;
+  status: string | null;
+  listType: string | null;
+  grade: number | null;
+  mediaType: MediaType;
+};
+
+export function buildLogsIndexPath(mediaType: MediaType): string {
+  return `/logs/index?mediaType=${encodeURIComponent(mediaType)}`;
+}
+
+export async function fetchLogsIndex(
+  mediaType: MediaType,
+  options?: { signal?: AbortSignal }
+): Promise<LogIndexEntry[]> {
+  return apiFetchCached<LogIndexEntry[]>(buildLogsIndexPath(mediaType), {
+    ttlMs: HEAVY_PAGE_TTL_MS,
+    signal: options?.signal,
+  });
+}
+
 export type LogsListResponse = Log[] | { data: Log[]; nextCursor: string | null };
 
 export function normalizeLogsListResponse(response: LogsListResponse): {
@@ -192,26 +214,6 @@ export function normalizeLogsListResponse(response: LogsListResponse): {
   return { logs: response.data ?? [], nextCursor: response.nextCursor ?? null };
 }
 
-/** All logs for a media type — paginates through GET /logs (needed for search in-list matching). */
-export async function fetchAllLogsForMediaType(mediaType: MediaType): Promise<Log[]> {
-  const all: Log[] = [];
-  let cursor: string | null = null;
-  for (;;) {
-    const path = buildLogsListPath({
-      mediaType,
-      sort: DEFAULT_SORT,
-      limit: LOGS_INDEX_PAGE_SIZE,
-      ...(cursor ? { cursor } : {}),
-    });
-    const response = await apiFetchCached<LogsListResponse>(path, { ttlMs: HEAVY_PAGE_TTL_MS });
-    const { logs, nextCursor } = normalizeLogsListResponse(response);
-    all.push(...logs);
-    if (!nextCursor) break;
-    cursor = nextCursor;
-  }
-  return all;
-}
-
 export function buildStatusCountsPath(mediaType: MediaType): string {
   return `/logs/status-counts?mediaType=${encodeURIComponent(mediaType)}`;
 }
@@ -220,8 +222,25 @@ export function buildFeedPath(userId?: string): string {
   return userId ? `/logs/feed?userId=${encodeURIComponent(userId)}` : "/logs/feed";
 }
 
-function prefetchGet(path: string, options?: { revalidate?: boolean }): void {
-  void apiFetchSWR(path, { ttlMs: HEAVY_PAGE_TTL_MS, revalidate: options?.revalidate });
+function prefetchGet(path: string, options?: { revalidate?: boolean; priority?: "high" | "low" }): void {
+  void apiFetchSWR(path, {
+    ttlMs: HEAVY_PAGE_TTL_MS,
+    revalidate: options?.revalidate,
+    priority: options?.priority ?? "low",
+  });
+}
+
+function scheduleIdle(fn: () => void): void {
+  if (typeof window === "undefined") {
+    fn();
+    return;
+  }
+  const ric = window.requestIdleCallback;
+  if (typeof ric === "function") {
+    ric(() => fn(), { timeout: 8000 });
+    return;
+  }
+  window.setTimeout(fn, 2500);
 }
 
 export function warmFriendFeedCaches(userIds: string[]): void {
@@ -243,14 +262,23 @@ export function prefetchDashboardPageCaches(
   category?: MediaType,
   searchParams?: URLSearchParams
 ): void {
-  prefetchGet("/logs/counts");
-  for (const mt of mediaTypes) {
-    prefetchGet(buildDefaultLogsListPath(mt));
-    prefetchGet(buildStatusCountsPath(mt));
+  prefetchGet("/logs/counts", { priority: "high" });
+  const primary = category ?? mediaTypes[0];
+  if (primary != null && searchParams) {
+    prefetchGet(buildLogsListPathFromSearchParams(primary, searchParams), { priority: "high" });
+    prefetchGet(buildStatusCountsPath(primary), { priority: "high" });
+  } else if (primary != null) {
+    prefetchGet(buildDefaultLogsListPath(primary), { priority: "high" });
+    prefetchGet(buildStatusCountsPath(primary), { priority: "high" });
   }
-  if (category != null && searchParams) {
-    prefetchDashboardCategoryView(category, searchParams);
-  }
+  const rest = mediaTypes.filter((mt) => mt !== primary);
+  if (rest.length === 0) return;
+  scheduleIdle(() => {
+    for (const mt of rest) {
+      prefetchGet(buildDefaultLogsListPath(mt));
+      prefetchGet(buildStatusCountsPath(mt));
+    }
+  });
 }
 
 export function revalidateLogsListInBackground(path: string): void {
@@ -264,16 +292,31 @@ export function warmDashboardLogsCaches(
 ): void {
   if (sessionDashboardLogsWarmed && !options?.force) return;
   if (!options?.force) sessionDashboardLogsWarmed = true;
-  const prefetchOpts = options?.revalidate ? { revalidate: true as const } : undefined;
+  const prefetchOpts = {
+    ...(options?.revalidate ? { revalidate: true as const } : {}),
+    priority: "low" as const,
+  };
   prefetchGet("/logs/counts", prefetchOpts);
   prefetchGet(FOLLOWS_PATH, prefetchOpts);
   prefetchGet(MILESTONES_PATH, prefetchOpts);
   prefetchGet(buildFeedPath(), prefetchOpts);
-  if (followedUserIds?.length) warmFriendFeedCaches(followedUserIds);
 
-  for (const mt of mediaTypes) {
-    prefetchGet(buildDefaultLogsListPath(mt), prefetchOpts);
-    prefetchGet(buildStatusCountsPath(mt), prefetchOpts);
+  const primary = mediaTypes[0];
+  if (primary) {
+    prefetchGet(buildDefaultLogsListPath(primary), prefetchOpts);
+    prefetchGet(buildStatusCountsPath(primary), prefetchOpts);
+  }
+  const rest = mediaTypes.slice(1);
+  if (rest.length > 0) {
+    scheduleIdle(() => {
+      for (const mt of rest) {
+        prefetchGet(buildDefaultLogsListPath(mt), prefetchOpts);
+        prefetchGet(buildStatusCountsPath(mt), prefetchOpts);
+      }
+    });
+  }
+  if (followedUserIds?.length) {
+    scheduleIdle(() => warmFriendFeedCaches(followedUserIds));
   }
 }
 
@@ -285,18 +328,24 @@ export function warmStatisticsCaches(
 ): void {
   if (sessionStatisticsWarmed && !options?.force) return;
   if (!options?.force) sessionStatisticsWarmed = true;
-  const prefetchOpts = options?.revalidate ? { revalidate: true as const } : undefined;
+  const prefetchOpts = {
+    ...(options?.revalidate ? { revalidate: true as const } : {}),
+    priority: "low" as const,
+  };
   warmStatisticsForFilter("all", tzOffsetMinutes, isPro, prefetchOpts);
-  for (const mt of mediaTypes) {
-    warmStatisticsForFilter(mt, tzOffsetMinutes, isPro, prefetchOpts);
-  }
+  const rest = [...mediaTypes];
+  scheduleIdle(() => {
+    for (const mt of rest) {
+      warmStatisticsForFilter(mt, tzOffsetMinutes, isPro, prefetchOpts);
+    }
+  });
 }
 
 function warmStatisticsForFilter(
   filter: MediaType | "all",
   tz: number,
   isPro: boolean,
-  prefetchOpts?: { revalidate?: boolean }
+  prefetchOpts?: { revalidate?: boolean; priority?: "high" | "low" }
 ): void {
   const mq = mediaQuery(filter);
   prefetchGet(`/logs/stats?group=summary&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
@@ -334,6 +383,14 @@ function warmStatisticsForFilter(
 let warmDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const WARM_DEBOUNCE_MS = 400;
 
+export function scheduleIdleDashboardWarm(
+  mediaTypes: MediaType[] = registeredMediaTypes,
+  followedUserIds?: string[],
+  options?: { force?: boolean; revalidate?: boolean }
+): void {
+  scheduleIdle(() => warmDashboardLogsCaches(mediaTypes, followedUserIds, options));
+}
+
 export function warmDashboardAndStatisticsCaches(
   mediaTypes: MediaType[] = registeredMediaTypes,
   tzOffsetMinutes: number = registeredTzOffset,
@@ -357,6 +414,7 @@ export async function loadWithSWR<T>(
     onError?: () => void;
     /** When false, do not show loading if cache is empty (keeps prior UI). */
     showLoadingOnMiss?: boolean;
+    signal?: AbortSignal;
   }
 ): Promise<void> {
   const cached = getCachedEntry<T>("GET", path);
@@ -370,13 +428,15 @@ export async function loadWithSWR<T>(
   try {
     const { data, fromCache } = await apiFetchSWR<T>(path, {
       ttlMs: HEAVY_PAGE_TTL_MS,
+      signal: options?.signal,
       onUpdate: (fresh) => apply(fresh as T),
     });
     if (!fromCache) apply(data);
-  } catch {
+  } catch (err) {
+    if (options?.signal?.aborted) return;
     if (!cached) options?.onError?.();
   } finally {
-    options?.setLoading?.(false);
+    if (!options?.signal?.aborted) options?.setLoading?.(false);
   }
 }
 
@@ -385,10 +445,8 @@ export function installLogsPageCacheListeners(): void {
   warmListenerInstalled = true;
 
   const onWarm = () => {
-    warmDashboardAndStatisticsCaches(
+    warmDashboardLogsCaches(
       registeredMediaTypes,
-      registeredTzOffset,
-      registeredIsPro,
       registeredFollowedUserIds,
       { force: true, revalidate: true }
     );

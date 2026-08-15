@@ -10,7 +10,6 @@ import { ForgotPassword } from "@/pages/ForgotPassword";
 import { ResetPassword } from "@/pages/ResetPassword";
 import { InvalidApiKeyProvider } from "@/contexts/InvalidApiKeyContext";
 import { Onboarding } from "@/pages/Onboarding";
-import { Dashboard } from "@/pages/Dashboard";
 import { PublicProfile } from "@/pages/PublicProfile";
 import { PublicProfileLayout } from "@/layouts/PublicProfileLayout";
 import { Landing } from "@/pages/Landing";
@@ -57,8 +56,6 @@ const lazyWithChunkRecovery = <T extends ComponentType<unknown>>(
     }
   });
 
-const Statistics = lazyWithChunkRecovery(() => import("@/pages/Statistics").then((m) => ({ default: m.Statistics })));
-const Search = lazyWithChunkRecovery(() => import("@/pages/Search").then((m) => ({ default: m.Search })));
 const Market = lazyWithChunkRecovery(() => import("@/pages/Market").then((m) => ({ default: m.Market })));
 const MarketListingPage = lazyWithChunkRecovery(() => import("@/pages/MarketListingPage").then((m) => ({ default: m.MarketListingPage })));
 const MyListings = lazyWithChunkRecovery(() => import("@/pages/MyListings").then((m) => ({ default: m.MyListings })));
@@ -146,9 +143,9 @@ export default function App() {
                 </Suspense>
               }
             >
-              <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
-              <Route path="search" element={<Search />} />
+              <Route path="dashboard" element={<ProtectedRoute>{null}</ProtectedRoute>} />
+              <Route path="statistics" element={<ProtectedRoute>{null}</ProtectedRoute>} />
+              <Route path="search" element={null} />
               <Route path="market/listing/:listingId" element={<MarketListingPage />} />
               <Route path="market" element={<Market />} />
               <Route path="my-listings" element={<ProtectedRoute><MyListings /></ProtectedRoute>} />

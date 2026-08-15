@@ -21,6 +21,14 @@ export function formatLogScopeLabel(
   return null;
 }
 
-export function getLogCardDisplay(log: Log) {
-  return getLogDisplayRating(log, log.scopedReviews);
+export function getLogCardDisplay(
+  log: Pick<Log, "grade" | "mediaType"> & {
+    review?: string | null;
+    scopedReviews?: Log["scopedReviews"];
+  }
+) {
+  return getLogDisplayRating(
+    { grade: log.grade ?? null, review: log.review ?? null, mediaType: log.mediaType },
+    log.scopedReviews
+  );
 }

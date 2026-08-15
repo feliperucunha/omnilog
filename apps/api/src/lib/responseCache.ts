@@ -87,6 +87,15 @@ export async function withSearchResultsCache<T extends { results: unknown[] }>(
   queryKey: string,
   fetch: () => Promise<T>
 ): Promise<{ data: T; cacheHit: boolean }> {
+  return withCachedSearchPayload(prisma, mediaType, queryKey, fetch);
+}
+
+export async function withCachedSearchPayload<T>(
+  prisma: PrismaClient,
+  mediaType: string,
+  queryKey: string,
+  fetch: () => Promise<T>
+): Promise<{ data: T; cacheHit: boolean }> {
   try {
     const cached = await getSearchResponseCached<T>(prisma, mediaType, queryKey);
     if (cached && (cached.fresh || cached.stale)) {

@@ -11,7 +11,7 @@ import { useMe } from "@/contexts/MeContext";
 import { tierHasProFeatures } from "@/lib/userTier";
 import {
   registerLogsPageCacheContext,
-  warmDashboardAndStatisticsCaches,
+  scheduleIdleDashboardWarm,
 } from "@/lib/logsPageCache";
 
 const STORAGE_KEY = (userId: string) => `geeklogs.visibleMediaTypes.v1:${userId}`;
@@ -89,7 +89,7 @@ export function VisibleMediaTypesProvider({ children }: { children: ReactNode })
     const isPro = tierHasProFeatures(me.tier);
     registerLogsPageCacheContext({ mediaTypes: visibleTypes, tzOffsetMinutes: tz, isPro });
     if (!visibleTypesOrderReady || visibleTypes.length === 0) return;
-    warmDashboardAndStatisticsCaches(visibleTypes, tz, isPro);
+    scheduleIdleDashboardWarm(visibleTypes);
   }, [token, loading, me, visibleTypes, visibleTypesOrderReady]);
 
   const value = useMemo(
