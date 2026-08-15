@@ -22,7 +22,7 @@ import {
 import type { LogViewMode } from "@/lib/logViewPreference";
 import { gradeToStars } from "@/lib/gradeStars";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { logStatusBadgeClass, logStatusBorderClass } from "@/lib/logStatusColors";
+import { searchResultLogIndicators } from "@/lib/searchResultLogIndicators";
 import type { TFunction } from "@/contexts/LocaleContext";
 import { cn } from "@/lib/utils";
 
@@ -47,10 +47,8 @@ export function SearchResultCard({
   onOpen,
   t,
 }: SearchResultCardProps) {
-  const status = userLog?.status ?? userLog?.listType;
+  const { inList, status, railClass, badgeClass } = searchResultLogIndicators(userLog);
   const display = userLog ? getLogCardDisplay(userLog) : null;
-  const listBorderClass = logStatusBorderClass(status);
-  const badgeClass = logStatusBadgeClass(status);
 
   const metaParts: string[] = [item.year ?? "", item.subtitle ?? ""].filter(Boolean);
   if (mediaType === "games" && item.timeToBeatHours != null && item.timeToBeatHours > 0) {
@@ -94,8 +92,8 @@ export function SearchResultCard({
         className={cn(
           "h-full w-full text-left overflow-hidden rounded-lg border bg-[var(--color-dark)] text-inherit no-underline shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95",
           layoutClass,
-          listBorderClass,
-          status == null && "hover:border-black",
+          railClass,
+          !inList && "hover:border-black",
           !isCompact && !isGrid && "max-md:min-h-[44px]"
         )}
       >
@@ -106,7 +104,7 @@ export function SearchResultCard({
             mediaType={mediaType}
             activeBoardGameProvider={mediaType === "boardgames" ? boardGameProvider : undefined}
           />
-          {token && status && (
+          {inList && status && (
             <span
               className={cn(
                 "absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 font-medium",

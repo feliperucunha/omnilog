@@ -18,11 +18,10 @@ import {
   apiFetch,
   apiFetchCached,
   apiFetchSWR,
-  HEAVY_PAGE_TTL_MS,
   invalidateApiCache,
   LOGS_INVALIDATED_EVENT,
 } from "@/lib/api";
-import { buildDefaultLogsListPath } from "@/lib/logsPageCache";
+import { fetchAllLogsForMediaType } from "@/lib/logsPageCache";
 import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import { SearchSkeleton, BrowseRailSkeleton } from "@/components/skeletons";
 import { SearchResultCard } from "@/components/SearchResultCard";
@@ -65,7 +64,7 @@ import { ApiKeyPrompt, type ApiKeyProvider } from "@/components/ApiKeyPrompt";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import * as storage from "@/lib/storage";
 import { cn } from "@/lib/utils";
-import { decodeSearchResultForDisplay } from "@/lib/decodeDisplayFields";
+import { decodeSearchResultForDisplay, decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
@@ -464,25 +463,28 @@ export function Search() {
   }, [stateQuery, runSearch]);
 
   const loadUserLogsForSearch = useCallback(() => {
-    const needsLogsForSearchResults =
-      hasSearched && searchFilter !== SEARCH_USERS_TYPE && results.length > 0;
-    const needsLogsForRecommendations =
-      searchFilter !== SEARCH_USERS_TYPE && currentRecResults.length > 0;
-    if (!token || (!needsLogsForSearchResults && !needsLogsForRecommendations)) {
+    if (!token || searchFilter === SEARCH_USERS_TYPE) {
       setLogsByExternalId(new Map());
       return;
     }
-    apiFetchCached<Log[]>(buildDefaultLogsListPath(mediaType), { ttlMs: HEAVY_PAGE_TTL_MS })
+    let cancelled = false;
+    void fetchAllLogsForMediaType(mediaType)
       .then((logs) => {
+        if (cancelled) return;
         const map = new Map<string, Log>();
-        for (const log of logs) map.set(log.externalId, log);
+        for (const log of logs) map.set(log.externalId, decodeLogForDisplay(log));
         setLogsByExternalId(map);
       })
-      .catch(() => setLogsByExternalId(new Map()));
-  }, [token, mediaType, hasSearched, results.length, currentRecResults.length, searchFilter]);
+      .catch(() => {
+        if (!cancelled) setLogsByExternalId(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, mediaType, searchFilter]);
 
   useEffect(() => {
-    loadUserLogsForSearch();
+    return loadUserLogsForSearch();
   }, [loadUserLogsForSearch]);
 
   useEffect(() => {

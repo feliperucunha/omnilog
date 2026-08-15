@@ -10,7 +10,7 @@ import {
 import { motion } from "framer-motion";
 import type { BoardGameProvider, Log, MediaType, SearchResult } from "@geeklogs/shared";
 import { getStatusLabel } from "@/lib/statusLabel";
-import { logStatusBadgeClass, logStatusBorderClass } from "@/lib/logStatusColors";
+import { searchResultLogIndicators } from "@/lib/searchResultLogIndicators";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
@@ -63,10 +63,8 @@ export function SearchRecommendationsCarousel({
     widthClass: string
   ) => {
     const userLog = token ? logsByExternalId.get(item.id) : undefined;
-    const status = userLog?.status ?? userLog?.listType;
+    const { inList, status, railClass, badgeClass } = searchResultLogIndicators(userLog);
     const display = userLog ? getLogCardDisplay(userLog) : null;
-    const listBorderClass = logStatusBorderClass(status);
-    const badgeClass = logStatusBadgeClass(status);
 
     return (
       <div key={reactKey} className={`shrink-0 ${widthClass}`}>
@@ -74,7 +72,7 @@ export function SearchRecommendationsCarousel({
           <button
             type="button"
             onClick={() => onItemOpen(item.id)}
-            className={`flex h-full w-full flex-col overflow-hidden rounded-lg border bg-[var(--color-dark)] text-left text-inherit shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 ${listBorderClass}`}
+            className={`flex h-full w-full flex-col overflow-hidden rounded-lg border bg-[var(--color-dark)] text-left text-inherit shadow-[var(--shadow-card)] cursor-pointer transition-[opacity,border-color] hover:opacity-95 ${railClass}${!inList ? " hover:border-black" : ""}`}
           >
             <div className="relative aspect-[2/3] w-full overflow-hidden rounded-t-lg">
               <ItemImage
@@ -85,7 +83,7 @@ export function SearchRecommendationsCarousel({
                 loading="lazy"
                 referrerPolicy="no-referrer"
               />
-              {token && status && (
+              {inList && status && (
                 <span
                   className={`absolute bottom-1 right-1 z-10 rounded px-1.5 py-0.5 text-[9px] font-medium ${badgeClass}`}
                   title={getStatusLabel(t, status, mediaType)}

@@ -5,6 +5,7 @@ import {
   type MediaType,
 } from "@geeklogs/shared";
 import {
+  apiFetchCached,
   apiFetchSWR,
   getCachedEntry,
   HEAVY_PAGE_TTL_MS,
@@ -13,6 +14,7 @@ import {
 import { updateCachedEntriesMatching } from "@/lib/cache.js";
 
 const LOGS_PAGE_SIZE = 24;
+const LOGS_INDEX_PAGE_SIZE = 100;
 const DEFAULT_SORT = "dateDesc";
 const MAX_FRIEND_FEED_PREFETCH = 50;
 
@@ -176,6 +178,38 @@ export function buildLogsListPathFromFilters(
 
 export function buildDefaultLogsListPath(mediaType: MediaType): string {
   return buildLogsListPath({ mediaType });
+}
+
+export type LogsListResponse = Log[] | { data: Log[]; nextCursor: string | null };
+
+export function normalizeLogsListResponse(response: LogsListResponse): {
+  logs: Log[];
+  nextCursor: string | null;
+} {
+  if (Array.isArray(response)) {
+    return { logs: response, nextCursor: null };
+  }
+  return { logs: response.data ?? [], nextCursor: response.nextCursor ?? null };
+}
+
+/** All logs for a media type — paginates through GET /logs (needed for search in-list matching). */
+export async function fetchAllLogsForMediaType(mediaType: MediaType): Promise<Log[]> {
+  const all: Log[] = [];
+  let cursor: string | null = null;
+  for (;;) {
+    const path = buildLogsListPath({
+      mediaType,
+      sort: DEFAULT_SORT,
+      limit: LOGS_INDEX_PAGE_SIZE,
+      ...(cursor ? { cursor } : {}),
+    });
+    const response = await apiFetchCached<LogsListResponse>(path, { ttlMs: HEAVY_PAGE_TTL_MS });
+    const { logs, nextCursor } = normalizeLogsListResponse(response);
+    all.push(...logs);
+    if (!nextCursor) break;
+    cursor = nextCursor;
+  }
+  return all;
 }
 
 export function buildStatusCountsPath(mediaType: MediaType): string {
