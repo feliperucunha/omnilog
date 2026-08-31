@@ -1751,9 +1751,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
   const paceChartTopLabel = paceChartIsCompleted ? completedTopLabel : paceTopLabel;
   const paceChartAvg = paceChartIsCompleted ? completedAvg : paceAvg;
   const paceChartUnit = paceChartIsCompleted ? completedUnit : paceUnit;
-  const paceChartHeaderChip = paceChartIsCompleted
-    ? completedTotal.toLocaleString(locale)
-    : paceHoursLabel;
   const paceChartTitle = t(paceChartIsCompleted ? "statistics.completedTitle" : "statistics.paceTitle");
 
   const totalPurchaseItems = useMemo(() => {
