@@ -420,12 +420,12 @@ export function Tiers() {
             {t("tiers.freePrice")}
           </p>
           <ul className="mt-4 flex flex-1 flex-col gap-2 text-sm text-[var(--color-light)]">
-            <li className="flex items-center gap-2">
-              <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+            <li className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
               {t("tiers.freeLogs")}
             </li>
-            <li className="flex items-center gap-2">
-              <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+            <li className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
               {t("tiers.freeLogsDesc")}
             </li>
           </ul>
@@ -511,30 +511,18 @@ export function Tiers() {
             </p>
           )}
           <ul className="mt-4 flex flex-1 flex-col gap-2 text-sm text-[var(--color-light)]">
-            <li className="flex items-center gap-2">
-              <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+            <li className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
               {t("tiers.proLogs")}
             </li>
-            <li className="flex items-center gap-2">
-              <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
-              {t("tiers.proExport")}
+            <li className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+              <span>{t("tiers.proLogsReason")}</span>
             </li>
-            <li className="flex items-center gap-2">
-              <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
-              {t("tiers.proExportDesc")}
-            </li>
-            <li className="flex items-center gap-2">
-              <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
-              <span>{t("tiers.proStatistics")}: {t("tiers.proStatisticsDesc")}</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
-              <span>{t("tiers.proProfileCustomization")}: {t("tiers.proProfileCustomizationDesc")}</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+            {/* <li className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
               {t("tiers.proNoAds")}
-            </li>
+            </li> */}
           </ul>
           {token && !isPayingPro && !isAdmin && (
             <Button

@@ -58,7 +58,6 @@ import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
-import { tierHasProFeatures } from "@/lib/userTier";
 
 interface FeedEntry {
   log: Log;
@@ -268,7 +267,6 @@ export function Dashboard() {
     [setSearchParams]
   );
 
-  const isPro = tierHasProFeatures(me?.tier);
   const tzOffsetMinutes = useMemo(() => -new Date().getTimezoneOffset(), []);
 
   const cachedCategoryLogs = useMemo(() => {
@@ -389,14 +387,14 @@ export function Dashboard() {
     registerLogsPageCacheContext({
       mediaTypes: visibleTypes,
       tzOffsetMinutes,
-      isPro,
+      isPro: true,
     });
     prefetchDashboardPageCaches(
       visibleTypes,
       selectedCategory,
       new URLSearchParams(searchParamsKey)
     );
-  }, [visibleTypes, visibleTypesOrderReady, tzOffsetMinutes, isPro, selectedCategory, searchParamsKey]);
+  }, [visibleTypes, visibleTypesOrderReady, tzOffsetMinutes, selectedCategory, searchParamsKey]);
 
   useEffect(() => {
     fetchFollows();

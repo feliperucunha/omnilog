@@ -522,20 +522,27 @@ export function boardGameWeightHistogramEntries(
   });
 }
 
-function periodKeyFromDate(d: Date, granularity: "month" | "year"): string {
+/** Period key in the user's timezone (`timezoneOffsetMinutes` from the client). */
+export function periodKeyFromInstant(
+  at: Date,
+  granularity: "month" | "year",
+  tzOffsetMinutes = 0
+): string {
+  const local = new Date(at.getTime() + tzOffsetMinutes * 60 * 1000);
   return granularity === "year"
-    ? `${d.getUTCFullYear()}`
-    : `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    ? `${local.getUTCFullYear()}`
+    : `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 export function sumMetricByPeriod(
   rows: Array<{ at: Date; value: number }>,
-  granularity: "month" | "year"
+  granularity: "month" | "year",
+  tzOffsetMinutes = 0
 ): StatsBarEntry[] {
   const byPeriod: Record<string, { sum: number; count: number }> = {};
   for (const row of rows) {
     if (!Number.isFinite(row.value) || row.value <= 0) continue;
-    const key = periodKeyFromDate(row.at, granularity);
+    const key = periodKeyFromInstant(row.at, granularity, tzOffsetMinutes);
     const cur = byPeriod[key] ?? { sum: 0, count: 0 };
     cur.sum += row.value;
     cur.count += 1;

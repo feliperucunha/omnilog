@@ -51,13 +51,23 @@ const Statistics = lazyWithChunkRecovery(() =>
   import("@/pages/Statistics").then((m) => ({ default: m.Statistics }))
 );
 
-const KEEP_ALIVE_CLASS = `${routeOutletClassName} flex min-h-0 flex-1 flex-col`;
+const KEEP_ALIVE_CLASS = `${routeOutletClassName} flex min-w-0 w-full shrink-0 flex-col`;
+/** Fill the scrollport (Search). Statistics/Dashboard must grow with content so widgets are not clipped. */
+const KEEP_ALIVE_FILL_CLASS = `${KEEP_ALIVE_CLASS} min-h-0 flex-1`;
 
-function KeptPane({ active, children }: { active: boolean; children: React.ReactNode }) {
+function KeptPane({
+  active,
+  fill,
+  children,
+}: {
+  active: boolean;
+  fill?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div
       hidden={!active}
-      className={cn(KEEP_ALIVE_CLASS, !active && "hidden")}
+      className={cn(fill ? KEEP_ALIVE_FILL_CLASS : KEEP_ALIVE_CLASS, !active && "hidden")}
       aria-hidden={!active}
     >
       <Suspense
@@ -106,7 +116,7 @@ export function AnimatedOutlet() {
   return (
     <>
       {seenSearch ? (
-        <KeptPane active={isSearch}>
+        <KeptPane active={isSearch} fill>
           <Search />
         </KeptPane>
       ) : null}

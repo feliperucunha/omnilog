@@ -66,4 +66,14 @@ describe("sumMetricByPeriod", () => {
       { period: "2026-02", hours: 10, count: 1 },
     ]);
   });
+
+  it("buckets by the user's timezone offset", () => {
+    // 2026-01-01 02:00 UTC is still 2025-12-31 in UTC-3.
+    const entries = sumMetricByPeriod(
+      [{ at: new Date(Date.UTC(2026, 0, 1, 2, 0, 0)), value: 5 }],
+      "month",
+      -180
+    );
+    expect(entries).toEqual([{ period: "2025-12", hours: 5, count: 1 }]);
+  });
 });

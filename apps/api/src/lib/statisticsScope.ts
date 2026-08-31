@@ -1,43 +1,21 @@
-import type { Prisma } from "@prisma/client";
-import { purchaseLogCreatedAtRange } from "./purchaseFields.js";
-
-/**
- * Logs that count toward "this calendar month" stats for free-tier users
- * (same month window as purchase "This month", in the user's timezone offset).
- */
-export function freeTierStatisticsMonthWhere(tzOffsetMinutes: number): Prisma.LogWhereInput {
-  const range = purchaseLogCreatedAtRange("month", tzOffsetMinutes);
-  if (!range) {
-    return { id: { in: [] } };
-  }
-  return {
-    OR: [
-      { createdAt: { gte: range.gte, lte: range.lte } },
-      { completedAt: { gte: range.gte, lte: range.lte } },
-      { updatedAt: { gte: range.gte, lte: range.lte } },
-    ],
-  };
-}
-
-export function freeTierStatisticsMonthRange(
-  tzOffsetMinutes: number
-): { gte: Date; lte: Date } | undefined {
-  return purchaseLogCreatedAtRange("month", tzOffsetMinutes);
-}
-
 export type StatsPeriodGranularity = "month" | "year";
 
-/** UTC month/year bounds matching GET /logs/stats completedByMonth / completedByYear keys. */
+/**
+ * Inclusive instant bounds for a stats period key (`YYYY-MM` or `YYYY`)
+ * in the user's timezone (`timezoneOffsetMinutes` from the client).
+ */
 export function completedAtBoundsForStatsPeriod(
   period: string,
-  granularity: StatsPeriodGranularity
+  granularity: StatsPeriodGranularity,
+  tzOffsetMinutes = 0
 ): { gte: Date; lte: Date } | null {
+  const offsetMs = tzOffsetMinutes * 60 * 1000;
   if (granularity === "year") {
     const y = parseInt(period.trim(), 10);
     if (!Number.isFinite(y)) return null;
     return {
-      gte: new Date(Date.UTC(y, 0, 1)),
-      lte: new Date(Date.UTC(y, 11, 31, 23, 59, 59, 999)),
+      gte: new Date(Date.UTC(y, 0, 1, 0, 0, 0, 0) - offsetMs),
+      lte: new Date(Date.UTC(y, 11, 31, 23, 59, 59, 999) - offsetMs),
     };
   }
   const match = /^(\d{4})-(\d{2})$/.exec(period.trim());
@@ -46,8 +24,8 @@ export function completedAtBoundsForStatsPeriod(
   const m = parseInt(match[2]!, 10);
   if (!Number.isFinite(y) || m < 1 || m > 12) return null;
   return {
-    gte: new Date(Date.UTC(y, m - 1, 1)),
-    lte: new Date(Date.UTC(y, m, 0, 23, 59, 59, 999)),
+    gte: new Date(Date.UTC(y, m - 1, 1, 0, 0, 0, 0) - offsetMs),
+    lte: new Date(Date.UTC(y, m, 0, 23, 59, 59, 999) - offsetMs),
   };
 }
 

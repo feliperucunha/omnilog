@@ -15,7 +15,6 @@ import { getBoardGameByIdLudopedia } from "../services/ludopedia.js";
 import { getVolumeById } from "../services/comicvine.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
-import { tierHasProFeatures } from "../lib/userTier.js";
 import { getAllReviewerMilestonesForMediumBatch } from "../services/milestone.service.js";
 import { loadItemReviewsPaginated } from "../lib/itemReviews.js";
 import { mapWithConcurrency } from "../lib/concurrency.js";

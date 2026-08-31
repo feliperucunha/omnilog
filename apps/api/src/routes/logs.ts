@@ -346,13 +346,14 @@ import {
   isReadingMediaType,
   parseBoardGameWeightBin,
   parseBoardGameWeightScope,
+  periodKeyFromInstant,
   READING_MEDIA_TYPES,
   recentBoardGamesForStats,
   sumAllPagesReadForStats,
   sumMetricByPeriod,
   sumPagesReadForStats,
 } from "../lib/statsCategoryMetrics.js";
-import { tierHasProFeatures, tierHasUnlimitedLogs } from "../lib/userTier.js";
+import { tierHasUnlimitedLogs } from "../lib/userTier.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
 import {
   handleLogCreated,
@@ -374,8 +375,6 @@ import {
 } from "../lib/purchaseFields.js";
 import {
   completedAtBoundsForStatsPeriod,
-  freeTierStatisticsMonthRange,
-  freeTierStatisticsMonthWhere,
   recentMonthRanges,
 } from "../lib/statisticsScope.js";
 
@@ -480,8 +479,6 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   const ownFilter = req.query.own === "true";
   const wantToBuyFilter = req.query.wantToBuy === "true";
   const purchasedFilter = req.query.purchased === "true" || req.query.purchased === "1";
-  const forStatistics =
-    req.query.forStatistics === "1" || req.query.forStatistics === "true";
   const recapFlag = req.query.recap === "1" || req.query.recap === "true";
   const limitParam = req.query.limit != null ? parseInt(String(req.query.limit), 10) : NaN;
   const effectivePaginationMax = recapFlag ? RECAP_LIMIT_MAX : PAGINATION_LIMIT_MAX;
@@ -489,27 +486,6 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     Number.isInteger(limitParam) && limitParam >= 1 && limitParam <= effectivePaginationMax;
   const takeSize = usePagination ? Math.min(limitParam, effectivePaginationMax) : undefined;
   const cursorId = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : undefined;
-
-  const tzRawList = req.query.timezoneOffsetMinutes;
-  const tzOffsetMinutesList =
-    typeof tzRawList === "string" && tzRawList !== "" && Number.isFinite(parseInt(tzRawList, 10))
-      ? parseInt(tzRawList, 10)
-      : 0;
-
-  let statisticsMonthWhereFree: Prisma.LogWhereInput | undefined;
-  let isFreeTierForList = false;
-  let hasProFeaturesForList = false;
-  if (forStatistics || purchasedFilter || recapFlag) {
-    const u = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { tier: true },
-    });
-    hasProFeaturesForList = u != null && tierHasProFeatures(u.tier);
-    isFreeTierForList = u != null && !hasProFeaturesForList;
-    if (forStatistics && isFreeTierForList) {
-      statisticsMonthWhereFree = freeTierStatisticsMonthWhere(tzOffsetMinutesList);
-    }
-  }
 
   if (recapFlag) {
     if (!usePagination || takeSize == null) {
@@ -541,31 +517,26 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       { AND: [{ purchaseAmountMinor: { not: null } }, { purchaseCurrency: { not: null } }] },
       { AND: [{ saleAmountMinor: { not: null } }, { saleCurrency: { not: null } }] },
     ];
-    if (isFreeTierForList) {
-      const range = purchaseLogCreatedAtRange("month", tzOffsetMinutesList);
-      if (range) where = mergeLogWhere(where, logSpendStatsDateWhere(range));
+    const dateRaw = typeof req.query.purchaseDate === "string" ? req.query.purchaseDate.trim() : "";
+    if (dateRaw !== "") {
+      const tzRaw = req.query.timezoneOffsetMinutes;
+      const tzOffsetMinutes =
+        typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
+          ? parseInt(tzRaw, 10)
+          : 0;
+      const bounds = localDayBoundsFromDateString(dateRaw, tzOffsetMinutes);
+      if (bounds) where = mergeLogWhere(where, logSpendStatsDateWhere(bounds));
     } else {
-      const dateRaw = typeof req.query.purchaseDate === "string" ? req.query.purchaseDate.trim() : "";
-      if (dateRaw !== "") {
+      const spendPeriodRaw = typeof req.query.spendPeriod === "string" ? req.query.spendPeriod.trim() : "";
+      const validPeriods: PurchasePeriod[] = ["month", "year", "all"];
+      if (validPeriods.includes(spendPeriodRaw as PurchasePeriod)) {
         const tzRaw = req.query.timezoneOffsetMinutes;
         const tzOffsetMinutes =
           typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
             ? parseInt(tzRaw, 10)
             : 0;
-        const bounds = localDayBoundsFromDateString(dateRaw, tzOffsetMinutes);
-        if (bounds) where = mergeLogWhere(where, logSpendStatsDateWhere(bounds));
-      } else {
-        const spendPeriodRaw = typeof req.query.spendPeriod === "string" ? req.query.spendPeriod.trim() : "";
-        const validPeriods: PurchasePeriod[] = ["month", "year", "all"];
-        if (validPeriods.includes(spendPeriodRaw as PurchasePeriod)) {
-          const tzRaw = req.query.timezoneOffsetMinutes;
-          const tzOffsetMinutes =
-            typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
-              ? parseInt(tzRaw, 10)
-              : 0;
-          const range = purchaseLogCreatedAtRange(spendPeriodRaw as PurchasePeriod, tzOffsetMinutes);
-          if (range) where = mergeLogWhere(where, logSpendStatsDateWhere(range));
-        }
+        const range = purchaseLogCreatedAtRange(spendPeriodRaw as PurchasePeriod, tzOffsetMinutes);
+        if (range) where = mergeLogWhere(where, logSpendStatsDateWhere(range));
       }
     }
   }
@@ -614,10 +585,6 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
     }
   }
 
-  if (statisticsMonthWhereFree) {
-    where = mergeLogWhere(where, statisticsMonthWhereFree);
-  }
-
   if (recapFlag) {
     const recapPeriodRaw =
       typeof req.query.recapPeriod === "string" ? req.query.recapPeriod.trim().toLowerCase() : "";
@@ -640,18 +607,8 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
       return;
     }
     const spanMs = toD.getTime() - fromD.getTime();
-    const maxSpanFreeMs = 10 * 24 * 60 * 60 * 1000;
-    const maxSpanProMs = 370 * 24 * 60 * 60 * 1000;
-    if (!hasProFeaturesForList) {
-      if (recapPeriod !== "week") {
-        res.status(403).json({ error: "Recap beyond last week requires Pro.", code: "PRO_REQUIRED" });
-        return;
-      }
-      if (spanMs > maxSpanFreeMs) {
-        res.status(400).json({ error: "Recap date range too wide for the current plan." });
-        return;
-      }
-    } else if (spanMs > maxSpanProMs) {
+    const maxSpanMs = 370 * 24 * 60 * 60 * 1000;
+    if (spanMs > maxSpanMs) {
       res.status(400).json({ error: "Recap date range too wide." });
       return;
     }
@@ -836,18 +793,13 @@ logsRouter.delete("/:id/reaction", async (req: AuthenticatedRequest, res) => {
 logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const statsMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { tier: true },
-  });
-  const fullStatsAccess = user != null && tierHasProFeatures(user.tier);
   const tzRawStats = req.query.timezoneOffsetMinutes;
   const tzOffsetMinutes =
     typeof tzRawStats === "string" && tzRawStats !== "" && Number.isFinite(parseInt(tzRawStats, 10))
       ? parseInt(tzRawStats, 10)
       : 0;
-  const freeMonthWhere = fullStatsAccess ? undefined : freeTierStatisticsMonthWhere(tzOffsetMinutes);
-  const freeMonthRange = fullStatsAccess ? undefined : freeTierStatisticsMonthRange(tzOffsetMinutes);
+  const freeMonthWhere = undefined as Prisma.LogWhereInput | undefined;
+  const freeMonthRange = undefined as { gte: Date; lte: Date } | undefined;
 
   const STATS_GROUPS = new Set([
     "summary",
@@ -919,7 +871,6 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     const periodRaw = typeof req.query.period === "string" ? req.query.period.trim() : "month";
     let period: PurchasePeriod =
       periodRaw === "year" || periodRaw === "all" ? periodRaw : "month";
-    if (!fullStatsAccess) period = "month";
     const range = purchaseLogCreatedAtRange(period, tzOffsetMinutes);
     const spendPresentWhere: Prisma.LogWhereInput = {
       OR: [
@@ -1141,7 +1092,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   }
 
   if (group === "summaryByMonth") {
-    const ranges = recentMonthRanges(tzOffsetMinutes, fullStatsAccess ? 13 : 2);
+    const ranges = recentMonthRanges(tzOffsetMinutes, 13);
 
     const completedMonthWhere = (range: { gte: Date; lte: Date }): Prisma.LogWhereInput =>
       applyStatsMediaFilter(
@@ -1273,7 +1224,6 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     }
     const periodRaw = typeof req.query.period === "string" ? req.query.period.trim() : "month";
     let period: "month" | "year" = periodRaw === "year" ? "year" : "month";
-    if (!fullStatsAccess) period = "month";
     const range = purchaseLogCreatedAtRange(period, tzOffsetMinutes);
     const playedAtWhere = range
       ? { playedAt: { gte: range.gte, lte: range.lte } }
@@ -1328,13 +1278,11 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       select: { completedAt: true, status: true, updatedAt: true },
     });
     const byPeriod: Record<string, number> = {};
+    const completedGranularity: "month" | "year" = group === "completedByYear" ? "year" : "month";
     for (const log of logs) {
       const d = effectiveCompletedAt(log);
       if (!d) continue;
-      const key =
-        group === "completedByYear"
-          ? `${d.getUTCFullYear()}`
-          : `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+      const key = periodKeyFromInstant(d, completedGranularity, tzOffsetMinutes);
       byPeriod[key] = (byPeriod[key] ?? 0) + 1;
     }
     const entries = Object.entries(byPeriod)
@@ -1434,7 +1382,8 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
           return { at, value: l.pagesRead };
         })
         .filter((row): row is { at: Date; value: number } => row != null),
-      granularity
+      granularity,
+      tzOffsetMinutes
     );
     res.json({ group, data: entries });
     return;
@@ -1466,7 +1415,8 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
           return { at, value: l.episode };
         })
         .filter((row): row is { at: Date; value: number } => row != null),
-      granularity
+      granularity,
+      tzOffsetMinutes
     );
     res.json({ group, data: entries });
     return;
@@ -1518,7 +1468,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
         increments.push({ at, value: log.pagesRead });
       }
     }
-    res.json({ group, metric, data: sumMetricByPeriod(increments, granularity) });
+    res.json({ group, metric, data: sumMetricByPeriod(increments, granularity, tzOffsetMinutes) });
     return;
   }
 
@@ -1546,6 +1496,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   const logsWithSessionHours = await attachBoardGameSessionHours(logs);
   const byKeyHours: Record<string, number> = {};
   const byKeyCount: Record<string, number> = {};
+  const hoursGranularity: "month" | "year" = group === "year" ? "year" : "month";
   for (const log of logsWithSessionHours) {
     const hours = hoursFromCompletedLogForStats(log);
     if (hours === null) continue;
@@ -1554,9 +1505,7 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
     const key =
       group === "category"
         ? (log.mediaType as string)
-        : group === "year"
-          ? `${completedAt.getUTCFullYear()}`
-          : `${completedAt.getUTCFullYear()}-${String(completedAt.getUTCMonth() + 1).padStart(2, "0")}`;
+        : periodKeyFromInstant(completedAt, hoursGranularity, tzOffsetMinutes);
     byKeyHours[key] = (byKeyHours[key] ?? 0) + hours;
     byKeyCount[key] = (byKeyCount[key] ?? 0) + 1;
   }
@@ -1570,14 +1519,9 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
   res.json({ group, data: entries });
 });
 
-/** GET /logs/by-date?date=YYYY-MM-DD&timezoneOffsetMinutes=? - Logs completed or started on the given date (in user's local time). Pro: any date. Free: only days in the current calendar month (same window as statistics). */
+/** GET /logs/by-date?date=YYYY-MM-DD&timezoneOffsetMinutes=? - Logs completed or started on the given date (in user's local time). */
 logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { tier: true },
-  });
-  const hasProAccess = user != null && tierHasProFeatures(user.tier);
   const dateParam = typeof req.query.date === "string" ? req.query.date.trim() : "";
   const tzOffsetMinutes = typeof req.query.timezoneOffsetMinutes === "string"
     ? parseInt(req.query.timezoneOffsetMinutes, 10)
@@ -1587,13 +1531,6 @@ logsRouter.get("/by-date", async (req: AuthenticatedRequest, res) => {
   if (!bounds) {
     res.status(400).json({ error: "Invalid date; use YYYY-MM-DD" });
     return;
-  }
-  if (!hasProAccess) {
-    const monthRange = freeTierStatisticsMonthRange(tz);
-    if (!monthRange || bounds.lte < monthRange.gte || bounds.gte > monthRange.lte) {
-      res.json({ data: [] });
-      return;
-    }
   }
   const { gte: start, lte: end } = bounds;
   const byDateMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
@@ -1637,35 +1574,22 @@ logsRouter.get("/by-weight", async (req: AuthenticatedRequest, res) => {
 /** GET /logs/by-period?period=YYYY-MM|YYYY&granularity=month|year - Logs completed in that stats period (same buckets as completedByMonth/Year). */
 logsRouter.get("/by-period", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { tier: true },
-  });
-  const hasProAccess = user != null && tierHasProFeatures(user.tier);
   const periodParam = typeof req.query.period === "string" ? req.query.period.trim() : "";
   const granularity = req.query.granularity === "year" ? "year" : "month";
-  const bounds = completedAtBoundsForStatsPeriod(periodParam, granularity);
+  const tzRawByPeriod = req.query.timezoneOffsetMinutes;
+  const tzOffsetByPeriod =
+    typeof tzRawByPeriod === "string" &&
+    tzRawByPeriod !== "" &&
+    Number.isFinite(parseInt(tzRawByPeriod, 10))
+      ? parseInt(tzRawByPeriod, 10)
+      : 0;
+  const bounds = completedAtBoundsForStatsPeriod(periodParam, granularity, tzOffsetByPeriod);
   if (!bounds) {
     res.status(400).json({ error: "Invalid period; use YYYY-MM for month or YYYY for year" });
     return;
   }
-  const tzOffsetMinutes = typeof req.query.timezoneOffsetMinutes === "string"
-    ? parseInt(req.query.timezoneOffsetMinutes, 10)
-    : 0;
-  const tz = Number.isFinite(tzOffsetMinutes) ? tzOffsetMinutes : 0;
-  const freeMonthRange = hasProAccess ? undefined : freeTierStatisticsMonthRange(tz);
-  if (!hasProAccess) {
-    if (!freeMonthRange || bounds.lte < freeMonthRange.gte || bounds.gte > freeMonthRange.lte) {
-      res.json({ data: [] });
-      return;
-    }
-  }
-  let completedGte = bounds.gte;
-  let completedLte = bounds.lte;
-  if (freeMonthRange) {
-    completedGte = new Date(Math.max(completedGte.getTime(), freeMonthRange.gte.getTime()));
-    completedLte = new Date(Math.min(completedLte.getTime(), freeMonthRange.lte.getTime()));
-  }
+  const completedGte = bounds.gte;
+  const completedLte = bounds.lte;
   const byPeriodMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
   const logs = await prisma.log.findMany({
     where: applyStatsMediaFilter(
@@ -1681,14 +1605,9 @@ logsRouter.get("/by-period", async (req: AuthenticatedRequest, res) => {
   res.json({ data: enriched });
 });
 
-/** GET /logs/calendar?year=YYYY&month=M - Activity counts per day. Pro: any month. Free: only the current calendar month in the user's timezone (same as statistics). */
+/** GET /logs/calendar?year=YYYY&month=M - Activity counts per day. */
 logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { tier: true },
-  });
-  const hasProAccess = user != null && tierHasProFeatures(user.tier);
   const yearParam = typeof req.query.year === "string" ? parseInt(req.query.year, 10) : new Date().getFullYear();
   const monthParam = typeof req.query.month === "string" ? parseInt(req.query.month, 10) : new Date().getMonth() + 1;
   const year = Number.isFinite(yearParam) ? yearParam : new Date().getFullYear();
@@ -1697,15 +1616,6 @@ logsRouter.get("/calendar", async (req: AuthenticatedRequest, res) => {
     ? parseInt(req.query.timezoneOffsetMinutes, 10)
     : 0;
   const offsetMs = Number.isFinite(tzOffsetMinutes) ? tzOffsetMinutes * 60 * 1000 : 0;
-  if (!hasProAccess) {
-    const shifted = new Date(Date.now() + offsetMs);
-    const cy = shifted.getUTCFullYear();
-    const cm = shifted.getUTCMonth() + 1;
-    if (year !== cy || month !== cm) {
-      res.json({ year, month, dates: {} });
-      return;
-    }
-  }
   const start = new Date(Date.UTC(year, month - 1, 1));
   const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
   const calendarMediaType = parseStatsMediaTypeFilter(req.query as Record<string, unknown>);
@@ -1874,21 +1784,12 @@ function getExportValue(
 }
 
 /**
- * GET /logs/export - Pro only; returns user logs as CSV.
+ * GET /logs/export - returns user logs as CSV.
  * Optional filters: ?mediaType, ?status, ?own=true, ?wantToBuy=true, ?genre, ?sort.
  * Filters mirror GET /logs (so the user gets exactly the list they're seeing).
  */
 logsRouter.get("/export", async (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { tier: true },
-  });
-  const hasProAccess = user != null && tierHasProFeatures(user.tier);
-  if (!hasProAccess) {
-    res.status(403).json({ error: "Export is available on Pro only", code: "PRO_REQUIRED" });
-    return;
-  }
   const mediaTypeParam = req.query.mediaType as string | undefined;
   const mediaTypeFilter =
     mediaTypeParam && MEDIA_TYPES.includes(mediaTypeParam as (typeof MEDIA_TYPES)[number])

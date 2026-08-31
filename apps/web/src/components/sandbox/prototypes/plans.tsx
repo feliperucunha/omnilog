@@ -7,11 +7,11 @@ type PlanId = "free" | "beta" | "pro";
 const CURRENT: PlanId = "beta";
 
 const FEATURES: { name: string; values: Record<PlanId, string> }[] = [
-  { name: "Log count", values: { free: "500", beta: "∞", pro: "∞" } },
-  { name: "Statistics", values: { free: "Basic", beta: "Full", pro: "Full+" } },
-  { name: "Calendar", values: { free: "—", beta: "✓", pro: "✓" } },
-  { name: "Year in review", values: { free: "—", beta: "—", pro: "✓" } },
-  { name: "Export", values: { free: "—", beta: "CSV", pro: "CSV+XLS" } },
+  { name: "Log count", values: { free: "500", beta: "500", pro: "∞" } },
+  { name: "Statistics", values: { free: "Full", beta: "Full", pro: "Full" } },
+  { name: "Calendar", values: { free: "✓", beta: "✓", pro: "✓" } },
+  { name: "Year in review", values: { free: "✓", beta: "✓", pro: "✓" } },
+  { name: "Export", values: { free: "CSV", beta: "CSV", pro: "CSV" } },
   { name: "Ad-free", values: { free: "—", beta: "✓", pro: "✓" } },
 ];
 
@@ -66,8 +66,8 @@ export function TiersCompare() {
 export function TiersBenefit() {
   const benefits = [
     { title: "See your year in art", desc: "Heatmap, calendar and a shareable recap.", blur: "year recap" },
-    { title: "Unlock deep statistics", desc: "Momentum cards, genres, streaks and donuts.", blur: "stats" },
-    { title: "Go beyond 500 logs", desc: "Unlimited logging and exports in CSV + XLS.", blur: "logs" },
+    { title: "Deep statistics for everyone", desc: "Momentum cards, genres, streaks and donuts.", blur: "stats" },
+    { title: "Go beyond 500 logs", desc: "Unlimited logging on Pro — server space isn't free.", blur: "logs" },
   ];
   return (
     <div className="flex min-h-[28rem] flex-col gap-3 bg-[var(--color-dark)] p-4">

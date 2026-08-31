@@ -134,7 +134,7 @@ export async function sendWelcomeEmail(
     `Welcome to Geeklogs — your account is ready.\n\n` +
     `Log everything you watch, play, and read in one place. ` +
     `You can start logging right away from your dashboard:\n${homeUrl}\n\n` +
-    `When you're ready for unlimited logs, statistics and CSV export, ` +
+    `When you're ready for unlimited logs, ` +
     `check out Pro:\n${tiersUrl}\n\n` +
     `If you didn't create this account, just ignore this email and the account will remain unused.\n\n` +
     `— The Geeklogs team`;
@@ -143,7 +143,7 @@ export async function sendWelcomeEmail(
     `<p>Welcome to Geeklogs — your account is ready.</p>` +
     `<p>Log everything you watch, play, and read in one place. ` +
     `You can start logging right away from <a href="${homeUrl}">your dashboard</a>.</p>` +
-    `<p>When you're ready for unlimited logs, statistics and CSV export, ` +
+    `<p>When you're ready for unlimited logs, ` +
     `check out <a href="${tiersUrl}">Pro</a>.</p>` +
     `<p style="color:#666;font-size:12px">If you didn't create this account, just ignore this email and the account will remain unused.</p>` +
     `<p>— The Geeklogs team</p>`;
@@ -199,10 +199,7 @@ export async function sendSubscriptionConfirmationEmail(
   const text =
     `Hi ${plainName},\n\n` +
     `Thanks for upgrading to Geeklogs Pro. Your account is active and you've unlocked:\n` +
-    `  - Unlimited logs\n` +
-    `  - Statistics page (calendar, time by category, monthly/yearly views)\n` +
-    `  - CSV export\n` +
-    `  - Public-profile customization\n` +
+    `  - Unlimited logs (server space is limited, so this is what Pro pays for)\n` +
     `  - No ads\n\n` +
     (billingLine ? `${billingLine}\n\n` : "") +
     `Manage or cancel anytime from your Plans page:\n${tiersUrl}\n\n` +
@@ -211,10 +208,7 @@ export async function sendSubscriptionConfirmationEmail(
     `<p>Hi ${safeName},</p>` +
     `<p>Thanks for upgrading to <strong>Geeklogs Pro</strong>. Your account is active and you've unlocked:</p>` +
     `<ul>` +
-    `<li>Unlimited logs</li>` +
-    `<li>Statistics page (calendar, time by category, monthly/yearly views)</li>` +
-    `<li>CSV export</li>` +
-    `<li>Public-profile customization</li>` +
+    `<li>Unlimited logs (server space is limited, so this is what Pro pays for)</li>` +
     `<li>No ads</li>` +
     `</ul>` +
     (billingLine ? `<p>${escapeHtml(billingLine)}</p>` : "") +
@@ -261,8 +255,8 @@ export async function sendSubscriptionCancellationEmail(
       : null;
   const subject = "Your Geeklogs Pro subscription is cancelled";
   const accessLine = endsLabel
-    ? `You'll keep Pro access until ${endsLabel}. After that date your account moves back to the Free plan, and your logs stay with you.`
-    : "You'll keep Pro access through the end of the current billing period. After that your account moves back to the Free plan, and your logs stay with you.";
+    ? `You'll keep unlimited logs until ${endsLabel}. After that date your account moves back to the 500-log limit, and your logs stay with you.`
+    : "You'll keep unlimited logs through the end of the current billing period. After that your account moves back to the 500-log limit, and your logs stay with you.";
   const text =
     `Hi ${plainName},\n\n` +
     `Your Geeklogs Pro subscription has been cancelled. ${accessLine}\n\n` +

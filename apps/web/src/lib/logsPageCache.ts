@@ -23,7 +23,7 @@ export const MILESTONES_PATH = "/me/milestones/progress";
 let registeredMediaTypes: MediaType[] = [...MEDIA_TYPES];
 let registeredFollowedUserIds: string[] = [];
 let registeredTzOffset = -new Date().getTimezoneOffset();
-let registeredIsPro = false;
+let registeredIsPro = true;
 let warmListenerInstalled = false;
 let sessionDashboardLogsWarmed = false;
 let sessionStatisticsWarmed = false;
@@ -344,21 +344,15 @@ export function warmStatisticsCaches(
 function warmStatisticsForFilter(
   filter: MediaType | "all",
   tz: number,
-  isPro: boolean,
+  _isPro: boolean,
   prefetchOpts?: { revalidate?: boolean; priority?: "high" | "low" }
 ): void {
   const mq = mediaQuery(filter);
   prefetchGet(`/logs/stats?group=summary&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
-  prefetchGet(`/logs/stats?group=category&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
+  prefetchGet(`/logs/stats?group=month&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
+  prefetchGet(`/logs/stats?group=paceByMonth&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
   prefetchGet(`/logs/stats?group=genre&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
-  if (isPro) {
-    prefetchGet(`/logs?limit=5&sort=dateDesc${mq}`, prefetchOpts);
-  } else {
-    prefetchGet(
-      `/logs?limit=5&sort=dateDesc&forStatistics=1&timezoneOffsetMinutes=${tz}${mq}`,
-      prefetchOpts
-    );
-  }
+  prefetchGet(`/logs?limit=5&sort=dateDesc${mq}`, prefetchOpts);
   if (filter === "games" || filter === "all") {
     prefetchGet(`/logs/stats?group=gamePlatforms&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
   }
@@ -374,10 +368,8 @@ function warmStatisticsForFilter(
       prefetchOpts
     );
   }
-  if (isPro) {
-    prefetchGet(`/logs/stats?group=completedByMonth&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
-    prefetchGet(`/logs/stats?group=categoryByMonth&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
-  }
+  prefetchGet(`/logs/stats?group=completedByMonth&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
+  prefetchGet(`/logs/stats?group=categoryByMonth&timezoneOffsetMinutes=${tz}${mq}`, prefetchOpts);
 }
 
 let warmDebounceTimer: ReturnType<typeof setTimeout> | null = null;

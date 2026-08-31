@@ -1,16 +1,21 @@
 /**
- * Shared logic for attributing "content hours" to completed logs (Statistics /logs/stats).
- * Kept pure for unit tests and to match category/month/year aggregation.
+ * Hours attributed to a completed log for Statistics (overview, pace, public profile).
+ * Calendar span (startedAt → completedAt) is not used: that is elapsed dates, not time spent.
+ *
+ * Per category:
+ * - movies / tv / anime: stored runtime (`contentHours`)
+ * - games: HowLongToBeat / user hours-to-beat, else `contentHours`
+ * - boardgames: summed session duration, else 1h per match
+ * - books / manga / comics: `contentHours`, else pages at READING_PAGES_PER_HOUR
  */
 
-import { COMPLETED_STATUSES, statusSetsCompletedAt, statusSetsStartedAt } from "@geeklogs/shared";
+import { COMPLETED_STATUSES, statusSetsCompletedAt } from "@geeklogs/shared";
 
-export const MS_PER_HOUR = 60 * 60 * 1000;
-export const FALLBACK_MAX_HOURS = 24;
-/** Rough reading pace for books/manga/comics when no dates or runtime are stored. */
+/** Rough reading pace for books/manga/comics when no runtime is stored. */
 export const READING_PAGES_PER_HOUR = 30;
 
 const READING_MEDIA_TYPES = new Set(["books", "manga", "comics"]);
+const SCREEN_MEDIA_TYPES = new Set(["movies", "tv", "anime"]);
 
 export type CompletedLogForHours = {
   completedAt: Date | null;
@@ -40,47 +45,43 @@ function resolveCompletedAt(log: CompletedLogForHours): Date | null {
   return null;
 }
 
-function resolveStartedAt(log: CompletedLogForHours): Date | null {
-  if (log.startedAt) return log.startedAt;
-  if (log.status != null && statusSetsStartedAt(log.status) && log.updatedAt) {
-    return log.updatedAt;
-  }
-  return null;
+function positiveHours(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value) || value <= 0) return null;
+  return value;
 }
 
 /**
- * Hours attributed to a completed log for stats charts (same rules as legacy /logs/stats loop).
- * Returns null when this log should not contribute any bucket (skip).
+ * Hours attributed to a completed log. Returns null when this log should not
+ * contribute any bucket (skip).
  */
 export function hoursFromCompletedLogForStats(log: CompletedLogForHours): number | null {
   const completedAt = resolveCompletedAt(log);
   if (completedAt == null) return null;
-  const startedAt = resolveStartedAt(log);
 
   if (log.mediaType === "boardgames") {
-    if (log.boardGameSessionHours != null) {
-      return log.boardGameSessionHours > 0 ? log.boardGameSessionHours : 0;
-    }
+    const session = positiveHours(log.boardGameSessionHours);
+    if (session != null) return session;
     return (log.matchesPlayed ?? 0) * 1;
   }
-  if (log.mediaType === "games" && log.hoursToBeat != null && log.hoursToBeat > 0) {
-    return log.hoursToBeat;
+
+  if (log.mediaType === "games") {
+    return positiveHours(log.hoursToBeat) ?? positiveHours(log.contentHours);
   }
-  if (log.contentHours != null && log.contentHours > 0) {
-    return log.contentHours;
+
+  if (SCREEN_MEDIA_TYPES.has(log.mediaType)) {
+    return positiveHours(log.contentHours);
   }
-  if (startedAt != null) {
-    const elapsedMs = completedAt.getTime() - startedAt.getTime();
-    const hours = Math.min(elapsedMs / MS_PER_HOUR, FALLBACK_MAX_HOURS);
-    if (hours > 0) return hours;
-  }
+
   if (READING_MEDIA_TYPES.has(log.mediaType)) {
+    const explicit = positiveHours(log.contentHours);
+    if (explicit != null) return explicit;
     if (log.pagesRead != null && log.pagesRead > 0) {
       return Math.round((log.pagesRead / READING_PAGES_PER_HOUR) * 10) / 10;
     }
     return 0;
   }
-  return null;
+
+  return positiveHours(log.contentHours);
 }
 
 export type SummaryHoursRollup = {

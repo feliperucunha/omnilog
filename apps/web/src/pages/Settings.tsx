@@ -33,7 +33,7 @@ import {
 } from "@geeklogs/shared";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { cn } from "@/lib/utils";
-import { tierHasProFeatures, tierHasUnlimitedLogs } from "@/lib/userTier";
+import { tierHasUnlimitedLogs } from "@/lib/userTier";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import {
@@ -798,10 +798,7 @@ export function Settings() {
               </Link>
               <button
                 type="button"
-                onClick={() => {
-                  if (tierHasProFeatures(me.tier)) setExportModalOpen(true);
-                  else setExportOpen(true);
-                }}
+                onClick={() => setExportModalOpen(true)}
                 className="flex flex-col gap-1 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 p-3 text-left transition-colors hover:bg-[var(--color-mid)]/10"
               >
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--btn-gradient-start)]/15 text-[var(--btn-gradient-start)]">
@@ -1074,7 +1071,7 @@ export function Settings() {
           hidden={!navigationSectionVisible}
         >
           <div className="flex flex-col gap-0.5">
-            {me && tierHasProFeatures(me.tier) ? (
+            {me && (
               <MediaCategoryDragList
                   order={orderedMediaTypes}
                   onReorder={(next) => {
@@ -1091,15 +1088,6 @@ export function Settings() {
                   gripAriaLabel={t("settings.dragToReorder")}
                   listAriaLabel={t("settings.visibleMediaTypesLabel")}
                 />
-            ) : (
-              <SettingsRow
-                label={t("settings.appNavigationProOnlyIntro")}
-                right={
-                  <Button variant="outline" className="h-7 px-3 text-xs" asChild>
-                    <Link to="/tiers">{t("settings.publicProfileUpgrade")}</Link>
-                  </Button>
-                }
-              />
             )}
 
             <div
@@ -1148,7 +1136,6 @@ export function Settings() {
             open={exportOpen}
             onToggle={() => setExportOpen((prev) => !prev)}
             hidden={!exportSectionVisible}
-            className={!tierHasProFeatures(me.tier) ? "opacity-75" : undefined}
           >
             <div className="flex flex-col gap-0.5">
               <SettingsRow
@@ -1158,22 +1145,12 @@ export function Settings() {
                     type="button"
                     variant="outline"
                     className="h-7 gap-1.5 px-3 text-xs"
-                    onClick={() => {
-                      if (tierHasProFeatures(me.tier)) setExportModalOpen(true);
-                    }}
-                    asChild={!tierHasProFeatures(me.tier)}
+                    onClick={() => setExportModalOpen(true)}
                   >
-                    {tierHasProFeatures(me.tier) ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Download className="h-3.5 w-3.5" aria-hidden />
-                        {t("tiers.exportLogs")}
-                      </span>
-                    ) : (
-                      <Link to="/tiers" className="inline-flex items-center gap-1.5">
-                        <Download className="h-3.5 w-3.5" aria-hidden />
-                        {t("tiers.exportLogs")}
-                      </Link>
-                    )}
+                    <span className="inline-flex items-center gap-1.5">
+                      <Download className="h-3.5 w-3.5" aria-hidden />
+                      {t("tiers.exportLogs")}
+                    </span>
                   </Button>
                 }
               />
@@ -1181,7 +1158,7 @@ export function Settings() {
           </SettingsCollapsibleSection>
         )}
 
-        {me && tierHasProFeatures(me.tier) && (
+        {me && (
           <>
             {isMobile ? (
               <Drawer open={exportModalOpen} onOpenChange={(open) => !open && setExportModalOpen(false)}>

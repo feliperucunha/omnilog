@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  FALLBACK_MAX_HOURS,
   hoursFromCompletedLogForStats,
-  MS_PER_HOUR,
+  READING_PAGES_PER_HOUR,
   rollupHoursFromCompletedLogs,
 } from "./completedLogHours.js";
 
@@ -49,6 +48,20 @@ describe("hoursFromCompletedLogForStats", () => {
     ).toBe(2.5);
   });
 
+  it("uses match count when session hours are missing or zero", () => {
+    expect(
+      hoursFromCompletedLogForStats({
+        completedAt: d("2024-01-01T00:00:00.000Z"),
+        contentHours: null,
+        startedAt: null,
+        mediaType: "boardgames",
+        hoursToBeat: null,
+        matchesPlayed: 4,
+        boardGameSessionHours: 0,
+      })
+    ).toBe(4);
+  });
+
   it("returns 0 for boardgames with no matches (still a numeric attribution)", () => {
     expect(
       hoursFromCompletedLogForStats({
@@ -75,7 +88,20 @@ describe("hoursFromCompletedLogForStats", () => {
     ).toBe(12.5);
   });
 
-  it("uses contentHours when set for non-boardgame non-game-hoursToBeat path", () => {
+  it("falls back to contentHours for games without hoursToBeat", () => {
+    expect(
+      hoursFromCompletedLogForStats({
+        completedAt: d("2024-01-01T00:00:00.000Z"),
+        contentHours: 8,
+        startedAt: null,
+        mediaType: "games",
+        hoursToBeat: null,
+        matchesPlayed: null,
+      })
+    ).toBe(8);
+  });
+
+  it("uses contentHours for movies, tv, and anime", () => {
     expect(
       hoursFromCompletedLogForStats({
         completedAt: d("2024-01-01T00:00:00.000Z"),
@@ -86,49 +112,76 @@ describe("hoursFromCompletedLogForStats", () => {
         matchesPlayed: null,
       })
     ).toBe(2.5);
-  });
-
-  it("derives hours from startedAt to completedAt with cap", () => {
-    const started = d("2024-01-01T00:00:00.000Z");
-    const completed = new Date(started.getTime() + 3 * MS_PER_HOUR);
     expect(
       hoursFromCompletedLogForStats({
-        completedAt: completed,
-        contentHours: null,
-        startedAt: started,
-        mediaType: "movies",
+        completedAt: d("2024-01-01T00:00:00.000Z"),
+        contentHours: 12,
+        startedAt: null,
+        mediaType: "tv",
         hoursToBeat: null,
         matchesPlayed: null,
       })
-    ).toBe(3);
-  });
-
-  it("caps derived elapsed hours at FALLBACK_MAX_HOURS", () => {
-    const started = d("2024-01-01T00:00:00.000Z");
-    const completed = new Date(started.getTime() + (FALLBACK_MAX_HOURS + 10) * MS_PER_HOUR);
+    ).toBe(12);
     expect(
       hoursFromCompletedLogForStats({
-        completedAt: completed,
-        contentHours: null,
-        startedAt: started,
+        completedAt: d("2024-01-01T00:00:00.000Z"),
+        contentHours: 0.4,
+        startedAt: null,
         mediaType: "anime",
         hoursToBeat: null,
         matchesPlayed: null,
       })
-    ).toBe(FALLBACK_MAX_HOURS);
+    ).toBe(0.4);
   });
 
-  it("returns null when no rule applies", () => {
+  it("does not use calendar elapsed time as watch or play time", () => {
+    const started = d("2024-01-01T00:00:00.000Z");
+    const completed = d("2024-01-15T00:00:00.000Z");
     expect(
       hoursFromCompletedLogForStats({
-        completedAt: d("2024-01-01T00:00:00.000Z"),
+        completedAt: completed,
         contentHours: null,
-        startedAt: null,
+        startedAt: started,
         mediaType: "movies",
         hoursToBeat: null,
         matchesPlayed: null,
       })
     ).toBeNull();
+    expect(
+      hoursFromCompletedLogForStats({
+        completedAt: completed,
+        contentHours: null,
+        startedAt: started,
+        mediaType: "games",
+        hoursToBeat: null,
+        matchesPlayed: null,
+      })
+    ).toBeNull();
+    expect(
+      hoursFromCompletedLogForStats({
+        completedAt: completed,
+        contentHours: null,
+        startedAt: started,
+        mediaType: "books",
+        hoursToBeat: null,
+        matchesPlayed: null,
+        pagesRead: 150,
+      })
+    ).toBe(150 / READING_PAGES_PER_HOUR);
+  });
+
+  it("prefers contentHours over pages for reading media", () => {
+    expect(
+      hoursFromCompletedLogForStats({
+        completedAt: d("2024-01-01T00:00:00.000Z"),
+        contentHours: 6,
+        startedAt: null,
+        mediaType: "books",
+        hoursToBeat: null,
+        matchesPlayed: null,
+        pagesRead: 300,
+      })
+    ).toBe(6);
   });
 
   it("uses updatedAt when status is read but completedAt is stale", () => {
@@ -162,7 +215,7 @@ describe("hoursFromCompletedLogForStats", () => {
     ).toBe(5);
   });
 
-  it("returns 0 hours for completed reading log without pages or dates", () => {
+  it("returns 0 hours for completed reading log without pages or runtime", () => {
     expect(
       hoursFromCompletedLogForStats({
         completedAt: d("2024-01-01T00:00:00.000Z"),

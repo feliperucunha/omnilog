@@ -8,7 +8,6 @@ import {
 import { MEDIA_TYPES, type MediaType } from "@geeklogs/shared";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
-import { tierHasProFeatures } from "@/lib/userTier";
 import {
   registerLogsPageCacheContext,
   scheduleIdleDashboardWarm,
@@ -86,8 +85,7 @@ export function VisibleMediaTypesProvider({ children }: { children: ReactNode })
   useEffect(() => {
     if (!token || loading || !me) return;
     const tz = -new Date().getTimezoneOffset();
-    const isPro = tierHasProFeatures(me.tier);
-    registerLogsPageCacheContext({ mediaTypes: visibleTypes, tzOffsetMinutes: tz, isPro });
+    registerLogsPageCacheContext({ mediaTypes: visibleTypes, tzOffsetMinutes: tz, isPro: true });
     if (!visibleTypesOrderReady || visibleTypes.length === 0) return;
     scheduleIdleDashboardWarm(visibleTypes);
   }, [token, loading, me, visibleTypes, visibleTypesOrderReady]);

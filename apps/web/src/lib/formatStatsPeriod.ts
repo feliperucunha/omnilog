@@ -58,6 +58,14 @@ export function statsPeriodRecentCutoff(
   return `${y}-${String(m).padStart(2, "0")}`;
 }
 
+/** Current month (`YYYY-MM`) or year (`YYYY`) in the user's timezone. */
+export function currentStatsPeriodKey(
+  granularity: "month" | "year",
+  tzOffsetMinutes: number
+): string {
+  return statsPeriodRecentCutoff(granularity, tzOffsetMinutes, 1);
+}
+
 export function isStatsPeriodAtOrAfter(period: string, cutoff: string): boolean {
   return period.localeCompare(cutoff) >= 0;
 }

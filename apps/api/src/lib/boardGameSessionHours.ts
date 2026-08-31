@@ -26,6 +26,8 @@ export async function attachBoardGameSessionHours<T extends CompletedLogForHours
   const byLog = await boardGameSessionHoursByLogIds(boardIds);
   return logs.map((log) => {
     if (log.mediaType !== "boardgames" || !log.id) return log;
-    return { ...log, boardGameSessionHours: byLog.get(log.id) ?? 0 };
+    const session = byLog.get(log.id);
+    if (session == null || session <= 0) return log;
+    return { ...log, boardGameSessionHours: session };
   });
 }

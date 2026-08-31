@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  currentStatsPeriodKey,
   partitionStatsPeriods,
   sortStatsPeriodsDesc,
   statsPeriodRecentCutoff,
@@ -12,6 +13,14 @@ describe("sortStatsPeriodsDesc", () => {
       "2025-12",
       "2024-01",
     ]);
+  });
+});
+
+describe("currentStatsPeriodKey", () => {
+  it("matches the latest cutoff (keep 1)", () => {
+    const tz = -180;
+    expect(currentStatsPeriodKey("month", tz)).toBe(statsPeriodRecentCutoff("month", tz, 1));
+    expect(currentStatsPeriodKey("year", tz)).toBe(statsPeriodRecentCutoff("year", tz, 1));
   });
 });
 

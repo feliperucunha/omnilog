@@ -8,11 +8,6 @@ import type { MediaType, Log } from "@geeklogs/shared";
 import { LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { buildMediaLogsSortOptions } from "@/lib/mediaLogsSortOptions";
 import { getStatusLabel } from "@/lib/statusLabel";
-import {
-  logStatusSelectTriggerClass,
-  logStatusSoftBadgeClass,
-  mediaTypeUsesEpisodeStatusColors,
-} from "@/lib/logStatusColors";
 import { cn } from "@/lib/utils";
 import {
   apiFetch,
@@ -60,15 +55,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { skipApiKeyMissingUi } from "@/lib/featureFlags";
-import { tierHasProFeatures } from "@/lib/userTier";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Select } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -307,7 +295,6 @@ export function MediaLogs({
   const [incrementingId, setIncrementingId] = useState<string | null>(null);
   const [statusChangingId, setStatusChangingId] = useState<string | null>(null);
   const [exportingCategory, setExportingCategory] = useState(false);
-  const [showProModal, setShowProModal] = useState(false);
   /** Log id whose review is expanded in-card (no modal). */
   const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
   const [milestoneProgressFetched, setMilestoneProgressFetched] = useState<CategoryMilestoneProgress | null>(null);
@@ -821,7 +808,6 @@ export function MediaLogs({
     ];
   }, [t, statusCounts]);
 
-  const colorizeTvStatuses = mediaTypeUsesEpisodeStatusColors(mediaType);
   const statusFilterSelectOptions = useMemo(
     () => [
       {
@@ -837,12 +823,9 @@ export function MediaLogs({
           statusCounts != null
             ? `${getStatusLabel(t, s, mediaType)} (${statusCounts.byStatus[s] ?? 0})`
             : getStatusLabel(t, s, mediaType),
-        className: colorizeTvStatuses
-          ? cn("rounded-sm", logStatusSoftBadgeClass(s))
-          : undefined,
       })),
     ],
-    [colorizeTvStatuses, mediaType, statusCounts, t]
+    [mediaType, statusCounts, t]
   );
 
   const genreSelectOptions = useMemo(() => {
@@ -918,20 +901,10 @@ export function MediaLogs({
     </form>
   );
 
-  const hasProFeatures = tierHasProFeatures(me?.tier);
   const handleOpenExport = () => {
-    if (!hasProFeatures) {
-      setShowProModal(true);
-      return;
-    }
     setShowExportModal(true);
   };
   const handleConfirmExport = async (opts: ExportLogsOptions) => {
-    if (!hasProFeatures) {
-      setShowExportModal(false);
-      setShowProModal(true);
-      return;
-    }
     setExportingCategory(true);
     try {
       const params = new URLSearchParams();
@@ -989,25 +962,6 @@ export function MediaLogs({
 
   return (
     <div className={`relative min-h-full min-w-0 overflow-hidden pb-24 md:pb-20 ${embedded ? "" : ""}`}>
-      {!readOnly && (
-        <Dialog open={showProModal && !hasProFeatures} onOpenChange={setShowProModal}>
-          <DialogContent onClose={() => setShowProModal(false)}>
-            <DialogHeader>
-              <DialogTitle className="min-w-0 text-[var(--color-lightest)]">
-                <OverflowMarquee>{t("statistics.proOnlyTitle")}</OverflowMarquee>
-              </DialogTitle>
-            </DialogHeader>
-            <p className="text-sm text-[var(--color-light)]">
-              {t("statistics.proOnlyMessage")}
-            </p>
-            <Button asChild className="btn-gradient w-fit">
-              <Link to="/tiers" onClick={() => setShowProModal(false)}>
-                {t("tiers.upgradeToPro")}
-              </Link>
-            </Button>
-          </DialogContent>
-        </Dialog>
-      )}
       {!embedded && (
         <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
           <Logo alt="" className="h-40 w-auto opacity-20 sm:h-52 md:h-64" />
@@ -1094,7 +1048,7 @@ export function MediaLogs({
                 type="button"
                 variant="outline"
                 size="icon"
-                className={cn("shrink-0", !hasProFeatures && "opacity-60 cursor-pointer")}
+                className="shrink-0"
                 onClick={handleOpenExport}
                 disabled={exportingCategory}
                 title={t("mediaLogs.exportCategory")}
@@ -1113,12 +1067,7 @@ export function MediaLogs({
                 options={statusFilterSelectOptions}
                 aria-label={t("itemReviewForm.status")}
                 className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
-                triggerClassName={cn(
-                  "w-full min-w-0 max-w-none",
-                  colorizeTvStatuses && statusFilter
-                    ? logStatusSelectTriggerClass(statusFilter)
-                    : undefined
-                )}
+                triggerClassName="w-full min-w-0 max-w-none"
               />
               {showCollectionOwnershipFilters && (
                 <Select
@@ -1267,10 +1216,7 @@ export function MediaLogs({
               type="button"
               variant="outline"
               size="icon"
-              className={cn(
-                "h-8 w-8 shrink-0 md:h-9 md:w-9",
-                !hasProFeatures && "opacity-60 cursor-pointer"
-              )}
+              className="h-8 w-8 shrink-0 md:h-9 md:w-9"
               onClick={handleOpenExport}
               disabled={exportingCategory}
               title={t("mediaLogs.exportCategory")}
@@ -1302,12 +1248,7 @@ export function MediaLogs({
               options={statusFilterSelectOptions}
               aria-label={t("itemReviewForm.status")}
               className="min-w-0 w-full"
-              triggerClassName={cn(
-                "w-full max-w-none min-w-0",
-                colorizeTvStatuses && statusFilter
-                  ? logStatusSelectTriggerClass(statusFilter)
-                  : undefined
-              )}
+              triggerClassName="w-full max-w-none min-w-0"
             />
             {showCollectionOwnershipFilters && (
               <Select
@@ -1362,12 +1303,7 @@ export function MediaLogs({
           options={statusFilterSelectOptions}
           aria-label={t("itemReviewForm.status")}
           className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
-          triggerClassName={cn(
-            "w-full min-w-0 max-w-none",
-            colorizeTvStatuses && statusFilter
-              ? logStatusSelectTriggerClass(statusFilter)
-              : undefined
-          )}
+          triggerClassName="w-full min-w-0 max-w-none"
         />
         {showCollectionOwnershipFilters && (
           <Select

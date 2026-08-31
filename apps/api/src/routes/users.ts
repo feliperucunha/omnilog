@@ -261,6 +261,9 @@ usersRouter.get("/:identifier/logs/stats", async (req: Request<{ identifier: str
       mediaType: true,
       hoursToBeat: true,
       matchesPlayed: true,
+      pagesRead: true,
+      status: true,
+      updatedAt: true,
     },
   });
   const logsWithSessionHours = await attachBoardGameSessionHours(logs);

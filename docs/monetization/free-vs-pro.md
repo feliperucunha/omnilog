@@ -1,15 +1,17 @@
 # Free vs Pro (source of truth)
 
-Server enforcement lives in [`apps/api/src/lib/userTier.ts`](../../apps/api/src/lib/userTier.ts) and route handlers (notably [`logs.ts`](../../apps/api/src/routes/logs.ts) for log limits and Pro-only features).
+Every tier can use every app feature (statistics, export, calendar, recap, profile customization). The only plan-based restriction is the log count cap, enforced in [`logs.ts`](../../apps/api/src/routes/logs.ts) via [`tierHasUnlimitedLogs`](../../apps/api/src/lib/userTier.ts).
 
 ## Tiers
 
-| Tier | Pro-style features (stats, export, etc.) | Unlimited logs (500+ cap) |
-|------|------------------------------------------|---------------------------|
-| `free` | No | No (cap enforced server-side) |
-| `beta` | Yes (promotional / early access) | **No** — beta still has the free log cap |
+| Tier | App features | Unlimited logs (500+ cap) |
+|------|--------------|---------------------------|
+| `free` | Yes | No (cap enforced server-side) |
+| `beta` | Yes | **No** — beta still has the free log cap |
 | `pro` | Yes | Yes |
 | `admin` | Yes | Yes |
+
+Pro is paid because server storage is limited; unlimited libraries are not offered on Free/Beta.
 
 ## Marketing alignment
 

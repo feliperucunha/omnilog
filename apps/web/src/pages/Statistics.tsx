@@ -23,9 +23,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import {
   apiFetch,
-  ApiError,
   getCachedEntry,
   HEAVY_PAGE_TTL_MS,
   apiFetchSWR,
@@ -61,8 +61,6 @@ import { itemDetailPath } from "@/lib/itemRoutes";
 import { useLocale, type Locale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
-import { useMe } from "@/contexts/MeContext";
-import { tierHasProFeatures } from "@/lib/userTier";
 import { logStatusBadgeClass, logStatusBorderClass } from "@/lib/logStatusColors";
 import {
   IN_PROGRESS_STATUSES,
@@ -93,7 +91,7 @@ import { buildRecapTitle, recapBoundsForPeriod, type RecapPeriod } from "@/lib/r
 import { RecapView } from "@/components/RecapView";
 import * as storage from "@/lib/storage";
 import { currencyMinorDecimals } from "@/lib/moneyInput";
-import { formatStatsTimeAxisLabel, partitionStatsPeriods, sortStatsPeriodsDesc } from "@/lib/formatStatsPeriod";
+import { currentStatsPeriodKey, formatStatsTimeAxisLabel, partitionStatsPeriods, sortStatsPeriodsDesc } from "@/lib/formatStatsPeriod";
 import { cn } from "@/lib/utils";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
@@ -474,7 +472,6 @@ type PurchasePeriod = "month" | "year" | "all";
 type BoardGameMatchesPeriod = "month" | "year";
 type BoardGameMatchesSort = "recent" | "mostPlayed" | "leastPlayed";
 
-const STORAGE_KEY_STATS = "geeklogs.statistics.statsCollapsed";
 const STORAGE_KEY_RECENT = "geeklogs.statistics.recentLogsCollapsed";
 const STORAGE_KEY_SUMMARY = "geeklogs.statistics.summaryCollapsed";
 const STORAGE_KEY_LIBRARY_STATUS = "geeklogs.statistics.libraryStatusCollapsed";
@@ -486,10 +483,10 @@ const STORAGE_KEY_CHARTS = "geeklogs.statistics.chartsCollapsed";
 const STORAGE_KEY_GAME_WEIGHT = "geeklogs.statistics.gameWeightCollapsed";
 const STORAGE_KEY_PACE = "geeklogs.statistics.paceCollapsed";
 
-type StatsGroup = "category" | "month" | "year";
 type GenreGraphMode = "genre" | "statusOverTime" | "byCategory";
 type StatusOverTimeGroup = "month" | "year";
 type PacePeriod = "month" | "year";
+type PaceChartMode = "pace" | "completed";
 interface StatsEntry {
   period: string;
   hours: number;
@@ -704,36 +701,58 @@ function formatPacePeriodLabel(period: string, granularity: PacePeriod, locale: 
   );
 }
 
+/** Compact enough to sit on a narrow bar; otherwise a normal locale number. */
+function formatPaceBarValue(value: number, locale: Locale, compact: boolean): string {
+  const tag = locale === "pt-BR" ? "pt-BR" : locale === "es" ? "es" : "en";
+  const n = Math.abs(value - Math.round(value)) < 0.05 ? Math.round(value) : value;
+  return new Intl.NumberFormat(tag, {
+    notation: compact && Math.abs(n) >= 1000 ? "compact" : "standard",
+    maximumFractionDigits: compact && Math.abs(n) >= 1000 ? 1 : Number.isInteger(n) ? 0 : 1,
+  }).format(n);
+}
+
 /** SVG bars for the monthly/yearly increments of a category (hover tooltips + tap to drill down). */
 function PaceBars({
   data,
   from,
   to,
   unit,
+  locale,
+  gradientId = "pace-bar",
   onBarSelect,
 }: {
   data: Array<{ period: string; label: string; value: number; count: number }>;
   from: string;
   to: string;
   unit: string;
+  locale: Locale;
+  gradientId?: string;
   onBarSelect?: (index: number) => void;
 }) {
+  const isMobile = useIsMobile();
   const max = Math.max(...data.map((d) => d.value)) || 1;
   const W = 560;
   const H = 150;
+  const AXIS = 22;
   const BAND = W / data.length;
   const BAR = Math.max(8, BAND * 0.55);
   const GAP = (BAND - BAR) / 2;
+  const compactValues = BAND < 36;
+  const valueFontSize = isMobile
+    ? Math.min(22, Math.max(15, BAND * 0.5))
+    : Math.min(10, Math.max(7, BAND * 0.32));
+  const valueGap = isMobile ? 6 : 4;
+  const TOP = valueFontSize + 8;
 
   return (
     <svg
-      viewBox={`0 0 ${W} ${H + 22}`}
+      viewBox={`0 0 ${W} ${TOP + H + AXIS}`}
       className="w-full"
       role="img"
       aria-label={data.map((d) => `${d.label}: ${d.value} ${unit}`).join(", ")}
     >
       <defs>
-        <linearGradient id="pace-bar" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={from} />
           <stop offset="100%" stopColor={to} stopOpacity={0.45} />
         </linearGradient>
@@ -743,8 +762,8 @@ function PaceBars({
           key={f}
           x1={0}
           x2={W}
-          y1={H - (H - 8) * f}
-          y2={H - (H - 8) * f}
+          y1={TOP + H - (H - 8) * f}
+          y2={TOP + H - (H - 8) * f}
           stroke="var(--color-mid)"
           strokeOpacity={0.18}
           strokeDasharray="3 4"
@@ -753,9 +772,10 @@ function PaceBars({
       {data.map((d, i) => {
         const h = Math.max(4, (d.value / max) * (H - 8));
         const x = i * BAND + GAP;
-        const y = H - h;
+        const y = TOP + H - h;
         const textX = i * BAND + BAND / 2;
         const clickable = Boolean(onBarSelect) && d.count > 0;
+        const amount = formatPaceBarValue(d.value, locale, compactValues);
         return (
           <g
             key={d.period}
@@ -775,11 +795,22 @@ function PaceBars({
             aria-label={clickable ? d.label : undefined}
             style={clickable ? { cursor: "pointer" } : undefined}
           >
-            <rect x={x} y={y} width={BAR} height={h} rx={3} fill="url(#pace-bar)" />
+            <rect x={x} y={y} width={BAR} height={h} rx={3} fill={`url(#${gradientId})`} />
             <title>{`${d.label}: ${d.value.toLocaleString()} ${unit}`}</title>
             <text
               x={textX}
-              y={H + 14}
+              y={y - valueGap}
+              textAnchor="middle"
+              fontSize={valueFontSize}
+              fontWeight={600}
+              fill="var(--color-lightest)"
+              pointerEvents="none"
+            >
+              {amount}
+            </text>
+            <text
+              x={textX}
+              y={TOP + H + 14}
               textAnchor="middle"
               fontSize={9}
               fill="var(--color-light)"
@@ -795,19 +826,15 @@ function PaceBars({
 
 export function Statistics() {
   const { t, locale } = useLocale();
-  const { me } = useMe();
   const { visibleTypes, visibleTypesOrderReady } = useVisibleMediaTypes();
   const { setPageTitle, setRightSlot, setBelowNavbar } = usePageTitle() ?? {};
   const [categoryFilter, setCategoryFilter] = useState<"all" | MediaType>("all");
-  const isPro = tierHasProFeatures(me?.tier);
+  const isPro = true;
   const [logs, setLogs] = useState<Log[]>([]);
   const [summary, setSummary] = useState<LogStatsSummary | null>(null);
   const [summaryByMonth, setSummaryByMonth] = useState<LogStatsSummaryByMonth[]>([]);
   const [summaryByMonthLoading, setSummaryByMonthLoading] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [statsGroup, setStatsGroup] = useState<StatsGroup>("category");
-  const [stats, setStats] = useState<StatsEntry[]>([]);
-  const [statsLoading, setStatsLoading] = useState(true);
   const [genreStats, setGenreStats] = useState<StatsEntry[]>([]);
   const [gamePlatformStats, setGamePlatformStats] = useState<StatsEntry[]>([]);
   const [gamePlatformStatsLoading, setGamePlatformStatsLoading] = useState(false);
@@ -832,8 +859,8 @@ export function Statistics() {
   >("all");
   const [pacePeriod, setPacePeriod] = useState<PacePeriod>("month");
   const [paceStats, setPaceStats] = useState<StatsEntry[]>([]);
+  const [paceHoursStats, setPaceHoursStats] = useState<StatsEntry[]>([]);
   const [paceLoading, setPaceLoading] = useState(true);
-  const [statsCollapsed, setStatsCollapsedState] = useState(false);
   const [recentLogsCollapsed, setRecentLogsCollapsedState] = useState(false);
   const [summaryCollapsed, setSummaryCollapsedState] = useState(false);
   const [libraryStatusCollapsed, setLibraryStatusCollapsedState] = useState(false);
@@ -844,7 +871,9 @@ export function Statistics() {
   const [chartsCollapsed, setChartsCollapsedState] = useState(false);
   const [gameWeightCollapsed, setGameWeightCollapsedState] = useState(false);
   const [paceCollapsed, setPaceCollapsedState] = useState(false);
-  const [showProModal, setShowProModal] = useState(false);
+  const [paceChartMode, setPaceChartMode] = useState<PaceChartMode>("pace");
+  const [completedStats, setCompletedStats] = useState<StatsEntry[]>([]);
+  const [completedLoading, setCompletedLoading] = useState(true);
   const [recapPickerOpen, setRecapPickerOpen] = useState(false);
   const [recapView, setRecapView] = useState<{ title: string; logs: Log[] } | null>(null);
   const [recapCategory, setRecapCategory] = useState<"all" | MediaType>("all");
@@ -871,7 +900,7 @@ export function Statistics() {
     period: string;
     granularity: StatusOverTimeGroup;
     title: string;
-    mediaType?: MediaType;
+    mediaType?: MediaType | "all";
   } | null>(null);
   const [weightBinActivity, setWeightBinActivity] = useState<{
     weightBin: string;
@@ -887,7 +916,6 @@ export function Statistics() {
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      storage.getItem(STORAGE_KEY_STATS),
       storage.getItem(STORAGE_KEY_RECENT),
       storage.getItem(STORAGE_KEY_SUMMARY),
       storage.getItem(STORAGE_KEY_LIBRARY_STATUS),
@@ -898,9 +926,8 @@ export function Statistics() {
       storage.getItem(STORAGE_KEY_CHARTS),
       storage.getItem(STORAGE_KEY_GAME_WEIGHT),
       storage.getItem(STORAGE_KEY_PACE),
-    ]).then(([statsVal, recentVal, summaryVal, libraryStatusVal, purchaseVal, boardGameMatchesVal, gamePlatformsVal, calendarVal, chartsVal, gameWeightVal, paceVal]) => {
+    ]).then(([recentVal, summaryVal, libraryStatusVal, purchaseVal, boardGameMatchesVal, gamePlatformsVal, calendarVal, chartsVal, gameWeightVal, paceVal]) => {
       if (cancelled) return;
-      if (statsVal === "true") setStatsCollapsedState(true);
       if (recentVal === "true") setRecentLogsCollapsedState(true);
       if (summaryVal === "true") setSummaryCollapsedState(true);
       if (libraryStatusVal === "true") setLibraryStatusCollapsedState(true);
@@ -915,11 +942,6 @@ export function Statistics() {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  const setStatsCollapsed = useCallback((value: boolean) => {
-    setStatsCollapsedState(value);
-    void storage.setItem(STORAGE_KEY_STATS, String(value));
   }, []);
 
   const setRecentLogsCollapsed = useCallback((value: boolean) => {
@@ -975,25 +997,9 @@ export function Statistics() {
   const collapsibleSectionBtnClass =
     "flex w-full items-center gap-2 rounded-lg py-2 max-md:min-h-[44px] max-md:py-3 text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)] focus:outline-none";
 
-  /** Bar charts: same label column and track height as the time consumed (stats) widget. */
-  const statBarGridClass =
-    "grid w-full min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto]";
-  const statBarTrackClass = "h-6 min-w-0 rounded bg-[var(--color-darkest)]";
-  const statBarFillClass = "h-full rounded bg-[var(--color-mid)]";
-  const statBarValueClass = "shrink-0 text-right text-xs tabular-nums text-[var(--color-lightest)]";
-
   const statsMediaQuery = useCallback(() => {
     return categoryFilter === "all" ? "" : `&mediaType=${encodeURIComponent(categoryFilter)}`;
   }, [categoryFilter]);
-
-  const fetchStats = useCallback(async () => {
-    const path = `/logs/stats?group=${statsGroup}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
-    await loadWithSWR<{ data: StatsEntry[] }>(
-      path,
-      (res) => setStats(res.data ?? []),
-      { setLoading: setStatsLoading, onError: () => setStats([]) }
-    );
-  }, [categoryFilter, statsGroup, tzOffsetMinutes, statsMediaQuery]);
 
   const fetchGamePlatformStats = useCallback(async () => {
     if (categoryFilter !== "games" && categoryFilter !== "all") {
@@ -1079,14 +1085,37 @@ export function Statistics() {
   }, [boardGameWeightScope, statsMediaQuery]);
 
   const fetchPace = useCallback(async () => {
-    const apiGroup = !isPro ? "paceByMonth" : pacePeriod === "year" ? "paceByYear" : "paceByMonth";
-    const path = `/logs/stats?group=${apiGroup}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
+    const paceGroup = pacePeriod === "year" ? "paceByYear" : "paceByMonth";
+    const hoursGroup = pacePeriod === "year" ? "year" : "month";
+    const mediaQ = statsMediaQuery();
+    const tzQ = `timezoneOffsetMinutes=${tzOffsetMinutes}`;
+    setPaceLoading(true);
+    try {
+      await Promise.all([
+        loadWithSWR<{ data: StatsEntry[] }>(
+          `/logs/stats?group=${paceGroup}&${tzQ}${mediaQ}`,
+          (res) => setPaceStats(res.data ?? []),
+          { onError: () => setPaceStats([]) }
+        ),
+        loadWithSWR<{ data: StatsEntry[] }>(
+          `/logs/stats?group=${hoursGroup}&${tzQ}${mediaQ}`,
+          (res) => setPaceHoursStats(res.data ?? []),
+          { onError: () => setPaceHoursStats([]) }
+        ),
+      ]);
+    } finally {
+      setPaceLoading(false);
+    }
+  }, [pacePeriod, tzOffsetMinutes, statsMediaQuery]);
+
+  const fetchCompleted = useCallback(async () => {
+    const group = pacePeriod === "year" ? "completedByYear" : "completedByMonth";
     await loadWithSWR<{ data: StatsEntry[] }>(
-      path,
-      (res) => setPaceStats(res.data ?? []),
-      { setLoading: setPaceLoading, onError: () => setPaceStats([]) }
+      `/logs/stats?group=${group}&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`,
+      (res) => setCompletedStats(res.data ?? []),
+      { setLoading: setCompletedLoading, onError: () => setCompletedStats([]) }
     );
-  }, [isPro, pacePeriod, tzOffsetMinutes, statsMediaQuery]);
+  }, [pacePeriod, tzOffsetMinutes, statsMediaQuery]);
 
   type PurchaseSpendingResponse = {
     data: Record<string, Record<string, number>>;
@@ -1116,10 +1145,6 @@ export function Statistics() {
       }
     );
   }, [purchasePeriod, tzOffsetMinutes, statsMediaQuery]);
-
-  useEffect(() => {
-    void fetchStats();
-  }, [fetchStats]);
 
   useEffect(() => {
     if (!visibleTypesOrderReady || visibleTypes.length === 0) return;
@@ -1152,6 +1177,10 @@ export function Statistics() {
   }, [fetchPace]);
 
   useEffect(() => {
+    void fetchCompleted();
+  }, [fetchCompleted]);
+
+  useEffect(() => {
     if (genreGraphMode === "statusOverTime") {
       const apiGroup =
         !isPro ? "completedByMonth" : statusOverTimeGroup === "year" ? "completedByYear" : "completedByMonth";
@@ -1177,32 +1206,8 @@ export function Statistics() {
   }, [categoryFilter, fetchBoardGameWeightStats]);
 
   useEffect(() => {
-    if (!isPro && pacePeriod !== "month") setPacePeriod("month");
-  }, [isPro, pacePeriod]);
-
-  useEffect(() => {
-    if (!isPro && statusOverTimeGroup !== "month") setStatusOverTimeGroup("month");
-  }, [isPro, statusOverTimeGroup]);
-
-  useEffect(() => {
-    if (!isPro && categoryOverTimeGroup !== "month") setCategoryOverTimeGroup("month");
-  }, [isPro, categoryOverTimeGroup]);
-
-  useEffect(() => {
     setLogsChartShowOlderPeriods(false);
   }, [genreGraphMode, statusOverTimeGroup, categoryOverTimeGroup]);
-
-  useEffect(() => {
-    if (!isPro && purchasePeriod !== "month") setPurchasePeriod("month");
-  }, [isPro, purchasePeriod]);
-
-  useEffect(() => {
-    if (!isPro && boardGameMatchesPeriod !== "month") setBoardGameMatchesPeriod("month");
-  }, [isPro, boardGameMatchesPeriod]);
-
-  useEffect(() => {
-    if (!isPro && statsGroup !== "category") setStatsGroup("category");
-  }, [isPro, statsGroup]);
 
   useEffect(() => {
     void fetchPurchaseSpending();
@@ -1247,7 +1252,7 @@ export function Statistics() {
       period: string,
       granularity: StatusOverTimeGroup,
       title: string,
-      mediaType?: MediaType
+      mediaType?: MediaType | "all"
     ) => {
       setWeightBinActivity(null);
       setLogsPeriodActivity({ period, granularity, title, mediaType });
@@ -1271,11 +1276,14 @@ export function Statistics() {
     let cancelled = false;
     setLogsPeriodActivityLoading(true);
     setLogsPeriodActivityLogs([]);
-    const mediaQ = logsPeriodActivity.mediaType
-      ? `&mediaType=${encodeURIComponent(logsPeriodActivity.mediaType)}`
-      : categoryFilter === "all"
-        ? ""
-        : `&mediaType=${encodeURIComponent(categoryFilter)}`;
+    const mediaQ =
+      logsPeriodActivity.mediaType != null
+        ? logsPeriodActivity.mediaType === "all"
+          ? ""
+          : `&mediaType=${encodeURIComponent(logsPeriodActivity.mediaType)}`
+        : categoryFilter === "all"
+          ? ""
+          : `&mediaType=${encodeURIComponent(categoryFilter)}`;
     const path = `/logs/by-period?period=${encodeURIComponent(logsPeriodActivity.period)}&granularity=${logsPeriodActivity.granularity}&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`;
     void apiFetch<{ data: Log[] }>(path)
       .then((res) => {
@@ -1321,9 +1329,7 @@ export function Statistics() {
 
   const fetchLogs = useCallback(() => {
     const mediaQ = statsMediaQuery();
-    const logsQuery = isPro
-      ? `/logs?limit=5&sort=dateDesc${mediaQ}`
-      : `/logs?limit=5&sort=dateDesc&forStatistics=1&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`;
+    const logsQuery = `/logs?limit=5&sort=dateDesc${mediaQ}`;
     const summaryPath = `/logs/stats?group=summary&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`;
     const summaryByMonthPath = `/logs/stats?group=summaryByMonth&timezoneOffsetMinutes=${tzOffsetMinutes}${mediaQ}`;
 
@@ -1429,12 +1435,6 @@ export function Statistics() {
     ];
   }, [recapCategory, t]);
 
-  useEffect(() => {
-    if (recapPickerOpen && !isPro && recapPeriod !== "week") {
-      setRecapPeriod("week");
-    }
-  }, [recapPickerOpen, isPro, recapPeriod]);
-
   const handleOpenRecapPicker = useCallback(() => {
     setRecapPickerOpen(true);
   }, []);
@@ -1471,10 +1471,6 @@ export function Statistics() {
       setRecapView({ title, logs: (res.data ?? []).map(decodeLogForDisplay) });
       setRecapPickerOpen(false);
     } catch (e) {
-      if (e instanceof ApiError && e.statusCode === 403) {
-        setShowProModal(true);
-        return;
-      }
       showErrorToast(t, "E010", { originalError: e });
     } finally {
       setRecapSubmitting(false);
@@ -1551,11 +1547,11 @@ export function Statistics() {
   const refreshAll = useCallback(() => {
     invalidateLogsAndItemsCache();
     requestLogsCacheWarm();
-    void fetchStats();
     void fetchGenreStats();
     void fetchGamePlatformStats();
     void fetchRecentBoardGames();
     void fetchPace();
+    void fetchCompleted();
     void fetchPurchaseSpending();
     if (genreGraphMode === "statusOverTime") {
       const apiGroup =
@@ -1572,11 +1568,11 @@ export function Statistics() {
     }
     fetchLogs();
   }, [
-    fetchStats,
     fetchGenreStats,
     fetchGamePlatformStats,
     fetchRecentBoardGames,
     fetchPace,
+    fetchCompleted,
     fetchPurchaseSpending,
     genreGraphMode,
     isPro,
@@ -1592,30 +1588,6 @@ export function Statistics() {
   useAppPtrRefresh(refreshAll);
 
   const recent = logs.slice(0, 5);
-  const displayedStats = useMemo(() => {
-    if (statsGroup === "category") {
-      if (categoryFilter !== "all") {
-        const row = stats.find((s) => s.period === categoryFilter);
-        return [
-          {
-            period: categoryFilter,
-            hours: row?.hours ?? 0,
-            count: row?.count ?? 0,
-          },
-        ];
-      }
-      return visibleTypes.map((period) => {
-        const row = stats.find((s) => s.period === period);
-        return {
-          period,
-          hours: row?.hours ?? 0,
-          count: row?.count ?? 0,
-        };
-      });
-    }
-    return stats;
-  }, [statsGroup, stats, visibleTypes, categoryFilter]);
-  const maxHours = displayedStats.length > 0 ? Math.max(...displayedStats.map((s) => s.hours), 1) : 1;
   const maxCategoryOverTimeCount =
     categoryOverTimeStats.length > 0 ? Math.max(...categoryOverTimeStats.map((s) => s.hours), 1) : 1;
   const maxBoardGameWeightCount =
@@ -1678,11 +1650,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
         .map((m) => ({ period: m.period, hours: pick(m) ?? 0 }))
         .filter((e) => e.hours != null);
 
-    const hours = momentumFromStatsEntries(
-      statsGroup === "month"
-        ? stats
-        : monthSeries((m) => m.totalContentHours ?? 0)
-    );
+    const hours = momentumFromStatsEntries(monthSeries((m) => m.totalContentHours ?? 0));
     const completed = momentumFromStatsEntries(monthSeries((m) => m.completedLogs));
     const pages = momentumFromStatsEntries(monthSeries((m) => m.totalPagesRead ?? 0));
     const genre = momentumFromStatsEntries(genreStats);
@@ -1692,7 +1660,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
     const boardGamesWon = momentumFromStatsEntries(monthSeries((m) => m.boardGamesWon ?? 0));
 
     return { hours, completed, pages, genre, totalLogs, reviewed, boardGamesWon };
-  }, [stats, statsGroup, genreStats, summaryByMonth]);
+  }, [genreStats, summaryByMonth]);
 
   const momentumAria = (delta: number) => t("statistics.momentumLabel", { delta: String(delta) });
 
@@ -1712,13 +1680,16 @@ const summaryData = summary ?? EMPTY_SUMMARY;
     [paceStats, paceGranularity, locale]
   );
   const paceTotal = paceSeries.reduce((a, s) => a + s.value, 0);
-  const paceMomentum = useMemo(() => momentumFromStatsEntries(paceStats), [paceStats]);
   const paceBest = paceSeries.length > 0 ? Math.max(...paceSeries.map((s) => s.value), 1) : 0;
   const paceTopEntry = [...paceSeries].sort((a, b) => b.value - a.value)[0];
   const paceTopLabel = paceTopEntry
     ? formatPacePeriodLabel(paceTopEntry.period, paceGranularity, locale)
     : "—";
   const paceAvg = paceSeries.length > 0 ? Math.round(paceTotal / paceSeries.length) : 0;
+  const paceHoursPeriodKey = currentStatsPeriodKey(paceGranularity, tzOffsetMinutes);
+  const paceHoursThisPeriod =
+    paceHoursStats.find((entry) => entry.period === paceHoursPeriodKey)?.hours ?? 0;
+  const paceHoursLabel = t("dashboard.hoursConsumed", { hours: paceHoursThisPeriod.toFixed(1) });
 
   const handlePaceBarSelect = useCallback(
     (index: number) => {
@@ -1734,6 +1705,56 @@ const summaryData = summary ?? EMPTY_SUMMARY;
     },
     [paceSeries, paceGranularity, pacePeriod, t, categoryFilter, openLogsPeriodActivity]
   );
+
+  const completedUnit = t("statistics.paceUnitItems");
+  const completedSeries = useMemo(
+    () =>
+      completedStats.map(({ period, hours, count }) => ({
+        period,
+        label: formatPacePeriodLabel(period, paceGranularity, locale),
+        value: count ?? hours,
+        count: count ?? hours,
+      })),
+    [completedStats, paceGranularity, locale]
+  );
+  const completedTotal = completedSeries.reduce((a, s) => a + s.value, 0);
+  const completedBest = completedSeries.length > 0 ? Math.max(...completedSeries.map((s) => s.value), 1) : 0;
+  const completedTopEntry = [...completedSeries].sort((a, b) => b.value - a.value)[0];
+  const completedTopLabel = completedTopEntry
+    ? formatPacePeriodLabel(completedTopEntry.period, paceGranularity, locale)
+    : "—";
+  const completedAvg = completedSeries.length > 0 ? Math.round(completedTotal / completedSeries.length) : 0;
+  const completedThisPeriod =
+    completedSeries.find((entry) => entry.period === currentStatsPeriodKey(paceGranularity, tzOffsetMinutes))
+      ?.value ?? 0;
+
+  const handleCompletedBarSelect = useCallback(
+    (index: number) => {
+      const entry = completedSeries[index];
+      if (!entry) return;
+      const timeLabel = formatStatsTimeAxisLabel(entry.period, paceGranularity, locale);
+      openLogsPeriodActivity(
+        entry.period,
+        pacePeriod,
+        t("statistics.activityInPeriod", { period: timeLabel }),
+        categoryFilter
+      );
+    },
+    [completedSeries, paceGranularity, pacePeriod, t, categoryFilter, openLogsPeriodActivity]
+  );
+
+  const paceChartIsCompleted = paceChartMode === "completed";
+  const paceChartLoading = paceChartIsCompleted ? completedLoading : paceLoading;
+  const paceChartSeries = paceChartIsCompleted ? completedSeries : paceSeries;
+  const paceChartTotal = paceChartIsCompleted ? completedTotal : paceTotal;
+  const paceChartBest = paceChartIsCompleted ? completedBest : paceBest;
+  const paceChartTopLabel = paceChartIsCompleted ? completedTopLabel : paceTopLabel;
+  const paceChartAvg = paceChartIsCompleted ? completedAvg : paceAvg;
+  const paceChartUnit = paceChartIsCompleted ? completedUnit : paceUnit;
+  const paceChartHeaderChip = paceChartIsCompleted
+    ? completedTotal.toLocaleString(locale)
+    : paceHoursLabel;
+  const paceChartTitle = t(paceChartIsCompleted ? "statistics.completedTitle" : "statistics.paceTitle");
 
   const totalPurchaseItems = useMemo(() => {
     if (!purchaseItemCounts) return 0;
@@ -1780,7 +1801,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
   const showBoardGamesWonHighlight = isAllCategories || categoryFilter === "boardgames";
   const showBoardGamesRecentWidget = isAllCategories || categoryFilter === "boardgames";
   const showGamePlatformsWidget = isAllCategories || categoryFilter === "games";
-  const showTimeConsumedWidget = isAllCategories;
   const showBoardGameWeightChart = isAllCategories || categoryFilter === "boardgames";
 
   const chartModeOptions = useMemo(
@@ -1812,25 +1832,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
   );
 
   return (
-    <div className="relative flex min-w-0 flex-col gap-10 overflow-x-hidden">
-      <Dialog open={showProModal && !isPro} onOpenChange={setShowProModal}>
-        <DialogContent onClose={() => setShowProModal(false)}>
-          <DialogHeader>
-            <DialogTitle className="min-w-0 text-[var(--color-lightest)]">
-              <OverflowMarquee>{t("statistics.proOnlyTitle")}</OverflowMarquee>
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-[var(--color-light)]">
-            {t("statistics.proOnlyMessage")}
-          </p>
-          <Button asChild className="btn-gradient w-fit">
-            <Link to="/tiers" onClick={() => setShowProModal(false)}>
-              {t("tiers.upgradeToPro")}
-            </Link>
-          </Button>
-        </DialogContent>
-      </Dialog>
-
+    <div className="relative flex min-w-0 shrink-0 flex-col gap-10">
       {recapPickerOpen ? (
         isMobile ? (
           <Drawer open onOpenChange={(open) => !open && setRecapPickerOpen(false)}>
@@ -1969,20 +1971,10 @@ const summaryData = summary ?? EMPTY_SUMMARY;
         <RecapView title={recapView.title} logs={recapView.logs} onClose={() => setRecapView(null)} />
       ) : null}
 
-      <div className="flex flex-col gap-12">
-      {!isPro && (
-        <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <p className="text-sm leading-snug text-[var(--color-light)]">
-            {t("statistics.freeMonthNotice")}
-          </p>
-          <Button asChild className="btn-gradient w-full shrink-0 sm:w-auto">
-            <Link to="/tiers">{t("tiers.upgradeToPro")}</Link>
-          </Button>
-        </div>
-      )}
+      <div className="flex shrink-0 flex-col gap-12">
       {loading && <StatisticsSummarySkeleton />}
       {!loading && (
-        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+        <div className="flex min-w-0 shrink-0 flex-col gap-2">
           <button
             type="button"
             onClick={() => setSummaryCollapsed(!summaryCollapsed)}
@@ -2096,7 +2088,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
       )}
 
       {(
-        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+        <div className="flex min-w-0 shrink-0 flex-col gap-2">
           <button
             type="button"
             onClick={() => setLibraryStatusCollapsed(!libraryStatusCollapsed)}
@@ -2137,7 +2129,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
       )}
 
       {!loading && showBoardGamesRecentWidget && (
-        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+        <div className="flex min-w-0 shrink-0 flex-col gap-2">
           <button
             type="button"
             onClick={() => setBoardGameMatchesCollapsed(!boardGameMatchesCollapsed)}
@@ -2154,7 +2146,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
           {!boardGameMatchesCollapsed && (
             <section aria-label={t("statistics.matchesPlayedTitle")} className="min-w-0 w-full">
               <Card
-                className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3"
+                className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3"
               >
                 <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2">
                   <SegmentedFilter
@@ -2194,7 +2186,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
       )}
 
       {showGamePlatformsWidget && visibleTypesOrderReady && (
-        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+        <div className="flex min-w-0 shrink-0 flex-col gap-2">
           <button
             type="button"
             onClick={() => setGamePlatformsCollapsed(!gamePlatformsCollapsed)}
@@ -2210,7 +2202,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
           </button>
           {!gamePlatformsCollapsed && (
             <section aria-label={t("statistics.mostPlayedPlatformsTitle")} className="min-w-0 w-full">
-              <Card className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
+              <Card className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
                 <GamePlatformStatsWidget
                   stats={gamePlatformStats}
                   loading={gamePlatformStatsLoading}
@@ -2223,7 +2215,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
       )}
 
       {showBoardGameWeightChart && visibleTypesOrderReady && (
-        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+        <div className="flex min-w-0 shrink-0 flex-col gap-2">
           <button
             type="button"
             onClick={() => setGameWeightCollapsed(!gameWeightCollapsed)}
@@ -2239,7 +2231,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
           </button>
           {!gameWeightCollapsed && (
             <section aria-label={t("statistics.byGameWeight")} className="min-w-0 w-full">
-              <Card className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
+              <Card className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
                 <SegmentedFilter
                   value={boardGameWeightScope}
                   onSelect={(v) => setBoardGameWeightScope(v)}
@@ -2262,7 +2254,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                   ) : (
                     <div
                       className={cn(
-                        "flex min-w-0 flex-col gap-2 overflow-hidden",
+                        "flex min-w-0 shrink-0 flex-col gap-2",
                         boardGameWeightLoading && "opacity-60"
                       )}
                     >
@@ -2322,7 +2314,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
       )}
 
       {visibleTypesOrderReady && (
-        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+        <div className="flex min-w-0 shrink-0 flex-col gap-2">
           <button
             type="button"
             onClick={() => setPaceCollapsed(!paceCollapsed)}
@@ -2334,40 +2326,56 @@ const summaryData = summary ?? EMPTY_SUMMARY;
             ) : (
               <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
             )}
-            <span>{t("statistics.paceTitle")}</span>
-            {paceLoading ? (
+            <span>{paceChartTitle}</span>
+            {paceChartLoading ? (
               <MomentumSkeleton className="ml-auto" />
-            ) : paceMomentum?.delta != null ? (
-              <DeltaChip delta={paceMomentum.delta} className="ml-auto" ariaLabel={momentumAria(paceMomentum.delta)} />
-            ) : null}
+            ) : (
+              <span className="ml-auto text-[10px] font-semibold tabular-nums text-[var(--color-lightest)]">
+                {/* {paceChartHeaderChip} */}
+              </span>
+            )}
           </button>
           {!paceCollapsed && (
-            <section aria-label={t("statistics.paceTitle")} className="min-w-0 w-full">
-              <Card className="flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
+            <section aria-label={paceChartTitle} className="min-w-0 w-full">
+              <Card className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3">
                 <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                  <div className="flex min-w-0 flex-wrap gap-1.5" role="group" aria-label={t("statistics.categoryFilter")}>
-                    {(["all" as PaceCategory, ...(visibleTypes as PaceCategory[])]).map((c) => {
-                      const m = PACE_CATEGORY_META[c];
-                      const Icon = m.icon;
-                      const active = categoryFilter === c;
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setCategoryFilter(c === "all" ? "all" : c)}
-                          className={cn(
-                            "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors max-md:min-h-[36px]",
-                            active
-                              ? "border-[var(--btn-gradient-start)] bg-[var(--btn-gradient-start)]/15 text-white"
-                              : "border-[var(--color-mid)]/50 bg-[var(--color-dark)] text-[var(--color-light)]"
-                          )}
-                          aria-pressed={active}
-                        >
-                          <Icon className="size-3.5" aria-hidden />
-                          {c === "all" ? t("statistics.filterAll") : t(`nav.${c}`)}
-                        </button>
-                      );
-                    })}
+                  <div
+                    className="flex items-center gap-2 max-md:min-h-[36px]"
+                    role="group"
+                    aria-label={t("statistics.paceCompletedToggle")}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setPaceChartMode("pace")}
+                      className={cn(
+                        "rounded-sm text-[10px] font-semibold uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]",
+                        paceChartMode === "pace"
+                          ? "text-[var(--color-lightest)]"
+                          : "text-[var(--color-light)]"
+                      )}
+                    >
+                      {t("statistics.paceTitle")}
+                    </button>
+                    <Switch
+                      checked={paceChartMode === "completed"}
+                      onCheckedChange={(checked) =>
+                        setPaceChartMode(checked ? "completed" : "pace")
+                      }
+                      aria-label={t("statistics.paceCompletedToggle")}
+                      className="data-[state=checked]:bg-[var(--btn-gradient-start)] data-[state=checked]:focus-visible:ring-[var(--btn-gradient-start)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPaceChartMode("completed")}
+                      className={cn(
+                        "rounded-sm text-[10px] font-semibold uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)]",
+                        paceChartMode === "completed"
+                          ? "text-[var(--color-lightest)]"
+                          : "text-[var(--color-light)]"
+                      )}
+                    >
+                      {t("statistics.completedTitle")}
+                    </button>
                   </div>
                   <div className="flex items-center gap-1.5" role="group" aria-label={t("statistics.timeGranularityLabel")}>
                     {(["month", "year"] as const).map((p) => (
@@ -2375,13 +2383,11 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                         key={p}
                         type="button"
                         onClick={() => setPacePeriod(p)}
-                        disabled={p === "year" && !isPro}
                         className={cn(
                           "rounded-lg px-2.5 py-1 text-[10px] font-semibold transition-colors max-md:min-h-[36px]",
                           pacePeriod === p
                             ? "bg-[var(--btn-gradient-start)] text-white"
-                            : "border border-[var(--color-mid)]/30 text-[var(--color-light)]",
-                          p === "year" && !isPro && "cursor-not-allowed opacity-50"
+                            : "border border-[var(--color-mid)]/30 text-[var(--color-light)]"
                         )}
                         aria-pressed={pacePeriod === p}
                       >
@@ -2389,6 +2395,30 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                       </button>
                     ))}
                   </div>
+                </div>
+                <div className="flex min-w-0 flex-wrap gap-1.5" role="group" aria-label={t("statistics.categoryFilter")}>
+                  {(["all" as PaceCategory, ...(visibleTypes as PaceCategory[])]).map((c) => {
+                    const m = PACE_CATEGORY_META[c];
+                    const Icon = m.icon;
+                    const active = categoryFilter === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCategoryFilter(c === "all" ? "all" : c)}
+                        className={cn(
+                          "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors max-md:min-h-[36px]",
+                          active
+                            ? "border-[var(--btn-gradient-start)] bg-[var(--btn-gradient-start)]/15 text-white"
+                            : "border-[var(--color-mid)]/50 bg-[var(--color-dark)] text-[var(--color-light)]"
+                        )}
+                        aria-pressed={active}
+                      >
+                        <Icon className="size-3.5" aria-hidden />
+                        {c === "all" ? t("statistics.filterAll") : t(`nav.${c}`)}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div className="flex min-w-0 flex-col gap-2.5 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 p-3">
@@ -2405,7 +2435,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                   </div>
 
                   <div className="flex items-baseline gap-1.5">
-                    {paceLoading ? (
+                    {paceChartLoading ? (
                       <>
                         <Skeleton className="h-8 w-20 rounded-md" />
                         <Skeleton className="h-3 w-14 rounded-full" />
@@ -2413,42 +2443,48 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                     ) : (
                       <>
                         <span className="text-2xl font-bold tabular-nums text-[var(--color-lightest)]">
-                          {paceTotal.toLocaleString(locale)}
+                          {paceChartTotal.toLocaleString(locale)}
                         </span>
                         <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-light)]">
-                          {t("statistics.paceUnitTotal", { unit: paceUnit })}
+                          {t("statistics.paceUnitTotal", { unit: paceChartUnit })}
                         </span>
                       </>
                     )}
                   </div>
 
-                  {paceLoading ? (
+                  {paceChartLoading ? (
                     <StatisticsBarsSkeleton rows={3} />
-                  ) : paceSeries.length === 0 ? (
+                  ) : paceChartSeries.length === 0 ? (
                     <p className="flex min-h-[10rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
-                      {t("statistics.paceEmpty")}
+                      {t(paceChartIsCompleted ? "statistics.completedEmpty" : "statistics.paceEmpty")}
                     </p>
                   ) : (
                     <>
                       <PaceBars
-                        data={paceSeries}
+                        data={paceChartSeries}
                         from={paceMeta.from}
                         to={paceMeta.to}
-                        unit={paceUnit}
-                        onBarSelect={handlePaceBarSelect}
+                        unit={paceChartUnit}
+                        locale={locale}
+                        gradientId={paceChartIsCompleted ? "completed-bar" : "pace-bar"}
+                        onBarSelect={paceChartIsCompleted ? handleCompletedBarSelect : handlePaceBarSelect}
                       />
                       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-mid)]/15 pt-2">
                         <p className="text-[9px] uppercase tracking-wide text-[var(--color-light)]">
                           {t(
-                            pacePeriod === "month"
-                              ? "statistics.paceIncrementsMonth"
-                              : "statistics.paceIncrementsYear"
+                            paceChartIsCompleted
+                              ? pacePeriod === "month"
+                                ? "statistics.completedIncrementsMonth"
+                                : "statistics.completedIncrementsYear"
+                              : pacePeriod === "month"
+                                ? "statistics.paceIncrementsMonth"
+                                : "statistics.paceIncrementsYear"
                           )}
                           {" · "}
                           {t("statistics.paceTapColumn")}
                         </p>
                         <span className="flex items-center gap-1 rounded-full bg-[var(--color-mid)]/20 px-2 py-0.5 text-[9px] text-[var(--color-light)]">
-                          {t("statistics.paceBest")} {paceBest.toLocaleString(locale)}
+                          {t("statistics.paceBest")} {paceChartBest.toLocaleString(locale)}
                         </span>
                       </div>
                     </>
@@ -2458,19 +2494,31 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                 <div className="grid grid-cols-3 gap-2">
                   <MomentumPanel title={t(pacePeriod === "month" ? "statistics.paceTopMonth" : "statistics.paceTopYear")}>
                     <p className="text-lg font-bold tabular-nums text-[var(--color-lightest)]">
-                      {paceTopLabel} · {paceBest.toLocaleString(locale)}
+                      {paceChartTopLabel} · {paceChartBest.toLocaleString(locale)}
                     </p>
                   </MomentumPanel>
                   <MomentumPanel title={t(pacePeriod === "month" ? "statistics.paceAvgMonth" : "statistics.paceAvgYear")}>
                     <p className="text-lg font-bold tabular-nums text-[var(--color-lightest)]">
-                      {paceAvg.toLocaleString(locale)}
+                      {paceChartAvg.toLocaleString(locale)}
                     </p>
                   </MomentumPanel>
-                  <MomentumPanel title={t("statistics.paceDeltaPrev")}>
-                    <p className="text-lg font-bold tabular-nums text-[var(--color-lightest)]">
-                      {paceMomentum?.delta != null ? `${paceMomentum.delta >= 0 ? "+" : ""}${paceMomentum.delta}%` : "—"}
-                    </p>
-                  </MomentumPanel>
+                  {paceChartIsCompleted ? (
+                    <MomentumPanel
+                      title={t(
+                        pacePeriod === "month" ? "statistics.completedThisMonth" : "statistics.completedThisYear"
+                      )}
+                    >
+                      <p className="text-lg font-bold tabular-nums text-[var(--color-lightest)]">
+                        {completedThisPeriod.toLocaleString(locale)}
+                      </p>
+                    </MomentumPanel>
+                  ) : (
+                    <MomentumPanel title={t("dashboard.statsTitle")}>
+                      <p className="text-lg font-bold tabular-nums text-[var(--color-lightest)]">
+                        {paceHoursLabel}
+                      </p>
+                    </MomentumPanel>
+                  )}
                 </div>
               </Card>
             </section>
@@ -2479,7 +2527,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
       )}
 
       {!loading && showFinanceSection && (
-        <div className="flex min-w-0 flex-col gap-2 overflow-hidden">
+        <div className="flex min-w-0 shrink-0 flex-col gap-2">
           <button
             type="button"
             onClick={() => setPurchaseCollapsed(!purchaseCollapsed)}
@@ -2700,8 +2748,8 @@ const summaryData = summary ?? EMPTY_SUMMARY;
           </Dialog>
         ))}
 
-      <div className="grid min-w-0 grid-cols-1 gap-6 overflow-hidden md:grid-cols-2 md:items-stretch md:gap-8">
-        <div className="flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden md:h-full">
+      <div className="grid min-w-0 shrink-0 grid-cols-1 gap-6 md:grid-cols-2 md:items-stretch md:gap-8">
+        <div className="flex min-w-0 shrink-0 flex-col gap-2 md:h-full">
           <button
             type="button"
             onClick={() => setCalendarCollapsed(!calendarCollapsed)}
@@ -2718,17 +2766,17 @@ const summaryData = summary ?? EMPTY_SUMMARY;
           {!calendarCollapsed && (
         <section
           aria-label={t("dashboard.calendarTitle")}
-          className="flex min-h-0 min-w-0 flex-1 flex-col md:min-h-0"
+          className="flex min-w-0 flex-1 flex-col"
         >
           <DashboardCalendar
-            access={isPro ? "full" : "monthOnly"}
+            access="full"
             fillColumnHeight
             mediaType={categoryFilter === "all" ? undefined : categoryFilter}
           />
         </section>
           )}
         </div>
-        <div className="flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden md:h-full">
+        <div className="flex min-w-0 shrink-0 flex-col gap-2 md:h-full">
           <button
             type="button"
             onClick={() => setChartsCollapsed(!chartsCollapsed)}
@@ -2756,7 +2804,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
           </button>
           {!chartsCollapsed && (
         <Card
-          className="min-w-0 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3 md:flex md:h-full md:min-h-0 md:flex-1 md:flex-col"
+          className="min-w-0 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3 md:flex md:h-full md:flex-1 md:flex-col"
         >
           <div className="mb-3 flex min-w-0 shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <SegmentedFilter
@@ -3029,133 +3077,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
         </div>
       </div>
 
-      <div
-        className={cn(
-          "grid min-w-0 grid-cols-1 gap-10 overflow-hidden md:items-stretch md:gap-10",
-          showTimeConsumedWidget && "md:grid-cols-2"
-        )}
-      >
-        {showTimeConsumedWidget && (
-          <div className="flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden md:h-full">
-            <button
-              type="button"
-              onClick={() => setStatsCollapsed(!statsCollapsed)}
-              className={collapsibleSectionBtnClass}
-              aria-expanded={!statsCollapsed}
-            >
-              {statsCollapsed ? (
-                <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-              ) : (
-                <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
-              )}
-              <span>{t("dashboard.statsTitle")}</span>
-              {(statsGroup === "month" ? statsLoading : summaryByMonthLoading) ? (
-                <MomentumSkeleton className="ml-auto" />
-              ) : overviewMomentum.hours?.delta != null ? (
-                <DeltaChip delta={overviewMomentum.hours.delta} className="ml-auto" ariaLabel={momentumAria(overviewMomentum.hours.delta)} />
-              ) : null}
-            </button>
-            {!statsCollapsed && (
-              <>
-                <Card
-                  className="min-w-0 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-3 md:flex md:h-full md:min-h-0 md:flex-1 md:flex-col"
-                >
-                  <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
-                    <div className="w-full min-w-0 shrink-0">
-                      <SegmentedFilter
-                        value={statsGroup}
-                        onSelect={(v) => setStatsGroup(v)}
-                        ariaLabel={t("dashboard.statsTitle")}
-                        options={
-                          isPro
-                            ? [
-                                { value: "category", label: t("dashboard.byCategory") },
-                                { value: "month", label: t("dashboard.byMonth") },
-                                { value: "year", label: t("dashboard.byYear") },
-                              ]
-                            : [{ value: "category", label: t("dashboard.byCategory") }]
-                        }
-                      />
-                    </div>
-                    <div className="min-h-[12.5rem] min-w-0 flex-1">
-                      {statsLoading ? (
-                        <StatisticsBarsSkeleton rows={5} />
-                      ) : stats.length === 0 ? (
-                        <p className="flex min-h-[12.5rem] items-center justify-center px-2 text-center text-sm text-[var(--color-light)]">
-                          {t("dashboard.noStatsYet")}
-                        </p>
-                      ) : (
-                        <div
-                          className={cn(
-                            "flex min-w-0 flex-col overflow-hidden",
-                            statsGroup === "category" ? "gap-2" : "gap-4"
-                          )}
-                        >
-                          {displayedStats.map(({ period, hours, count }) => {
-                            const isTimeAxis = statsGroup === "month" || statsGroup === "year";
-                            const timeLabel = isTimeAxis
-                              ? formatStatsTimeAxisLabel(
-                                  period,
-                                  statsGroup === "year" ? "year" : "month",
-                                  locale
-                                )
-                              : null;
-                            if (!isTimeAxis) {
-                              return (
-                                <MomentumBreakdownRow
-                                  key={period}
-                                  label={t(`nav.${period}`)}
-                                  value={t("dashboard.hoursConsumed", { hours: hours.toFixed(1) })}
-                                  pct={(hours / Math.max(1, maxHours)) * 100}
-                                  color="var(--btn-gradient-start)"
-                                />
-                              );
-                            }
-                            const barRow = (
-                              <div className={statBarGridClass}>
-                                <div className="flex min-h-[2.25rem] min-w-0 flex-col justify-center gap-0.5 leading-tight">
-                                  {(count ?? 0) > 0 && (
-                                    <span className="block text-[10px] tabular-nums text-[var(--color-light)]">
-                                      {t(
-                                        (count ?? 0) === 1
-                                          ? "statistics.statItemsCount_one"
-                                          : "statistics.statItemsCount_other",
-                                        { count: String(count ?? 0) }
-                                      )}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className={statBarTrackClass}>
-                                  <div
-                                    className={statBarFillClass}
-                                    style={{ width: `${Math.max(5, (hours / maxHours) * 100)}%` }}
-                                  />
-                                </div>
-                                <span className={statBarValueClass}>
-                                  {t("dashboard.hoursConsumed", { hours: hours.toFixed(1) })}
-                                </span>
-                              </div>
-                            );
-                            return (
-                              <div key={period} className={cn("flex min-w-0 flex-col gap-2")}>
-                                {timeLabel != null && (
-                                  <StatsTimeSectionDivider label={timeLabel} />
-                                )}
-                                {barRow}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              </>
-            )}
-          </div>
-        )}
-
-        <div className="flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden md:h-full">
+      <div className="flex min-w-0 shrink-0 flex-col gap-2">
           <button
             type="button"
             onClick={() => setRecentLogsCollapsed(!recentLogsCollapsed)}
@@ -3170,7 +3092,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
             <span>{t("dashboard.recentLogs")}</span>
           </button>
           {!recentLogsCollapsed && (
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col md:min-h-0">
+            <div className="flex min-w-0 flex-col">
               {loading ? (
                 <div className="flex min-h-0 flex-1 flex-col">
                   <StatisticsRecentLogsSkeleton rows={5} />
@@ -3275,7 +3197,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
               )}
             </div>
           )}
-        </div>
       </div>
       </div>
       <LogActivitySheet
