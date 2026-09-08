@@ -101,7 +101,7 @@ export function FloatingBottomNav() {
   const searchNavPath = useSearchNavPath();
   const dashboardNavPath = useDashboardNavPath();
   const items = (token ? AUTH_ITEMS : GUEST_ITEMS).map((item) => {
-    if (item.to === "/") return { ...item, to: searchNavPath };
+    if (item.to === "/" || item.to === "/search") return { ...item, to: searchNavPath };
     if (item.to === "/dashboard") return { ...item, to: dashboardNavPath };
     return item;
   });
@@ -126,7 +126,7 @@ export function FloatingBottomNav() {
         >
           {items.map((item) => (
           <DockTab
-            key={item.to}
+            key={item.labelKey}
             to={item.to}
             label={t(item.labelKey)}
             icon={item.icon}

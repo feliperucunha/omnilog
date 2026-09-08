@@ -87,9 +87,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 function HomeEntry() {
   const { token, initializing } = useAuth();
+  const location = useLocation();
   if (initializing) return null;
   if (!isCapacitorNative() && !token) return <Landing />;
-  return <Navigate to="/search" replace />;
+  return <Navigate to={{ pathname: "/search", search: location.search }} replace />;
 }
 
 const RequireOnboarded = ({ children }: { children: React.ReactNode }) => {

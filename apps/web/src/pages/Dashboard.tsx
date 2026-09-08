@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Share2, User, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   loadWithSWR,
   MILESTONES_PATH,
   prefetchDashboardPageCaches,
+  prefetchDashboardCategoryView,
   registerFollowedUserIds,
   registerLogsPageCacheContext,
   warmFriendFeedCaches,
@@ -154,6 +155,8 @@ export function Dashboard() {
   const { me } = useMe();
   const { visibleTypes, visibleTypesOrderReady } = useVisibleMediaTypes();
   const { setPageTitle, setRightSlot, setBelowNavbar } = usePageTitle() ?? {};
+  const location = useLocation();
+  const isDashboardActive = location.pathname === "/dashboard";
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParamsKey = searchParams.toString();
   const logsInitialFilters = useMemo((): Partial<SharedFilters> | undefined => {
@@ -239,11 +242,24 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (categoryParam && MEDIA_TYPES.includes(categoryParam as MediaType)) setSelectedCategory(toMediaType(categoryParam));
-    else if (!categoryParam && visibleTypes.length > 0) setSelectedCategory(toMediaType(visibleTypes[0]));
-  }, [categoryParam, visibleTypes]);
+    if (!isDashboardActive) return;
+    if (categoryParam && MEDIA_TYPES.includes(categoryParam as MediaType)) {
+      setSelectedCategory(toMediaType(categoryParam));
+      return;
+    }
+    if (visibleTypes.length === 0) return;
+    const fallback = toMediaType(visibleTypes[0]);
+    setSelectedCategory(fallback);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (next.get("category") === fallback) return prev;
+      next.set("category", fallback);
+      return next;
+    }, { replace: true });
+  }, [isDashboardActive, categoryParam, visibleTypes, setSearchParams]);
 
   useEffect(() => {
+    if (!isDashboardActive) return;
     if (visibleTypes.length > 0 && !visibleTypes.includes(selectedCategory)) {
       const fallback = toMediaType(visibleTypes[0]);
       setSelectedCategory(fallback);
@@ -253,7 +269,7 @@ export function Dashboard() {
         return next;
       }, { replace: true });
     }
-  }, [visibleTypes, selectedCategory, setSearchParams]);
+  }, [isDashboardActive, visibleTypes, selectedCategory, setSearchParams]);
 
   const setCategory = useCallback(
     (type: MediaType) => {
@@ -261,6 +277,7 @@ export function Dashboard() {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set("category", type);
+        prefetchDashboardCategoryView(type, next);
         return next;
       }, { replace: true });
     },
@@ -285,11 +302,17 @@ export function Dashboard() {
   }, [selectedCategory, searchParamsKey]);
 
   const fetchCounts = useCallback(() => {
+    const applyCounts = (next: Record<MediaType, number> | null | undefined) => {
+      if (next == null || typeof next !== "object") return;
+      setCounts(next);
+      setCountsError(null);
+    };
+
     setCountsError(null);
     const path = "/logs/counts";
     const cached = getCachedEntry<{ data: Record<MediaType, number> }>("GET", path);
-    if (cached) {
-      setCounts(cached.data.data ?? null);
+    if (cached?.data?.data) {
+      applyCounts(cached.data.data);
       setCountsLoading(false);
     } else {
       setCountsLoading(true);
@@ -299,16 +322,13 @@ export function Dashboard() {
       ttlMs: HEAVY_PAGE_TTL_MS,
       onUpdate: (res) => {
         const payload = res as { data: Record<MediaType, number> };
-        setCounts(payload.data ?? null);
-        setCountsError(null);
+        applyCounts(payload.data);
       },
     })
       .then(({ data }) => {
-        setCounts(data.data ?? null);
-        setCountsError(null);
+        applyCounts(data?.data);
       })
       .catch((err) => {
-        if (!cached) setCounts(null);
         setCountsError(err instanceof Error ? err.message : t("dashboard.couldntLoadLogs"));
       })
       .finally(() => setCountsLoading(false));
@@ -523,15 +543,16 @@ export function Dashboard() {
   }, [me?.user?.id, visibleTypes, selectedCategory, t]);
 
   useEffect(() => {
+    if (!isDashboardActive) return;
     setPageTitle?.(t("dashboard.title"));
     return () => {
       setPageTitle?.(null);
       setRightSlot?.(null);
-      setBelowNavbar?.(null);
     };
-  }, [t, setPageTitle, setRightSlot, setBelowNavbar]);
+  }, [isDashboardActive, t, setPageTitle, setRightSlot]);
 
   useEffect(() => {
+    if (!isDashboardActive) return;
     if (me?.user?.id) {
       setRightSlot?.(
         <Button type="button" variant="outline" size="sm" onClick={handleShare} aria-label={t("dashboard.share")}>
@@ -543,9 +564,10 @@ export function Dashboard() {
       setRightSlot?.(null);
     }
     return () => setRightSlot?.(null);
-  }, [me?.user?.id, handleShare, t, setRightSlot]);
+  }, [isDashboardActive, me?.user?.id, handleShare, t, setRightSlot]);
 
   useEffect(() => {
+    if (!isDashboardActive) return;
     if (visibleTypes.length === 0) {
       setBelowNavbar?.(null);
       return;
@@ -556,7 +578,7 @@ export function Dashboard() {
           <CategoryOrderSkeletonStrip />
         </div>
       );
-      return () => setBelowNavbar?.(null);
+      return;
     }
     const byTypeMap = Object.fromEntries(
       MEDIA_TYPES.map((type) => [type, counts?.[type] ?? 0])
@@ -575,8 +597,12 @@ export function Dashboard() {
         aria-label={t("dashboard.category")}
       />
     );
+  }, [isDashboardActive, visibleTypes, visibleTypesOrderReady, selectedCategory, counts, t, setBelowNavbar, setCategory]);
+
+  useEffect(() => {
+    if (!isDashboardActive) return;
     return () => setBelowNavbar?.(null);
-  }, [visibleTypes, visibleTypesOrderReady, selectedCategory, counts, t, setBelowNavbar, setCategory]);
+  }, [isDashboardActive, setBelowNavbar]);
 
   const betaMessageParagraphs = t("dashboard.betaModalMessage").split("\n\n");
 

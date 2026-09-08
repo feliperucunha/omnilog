@@ -2,6 +2,7 @@ export type UpstreamProvider =
   | "tmdb"
   | "bgg"
   | "jikan"
+  | "kitsu"
   | "rawg"
   | "openlibrary"
   | "comicvine"
@@ -11,6 +12,7 @@ const TIMEOUT_MS: Record<UpstreamProvider, number> = {
   tmdb: 8_000,
   bgg: 12_000,
   jikan: 8_000,
+  kitsu: 10_000,
   rawg: 8_000,
   openlibrary: 10_000,
   comicvine: 10_000,

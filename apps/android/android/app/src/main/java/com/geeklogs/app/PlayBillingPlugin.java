@@ -32,7 +32,10 @@ public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListene
         billingClient =
             BillingClient.newBuilder(getContext())
                 .setListener(this)
-                .enablePendingPurchases()
+                .enablePendingPurchases(
+                    PendingPurchasesParams.newBuilder().enableOneTimeProducts().build()
+                )
+                .enableAutoServiceReconnection()
                 .build();
     }
 
@@ -110,6 +113,18 @@ public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListene
         void accept(BillingResult r);
     }
 
+    @Nullable
+    private static List<ProductDetails> fetchedProductDetails(@Nullable QueryProductDetailsResult result) {
+        if (result == null) {
+            return null;
+        }
+        List<ProductDetails> list = result.getProductDetailsList();
+        if (list == null || list.isEmpty()) {
+            return null;
+        }
+        return list;
+    }
+
     @PluginMethod
     public void querySubscriptionProducts(PluginCall call) {
         if (getActivity() == null) {
@@ -152,7 +167,7 @@ public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListene
             () ->
                 billingClient.queryProductDetailsAsync(
                     params,
-                    (billingResult, productDetailsList) -> {
+                    (billingResult, queryProductDetailsResult) -> {
                         if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK) {
                             runOnMainThread(
                                 () ->
@@ -165,7 +180,8 @@ public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListene
                             );
                             return;
                         }
-                        if (productDetailsList == null || productDetailsList.isEmpty()) {
+                        List<ProductDetails> productDetailsList = fetchedProductDetails(queryProductDetailsResult);
+                        if (productDetailsList == null) {
                             runOnMainThread(() -> call.reject("No products returned from Play Store"));
                             return;
                         }
@@ -223,7 +239,7 @@ public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListene
             () ->
                 billingClient.queryProductDetailsAsync(
                     qParams,
-                    (billingResult, productDetailsList) -> {
+                    (billingResult, queryProductDetailsResult) -> {
                         if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK) {
                             pendingPurchaseCall = null;
                             runOnMainThread(
@@ -237,7 +253,8 @@ public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListene
                             );
                             return;
                         }
-                        if (productDetailsList == null || productDetailsList.isEmpty()) {
+                        List<ProductDetails> productDetailsList = fetchedProductDetails(queryProductDetailsResult);
+                        if (productDetailsList == null) {
                             pendingPurchaseCall = null;
                             runOnMainThread(() -> call.reject("Product not found"));
                             return;

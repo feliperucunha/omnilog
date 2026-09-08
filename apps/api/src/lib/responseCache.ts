@@ -81,13 +81,38 @@ export async function setSearchResponseCached(
   }
 }
 
+function isEmptyResultsPayload(data: unknown): boolean {
+  if (!data || typeof data !== "object") return false;
+  const results = (data as { results?: unknown }).results;
+  return Array.isArray(results) && results.length === 0;
+}
+
 export async function withSearchResultsCache<T extends { results: unknown[] }>(
   prisma: PrismaClient,
   mediaType: string,
   queryKey: string,
   fetch: () => Promise<T>
 ): Promise<{ data: T; cacheHit: boolean }> {
-  return withCachedSearchPayload(prisma, mediaType, queryKey, fetch);
+  try {
+    const cached = await getSearchResponseCached<T>(prisma, mediaType, queryKey);
+    if (cached && (cached.fresh || cached.stale) && !isEmptyResultsPayload(cached.data)) {
+      if (cached.stale) {
+        scheduleSearchCacheRefresh(prisma, mediaType, queryKey, fetch);
+      }
+      return { data: cached.data, cacheHit: true };
+    }
+    const data = await fetch();
+    if (!isEmptyResultsPayload(data)) {
+      await setSearchResponseCached(prisma, mediaType, queryKey, data);
+    }
+    return { data, cacheHit: false };
+  } catch (err) {
+    if (isMissingCacheTableError(err)) {
+      const data = await fetch();
+      return { data, cacheHit: false };
+    }
+    throw err;
+  }
 }
 
 export async function withCachedSearchPayload<T>(

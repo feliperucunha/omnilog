@@ -43,7 +43,12 @@ import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentPro
 import { LogViewSelector } from "@/components/LogViewSelector";
 import { MediaLogCard } from "@/components/MediaLogCard";
 import { useLogViewPreference } from "@/hooks/useLogViewPreference";
-import { resolveLogViewForContext } from "@/lib/logViewPreference";
+import { useIsMobile } from "@/hooks/useMediaQuery";
+import {
+  defaultPublicProfileLogView,
+  resolveLogViewForContext,
+  type LogViewPage,
+} from "@/lib/logViewPreference";
 import {
   LOG_LIST_CARD_GRID,
   LOG_LIST_CARD_GRID_DENSE,
@@ -273,13 +278,21 @@ export function MediaLogs({
   const [editingLogEpisodesCount, setEditingLogEpisodesCount] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>(() => initialFilters?.status ?? "");
-  const [statusCounts, setStatusCounts] = useState<{
-    total: number;
-    byStatus: Record<string, number>;
-    owned?: number;
-    wantToBuy?: number;
-    byGenre?: Array<{ name: string; count: number }>;
-  } | null>(null);
+  const [statusCountsByType, setStatusCountsByType] = useState<
+    Partial<
+      Record<
+        string,
+        {
+          total: number;
+          byStatus: Record<string, number>;
+          owned?: number;
+          wantToBuy?: number;
+          byGenre?: Array<{ name: string; count: number }>;
+        }
+      >
+    >
+  >({});
+  const statusCounts = statusCountsByType[mediaType] ?? null;
   const [collectionFilter, setCollectionFilter] = useState<CollectionListFilter>(
     () => initialFilters?.collection ?? ""
   );
@@ -300,8 +313,11 @@ export function MediaLogs({
   const [milestoneProgressFetched, setMilestoneProgressFetched] = useState<CategoryMilestoneProgress | null>(null);
   /** When embedded (home): start with Load more button; after first click, switch to infinite scroll. When not embedded, use infinite scroll from the start. */
   const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(() => !embedded);
-  const logViewEnabled = embedded && !publicUserId;
-  const [dashboardLogView, setDashboardLogView] = useLogViewPreference("dashboard", logViewEnabled);
+  const isMobile = useIsMobile();
+  const logViewEnabled = !!embedded;
+  const logViewPage: LogViewPage = publicUserId ? "publicProfile" : "dashboard";
+  const logViewFallback = publicUserId ? defaultPublicProfileLogView(isMobile) : "list";
+  const [logView, setLogView] = useLogViewPreference(logViewPage, logViewEnabled, logViewFallback);
 
   const buildLogsPath = useCallback(
     (cursor?: string | null) => {
@@ -523,32 +539,36 @@ export function MediaLogs({
     };
   };
 
+  const applyStatusCounts = useCallback((type: string, payload: StatusCountsPayload["data"] | null | undefined) => {
+    if (payload == null) return;
+    setStatusCountsByType((prev) => ({ ...prev, [type]: payload }));
+  }, []);
+
   const fetchStatusCounts = useCallback(() => {
+    const type = mediaType;
     const path = publicUserId
-      ? `/users/${publicUserId}/logs/status-counts?mediaType=${encodeURIComponent(mediaType)}`
-      : `/logs/status-counts?mediaType=${encodeURIComponent(mediaType)}`;
+      ? `/users/${publicUserId}/logs/status-counts?mediaType=${encodeURIComponent(type)}`
+      : `/logs/status-counts?mediaType=${encodeURIComponent(type)}`;
 
     if (publicUserId) {
       void apiFetchPublic<StatusCountsPayload>(path)
-        .then((res) => setStatusCounts(res.data ?? null))
-        .catch(() => setStatusCounts(null));
+        .then((res) => applyStatusCounts(type, res.data))
+        .catch(() => {});
       return;
     }
 
     const cached = getCachedEntry<StatusCountsPayload>("GET", path);
-    if (cached) setStatusCounts(cached.data.data ?? null);
+    if (cached?.data?.data) applyStatusCounts(type, cached.data.data);
 
     void apiFetchSWR<StatusCountsPayload>(path, {
       ttlMs: HEAVY_PAGE_TTL_MS,
-      onUpdate: (res) => setStatusCounts((res as StatusCountsPayload).data ?? null),
+      onUpdate: (res) => applyStatusCounts(type, (res as StatusCountsPayload).data),
     })
       .then(({ data, fromCache }) => {
-        if (!fromCache) setStatusCounts(data.data ?? null);
+        if (!fromCache) applyStatusCounts(type, data?.data);
       })
-      .catch(() => {
-        if (!cached) setStatusCounts(null);
-      });
-  }, [mediaType, publicUserId]);
+      .catch(() => {});
+  }, [mediaType, publicUserId, applyStatusCounts]);
 
   useEffect(() => {
     setCategorySearchQuery("");
@@ -877,7 +897,7 @@ export function MediaLogs({
   const showCategorySearchClear =
     categorySearchDraft.trim() !== "" || categorySearchQuery !== "";
 
-  const activeLogView = resolveLogViewForContext(logViewEnabled, dashboardLogView);
+  const activeLogView = resolveLogViewForContext(logViewEnabled, logView);
 
   const categorySearchBar = (
     <form onSubmit={handleListSearchSubmit} className="relative min-h-11 max-md:min-h-[44px] min-w-0 flex-1">
@@ -1350,7 +1370,7 @@ export function MediaLogs({
         <div className="flex min-w-0 items-center gap-2">
           {categorySearchBar}
           {logViewEnabled && (
-            <LogViewSelector value={dashboardLogView} onValueChange={setDashboardLogView} />
+            <LogViewSelector value={logView} onValueChange={setLogView} />
           )}
         </div>
       )}

@@ -3,25 +3,32 @@ import {
   type LogViewMode,
   type LogViewPage,
   persistLogViewPreference,
-  readLogViewPreference,
-  readLogViewPreferenceSync,
+  readStoredLogViewPreference,
+  readStoredLogViewPreferenceSync,
 } from "@/lib/logViewPreference";
 
-export function useLogViewPreference(page: LogViewPage, enabled = true) {
+export function useLogViewPreference(
+  page: LogViewPage,
+  enabled = true,
+  fallbackWhenUnset: LogViewMode = "list"
+) {
   const [view, setView] = useState<LogViewMode>(() =>
-    enabled ? readLogViewPreferenceSync(page) : "list"
+    enabled ? (readStoredLogViewPreferenceSync(page) ?? fallbackWhenUnset) : fallbackWhenUnset
   );
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setView(fallbackWhenUnset);
+      return;
+    }
     let cancelled = false;
-    void readLogViewPreference(page).then((stored) => {
-      if (!cancelled) setView(stored);
+    void readStoredLogViewPreference(page).then((stored) => {
+      if (!cancelled) setView(stored ?? fallbackWhenUnset);
     });
     return () => {
       cancelled = true;
     };
-  }, [page, enabled]);
+  }, [page, enabled, fallbackWhenUnset]);
 
   const setViewAndPersist = useCallback(
     (next: LogViewMode) => {

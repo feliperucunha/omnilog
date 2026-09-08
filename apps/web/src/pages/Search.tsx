@@ -138,12 +138,12 @@ export function Search() {
   const { visibleTypes } = useVisibleMediaTypes();
   const { setPageTitle, setBelowNavbar } = usePageTitle() ?? {};
   useEffect(() => {
+    if (location.pathname !== "/search") return;
     setPageTitle?.(t("nav.search"));
     return () => {
       setPageTitle?.(null);
-      setBelowNavbar?.(null);
     };
-  }, [t, setPageTitle, setBelowNavbar]);
+  }, [location.pathname, t, setPageTitle]);
 
   const state = location.state as { mediaType?: MediaType; query?: string; sortBy?: string } | null;
   const effectiveVisibleTypes = visibleTypes.length > 0 ? visibleTypes : [...MEDIA_TYPES];
@@ -306,8 +306,13 @@ export function Search() {
     }
   }, [searchFilter]);
 
+  const queryRef = useRef(query);
+  queryRef.current = query;
+
   useEffect(() => {
-    if (stateQuery) setQuery(stateQuery);
+    if (!stateQuery) return;
+    if (searchInputRef.current && document.activeElement === searchInputRef.current) return;
+    setQuery(stateQuery);
   }, [stateQuery]);
 
   useEffect(() => {
@@ -661,6 +666,7 @@ export function Search() {
   );
 
   useEffect(() => {
+    if (location.pathname !== "/search") return;
     setBelowNavbar?.(
       <div id="onboarding-search-category-wrap" className="w-full min-w-0">
       <StickyCategoryStrip
@@ -697,7 +703,7 @@ export function Search() {
           setSearchFilter(nextFilter);
           const loc = buildSearchCategoryLocation(location.pathname, location.search, nextFilter);
           navigate(loc, { replace: true });
-          if (query.trim()) runSearch(query, nextFilter);
+          if (queryRef.current.trim()) runSearch(queryRef.current, nextFilter);
         }}
         showCount={false}
         mobileOnly={false}
@@ -706,11 +712,9 @@ export function Search() {
       />
       </div>
     );
-    return () => setBelowNavbar?.(null);
   }, [
     effectiveVisibleTypes,
     searchFilter,
-    query,
     boardGameProvider,
     me?.apiKeys,
     skipApiKeyReq,
@@ -724,6 +728,11 @@ export function Search() {
     location.search,
     navigate,
   ]);
+
+  useEffect(() => {
+    if (location.pathname !== "/search") return;
+    return () => setBelowNavbar?.(null);
+  }, [location.pathname, setBelowNavbar]);
 
   const showRecommendations =
     searchFilter !== SEARCH_USERS_TYPE && RECOMMENDATION_MEDIA_TYPES.includes(mediaType);
@@ -862,7 +871,7 @@ export function Search() {
   ) : null;
 
   const searchFormContent = (
-    <motion.div layout transition={{ type: "spring", stiffness: 300, damping: 35 }} className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <div className="flex min-w-0 items-center gap-2">
         <div className="min-w-0 flex-1">
           <UnifiedSearchBar
@@ -914,7 +923,7 @@ export function Search() {
           </div>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 
   const searchBarTop = (

@@ -39,7 +39,7 @@ export function parseSearchUrl(
 export function buildSearchNavPath(type: MediaType): string {
   const params = new URLSearchParams();
   params.set("type", type);
-  return `/?${params.toString()}`;
+  return `/search?${params.toString()}`;
 }
 
 export function buildDashboardNavPath(category: MediaType): string {
@@ -49,12 +49,12 @@ export function buildDashboardNavPath(category: MediaType): string {
 }
 
 export function resolveSearchNavPath(pathname: string, search: string): string {
-  if (!pathname.startsWith("/dashboard")) return "/";
+  if (!pathname.startsWith("/dashboard")) return "/search";
   const category = new URLSearchParams(search).get("category");
   if (category && (MEDIA_TYPES as readonly string[]).includes(category)) {
     return buildSearchNavPath(category as MediaType);
   }
-  return "/";
+  return "/search";
 }
 
 export function resolveDashboardNavPath(pathname: string, search: string): string {

@@ -192,8 +192,11 @@ export function Market() {
         />
       </div>
     );
-    return () => setBelowNavbar?.(null);
   }, [category, t, setBelowNavbar]);
+
+  useEffect(() => {
+    return () => setBelowNavbar?.(null);
+  }, [setBelowNavbar]);
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-4">

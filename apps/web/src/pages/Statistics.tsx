@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { MotionLink } from "@/components/MotionLink";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { motion } from "framer-motion";
@@ -828,6 +828,7 @@ export function Statistics() {
   const { t, locale } = useLocale();
   const { visibleTypes, visibleTypesOrderReady } = useVisibleMediaTypes();
   const { setPageTitle, setRightSlot, setBelowNavbar } = usePageTitle() ?? {};
+  const isStatisticsActive = useLocation().pathname === "/statistics";
   const [categoryFilter, setCategoryFilter] = useState<"all" | MediaType>("all");
   const isPro = true;
   const [logs, setLogs] = useState<Log[]>([]);
@@ -1478,6 +1479,7 @@ export function Statistics() {
   }, [recapPeriod, tzOffsetMinutes, recapCategory, recapStatusFilter, t, locale]);
 
   useEffect(() => {
+    if (!isStatisticsActive) return;
     setPageTitle?.(t("nav.statistics"));
     setRightSlot?.(
       <Button
@@ -1494,11 +1496,11 @@ export function Statistics() {
     return () => {
       setPageTitle?.(null);
       setRightSlot?.(null);
-      setBelowNavbar?.(null);
     };
-  }, [t, setPageTitle, setRightSlot, setBelowNavbar, handleOpenRecapPicker]);
+  }, [isStatisticsActive, t, setPageTitle, setRightSlot, handleOpenRecapPicker]);
 
   useEffect(() => {
+    if (!isStatisticsActive) return;
     if (visibleTypes.length === 0) {
       setBelowNavbar?.(null);
       return;
@@ -1509,7 +1511,7 @@ export function Statistics() {
           <CategoryOrderSkeletonStrip />
         </div>
       );
-      return () => setBelowNavbar?.(null);
+      return;
     }
     setBelowNavbar?.(
       <div className="sticky top-14 z-20 w-full shrink-0 self-start border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
@@ -1531,8 +1533,12 @@ export function Statistics() {
         />
       </div>
     );
+  }, [isStatisticsActive, visibleTypes, visibleTypesOrderReady, categoryFilter, t, setBelowNavbar]);
+
+  useEffect(() => {
+    if (!isStatisticsActive) return;
     return () => setBelowNavbar?.(null);
-  }, [visibleTypes, visibleTypesOrderReady, categoryFilter, t, setBelowNavbar]);
+  }, [isStatisticsActive, setBelowNavbar]);
 
   useEffect(() => {
     if (categoryFilter !== "all" && spendDetailMediaType && spendDetailMediaType !== categoryFilter) {

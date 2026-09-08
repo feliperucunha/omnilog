@@ -85,14 +85,15 @@ function anilistRowToSearchResult(
   };
 }
 
-export async function searchAnimeAnilist(
+async function searchMediaAnilist(
   q: string,
-  perPage = SEARCH_RESULTS_PAGE_SIZE,
-  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+  type: "ANIME" | "MANGA",
+  perPage: number,
+  preference: AnimeMangaTitleLanguage
 ): Promise<SearchResult[]> {
-  const query = `query ($search: String, $perPage: Int) {
+  const query = `query ($search: String, $perPage: Int, $type: MediaType) {
     Page(page: 1, perPage: $perPage) {
-      media(search: $search, type: ANIME, sort: SEARCH_MATCH, isAdult: false) {
+      media(search: $search, type: $type, sort: SEARCH_MATCH, isAdult: false) {
         idMal
         title { romaji english native }
         coverImage { medium }
@@ -105,7 +106,10 @@ export async function searchAnimeAnilist(
   const res = await fetch(ANILIST_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ query, variables: { search: q.trim(), perPage } }),
+    body: JSON.stringify({
+      query,
+      variables: { search: q.trim(), perPage, type },
+    }),
   });
   if (!res.ok) return [];
 
@@ -125,6 +129,22 @@ export async function searchAnimeAnilist(
     if (out.length >= perPage) break;
   }
   return out;
+}
+
+export async function searchAnimeAnilist(
+  q: string,
+  perPage = SEARCH_RESULTS_PAGE_SIZE,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<SearchResult[]> {
+  return searchMediaAnilist(q, "ANIME", perPage, preference);
+}
+
+export async function searchMangaAnilist(
+  q: string,
+  perPage = SEARCH_RESULTS_PAGE_SIZE,
+  preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
+): Promise<SearchResult[]> {
+  return searchMediaAnilist(q, "MANGA", perPage, preference);
 }
 
 type AnilistDetailMedia = {

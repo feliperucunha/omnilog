@@ -9,7 +9,8 @@ import {
   SEARCH_RESULTS_PAGE_SIZE,
 } from "@geeklogs/shared";
 import { sortSearchResults } from "../lib/sortSearchResults.js";
-import { getAnimeByIdAnilist, getMangaByIdAnilist, searchAnimeAnilist } from "./anilist.js";
+import { getAnimeByIdAnilist, getMangaByIdAnilist, searchAnimeAnilist, searchMangaAnilist } from "./anilist.js";
+import { searchAnimeKitsu, searchMangaKitsu } from "./kitsu.js";
 import { upstreamFetch } from "../lib/upstreamFetch.js";
 
 async function jikanFetch(url: string, init?: RequestInit): Promise<Response> {
@@ -83,17 +84,19 @@ async function fetchJikanSearchPages<T extends { mal_id: number }>(
     if (order.sort) params.set("sort", order.sort);
     return params;
   };
-  const [res1, res2] = await Promise.all([
-    fetch(`${BASE}/${path}?${buildParams("1").toString()}`),
-    fetch(`${BASE}/${path}?${buildParams("2").toString()}`),
-  ]);
+  const res1 = await jikanFetch(`${BASE}/${path}?${buildParams("1").toString()}`);
   if (!res1.ok) return [];
   const data1 = (await res1.json()) as { data?: T[] };
   const page1 = data1.data ?? [];
   let page2: T[] = [];
-  if (res2.ok) {
-    const data2 = (await res2.json()) as { data?: T[] };
-    page2 = data2.data ?? [];
+  try {
+    const res2 = await jikanFetch(`${BASE}/${path}?${buildParams("2").toString()}`);
+    if (res2.ok) {
+      const data2 = (await res2.json()) as { data?: T[] };
+      page2 = data2.data ?? [];
+    }
+  } catch {
+    /* keep page 1 when the second page times out */
   }
   return mergeJikanRowsByMalId([...page1, ...page2]);
 }
@@ -192,41 +195,34 @@ export async function getAnimeById(
   return getAnimeByIdAnilist(id, preference);
 }
 
-function mergeAnimeSearchResults(
-  anilist: SearchResult[],
-  jikan: SearchResult[]
-): SearchResult[] {
+function mergeSearchResultLists(...lists: SearchResult[][]): SearchResult[] {
   const byId = new Map<string, SearchResult>();
-  for (const r of anilist) byId.set(r.id, r);
-  for (const r of jikan) {
-    const existing = byId.get(r.id);
-    if (existing) {
-      byId.set(r.id, {
-        ...existing,
-        title: r.title || existing.title,
-        image: r.image ?? existing.image,
-        year: r.year ?? existing.year,
-        score: r.score ?? existing.score,
-      });
-    } else {
-      byId.set(r.id, r);
+  for (const list of lists) {
+    for (const r of list) {
+      const existing = byId.get(r.id);
+      if (existing) {
+        byId.set(r.id, {
+          ...existing,
+          title: r.title || existing.title,
+          image: r.image ?? existing.image,
+          year: r.year ?? existing.year,
+          score: r.score ?? existing.score,
+        });
+      } else {
+        byId.set(r.id, r);
+      }
     }
   }
   const ordered: SearchResult[] = [];
   const seen = new Set<string>();
-  for (const r of anilist) {
-    if (seen.has(r.id)) continue;
-    const merged = byId.get(r.id);
-    if (!merged) continue;
-    ordered.push(merged);
-    seen.add(r.id);
-  }
-  for (const r of jikan) {
-    if (seen.has(r.id)) continue;
-    const merged = byId.get(r.id);
-    if (!merged) continue;
-    ordered.push(merged);
-    seen.add(r.id);
+  for (const list of lists) {
+    for (const r of list) {
+      if (seen.has(r.id)) continue;
+      const merged = byId.get(r.id);
+      if (!merged) continue;
+      ordered.push(merged);
+      seen.add(r.id);
+    }
   }
   return ordered;
 }
@@ -260,11 +256,12 @@ export async function searchAnime(
   sort?: string,
   preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
 ): Promise<SearchResult[]> {
-  const [anilistResults, jikanResults] = await Promise.all([
+  const [anilistResults, jikanResults, kitsuResults] = await Promise.all([
     searchAnimeAnilist(q, SEARCH_RESULTS_PAGE_SIZE, preference).catch(() => [] as SearchResult[]),
-    searchAnimeJikan(q, preference),
+    searchAnimeJikan(q, preference).catch(() => [] as SearchResult[]),
+    searchAnimeKitsu(q, preference).catch(() => [] as SearchResult[]),
   ]);
-  const merged = mergeAnimeSearchResults(anilistResults, jikanResults);
+  const merged = mergeSearchResultLists(anilistResults, jikanResults, kitsuResults);
   return sortSearchResults(merged, sort).slice(0, SEARCH_RESULTS_PAGE_SIZE);
 }
 
@@ -362,8 +359,12 @@ export async function searchManga(
     score?: number;
     images?: { jpg?: { image_url?: string } };
   };
-  const list = await fetchJikanSearchPages<Row>("manga", q, sort);
-  const results = list.map((item) => {
+  const [anilistResults, jikanResults, kitsuResults] = await Promise.all([
+    searchMangaAnilist(q, SEARCH_RESULTS_PAGE_SIZE, preference).catch(() => [] as SearchResult[]),
+    fetchJikanSearchPages<Row>("manga", q, sort).catch(() => [] as Row[]),
+    searchMangaKitsu(q, preference).catch(() => [] as SearchResult[]),
+  ]);
+  const jikanMapped: SearchResult[] = jikanResults.map((item) => {
     const year = item.published?.from ? item.published.from.slice(0, 4) : null;
     return {
       id: String(item.mal_id),
@@ -374,7 +375,8 @@ export async function searchManga(
       score: typeof item.score === "number" && item.score > 0 ? item.score : null,
     };
   });
-  return sortSearchResults(results, sort);
+  const merged = mergeSearchResultLists(anilistResults, jikanMapped, kitsuResults);
+  return sortSearchResults(merged, sort).slice(0, SEARCH_RESULTS_PAGE_SIZE);
 }
 
 /** Jikan /anime/{id}/recommendations (rate-limit friendly: caller should not burst). */

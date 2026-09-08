@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 export interface StickyCategoryStripItem {
@@ -26,6 +27,8 @@ interface StickyCategoryStripProps {
   className?: string;
 }
 
+const SCROLL_PAD_PX = 16;
+
 /**
  * Sticky, horizontally scrollable category strip for mobile (app-store style).
  * No pills or buttons – text tabs with underline for selected. Slides horizontally.
@@ -41,10 +44,29 @@ export function StickyCategoryStrip({
   "aria-label": ariaLabel,
   className,
 }: StickyCategoryStripProps) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<HTMLButtonElement>(null);
+  const itemsKey = items.map((i) => `${i.value}:${i.count ?? ""}`).join("|");
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    const el = selectedRef.current;
+    if (!scroller || !el) return;
+    const left = el.offsetLeft - SCROLL_PAD_PX;
+    const right = el.offsetLeft + el.offsetWidth + SCROLL_PAD_PX;
+    const viewLeft = scroller.scrollLeft;
+    const viewRight = viewLeft + scroller.clientWidth;
+    if (left < viewLeft) {
+      scroller.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+    } else if (right > viewRight) {
+      scroller.scrollTo({ left: Math.max(0, right - scroller.clientWidth), behavior: "smooth" });
+    }
+  }, [selectedValue, itemsKey]);
+
   const strip = (
     <div
       className={cn(
-        "flex shrink-0",
+        "flex min-w-0 w-full shrink-0",
         !bare && "border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]",
         stickyTop && `sticky z-20 self-start ${stickyTop}`,
         mobileOnly && "md:hidden",
@@ -53,6 +75,7 @@ export function StickyCategoryStrip({
     >
       {/* Scrollable row – edge-to-edge, no horizontal padding */}
       <div
+        ref={scrollerRef}
         className="scrollbar-hide flex min-w-0 overflow-x-auto overflow-y-hidden scroll-smooth min-h-[3rem] [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]"
         role="tablist"
         aria-label={ariaLabel}
@@ -60,10 +83,10 @@ export function StickyCategoryStrip({
         <div className="flex min-w-max items-stretch gap-6 pl-2.5 pr-2.5 md:pl-3 md:pr-3">
           {items.map((item) => {
             const selected = selectedValue === item.value;
-            const label = showCount && item.count != null ? `${item.label} (${item.count})` : item.label;
             return (
               <button
                 key={item.value}
+                ref={selected ? selectedRef : undefined}
                 type="button"
                 role="tab"
                 aria-selected={selected}
@@ -79,7 +102,12 @@ export function StickyCategoryStrip({
                     : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
                 )}
               >
-                {label}
+                <span className="inline-flex items-baseline gap-1">
+                  {item.label}
+                  {showCount && item.count != null ? (
+                    <span className="tabular-nums">({item.count})</span>
+                  ) : null}
+                </span>
               </button>
             );
           })}
