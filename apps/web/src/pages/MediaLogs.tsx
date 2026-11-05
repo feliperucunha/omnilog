@@ -8,6 +8,7 @@ import type { MediaType, Log } from "@geeklogs/shared";
 import { LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { buildMediaLogsSortOptions } from "@/lib/mediaLogsSortOptions";
 import { getStatusLabel } from "@/lib/statusLabel";
+import { getLogCardDisplay } from "@/lib/logDisplay";
 import { cn } from "@/lib/utils";
 import {
   apiFetch,
@@ -42,6 +43,7 @@ import { tapScale, tapTransition } from "@/lib/animations";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps, visibleEnterProps } from "@/lib/motionPolicy";
 import { LogViewSelector } from "@/components/LogViewSelector";
 import { MediaLogCard } from "@/components/MediaLogCard";
+import { ReviewQuoteModal } from "@/components/ReviewQuoteModal";
 import { useLogViewPreference } from "@/hooks/useLogViewPreference";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import {
@@ -229,7 +231,7 @@ export function MediaLogs({
   const onFiltersChangeRef = useRef(onFiltersChange);
   onFiltersChangeRef.current = onFiltersChange;
 
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const navigate = useNavigate();
   const { showLogComplete } = useLogComplete();
   const { token } = useAuth();
@@ -308,8 +310,8 @@ export function MediaLogs({
   const [incrementingId, setIncrementingId] = useState<string | null>(null);
   const [statusChangingId, setStatusChangingId] = useState<string | null>(null);
   const [exportingCategory, setExportingCategory] = useState(false);
-  /** Log id whose review is expanded in-card (no modal). */
-  const [expandedReviewLogId, setExpandedReviewLogId] = useState<string | null>(null);
+  /** Log id whose full review is open in the quote modal. */
+  const [reviewLogId, setReviewLogId] = useState<string | null>(null);
   const [milestoneProgressFetched, setMilestoneProgressFetched] = useState<CategoryMilestoneProgress | null>(null);
   /** When embedded (home): start with Load more button; after first click, switch to infinite scroll. When not embedded, use infinite scroll from the start. */
   const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(() => !embedded);
@@ -950,6 +952,9 @@ export function MediaLogs({
     }
   };
 
+  const reviewLog = reviewLogId ? logs.find((log) => log.id === reviewLogId) ?? null : null;
+  const reviewText = reviewLog ? getLogCardDisplay(reviewLog).review ?? null : null;
+
   if (loading && logs.length === 0 && !listRefreshing) {
     return (
       <motion.div {...visibleEnterProps}>
@@ -1450,8 +1455,7 @@ export function MediaLogs({
                     deletingId={deletingId}
                     incrementingId={incrementingId}
                     statusChangingId={statusChangingId}
-                    expandedReviewLogId={expandedReviewLogId}
-                    onExpandReview={setExpandedReviewLogId}
+                    onViewReview={setReviewLogId}
                     onIncrement={handleIncrement}
                     onStatusChange={handleStatusChange}
                     onEdit={(lg, tab) => {
@@ -1460,6 +1464,7 @@ export function MediaLogs({
                     }}
                     onDelete={handleDelete}
                     t={t}
+                    locale={locale}
                   />
                 </div>
               </motion.div>
@@ -1501,6 +1506,13 @@ export function MediaLogs({
           </motion.div>
         )}
       </div>
+
+      <ReviewQuoteModal
+        open={reviewText != null}
+        review={reviewText}
+        title={reviewLog?.title}
+        onClose={() => setReviewLogId(null)}
+      />
 
       {!readOnly && editingLog && (
         <LogForm

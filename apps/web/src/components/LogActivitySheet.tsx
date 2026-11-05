@@ -25,7 +25,7 @@ function LogActivityList({
   loading: boolean;
   onNavigate: () => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
 
   if (loading) {
     return (
@@ -64,7 +64,7 @@ function LogActivityList({
                 {t(`nav.${log.mediaType}`)}
                 {(() => {
                   const duration =
-                    log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
+                    log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt, locale) : "";
                   return duration ? <> · {t("dashboard.finishedIn", { duration })}</> : null;
                 })()}
               </p>

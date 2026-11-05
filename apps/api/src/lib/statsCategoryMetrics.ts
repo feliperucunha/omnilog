@@ -54,6 +54,15 @@ function userTaggedInMatch(players: BoardGameMatchPlayer[], userId: string): boo
   return players.some((p) => p.appUserId === userId);
 }
 
+type BoardGameMatchSessionKeyRow = {
+  log: { externalId: string };
+  createdAt: Date;
+};
+
+export function boardGameMatchSessionKey(row: BoardGameMatchSessionKeyRow): string {
+  return `${row.log.externalId}:${row.createdAt.getTime()}`;
+}
+
 export function buildBoardGameMatchStatsWhere(
   userId: string,
   opts: {
@@ -123,6 +132,7 @@ async function recentBoardGamesForStats_recent(
     where,
     select: {
       playedAt: true,
+      createdAt: true,
       players: true,
       log: {
         select: {
@@ -152,7 +162,7 @@ async function recentBoardGamesForStats_recent(
     const players = parseBoardGamePlayersJson(row.players);
     const isOwnLog = row.log.userId === userId;
     if (!isOwnLog && !userTaggedInMatch(players, userId)) continue;
-    const sessionKey = `${row.log.externalId}:${row.playedAt.getTime()}`;
+    const sessionKey = boardGameMatchSessionKey(row);
     const existing = sessionRows.get(sessionKey);
     if (!existing) {
       sessionRows.set(sessionKey, row);
@@ -234,90 +244,149 @@ async function recentBoardGamesForStats_allTime(
     includeTaggedMatches: opts?.includeTaggedMatches,
   });
 
-  const rows = await prisma.boardGameMatch.findMany({
-    where,
-    select: {
-      playedAt: true,
-      log: {
-        select: {
-          id: true,
-          userId: true,
-          externalId: true,
-          title: true,
-          image: true,
-          boardGameSource: true,
+  const [rows, logs] = await Promise.all([
+    prisma.boardGameMatch.findMany({
+      where,
+      select: {
+        playedAt: true,
+        createdAt: true,
+        players: true,
+        log: {
+          select: {
+            id: true,
+            userId: true,
+            externalId: true,
+            title: true,
+            image: true,
+            boardGameSource: true,
+          },
         },
       },
-    },
-    orderBy: { playedAt: "desc" },
-  });
-
-  const byExternalId = new Map<string, {
-    logId: string;
-    externalId: string;
-    title: string;
-    image: string | null;
-    boardGameSource: string | null;
-    matchCount: number;
-    lastPlayedAt: Date;
-  }>();
-
-  for (const row of rows) {
-    const extId = row.log.externalId;
-    let acc = byExternalId.get(extId);
-    if (!acc) {
-      acc = {
-        logId: row.log.id,
-        externalId: extId,
-        title: row.log.title,
-        image: row.log.image,
-        boardGameSource: row.log.boardGameSource,
-        matchCount: 0,
-        lastPlayedAt: row.playedAt,
-      };
-      byExternalId.set(extId, acc);
-    }
-    acc.matchCount += 1;
-    if (row.log.userId === userId) {
-      acc.logId = row.log.id;
-      acc.title = row.log.title;
-      acc.image = row.log.image;
-      acc.boardGameSource = row.log.boardGameSource;
-    }
-    if (row.playedAt.getTime() > acc.lastPlayedAt.getTime()) {
-      acc.lastPlayedAt = row.playedAt;
-    }
-  }
-
-  if (sort === "leastPlayed") {
-    const existingExtIds = new Set(byExternalId.keys());
-    const zeroMatchLogs = await prisma.log.findMany({
-      where: {
-        userId,
-        mediaType: "boardgames",
-        OR: [{ matchesPlayed: 0 }, { matchesPlayed: null }],
-        externalId: { notIn: [...existingExtIds] },
-      },
+      orderBy: { playedAt: "desc" },
+    }),
+    prisma.log.findMany({
+      where: { userId, mediaType: "boardgames" },
       select: {
         id: true,
         externalId: true,
         title: true,
         image: true,
         boardGameSource: true,
+        matchesPlayed: true,
+        completedAt: true,
         createdAt: true,
       },
-    });
-    for (const log of zeroMatchLogs) {
-      byExternalId.set(log.externalId, {
-        logId: log.id,
-        externalId: log.externalId,
-        title: log.title,
-        image: log.image,
-        boardGameSource: log.boardGameSource,
-        matchCount: 0,
-        lastPlayedAt: log.createdAt,
-      });
+    }),
+  ]);
+
+  const sessionRows = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    const sessionKey = boardGameMatchSessionKey(row);
+    const existing = sessionRows.get(sessionKey);
+    if (!existing) {
+      sessionRows.set(sessionKey, row);
+      continue;
     }
+    if (row.log.userId === userId && existing.log.userId !== userId) {
+      sessionRows.set(sessionKey, row);
+    }
+  }
+
+  type RowStats = {
+    log: (typeof rows)[number]["log"];
+    matchCount: number;
+    wins: number;
+    lastPlayedAt: Date;
+    lastScore: number | null;
+    lastScoreTrend: "higher" | "lower" | null;
+  };
+
+  const rowStats = new Map<string, RowStats>();
+  for (const row of sessionRows.values()) {
+    const externalId = row.log.externalId;
+    const players = parseBoardGamePlayersJson(row.players);
+    let acc = rowStats.get(externalId);
+    if (!acc) {
+      acc = {
+        log: row.log,
+        matchCount: 0,
+        wins: 0,
+        lastPlayedAt: row.playedAt,
+        lastScore: null,
+        lastScoreTrend: null,
+      };
+      rowStats.set(externalId, acc);
+    }
+    acc.matchCount += 1;
+    if (matchCountsAsWinForUser(players, userId)) acc.wins += 1;
+    if (row.playedAt.getTime() > acc.lastPlayedAt.getTime()) {
+      acc.lastPlayedAt = row.playedAt;
+    }
+    if (row.log.userId === userId) {
+      acc.log = row.log;
+    }
+  }
+
+  for (const [externalId, acc] of rowStats) {
+    const scoredSessions = [...sessionRows.values()]
+      .filter((row) => row.log.externalId === externalId)
+      .map((row) => ({
+        playedAt: row.playedAt,
+        score: userScoreFromMatch(parseBoardGamePlayersJson(row.players), userId),
+      }))
+      .filter((row): row is { playedAt: Date; score: number } => row.score != null)
+      .sort((a, b) => b.playedAt.getTime() - a.playedAt.getTime());
+    acc.lastScore = scoredSessions[0]?.score ?? null;
+    acc.lastScoreTrend = boardGameScoreTrend(scoredSessions[0]?.score, scoredSessions[1]?.score);
+  }
+
+  type Entry = {
+    logId: string;
+    externalId: string;
+    title: string;
+    image: string | null;
+    boardGameSource: string | null;
+    matchCount: number;
+    wins: number;
+    lastPlayedAt: Date;
+    lastScore: number | null;
+    lastScoreTrend: "higher" | "lower" | null;
+  };
+
+  const byExternalId = new Map<string, Entry>();
+
+  for (const log of logs) {
+    const stats = rowStats.get(log.externalId);
+    const matchCount = log.matchesPlayed ?? stats?.matchCount ?? 0;
+    if (sort === "mostPlayed" && matchCount === 0 && !stats) continue;
+    byExternalId.set(log.externalId, {
+      logId: log.id,
+      externalId: log.externalId,
+      title: log.title,
+      image: log.image,
+      boardGameSource: log.boardGameSource,
+      matchCount,
+      wins: Math.min(stats?.wins ?? 0, matchCount),
+      lastPlayedAt: stats?.lastPlayedAt ?? log.completedAt ?? log.createdAt,
+      lastScore: stats?.lastScore ?? null,
+      lastScoreTrend: stats?.lastScoreTrend ?? null,
+    });
+  }
+
+  for (const [externalId, stats] of rowStats) {
+    if (byExternalId.has(externalId)) continue;
+    byExternalId.set(externalId, {
+      logId: stats.log.id,
+      externalId,
+      title: stats.log.title,
+      image: stats.log.image,
+      boardGameSource: stats.log.boardGameSource,
+      matchCount: stats.matchCount,
+      wins: stats.wins,
+      lastPlayedAt: stats.lastPlayedAt,
+      lastScore: stats.lastScore,
+      lastScoreTrend: stats.lastScoreTrend,
+    });
   }
 
   const now = Date.now();
@@ -337,11 +406,11 @@ async function recentBoardGamesForStats_allTime(
     image: entry.image,
     boardGameSource: entry.boardGameSource as BoardGameProvider | null,
     matchCount: entry.matchCount,
-    wins: 0,
+    wins: entry.wins,
     lastPlayedAt: entry.lastPlayedAt.toISOString(),
     daysSinceLastPlayed: Math.max(0, Math.round((now - entry.lastPlayedAt.getTime()) / 86_400_000)),
-    lastScore: null,
-    lastScoreTrend: null,
+    lastScore: entry.lastScore,
+    lastScoreTrend: entry.lastScoreTrend,
   }));
 }
 
@@ -403,7 +472,12 @@ export async function countBoardGameWinsForStats(
   });
   const matches = await prisma.boardGameMatch.findMany({
     where,
-    select: { players: true, playedAt: true, log: { select: { userId: true, externalId: true } } },
+    select: {
+      players: true,
+      playedAt: true,
+      createdAt: true,
+      log: { select: { userId: true, externalId: true } },
+    },
   });
   const seenSessions = new Set<string>();
   let wins = 0;
@@ -411,7 +485,7 @@ export async function countBoardGameWinsForStats(
     const players = parseBoardGamePlayersJson(row.players);
     const isOwnLog = row.log.userId === userId;
     if (!isOwnLog && !userTaggedInMatch(players, userId)) continue;
-    const sessionKey = `${row.log.externalId}:${row.playedAt.getTime()}`;
+    const sessionKey = boardGameMatchSessionKey(row);
     if (seenSessions.has(sessionKey)) continue;
     seenSessions.add(sessionKey);
     if (matchCountsAsWinForUser(players, userId)) wins += 1;

@@ -207,6 +207,7 @@ function getLogCashFlow(log: Log): {
 
 /** Stock-style row: cost / proceeds columns and signed net when computable. */
 function SpendFinanceLogRow({ log, t, onNavigate }: { log: Log; t: SpendFinanceT; onNavigate: () => void }) {
+  const { locale } = useLocale();
   const cf = getLogCashFlow(log);
   const netTone =
     cf.netMinor != null
@@ -241,7 +242,7 @@ function SpendFinanceLogRow({ log, t, onNavigate }: { log: Log; t: SpendFinanceT
             {t(`nav.${log.mediaType}`)}
             {(() => {
               const duration =
-                log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
+                log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt, locale) : "";
               return duration ? <> · {t("dashboard.finishedIn", { duration })}</> : null;
             })()}
           </p>
@@ -3124,7 +3125,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                     const badgeClass = logStatusBadgeClass(status);
                     const duration =
                       log.startedAt && log.completedAt
-                        ? formatTimeToFinish(log.startedAt, log.completedAt)
+                        ? formatTimeToFinish(log.startedAt, log.completedAt, locale)
                         : "";
                     return (
                       <motion.li

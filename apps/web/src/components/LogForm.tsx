@@ -17,6 +17,7 @@ import { Select } from "@/components/ui/select";
 import { NumberCombobox } from "@/components/ui/number-combobox";
 import type { MediaType, Log, ScopedReview } from "@geeklogs/shared";
 import { BoardGameMatchesSection } from "@/components/BoardGameMatchesSection";
+import { MatchesPlayedField } from "@/components/MatchesPlayedField";
 import {
   canSavePartialReview,
   partialReviewSaveKind,
@@ -29,6 +30,7 @@ import { ReviewPartialSaveButtons } from "@/components/ReviewPartialSaveButtons"
 import { SavedTvReviewsSection } from "@/components/SavedTvReviewsSection";
 import { GameLogFields } from "@/components/GameLogFields";
 import { ReadingProgressFields } from "@/components/ReadingProgressFields";
+import { LogDateFields } from "@/components/LogDateFields";
 import { dateInputToIso, isoToDateInput, applyStatusAutoDates, applyBookStatusPagesChange } from "@/lib/readingDates";
 import { cn } from "@/lib/utils";
 import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
@@ -161,6 +163,7 @@ export function LogForm(props: LogFormProps) {
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
   const showReadingProgress = HAS_READING_PROGRESS.includes(mediaType);
   const showGameLogFields = HAS_GAME_LOG_FIELDS.includes(mediaType);
+  const showWatchDates = mediaType === "tv" || mediaType === "anime";
   const platformOptions =
     isEdit && "platforms" in props ? (props.platforms ?? null) : null;
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
@@ -341,6 +344,9 @@ export function LogForm(props: LogFormProps) {
           ((gamePlatform.trim() || null) === (log.gamePlatform ?? null) &&
             logDateInputMatchesStored(log.startedAt, startedAtInput) &&
             logDateInputMatchesStored(log.completedAt, completedAtInput))) &&
+        (!showWatchDates ||
+          (logDateInputMatchesStored(log.startedAt, startedAtInput) &&
+            logDateInputMatchesStored(log.completedAt, completedAtInput))) &&
         (!showHoursToBeat || toNum(hoursToBeat) === (log.hoursToBeat ?? null)) &&
         (!showCollectionOwnership ||
           (own === (log.own ?? false) &&
@@ -385,6 +391,7 @@ export function LogForm(props: LogFormProps) {
       volume !== "" ||
       (showReadingProgress && (pagesRead !== "" || startedAtInput !== "" || completedAtInput !== "")) ||
       (showGameLogFields && (gamePlatform.trim() !== "" || startedAtInput !== "" || completedAtInput !== "")) ||
+      (showWatchDates && (startedAtInput !== "" || completedAtInput !== "")) ||
       (showHoursToBeat && hoursToBeat !== "") ||
       (showCollectionOwnership && (own || wantToBuy || sold)) ||
       (showBoardGameFields &&
@@ -414,6 +421,7 @@ export function LogForm(props: LogFormProps) {
     showSeasonEpisode,
     showReadingProgress,
     showGameLogFields,
+    showWatchDates,
     gamePlatform,
     showHoursToBeat,
     showCollectionOwnership,
@@ -467,6 +475,10 @@ export function LogForm(props: LogFormProps) {
           payload.startedAt = startedAtInput.trim() ? dateInputToIso(startedAtInput) : null;
           payload.completedAt = completedAtInput.trim() ? dateInputToIso(completedAtInput) : null;
         }
+        if (showWatchDates) {
+          payload.startedAt = startedAtInput.trim() ? dateInputToIso(startedAtInput) : null;
+          payload.completedAt = completedAtInput.trim() ? dateInputToIso(completedAtInput) : null;
+        }
         if (showHoursToBeat) payload.hoursToBeat = toNum(hoursToBeat);
         if (showCollectionOwnership) {
           payload.own = own;
@@ -511,6 +523,9 @@ export function LogForm(props: LogFormProps) {
           (!showGameLogFields ||
             ((gamePlatform.trim() || null) === (props.log.gamePlatform ?? null) &&
               logDateInputMatchesStored(props.log.startedAt, startedAtInput) &&
+              logDateInputMatchesStored(props.log.completedAt, completedAtInput))) &&
+          (!showWatchDates ||
+            (logDateInputMatchesStored(props.log.startedAt, startedAtInput) &&
               logDateInputMatchesStored(props.log.completedAt, completedAtInput))) &&
           (!showHoursToBeat || toNum(hoursToBeat) === (props.log.hoursToBeat ?? null)) &&
           (!showCollectionOwnership ||
@@ -617,6 +632,10 @@ export function LogForm(props: LogFormProps) {
               startedAt: startedAtInput.trim() ? dateInputToIso(startedAtInput) : null,
               completedAt: completedAtInput.trim() ? dateInputToIso(completedAtInput) : null,
             }),
+            ...(showWatchDates && {
+              startedAt: startedAtInput.trim() ? dateInputToIso(startedAtInput) : null,
+              completedAt: completedAtInput.trim() ? dateInputToIso(completedAtInput) : null,
+            }),
             ...(showHoursToBeat && { hoursToBeat: toNum(hoursToBeat) }),
             ...(showCollectionOwnership && { own, wantToBuy, sold }),
             ...(showBoardGameFields && { matchesPlayed: toNum(matchesPlayed) }),
@@ -706,6 +725,7 @@ export function LogForm(props: LogFormProps) {
     clearReviewDraft,
     showReadingProgress,
     showGameLogFields,
+    showWatchDates,
     gamePlatform,
     showHoursToBeat,
     showCollectionOwnership,
@@ -974,6 +994,15 @@ export function LogForm(props: LogFormProps) {
                       </div>
                     </div>
                   )}
+                  {showWatchDates && (
+                    <LogDateFields
+                      startedAt={startedAtInput}
+                      onStartedAtChange={setStartedAtInput}
+                      completedAt={completedAtInput}
+                      onCompletedAtChange={setCompletedAtInput}
+                      disabled={loading}
+                    />
+                  )}
                   {showReadingProgress && (
                     <ReadingProgressFields
                       pagesRead={pagesRead}
@@ -1067,23 +1096,10 @@ export function LogForm(props: LogFormProps) {
               {showBoardGameFields && (
                 <div className="space-y-2">
                   <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.matchesPlayed")}</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder="0"
-                    value={matchesPlayed === "" ? "" : matchesPlayed}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const v = e.target.value;
-                      if (v === "") setMatchesPlayed("");
-                      else {
-                        const n = parseInt(v, 10);
-                        if (Number.isInteger(n) && n >= 0) setMatchesPlayed(n);
-                      }
-                    }}
+                  <MatchesPlayedField
+                    value={matchesPlayed}
+                    onChange={setMatchesPlayed}
                     disabled={loading || deleting}
-                    className="w-full max-w-[8rem]"
-                    aria-label={t("itemReviewForm.matchesPlayed")}
                   />
                 </div>
               )}

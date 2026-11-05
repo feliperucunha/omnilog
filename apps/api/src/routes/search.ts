@@ -37,6 +37,7 @@ import { searchBoardGames } from "../services/bgg.js";
 import { searchBoardGamesLudopedia } from "../services/ludopedia.js";
 import { searchComics } from "../services/comicvine.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
+import { UpstreamUnavailableError } from "../lib/UpstreamUnavailableError.js";
 import { collectFromSeeds, topUpFromPopular } from "../lib/searchRecommendationsMerge.js";
 import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
 import { preferEnvApiToken } from "../lib/preferEnvApiToken.js";
@@ -517,6 +518,15 @@ searchRouter.get("/recommendations", async (req: AuthenticatedRequest, res) => {
     );
     res.json(payload);
   } catch (err) {
+    if (err instanceof UpstreamUnavailableError) {
+      console.error("Recommendations upstream unavailable:", err);
+      res.status(503).json({
+        error: "This source is temporarily unavailable. Please try again later.",
+        code: "UPSTREAM_UNAVAILABLE",
+        provider: err.provider,
+      });
+      return;
+    }
     if (err instanceof InvalidApiKeyError) {
       if (skipApiKeyUX) {
         console.error("Recommendations error (INVALID_API_KEY UX disabled by feature flag):", err);
@@ -588,6 +598,15 @@ searchRouter.get("/browse", async (req: AuthenticatedRequest, res) => {
     });
     res.json(data);
   } catch (err) {
+    if (err instanceof UpstreamUnavailableError) {
+      console.error("Browse upstream unavailable:", err);
+      res.status(503).json({
+        error: "This source is temporarily unavailable. Please try again later.",
+        code: "UPSTREAM_UNAVAILABLE",
+        provider: err.provider,
+      });
+      return;
+    }
     if (err instanceof InvalidApiKeyError) {
       if (skipApiKeyUX) {
         console.error("Browse error (INVALID_API_KEY UX disabled by feature flag):", err);
@@ -948,6 +967,14 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
       }
     }
   } catch (err) {
+    if (err instanceof UpstreamUnavailableError) {
+      console.error("Search upstream unavailable:", err);
+      return res.status(503).json({
+        error: "This source is temporarily unavailable. Please try again later.",
+        code: "UPSTREAM_UNAVAILABLE",
+        provider: err.provider,
+      });
+    }
     if (err instanceof InvalidApiKeyError) {
       if (skipApiKeyUX) {
         console.error("Search error (INVALID_API_KEY UX disabled by feature flag):", err);

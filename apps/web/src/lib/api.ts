@@ -301,6 +301,8 @@ export { getCachedEntry } from "./cache.js";
 
 export interface ApiFetchOptions extends RequestInit {
   timeout?: number;
+  /** Overrides the default retry budget for callers that should fail fast (e.g. search). */
+  maxAttempts?: number;
   /** When true, do not redirect to /login on 401 (e.g. for session restore or logout). */
   skipAuthRedirect?: boolean;
   /** Low-priority GETs wait behind a small concurrency lane (prefetch / cache warm). */
@@ -317,8 +319,14 @@ async function performSingleFetchAttempt<T>(
   options: ApiFetchOptions | undefined,
   timeoutMs: number
 ): Promise<T> {
-  const { timeout: _t, skipAuthRedirect, priority: _p, signal: callerSignal, ...fetchOptions } =
-    options ?? {};
+  const {
+    timeout: _t,
+    maxAttempts: _m,
+    skipAuthRedirect,
+    priority: _p,
+    signal: callerSignal,
+    ...fetchOptions
+  } = options ?? {};
 
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
@@ -401,12 +409,13 @@ async function performSingleFetchAttempt<T>(
 async function fetchInternal<T>(path: string, options?: ApiFetchOptions): Promise<T> {
   const run = async (): Promise<T> => {
     const timeoutMs = options?.timeout ?? DEFAULT_TIMEOUT_MS;
+    const maxAttempts = Math.max(1, options?.maxAttempts ?? MAX_FETCH_ATTEMPTS);
     const callerSignal = options?.signal ?? undefined;
     if (callerSignal?.aborted) {
       throw new DOMException("The operation was aborted.", "AbortError");
     }
     let lastError: unknown;
-    for (let attempt = 0; attempt < MAX_FETCH_ATTEMPTS; attempt++) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const result = await performSingleFetchAttempt<T>(path, options, timeoutMs);
         fireFirstApiResponseOnce();
@@ -416,7 +425,7 @@ async function fetchInternal<T>(path: string, options?: ApiFetchOptions): Promis
         if (isCallerAborted(callerSignal, e)) {
           throw e instanceof Error ? e : new DOMException("The operation was aborted.", "AbortError");
         }
-        const canRetry = attempt < MAX_FETCH_ATTEMPTS - 1 && isRetryableAfterError(e, callerSignal);
+        const canRetry = attempt < maxAttempts - 1 && isRetryableAfterError(e, callerSignal);
         if (!canRetry) {
           fireFirstApiErrorFromCaught(e);
           if (isAbortError(e)) {

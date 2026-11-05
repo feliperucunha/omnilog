@@ -13,7 +13,7 @@ const TIMEOUT_MS: Record<UpstreamProvider, number> = {
   bgg: 12_000,
   jikan: 8_000,
   kitsu: 10_000,
-  rawg: 8_000,
+  rawg: 6_000,
   openlibrary: 10_000,
   comicvine: 10_000,
   default: 10_000,
@@ -48,7 +48,10 @@ export async function upstreamFetch(
     }
     return res;
   } catch (err) {
-    if (retry) return attempt();
+    /** Timeouts are unlikely to recover within a second retry and make errors feel stuck. */
+    const timedOut =
+      err instanceof Error && (err.name === "AbortError" || err.name === "TimeoutError");
+    if (retry && !timedOut) return attempt();
     throw err;
   }
 }

@@ -29,6 +29,7 @@ import {
   logDateInputMatchesStored,
 } from "@/lib/logFormEquality";
 import { BoardGameOwnershipSwitch } from "@/components/BoardGameOwnershipSwitch";
+import { MatchesPlayedField } from "@/components/MatchesPlayedField";
 import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/lib/boardGameOwnership";
 import {
   mediaTypeHasBoardGameOnlyFields,
@@ -55,6 +56,7 @@ import { ReviewPartialSaveButtons } from "@/components/ReviewPartialSaveButtons"
 import { SavedTvReviewsSection } from "@/components/SavedTvReviewsSection";
 import { GameLogFields } from "@/components/GameLogFields";
 import { ReadingProgressFields } from "@/components/ReadingProgressFields";
+import { LogDateFields } from "@/components/LogDateFields";
 import { MarketListingSection } from "@/components/MarketListingSection";
 import { dateInputToIso, isoToDateInput, applyStatusAutoDates, applyBookStatusPagesChange } from "@/lib/readingDates";
 import { cn } from "@/lib/utils";
@@ -184,6 +186,7 @@ export function ItemReviewForm({
   const showChapterVolume = HAS_CHAPTER_VOLUME.includes(mediaType);
   const showReadingProgress = HAS_READING_PROGRESS.includes(mediaType);
   const showGameLogFields = HAS_GAME_LOG_FIELDS.includes(mediaType);
+  const showWatchDates = mediaType === "tv" || mediaType === "anime";
   const showHoursToBeat = mediaType === "games";
   const showBoardGameFields = mediaTypeHasBoardGameOnlyFields(mediaType);
   const showMarketTab = mediaTypeHasMarketTab(mediaType);
@@ -504,6 +507,10 @@ export function ItemReviewForm({
         payload.startedAt = startedAtInput.trim() ? dateInputToIso(startedAtInput) : null;
         payload.completedAt = completedAtInput.trim() ? dateInputToIso(completedAtInput) : null;
       }
+      if (showWatchDates) {
+        payload.startedAt = startedAtInput.trim() ? dateInputToIso(startedAtInput) : null;
+        payload.completedAt = completedAtInput.trim() ? dateInputToIso(completedAtInput) : null;
+      }
       if (showHoursToBeat) payload.hoursToBeat = toNum(hoursToBeat);
       if (showCollectionOwnership) {
         payload.own = own;
@@ -564,6 +571,9 @@ export function ItemReviewForm({
           (!showGameLogFields ||
             ((gamePlatform.trim() || null) === (myLog.gamePlatform ?? null) &&
               logDateInputMatchesStored(myLog.startedAt, startedAtInput) &&
+              logDateInputMatchesStored(myLog.completedAt, completedAtInput))) &&
+          (!showWatchDates ||
+            (logDateInputMatchesStored(myLog.startedAt, startedAtInput) &&
               logDateInputMatchesStored(myLog.completedAt, completedAtInput))) &&
           (!showHoursToBeat || toNum(hoursToBeat) === (myLog.hoursToBeat ?? null)) &&
           sameStringList(genreList, myLog.genres ?? []) &&
@@ -941,6 +951,16 @@ export function ItemReviewForm({
               </div>
             )}
 
+            {showWatchDates && (
+              <LogDateFields
+                startedAt={startedAtInput}
+                onStartedAtChange={setStartedAtInput}
+                completedAt={completedAtInput}
+                onCompletedAtChange={setCompletedAtInput}
+                disabled={saving}
+              />
+            )}
+
             {showReadingProgress && (
               <ReadingProgressFields
                 pagesRead={pagesRead}
@@ -1038,24 +1058,7 @@ export function ItemReviewForm({
                 <Label className="text-sm text-[var(--color-lightest)]">
                   {t("itemReviewForm.matchesPlayed")}
                 </Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={1}
-                  placeholder="0"
-                  value={matchesPlayed === "" ? "" : matchesPlayed}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === "") setMatchesPlayed("");
-                    else {
-                      const n = parseInt(v, 10);
-                      if (Number.isInteger(n) && n >= 0) setMatchesPlayed(n);
-                    }
-                  }}
-                  disabled={saving}
-                  className="w-full max-w-[8rem]"
-                  aria-label={t("itemReviewForm.matchesPlayed")}
-                />
+                <MatchesPlayedField value={matchesPlayed} onChange={setMatchesPlayed} disabled={saving} />
               </div>
             )}
 

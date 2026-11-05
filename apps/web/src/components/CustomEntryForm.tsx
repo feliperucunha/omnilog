@@ -26,6 +26,7 @@ import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { starsToGrade } from "@/lib/gradeStars";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
 import { BoardGameOwnershipSwitch } from "@/components/BoardGameOwnershipSwitch";
+import { MatchesPlayedField } from "@/components/MatchesPlayedField";
 import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/lib/boardGameOwnership";
 import { mediaTypeHasBoardGameOnlyFields, mediaTypeHasCollectionOwnership } from "@/lib/mediaTypeFeatures";
 
@@ -386,22 +387,10 @@ export const CustomEntryForm = forwardRef<CustomEntryFormHandle, CustomEntryForm
               {showBoardGameFields && (
                 <div className="space-y-2">
                     <Label className="text-sm text-[var(--color-lightest)]">{t("itemReviewForm.matchesPlayed")}</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={1}
-                      placeholder="0"
-                      value={matchesPlayed === "" ? "" : matchesPlayed}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v === "") setMatchesPlayed("");
-                        else {
-                          const n = parseInt(v, 10);
-                          if (Number.isInteger(n) && n >= 0) setMatchesPlayed(n);
-                        }
-                      }}
-                      className="w-full max-w-[8rem] bg-[var(--color-darkest)]"
-                      aria-label={t("itemReviewForm.matchesPlayed")}
+                    <MatchesPlayedField
+                      value={matchesPlayed}
+                      onChange={setMatchesPlayed}
+                      inputClassName="bg-[var(--color-darkest)]"
                     />
                 </div>
               )}

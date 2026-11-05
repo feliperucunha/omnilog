@@ -37,7 +37,6 @@ import {
   LOG_CARD_EDIT_BUTTON,
   LOG_CARD_EDIT_BUTTON_GRID,
   LOG_CARD_HEIGHT_DEFAULT,
-  LOG_CARD_HEIGHT_EMBEDDED,
   LOG_CARD_HEIGHT_EMBEDDED_COLLAPSED,
   LOG_CARD_HEIGHT_EMBEDDED_GRID_COLLAPSED,
   LOG_CARD_IMAGE_COLUMN,
@@ -53,7 +52,7 @@ import { tapScale, tapTransition } from "@/lib/animations";
 import type { MediaType, Log } from "@geeklogs/shared";
 import { COMPLETED_STATUSES, LOG_STATUS_OPTIONS } from "@geeklogs/shared";
 import { cn } from "@/lib/utils";
-import type { TFunction } from "@/contexts/LocaleContext";
+import type { Locale, TFunction } from "@/contexts/LocaleContext";
 
 const cardShadow: CSSProperties = { boxShadow: "var(--shadow-card)" };
 
@@ -137,13 +136,13 @@ export type MediaLogCardProps = {
   deletingId: string | null;
   incrementingId: string | null;
   statusChangingId: string | null;
-  expandedReviewLogId: string | null;
-  onExpandReview: (logId: string | null) => void;
+  onViewReview: (logId: string) => void;
   onIncrement: (log: Log, field: "episode" | "chapter" | "volume") => void;
   onStatusChange: (log: Log, status: string) => void | Promise<void>;
   onEdit: (log: Log, tab: "review" | "matches" | "market") => void;
   onDelete?: (logId: string) => void | Promise<void>;
   t: TFunction;
+  locale: Locale;
 };
 
 function LogImageOverlays({
@@ -219,6 +218,7 @@ function LogMetaRow({
   mediaType,
   showCollectionOwnershipFilters,
   t,
+  locale,
   compact,
   grid,
 }: {
@@ -228,6 +228,7 @@ function LogMetaRow({
   mediaType: MediaType;
   showCollectionOwnershipFilters: boolean;
   t: TFunction;
+  locale: Locale;
   compact: boolean;
   grid: boolean;
 }) {
@@ -306,7 +307,7 @@ function LogMetaRow({
         );
       })()}
       {(() => {
-        const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt) : "";
+        const duration = log.startedAt && log.completedAt ? formatTimeToFinish(log.startedAt, log.completedAt, locale) : "";
         return duration ? (
           <span className={cn(textSize, "text-[var(--color-light)]")}>{t("dashboard.finishedIn", { duration })}</span>
         ) : null;
@@ -378,8 +379,7 @@ function LogReviewBlock({
   embedded,
   compact,
   grid,
-  expandedReviewLogId,
-  onExpandReview,
+  onViewReview,
   t,
 }: {
   log: Log;
@@ -387,8 +387,7 @@ function LogReviewBlock({
   embedded: boolean;
   compact: boolean;
   grid: boolean;
-  expandedReviewLogId: string | null;
-  onExpandReview: (logId: string | null) => void;
+  onViewReview: (logId: string) => void;
   t: TFunction;
 }) {
   if (!display.review) {
@@ -397,10 +396,9 @@ function LogReviewBlock({
   }
 
   const review = display.review;
-  const isExpanded = expandedReviewLogId === log.id;
   const truncated = review.length > REVIEW_PREVIEW_LENGTH;
-  const preview = truncated && !isExpanded ? review.slice(0, REVIEW_PREVIEW_LENGTH) : review;
-  const showClamp = (embedded || compact || grid) && truncated && !isExpanded;
+  const preview = truncated ? review.slice(0, REVIEW_PREVIEW_LENGTH) : review;
+  const showClamp = (embedded || compact || grid) && truncated;
   const reviewClass = compact ? "text-[9px] sm:text-[10px]" : grid ? "text-[10px] md:text-[9px]" : "text-xs sm:text-sm";
 
   return (
@@ -414,7 +412,7 @@ function LogReviewBlock({
       >
         <p className={cn(reviewClass, "text-[var(--color-light)] whitespace-pre-wrap break-words")}>
           {preview}
-          {truncated && !isExpanded && " ... "}
+          {truncated && " ... "}
         </p>
       </div>
       {truncated && (
@@ -426,10 +424,10 @@ function LogReviewBlock({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            onExpandReview(isExpanded ? null : log.id);
+            onViewReview(log.id);
           }}
         >
-          {isExpanded ? t("social.viewLess") : t("social.viewMore")}
+          {t("social.viewMore")}
         </Button>
       )}
     </>
@@ -705,17 +703,16 @@ export function MediaLogCard({
   deletingId,
   incrementingId,
   statusChangingId,
-  expandedReviewLogId,
-  onExpandReview,
+  onViewReview,
   onIncrement,
   onStatusChange,
   onEdit,
   onDelete,
   t,
+  locale,
 }: MediaLogCardProps) {
   const display = getLogCardDisplay(log);
   const scopeLabel = formatLogScopeLabel(t, display);
-  const isReviewExpanded = embedded && expandedReviewLogId === log.id;
   const isCompact = view === "compact";
   const isGrid = view === "grid";
   const borderClass = listBorderClass(log, isCompact);
@@ -725,8 +722,7 @@ export function MediaLogCard({
       <Card
         className={cn(
           "relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-[var(--color-dark)] p-0",
-          borderClass,
-          isReviewExpanded && "row-span-2"
+          borderClass
         )}
         style={cardShadow}
       >
@@ -789,6 +785,7 @@ export function MediaLogCard({
               mediaType={mediaType}
               showCollectionOwnershipFilters={showCollectionOwnershipFilters}
               t={t}
+              locale={locale}
               compact
               grid={false}
             />
@@ -800,8 +797,7 @@ export function MediaLogCard({
                 embedded={embedded}
                 compact
                 grid={false}
-                expandedReviewLogId={expandedReviewLogId}
-                onExpandReview={onExpandReview}
+                onViewReview={onViewReview}
                 t={t}
               />
             </div>
@@ -829,13 +825,11 @@ export function MediaLogCard({
     <Card
       className={cn(
         "relative flex min-h-0 flex-row overflow-hidden rounded-lg bg-[var(--color-dark)] p-0",
-        embedded && !isReviewExpanded
+        embedded
           ? isGrid
             ? LOG_CARD_HEIGHT_EMBEDDED_GRID_COLLAPSED
             : LOG_CARD_HEIGHT_EMBEDDED_COLLAPSED
-          : embedded
-            ? LOG_CARD_HEIGHT_EMBEDDED
-            : LOG_CARD_HEIGHT_DEFAULT,
+          : LOG_CARD_HEIGHT_DEFAULT,
         borderClass
       )}
       style={cardShadow}
@@ -886,7 +880,7 @@ export function MediaLogCard({
             "flex min-w-0 flex-1 flex-col overflow-hidden",
             isGrid ? LOG_CARD_BODY_GAP_GRID : LOG_CARD_BODY_GAP,
             isGrid ? LOG_CARD_BODY_PADDING_GRID : LOG_CARD_BODY_PADDING,
-            embedded && !isReviewExpanded && "min-h-0"
+            embedded && "min-h-0"
           )}
         >
           {readOnly ? (
@@ -910,6 +904,7 @@ export function MediaLogCard({
             mediaType={mediaType}
             showCollectionOwnershipFilters={showCollectionOwnershipFilters}
             t={t}
+            locale={locale}
             compact={false}
             grid={isGrid}
           />
@@ -917,7 +912,7 @@ export function MediaLogCard({
           <div
             className={cn(
               "flex min-h-0 flex-col items-start gap-1",
-              embedded && !isReviewExpanded && "flex-1 overflow-hidden"
+              embedded && "flex-1 overflow-hidden"
             )}
           >
             <LogReviewBlock
@@ -926,8 +921,7 @@ export function MediaLogCard({
               embedded={embedded}
               compact={false}
               grid={isGrid}
-              expandedReviewLogId={expandedReviewLogId}
-              onExpandReview={onExpandReview}
+              onViewReview={onViewReview}
               t={t}
             />
           </div>

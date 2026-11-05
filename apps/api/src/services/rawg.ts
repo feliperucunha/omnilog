@@ -1,11 +1,33 @@
 import { decodeHtmlEntities, type SearchResult, type ItemDetail, SEARCH_RESULTS_PAGE_SIZE } from "@geeklogs/shared";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
+import { UpstreamUnavailableError } from "../lib/UpstreamUnavailableError.js";
 import { upstreamFetch } from "../lib/upstreamFetch.js";
 
 const BASE = "https://api.rawg.io/api";
 
-function rawgFetch(url: string, init?: RequestInit): Promise<Response> {
-  return upstreamFetch(url, { ...init, provider: "rawg", retry: true });
+/** RAWG outages can last hours; stop hammering it once it fails and fail fast for a while. */
+const RAWG_UNAVAILABLE_COOLDOWN_MS = 60_000;
+let rawgUnavailableUntil = 0;
+
+function markRawgUnavailable(): never {
+  rawgUnavailableUntil = Date.now() + RAWG_UNAVAILABLE_COOLDOWN_MS;
+  throw new UpstreamUnavailableError("rawg");
+}
+
+async function rawgFetch(url: string, init?: RequestInit): Promise<Response> {
+  if (Date.now() < rawgUnavailableUntil) {
+    throw new UpstreamUnavailableError("rawg");
+  }
+  let res: Response;
+  try {
+    res = await upstreamFetch(url, { ...init, provider: "rawg", retry: true });
+  } catch (err) {
+    if (err instanceof InvalidApiKeyError) throw err;
+    markRawgUnavailable();
+  }
+  if (res.status >= 500) markRawgUnavailable();
+  rawgUnavailableUntil = 0;
+  return res;
 }
 
 function getKey(apiKey?: string | null): string | null {

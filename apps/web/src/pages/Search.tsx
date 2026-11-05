@@ -76,6 +76,9 @@ import {
 
 const FREE_SEARCH_USAGE_STORAGE_KEY = "geeklogs_free_search_usage";
 
+/** Search should fail visibly instead of retrying for minutes when a provider is down. */
+const SEARCH_REQUEST_OPTIONS = { timeout: 15_000, maxAttempts: 2 } as const;
+
 function getFreeSearchUsageKey(type: MediaType, boardProvider: BoardGameProvider): string {
   return type === "boardgames" ? `boardgames-${boardProvider}` : type;
 }
@@ -192,6 +195,7 @@ export function Search() {
   const [results, setResults] = useState<SearchResult[]>(() => pageCache?.results ?? []);
   const [userResults, setUserResults] = useState<UserSearchResult[]>(() => pageCache?.userResults ?? []);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [limitReachedByCategory, setLimitReachedByCategory] = useState<Partial<Record<MediaType, boolean>>>({});
   const [usageByCategory, setUsageByCategory] = useState<Partial<Record<MediaType, { used: number; limit: number }>>>(() => {
     const stored = loadFreeSearchUsageFromStorage(() => storage.getItemSync(FREE_SEARCH_USAGE_STORAGE_KEY));
@@ -352,15 +356,20 @@ export function Search() {
       const sort = sortOverride ?? sortBy;
       if (filter === SEARCH_USERS_TYPE) {
         setLoading(true);
+        setSearchError(null);
         setResults([]);
         setUserResults([]);
         try {
           const params = new URLSearchParams({ q: q.trim() });
-          const data = await apiFetch<{ users: UserSearchResult[] }>(`/search/users?${params.toString()}`);
+          const data = await apiFetch<{ users: UserSearchResult[] }>(
+            `/search/users?${params.toString()}`,
+            SEARCH_REQUEST_OPTIONS
+          );
           setUserResults(data.users ?? []);
           syncSearchToUrl({ query: q.trim(), searchFilter: SEARCH_USERS_TYPE, sortBy: sort });
         } catch (err) {
           setUserResults([]);
+          setSearchError(t("search.searchError"));
           showErrorToast(t, "E016", { originalError: err });
         } finally {
           setLoading(false);
@@ -373,6 +382,7 @@ export function Search() {
       const stored = loadFreeSearchUsageFromStorage(() => storage.getItemSync(FREE_SEARCH_USAGE_STORAGE_KEY));
       const clientUsed = stored[usageKey]?.used ?? 0;
       setLoading(true);
+      setSearchError(null);
       setResults([]);
       setUserResults([]);
       try {
@@ -381,6 +391,7 @@ export function Search() {
         if (searchType === "boardgames" && boardProvider) params.set("boardGameProvider", boardProvider);
         const searchPath = `/search?${params.toString()}`;
         const { data } = await apiFetchSWR<SearchResponse>(searchPath, {
+          ...SEARCH_REQUEST_OPTIONS,
           ttlMs: 10 * 60 * 1000,
           headers: { "X-Free-Search-Used": String(clientUsed) },
         });
@@ -398,6 +409,7 @@ export function Search() {
         syncSearchToUrl({ query: q.trim(), searchFilter: filter, sortBy: sort });
       } catch (err) {
         setResults([]);
+        setSearchError(t("search.searchError"));
         showErrorToast(t, "E016", { originalError: err });
       } finally {
         setLoading(false);
@@ -414,7 +426,7 @@ export function Search() {
   );
 
   const persistSearchCache = useCallback(() => {
-    if (!hasSearched || !query.trim() || loading) return;
+    if (!hasSearched || !query.trim() || loading || searchError) return;
     const urlState: SearchUrlState = { query: query.trim(), searchFilter, sortBy };
     setSearchPageCache({
       cacheKey: buildSearchCacheKey(location.pathname, urlState),
@@ -442,6 +454,7 @@ export function Search() {
     browseByMediaType,
     browseMetaByMediaType,
     loading,
+    searchError,
   ]);
 
   const openItemDetail = useCallback(
@@ -515,6 +528,7 @@ export function Search() {
       params.set("boardGameProvider", boardGameProvider);
     }
     apiFetchCached<RecommendationsResponse>(`/search/recommendations?${params.toString()}`, {
+      ...SEARCH_REQUEST_OPTIONS,
       ttlMs: 5 * 60 * 1000,
       signal: controller.signal,
     })
@@ -567,6 +581,7 @@ export function Search() {
       params.set("boardGameProvider", boardGameProvider);
     }
     apiFetchCached<BrowseResponse>(`/search/browse?${params.toString()}`, {
+      ...SEARCH_REQUEST_OPTIONS,
       ttlMs: 5 * 60 * 1000,
       signal: controller.signal,
     })
@@ -891,6 +906,7 @@ export function Search() {
             onClear={() => {
               setQuery("");
               setHasSearched(false);
+              setSearchError(null);
               setResults([]);
               setUserResults([]);
               searchInputRef.current?.focus();
@@ -962,6 +978,24 @@ export function Search() {
         </motion.div>
       )}
 
+      {hasSearched && !loading && searchError && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        >
+          <Card className="flex flex-col items-center gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 text-center shadow-[var(--shadow-sm)]">
+            <div className="flex flex-col gap-1">
+              <p className="font-medium text-[var(--color-lightest)]">{searchError}</p>
+              <p className="text-sm text-[var(--color-light)]">{t("search.searchErrorHint")}</p>
+            </div>
+            <Button type="button" size="sm" onClick={() => void runSearch(query)}>
+              {t("common.tryAgain")}
+            </Button>
+          </Card>
+        </motion.div>
+      )}
+
       {hasSearched && !loading && searchFilter === SEARCH_USERS_TYPE && userResults.length > 0 && (
         <motion.div {...listStaggerParentProps}>
           <div className="flex flex-col gap-2">
@@ -1021,7 +1055,7 @@ export function Search() {
         </motion.div>
       )}
 
-      {hasSearched && !loading && searchFilter === SEARCH_USERS_TYPE && query && userResults.length === 0 && (
+      {hasSearched && !loading && !searchError && searchFilter === SEARCH_USERS_TYPE && query && userResults.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1075,7 +1109,7 @@ export function Search() {
         </motion.div>
       )}
 
-      {hasSearched && !loading && searchFilter !== SEARCH_USERS_TYPE && query && results.length === 0 && (
+      {hasSearched && !loading && !searchError && searchFilter !== SEARCH_USERS_TYPE && query && results.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}

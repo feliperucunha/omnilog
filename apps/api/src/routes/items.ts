@@ -14,6 +14,7 @@ import { getBoardGameById } from "../services/bgg.js";
 import { getBoardGameByIdLudopedia } from "../services/ludopedia.js";
 import { getVolumeById } from "../services/comicvine.js";
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
+import { UpstreamUnavailableError } from "../lib/UpstreamUnavailableError.js";
 import { isDisableApiKeyRequirementsEnabled } from "../lib/featureFlags.js";
 import { getAllReviewerMilestonesForMediumBatch } from "../services/milestone.service.js";
 import { loadItemReviewsPaginated } from "../lib/itemReviews.js";
@@ -299,6 +300,14 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
       }
     }
   } catch (err) {
+    if (err instanceof UpstreamUnavailableError) {
+      console.error("Item upstream unavailable:", err);
+      return res.status(503).json({
+        error: "This source is temporarily unavailable. Please try again later.",
+        code: "UPSTREAM_UNAVAILABLE",
+        provider: err.provider,
+      });
+    }
     if (err instanceof InvalidApiKeyError) {
       if (skipApiKeyUX) {
         console.error("Item fetch error (INVALID_API_KEY UX disabled by feature flag):", err);

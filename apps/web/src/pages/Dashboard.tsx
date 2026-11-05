@@ -67,7 +67,26 @@ interface FeedEntry {
 
 const BETA_MODAL_STORAGE_KEY = "geeklogs.betaModalSeen";
 const SOCIAL_COLLAPSED_STORAGE_KEY = "geeklogs.dashboard.socialCollapsed";
+const DASHBOARD_CATEGORY_STORAGE_KEY = "geeklogs.dashboard.category.v1";
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function readStoredDashboardCategory(): MediaType | null {
+  try {
+    const value = localStorage.getItem(DASHBOARD_CATEGORY_STORAGE_KEY);
+    if (value && MEDIA_TYPES.includes(value as MediaType)) return toMediaType(value);
+  } catch {
+    // localStorage may be unavailable
+  }
+  return null;
+}
+
+function storeDashboardCategory(type: MediaType): void {
+  try {
+    localStorage.setItem(DASHBOARD_CATEGORY_STORAGE_KEY, type);
+  } catch {
+    // localStorage may be unavailable
+  }
+}
 
 /** Base URL for share profile link (always prod so shared links work). */
 const PROFILE_SHARE_BASE_URL = "https://geeklogs.com.br";
@@ -186,7 +205,7 @@ export function Dashboard() {
   const defaultCategory: MediaType = visibleTypes.length > 0 ? toMediaType(visibleTypes[0]) : "movies";
   const [selectedCategory, setSelectedCategory] = useState<MediaType>(() => {
     if (categoryParam && MEDIA_TYPES.includes(categoryParam as MediaType)) return toMediaType(categoryParam);
-    return defaultCategory;
+    return readStoredDashboardCategory() ?? defaultCategory;
   });
   const [counts, setCounts] = useState<Record<MediaType, number> | null>(() => {
     const cached = getCachedEntry<{ data: Record<MediaType, number> }>("GET", "/logs/counts");
@@ -244,12 +263,17 @@ export function Dashboard() {
   useEffect(() => {
     if (!isDashboardActive) return;
     if (categoryParam && MEDIA_TYPES.includes(categoryParam as MediaType)) {
-      setSelectedCategory(toMediaType(categoryParam));
+      const next = toMediaType(categoryParam);
+      setSelectedCategory(next);
+      storeDashboardCategory(next);
       return;
     }
     if (visibleTypes.length === 0) return;
-    const fallback = toMediaType(visibleTypes[0]);
+    const stored = readStoredDashboardCategory();
+    const fallback =
+      stored && visibleTypes.includes(stored) ? stored : toMediaType(visibleTypes[0]);
     setSelectedCategory(fallback);
+    storeDashboardCategory(fallback);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       if (next.get("category") === fallback) return prev;
@@ -263,6 +287,7 @@ export function Dashboard() {
     if (visibleTypes.length > 0 && !visibleTypes.includes(selectedCategory)) {
       const fallback = toMediaType(visibleTypes[0]);
       setSelectedCategory(fallback);
+      storeDashboardCategory(fallback);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set("category", fallback);
@@ -274,6 +299,7 @@ export function Dashboard() {
   const setCategory = useCallback(
     (type: MediaType) => {
       setSelectedCategory(type);
+      storeDashboardCategory(type);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set("category", type);
