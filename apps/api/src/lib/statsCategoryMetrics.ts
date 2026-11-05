@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
 const READING_MEDIA_TYPES = ["books", "manga", "comics"] as const;
 
-function parseBoardGamePlayersJson(json: string): BoardGameMatchPlayer[] {
+export function parseBoardGamePlayersJson(json: string): BoardGameMatchPlayer[] {
   try {
     const raw = JSON.parse(json) as unknown;
     if (!Array.isArray(raw)) return [];
@@ -32,14 +32,14 @@ function parseBoardGamePlayersJson(json: string): BoardGameMatchPlayer[] {
   }
 }
 
-function matchCountsAsWinForUser(players: BoardGameMatchPlayer[], userId: string): boolean {
+export function matchCountsAsWinForUser(players: BoardGameMatchPlayer[], userId: string): boolean {
   if (players.some((p) => p.winner && p.appUserId === userId)) return true;
   const winners = players.filter((p) => p.winner);
   if (winners.length === 1 && !players.some((p) => p.appUserId)) return true;
   return false;
 }
 
-function userScoreFromMatch(players: BoardGameMatchPlayer[], userId: string): number | null {
+export function userScoreFromMatch(players: BoardGameMatchPlayer[], userId: string): number | null {
   const row = players.find((p) => p.appUserId === userId);
   const score = row?.score;
   if (score == null || typeof score !== "number" || !Number.isFinite(score)) return null;
@@ -50,7 +50,7 @@ function taggedPlayerJsonContains(userId: string): string {
   return `"appUserId":"${userId}"`;
 }
 
-function userTaggedInMatch(players: BoardGameMatchPlayer[], userId: string): boolean {
+export function userTaggedInMatch(players: BoardGameMatchPlayer[], userId: string): boolean {
   return players.some((p) => p.appUserId === userId);
 }
 

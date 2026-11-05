@@ -353,6 +353,10 @@ import {
   sumMetricByPeriod,
   sumPagesReadForStats,
 } from "../lib/statsCategoryMetrics.js";
+import {
+  getStatsRecordsForUser,
+  type StatsRecordScope,
+} from "../lib/statsRecords.js";
 import { tierHasUnlimitedLogs } from "../lib/userTier.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
 import {
@@ -1517,6 +1521,38 @@ logsRouter.get("/stats", async (req: AuthenticatedRequest, res) => {
       count: byKeyCount[period] ?? 0,
     }));
   res.json({ group, data: entries });
+});
+
+logsRouter.get("/stats/records", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const rawScope =
+    typeof req.query.scope === "string"
+      ? req.query.scope.trim()
+      : typeof req.query.mediaType === "string"
+        ? req.query.mediaType.trim()
+        : "all";
+  const scope: StatsRecordScope =
+    rawScope === "all" || MEDIA_TYPES.includes(rawScope as MediaType)
+      ? (rawScope as StatsRecordScope)
+      : "all";
+  const rawPeriod = typeof req.query.period === "string" ? req.query.period.trim() : "all";
+  const periodYear = /^\d{4}$/.test(rawPeriod) ? parseInt(rawPeriod, 10) : null;
+  const tzRaw = req.query.timezoneOffsetMinutes;
+  const tzOffsetMinutes =
+    typeof tzRaw === "string" && tzRaw !== "" && Number.isFinite(parseInt(tzRaw, 10))
+      ? parseInt(tzRaw, 10)
+      : 0;
+  const rawLimit = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : 10;
+  const limit = Number.isFinite(rawLimit) ? Math.min(10, Math.max(1, rawLimit)) : 10;
+
+  const data = await getStatsRecordsForUser({
+    userId,
+    scope,
+    periodYear,
+    tzOffsetMinutes,
+    limit,
+  });
+  res.json({ group: "records", data });
 });
 
 /** GET /logs/by-date?date=YYYY-MM-DD&timezoneOffsetMinutes=? - Logs completed or started on the given date (in user's local time). */

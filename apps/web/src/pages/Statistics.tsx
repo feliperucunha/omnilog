@@ -52,6 +52,10 @@ import {
   BoardGameRecentStatsWidget,
   type RecentBoardGameStatEntry,
 } from "@/components/BoardGameRecentStatsWidget";
+import {
+  StatisticsHallOfFameWidget,
+  type StatsRecord,
+} from "@/components/statistics/StatisticsHallOfFameWidget";
 import { GamePlatformStatsWidget } from "@/components/GamePlatformStatsWidget";
 import { ItemImage } from "@/components/ItemImage";
 import { GenreBadges } from "@/components/GenreBadges";
@@ -472,6 +476,7 @@ function SegmentedFilter<T extends string>({
 type PurchasePeriod = "month" | "year" | "all";
 type BoardGameMatchesPeriod = "month" | "year";
 type BoardGameMatchesSort = "recent" | "mostPlayed" | "leastPlayed";
+type HallOfFamePeriod = "all" | "year";
 
 const STORAGE_KEY_RECENT = "geeklogs.statistics.recentLogsCollapsed";
 const STORAGE_KEY_SUMMARY = "geeklogs.statistics.summaryCollapsed";
@@ -483,6 +488,7 @@ const STORAGE_KEY_CALENDAR = "geeklogs.statistics.calendarCollapsed";
 const STORAGE_KEY_CHARTS = "geeklogs.statistics.chartsCollapsed";
 const STORAGE_KEY_GAME_WEIGHT = "geeklogs.statistics.gameWeightCollapsed";
 const STORAGE_KEY_PACE = "geeklogs.statistics.paceCollapsed";
+const STORAGE_KEY_HALL_OF_FAME = "geeklogs.statistics.hallOfFameCollapsed";
 
 type GenreGraphMode = "genre" | "statusOverTime" | "byCategory";
 type StatusOverTimeGroup = "month" | "year";
@@ -844,6 +850,11 @@ export function Statistics() {
   const [recentBoardGamesLoading, setRecentBoardGamesLoading] = useState(false);
   const [boardGameMatchesPeriod, setBoardGameMatchesPeriod] = useState<BoardGameMatchesPeriod>("month");
   const [boardGameMatchesSort, setBoardGameMatchesSort] = useState<BoardGameMatchesSort>("recent");
+  const [hallOfFameRecords, setHallOfFameRecords] = useState<StatsRecord[]>([]);
+  const [hallOfFameLoading, setHallOfFameLoading] = useState(true);
+  const [hallOfFamePeriod, setHallOfFamePeriod] = useState<HallOfFamePeriod>("all");
+  const [hallOfFameCategoryFilter, setHallOfFameCategoryFilter] =
+    useState<PaceCategory>("all");
   const [genreStatsLoading, setGenreStatsLoading] = useState(true);
   const [genreGraphMode, setGenreGraphMode] = useState<GenreGraphMode>("byCategory");
   const [statusOverTimeGroup, setStatusOverTimeGroup] = useState<StatusOverTimeGroup>("month");
@@ -873,6 +884,7 @@ export function Statistics() {
   const [chartsCollapsed, setChartsCollapsedState] = useState(false);
   const [gameWeightCollapsed, setGameWeightCollapsedState] = useState(false);
   const [paceCollapsed, setPaceCollapsedState] = useState(false);
+  const [hallOfFameCollapsed, setHallOfFameCollapsedState] = useState(false);
   const [paceChartMode, setPaceChartMode] = useState<PaceChartMode>("pace");
   const [completedStats, setCompletedStats] = useState<StatsEntry[]>([]);
   const [completedLoading, setCompletedLoading] = useState(true);
@@ -928,7 +940,8 @@ export function Statistics() {
       storage.getItem(STORAGE_KEY_CHARTS),
       storage.getItem(STORAGE_KEY_GAME_WEIGHT),
       storage.getItem(STORAGE_KEY_PACE),
-    ]).then(([recentVal, summaryVal, libraryStatusVal, purchaseVal, boardGameMatchesVal, gamePlatformsVal, calendarVal, chartsVal, gameWeightVal, paceVal]) => {
+      storage.getItem(STORAGE_KEY_HALL_OF_FAME),
+    ]).then(([recentVal, summaryVal, libraryStatusVal, purchaseVal, boardGameMatchesVal, gamePlatformsVal, calendarVal, chartsVal, gameWeightVal, paceVal, hallOfFameVal]) => {
       if (cancelled) return;
       if (recentVal === "true") setRecentLogsCollapsedState(true);
       if (summaryVal === "true") setSummaryCollapsedState(true);
@@ -940,6 +953,7 @@ export function Statistics() {
       if (chartsVal === "true") setChartsCollapsedState(true);
       if (gameWeightVal === "true") setGameWeightCollapsedState(true);
       if (paceVal === "true") setPaceCollapsedState(true);
+      if (hallOfFameVal === "true") setHallOfFameCollapsedState(true);
     });
     return () => {
       cancelled = true;
@@ -996,6 +1010,11 @@ export function Statistics() {
     void storage.setItem(STORAGE_KEY_PACE, String(value));
   }, []);
 
+  const setHallOfFameCollapsed = useCallback((value: boolean) => {
+    setHallOfFameCollapsedState(value);
+    void storage.setItem(STORAGE_KEY_HALL_OF_FAME, String(value));
+  }, []);
+
   const collapsibleSectionBtnClass =
     "flex w-full items-center gap-2 rounded-lg py-2 max-md:min-h-[44px] max-md:py-3 text-left text-sm font-medium uppercase text-[var(--color-light)] hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)] focus:outline-none";
 
@@ -1030,6 +1049,24 @@ export function Statistics() {
       { setLoading: setRecentBoardGamesLoading, onError: () => setRecentBoardGames([]) }
     );
   }, [boardGameMatchesPeriod, boardGameMatchesSort, categoryFilter, tzOffsetMinutes, statsMediaQuery]);
+
+  const fetchHallOfFame = useCallback(async () => {
+    const period =
+      hallOfFamePeriod === "all" ? "all" : String(new Date().getFullYear());
+    const scope =
+      categoryFilter === "all" ? hallOfFameCategoryFilter : categoryFilter;
+    const path = `/logs/stats/records?scope=${encodeURIComponent(scope)}&period=${period}&limit=10&timezoneOffsetMinutes=${tzOffsetMinutes}`;
+    await loadWithSWR<{ data: StatsRecord[] }>(
+      path,
+      (res) => setHallOfFameRecords(res.data ?? []),
+      { setLoading: setHallOfFameLoading, onError: () => setHallOfFameRecords([]) }
+    );
+  }, [
+    categoryFilter,
+    hallOfFameCategoryFilter,
+    hallOfFamePeriod,
+    tzOffsetMinutes,
+  ]);
 
   const fetchGenreStats = useCallback(async () => {
     const path = `/logs/stats?group=genre&timezoneOffsetMinutes=${tzOffsetMinutes}${statsMediaQuery()}`;
@@ -1173,6 +1210,14 @@ export function Statistics() {
   useEffect(() => {
     void fetchRecentBoardGames();
   }, [fetchRecentBoardGames]);
+
+  useEffect(() => {
+    void fetchHallOfFame();
+  }, [fetchHallOfFame]);
+
+  useEffect(() => {
+    if (categoryFilter !== "all") setHallOfFameCategoryFilter("all");
+  }, [categoryFilter]);
 
   useEffect(() => {
     void fetchPace();
@@ -1399,11 +1444,12 @@ export function Statistics() {
   useEffect(() => {
     const onLogsInvalidated = () => {
       void fetchGamePlatformStats();
+      void fetchHallOfFame();
       void fetchLogs();
     };
     window.addEventListener(LOGS_INVALIDATED_EVENT, onLogsInvalidated);
     return () => window.removeEventListener(LOGS_INVALIDATED_EVENT, onLogsInvalidated);
-  }, [fetchGamePlatformStats, fetchLogs]);
+  }, [fetchGamePlatformStats, fetchHallOfFame, fetchLogs]);
 
   const recapCategoryOptions = useMemo(
     () => [
@@ -1420,6 +1466,14 @@ export function Statistics() {
       { value: "year" as const, label: t("recap.periodLastYear"), disabled: !isPro },
     ],
     [isPro, t]
+  );
+
+  const hallOfFamePeriodOptions = useMemo(
+    () => [
+      { value: "all" as const, label: t("statistics.hallOfFamePeriodAll") },
+      { value: "year" as const, label: t("statistics.hallOfFamePeriodYear") },
+    ],
+    [t]
   );
 
   const recapStatusOptions = useMemo(() => {
@@ -1557,6 +1611,7 @@ export function Statistics() {
     void fetchGenreStats();
     void fetchGamePlatformStats();
     void fetchRecentBoardGames();
+    void fetchHallOfFame();
     void fetchPace();
     void fetchCompleted();
     void fetchPurchaseSpending();
@@ -1578,6 +1633,7 @@ export function Statistics() {
     fetchGenreStats,
     fetchGamePlatformStats,
     fetchRecentBoardGames,
+    fetchHallOfFame,
     fetchPace,
     fetchCompleted,
     fetchPurchaseSpending,
@@ -2087,6 +2143,76 @@ const summaryData = summary ?? EMPTY_SUMMARY;
             })()}
           />
         </section>
+          )}
+        </div>
+      )}
+
+      {!loading && (
+        <div className="flex min-w-0 shrink-0 flex-col gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setHallOfFameCollapsed(!hallOfFameCollapsed)}
+              className={cn(collapsibleSectionBtnClass, "min-w-0 flex-1")}
+              aria-expanded={!hallOfFameCollapsed}
+            >
+              {hallOfFameCollapsed ? (
+                <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+              ) : (
+                <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+              )}
+              <span className="min-w-0 truncate">{t("statistics.hallOfFameTitle")}</span>
+            </button>
+            <Select
+              value={hallOfFamePeriod}
+              onValueChange={(value) => setHallOfFamePeriod(value as HallOfFamePeriod)}
+              options={hallOfFamePeriodOptions}
+              aria-label={t("statistics.hallOfFamePeriodLabel")}
+              className="w-[8.5rem] shrink-0"
+              triggerClassName="h-9 py-1.5"
+            />
+          </div>
+          {!hallOfFameCollapsed && (
+            <>
+              {categoryFilter === "all" && (
+                <div
+                  className="flex min-w-0 flex-wrap gap-1.5"
+                  role="group"
+                  aria-label={t("statistics.categoryFilter")}
+                >
+                  {(["all", ...visibleTypes] as PaceCategory[]).map((c) => {
+                    const meta = PACE_CATEGORY_META[c];
+                    const Icon = meta.icon;
+                    const active = hallOfFameCategoryFilter === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setHallOfFameCategoryFilter(c)}
+                        className={cn(
+                          "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors max-md:min-h-[36px]",
+                          active
+                            ? "border-[var(--btn-gradient-start)] bg-[var(--btn-gradient-start)]/15 text-white"
+                            : "border-[var(--color-mid)]/50 bg-[var(--color-dark)] text-[var(--color-light)]"
+                        )}
+                        aria-pressed={active}
+                      >
+                        <Icon className="size-3.5" aria-hidden />
+                        {c === "all" ? t("statistics.filterAll") : t(`nav.${c}`)}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <section aria-label={t("statistics.hallOfFameTitle")} className="min-w-0">
+                <StatisticsHallOfFameWidget
+                  records={hallOfFameRecords}
+                  loading={hallOfFameLoading}
+                  locale={locale}
+                  t={t}
+                />
+              </section>
+            </>
           )}
         </div>
       )}
