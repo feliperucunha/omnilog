@@ -2,6 +2,16 @@ import { decodeHtmlEntities, type SearchResult, type ItemDetail, SEARCH_RESULTS_
 import { InvalidApiKeyError } from "../lib/InvalidApiKeyError.js";
 import { UpstreamUnavailableError } from "../lib/UpstreamUnavailableError.js";
 import { upstreamFetch } from "../lib/upstreamFetch.js";
+import {
+  getIgdbGameById,
+  getIgdbGamesRecommendationsFromSeedsViaGenres,
+  getIgdbNewReleasesGames,
+  getIgdbPopularGames,
+  getIgdbTrendingGames,
+  isIgdbConfigured,
+  isIgdbExternalId,
+  searchIgdbGames,
+} from "./igdb.js";
 
 const BASE = "https://api.rawg.io/api";
 
@@ -32,6 +42,29 @@ async function rawgFetch(url: string, init?: RequestInit): Promise<Response> {
 
 function getKey(apiKey?: string | null): string | null {
   return apiKey ?? process.env.RAWG_API_KEY ?? null;
+}
+
+function rawgUnavailable(): boolean {
+  return Date.now() < rawgUnavailableUntil;
+}
+
+function shouldUseIgdbFallback(err?: unknown): boolean {
+  if (!isIgdbConfigured()) return false;
+  if (err === undefined) return rawgUnavailable();
+  return err instanceof UpstreamUnavailableError && err.provider === "rawg";
+}
+
+async function withIgdbFallback<T>(
+  rawgCall: () => Promise<T>,
+  igdbCall: () => Promise<T>
+): Promise<T> {
+  if (rawgUnavailable() && isIgdbConfigured()) return igdbCall();
+  try {
+    return await rawgCall();
+  } catch (err) {
+    if (shouldUseIgdbFallback(err)) return igdbCall();
+    throw err;
+  }
 }
 
 type RawgGameListRow = {
@@ -87,41 +120,54 @@ export async function getGamesRecommendationsFromSeedsViaGenres(
   apiKey?: string | null,
   maxSeeds = 4
 ): Promise<SearchResult[]> {
+  if (seedGameIds.length === 0) return [];
   const key = getKey(apiKey);
-  if (!key || seedGameIds.length === 0) return [];
-  const seeds = seedGameIds.slice(0, maxSeeds);
-  const genreBatches = await Promise.all(seeds.map((id) => fetchRawgGameGenreIds(id, apiKey)));
-  const genreIds = new Set<number>();
-  for (const ids of genreBatches) {
-    for (const gid of ids.slice(0, 4)) genreIds.add(gid);
+  if (!key) {
+    return isIgdbConfigured()
+      ? getIgdbGamesRecommendationsFromSeedsViaGenres(seedGameIds, exclude, maxResults, maxSeeds)
+      : [];
   }
-  const gidList = [...genreIds].slice(0, 6);
-  if (gidList.length === 0) return [];
 
-  const params = new URLSearchParams({
-    key,
-    page_size: String(Math.min(40, Math.max(maxResults * 3, 20))),
-    ordering: "-rating",
-    genres: gidList.join(","),
-  });
-  const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
-  if (res.status === 401) throw new InvalidApiKeyError("rawg");
-  if (!res.ok) return [];
-  const data = (await res.json()) as { results?: RawgGameListRow[] };
-  const seedSet = new Set(seeds);
-  const seen = new Set<string>();
-  const out: SearchResult[] = [];
-  for (const item of data.results ?? []) {
-    const row = mapRawgGameToSearchResult(item);
-    if (exclude.has(row.id) || seedSet.has(row.id) || seen.has(row.id)) continue;
-    seen.add(row.id);
-    out.push(row);
-    if (out.length >= maxResults) break;
-  }
-  return out;
+  const fetchFromRawg = async (): Promise<SearchResult[]> => {
+    const seeds = seedGameIds.slice(0, maxSeeds);
+    const genreBatches = await Promise.all(seeds.map((id) => fetchRawgGameGenreIds(id, apiKey)));
+    const genreIds = new Set<number>();
+    for (const ids of genreBatches) {
+      for (const gid of ids.slice(0, 4)) genreIds.add(gid);
+    }
+    const gidList = [...genreIds].slice(0, 6);
+    if (gidList.length === 0) return [];
+
+    const params = new URLSearchParams({
+      key,
+      page_size: String(Math.min(40, Math.max(maxResults * 3, 20))),
+      ordering: "-rating",
+      genres: gidList.join(","),
+    });
+    const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
+    if (res.status === 401) throw new InvalidApiKeyError("rawg");
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: RawgGameListRow[] };
+    const seedSet = new Set(seeds);
+    const seen = new Set<string>();
+    const out: SearchResult[] = [];
+    for (const item of data.results ?? []) {
+      const row = mapRawgGameToSearchResult(item);
+      if (exclude.has(row.id) || seedSet.has(row.id) || seen.has(row.id)) continue;
+      seen.add(row.id);
+      out.push(row);
+      if (out.length >= maxResults) break;
+    }
+    return out;
+  };
+
+  return withIgdbFallback(fetchFromRawg, () =>
+    getIgdbGamesRecommendationsFromSeedsViaGenres(seedGameIds, exclude, maxResults, maxSeeds)
+  );
 }
 
 export async function getGameById(id: string, apiKey?: string | null): Promise<ItemDetail | null> {
+  if (isIgdbExternalId(id)) return getIgdbGameById(id);
   const key = getKey(apiKey);
   if (!key) return null;
   const res = await rawgFetch(`${BASE}/games/${id}?key=${key}`);
@@ -214,25 +260,31 @@ export async function searchGames(
 ): Promise<SearchGamesResult> {
   const key = getKey(apiKey);
   if (!key) {
+    if (isIgdbConfigured()) return { results: await searchIgdbGames(q, sort) };
     return meta
       ? { results: [], requiresApiKey: "rawg", link: meta.link, tutorial: meta.tutorial }
       : { results: [] };
   }
-  const ordering = rawgOrdering(sort);
-  const params = new URLSearchParams({
-    key,
-    search: q,
-    page_size: String(Math.min(40, SEARCH_RESULTS_PAGE_SIZE)),
-  });
-  if (ordering) params.set("ordering", ordering);
-  const res = await rawgFetch(
-    `${BASE}/games?${params.toString()}`
-  );
-  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("rawg");
-  if (!res.ok) return { results: [] };
-  const data = (await res.json()) as { results?: RawgGameListRow[] };
-  const results = (data.results ?? []).map((item) => mapRawgGameToSearchResult(item));
-  return { results };
+
+  const fetchFromRawg = async (): Promise<SearchGamesResult> => {
+    const ordering = rawgOrdering(sort);
+    const params = new URLSearchParams({
+      key,
+      search: q,
+      page_size: String(Math.min(40, SEARCH_RESULTS_PAGE_SIZE)),
+    });
+    if (ordering) params.set("ordering", ordering);
+    const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
+    if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("rawg");
+    if (!res.ok) return { results: [] };
+    const data = (await res.json()) as { results?: RawgGameListRow[] };
+    const results = (data.results ?? []).map((item) => mapRawgGameToSearchResult(item));
+    return { results };
+  };
+
+  return withIgdbFallback(fetchFromRawg, async () => ({
+    results: await searchIgdbGames(q, sort),
+  }));
 }
 
 /** Enterprise-only on RAWG; consumer keys should use getGamesRecommendationsFromSeedsViaGenres. */
@@ -254,35 +306,44 @@ export async function getGameSuggestionsFromRawg(
 /** Discover popular / highly rated games (same shape as search results). */
 export async function getPopularGames(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
   const key = getKey(apiKey);
-  if (!key) return [];
-  const params = new URLSearchParams({ key, page_size: String(max), ordering: "-rating" });
-  const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
-  if (res.status === 401) throw new InvalidApiKeyError("rawg");
-  if (!res.ok) return [];
-  const data = (await res.json()) as { results?: RawgGameListRow[] };
-  return (data.results ?? []).slice(0, max).map((item) => mapRawgGameToSearchResult(item));
+  if (!key) return isIgdbConfigured() ? getIgdbPopularGames(max) : [];
+  const fetchFromRawg = async (): Promise<SearchResult[]> => {
+    const params = new URLSearchParams({ key, page_size: String(max), ordering: "-rating" });
+    const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
+    if (res.status === 401) throw new InvalidApiKeyError("rawg");
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: RawgGameListRow[] };
+    return (data.results ?? []).slice(0, max).map((item) => mapRawgGameToSearchResult(item));
+  };
+  return withIgdbFallback(fetchFromRawg, () => getIgdbPopularGames(max));
 }
 
 /** Most-added games ("hottest" / trending rail). */
 export async function getTrendingGames(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
   const key = getKey(apiKey);
-  if (!key) return [];
-  const params = new URLSearchParams({ key, page_size: String(max), ordering: "-added" });
-  const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
-  if (res.status === 401) throw new InvalidApiKeyError("rawg");
-  if (!res.ok) return [];
-  const data = (await res.json()) as { results?: RawgGameListRow[] };
-  return (data.results ?? []).slice(0, max).map((item) => mapRawgGameToSearchResult(item));
+  if (!key) return isIgdbConfigured() ? getIgdbTrendingGames(max) : [];
+  const fetchFromRawg = async (): Promise<SearchResult[]> => {
+    const params = new URLSearchParams({ key, page_size: String(max), ordering: "-added" });
+    const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
+    if (res.status === 401) throw new InvalidApiKeyError("rawg");
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: RawgGameListRow[] };
+    return (data.results ?? []).slice(0, max).map((item) => mapRawgGameToSearchResult(item));
+  };
+  return withIgdbFallback(fetchFromRawg, () => getIgdbTrendingGames(max));
 }
 
 /** Newest game releases (new releases rail). */
 export async function getNewReleasesGames(apiKey?: string | null, max = 12): Promise<SearchResult[]> {
   const key = getKey(apiKey);
-  if (!key) return [];
-  const params = new URLSearchParams({ key, page_size: String(max), ordering: "-released" });
-  const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
-  if (res.status === 401) throw new InvalidApiKeyError("rawg");
-  if (!res.ok) return [];
-  const data = (await res.json()) as { results?: RawgGameListRow[] };
-  return (data.results ?? []).slice(0, max).map((item) => mapRawgGameToSearchResult(item));
+  if (!key) return isIgdbConfigured() ? getIgdbNewReleasesGames(max) : [];
+  const fetchFromRawg = async (): Promise<SearchResult[]> => {
+    const params = new URLSearchParams({ key, page_size: String(max), ordering: "-released" });
+    const res = await rawgFetch(`${BASE}/games?${params.toString()}`);
+    if (res.status === 401) throw new InvalidApiKeyError("rawg");
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: RawgGameListRow[] };
+    return (data.results ?? []).slice(0, max).map((item) => mapRawgGameToSearchResult(item));
+  };
+  return withIgdbFallback(fetchFromRawg, () => getIgdbNewReleasesGames(max));
 }

@@ -29,6 +29,7 @@ import {
   getTrendingGames,
   getNewReleasesGames,
 } from "../services/rawg.js";
+import { isIgdbConfigured } from "../services/igdb.js";
 import { searchBooks } from "../services/openLibrary.js";
 import { searchAnime, searchManga, getAnimeRecommendationsForId, getTopAnimeByScore, getTopMangaByScore, getPopularAnime, getPopularManga, getAiringAnime } from "../services/jikan.js";
 import { getHotBoardGames } from "../services/bgg.js";
@@ -230,7 +231,7 @@ async function buildRecommendationsPayload(ctx: RecommendationCtx): Promise<Reco
     }
     case "games": {
       const userKey = keys?.rawgApiKey ?? null;
-      const hasKey = !!(userKey ?? process.env.RAWG_API_KEY);
+      const hasKey = !!(userKey ?? process.env.RAWG_API_KEY) || isIgdbConfigured();
       if (!skipApiKeyUX && !hasKey) {
         return {
           results: [],
@@ -383,7 +384,10 @@ async function buildBrowseRails(ctx: RecommendationCtx): Promise<{ rails: Browse
 
   const singleNotFound = (provider: "tmdb" | "rawg"): { requiresApiKey?: string; link?: string; tutorial?: string } | undefined => {
     const userKey = provider === "tmdb" ? keys?.tmdbApiKey : keys?.rawgApiKey;
-    const hasKey = provider === "tmdb" ? !!(userKey ?? process.env.TMDB_API_KEY) : !!(userKey ?? process.env.RAWG_API_KEY);
+    const hasKey =
+      provider === "tmdb"
+        ? !!(userKey ?? process.env.TMDB_API_KEY)
+        : !!(userKey ?? process.env.RAWG_API_KEY) || isIgdbConfigured();
     if (!skipApiKeyUX && !hasKey) {
       const meta = provider === "tmdb" ? tmdbMeta : rawgMeta;
       return { requiresApiKey: provider, link: meta.link, tutorial: meta.tutorial };
@@ -862,7 +866,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
         );
       }
       case "games": {
-        const userHasKey = skipApiKeyUX || !!keys?.rawgApiKey;
+        const userHasKey = skipApiKeyUX || !!keys?.rawgApiKey || isIgdbConfigured();
         if (!userHasKey) {
           const key = getFreeSearchKey(req, type, boardProvider);
           const { used } = getFreeSearchUsage(key, clientUsed);
@@ -892,7 +896,7 @@ searchRouter.get("/", async (req: AuthenticatedRequest, res) => {
           addPromptIfUserHasNoKey(
             out,
             "rawg",
-            !!keys?.rawgApiKey,
+            !!keys?.rawgApiKey || isIgdbConfigured(),
             usage?.used,
             usage?.limit,
             usage ? usage.used >= FREE_SEARCH_LIMIT_PER_CATEGORY : false

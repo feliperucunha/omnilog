@@ -4,6 +4,7 @@ export type UpstreamProvider =
   | "jikan"
   | "kitsu"
   | "rawg"
+  | "igdb"
   | "openlibrary"
   | "comicvine"
   | "default";
@@ -14,6 +15,7 @@ const TIMEOUT_MS: Record<UpstreamProvider, number> = {
   jikan: 8_000,
   kitsu: 10_000,
   rawg: 6_000,
+  igdb: 8_000,
   openlibrary: 10_000,
   comicvine: 10_000,
   default: 10_000,
