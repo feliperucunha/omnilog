@@ -76,6 +76,31 @@ export function getGamePlatformBarFillClass(family: GamePlatformFamily): string 
   }
 }
 
+const LAST_GAME_PLATFORM_STORAGE_KEY = "geeklogs:lastGamePlatform";
+
+export function getLastGamePlatform(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(LAST_GAME_PLATFORM_STORAGE_KEY)?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function rememberGamePlatform(platform: string): void {
+  if (typeof window === "undefined") return;
+  const value = platform.trim();
+  try {
+    if (value) {
+      window.localStorage.setItem(LAST_GAME_PLATFORM_STORAGE_KEY, value);
+    } else {
+      window.localStorage.removeItem(LAST_GAME_PLATFORM_STORAGE_KEY);
+    }
+  } catch {
+    return;
+  }
+}
+
 /** Common platforms for game logs (scrollable select). */
 export const POPULAR_GAME_PLATFORMS = [
   "PC",

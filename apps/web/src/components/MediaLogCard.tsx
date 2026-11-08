@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { BookPagesBadge } from "@/components/BookPagesBadge";
 import { DaysSinceBadge } from "@/components/DaysSinceBadge";
+import { GamePlatformIcon } from "@/components/GamePlatformIcon";
 import { GenreBadges } from "@/components/GenreBadges";
 import { ItemImage } from "@/components/ItemImage";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
@@ -263,6 +264,11 @@ function LogMetaRow({
       )}
       {scopeLabel ? <span className={badgeSize}>{scopeLabel}</span> : null}
       <GenreBadges genres={log.genres} maxCount={1} compact={useCompactBadges} />
+      {log.mediaType === "games" && log.gamePlatform?.trim() ? (
+        <span className="inline-flex shrink-0" title={log.gamePlatform}>
+          <GamePlatformIcon platform={log.gamePlatform} />
+        </span>
+      ) : null}
       {(log.mediaType === "tv" || log.mediaType === "movies" || log.mediaType === "anime") && log.networks?.[0] && (
         <span className={cn(badgeSize, "border-0 bg-[var(--color-mid)]/30")}>{log.networks[0]}</span>
       )}

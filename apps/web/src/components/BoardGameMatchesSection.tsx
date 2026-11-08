@@ -134,7 +134,7 @@ function PlayerAvatar({
   const initials = initialsFromName(name);
   const { h1, h2 } = huesFromName(name);
   const sizeClass =
-    size === "sm" ? "h-9 w-9 min-h-9 min-w-9 text-[11px]" : size === "lg" ? "h-14 w-14 min-h-14 min-w-14 text-lg" : "h-11 w-11 min-h-11 min-w-11 text-sm";
+    size === "sm" ? "h-9 w-9 min-h-9 min-w-9 text-[11px]" : size === "lg" ? "h-14 w-14 min-h-14 min-w-14 text-lg" : "h-10 w-10 min-h-10 min-w-10 text-sm";
 
   return (
     <div
@@ -142,7 +142,7 @@ function PlayerAvatar({
         "flex shrink-0 items-center justify-center rounded-full font-bold tracking-tight text-white shadow-md ring-1 ring-white/15",
         sizeClass,
         winner &&
-          "ring-2 ring-amber-400/95 ring-offset-2 ring-offset-[var(--color-darkest)] shadow-[0_0_18px_-2px_rgba(251,191,36,0.55)]",
+          "border-2 border-amber-400/95 ring-0 shadow-[0_0_18px_-2px_rgba(251,191,36,0.55)]",
         className
       )}
       style={{
@@ -619,20 +619,17 @@ export const BoardGameMatchesSection = forwardRef<
               <motion.div
                 key={i}
                 layout
-                className="flex min-w-0 flex-wrap items-center gap-2 border-b border-[var(--color-mid)]/20 pb-3 last:border-b-0 last:pb-0 sm:gap-3"
+                className="flex min-w-0 items-center gap-2 border-b border-[var(--color-mid)]/20 pb-3 last:border-b-0 last:pb-0 sm:gap-3"
               >
                 <div className="relative shrink-0">
                   <PlayerAvatar name={p.name || "?"} size="md" winner={p.winner} />
                   {p.appUserId && (
-                    <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-md bg-[var(--color-darkest)] p-0.5 ring-2 ring-[var(--color-dark)]">
+                    <span className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-md bg-[var(--color-darkest)] p-0.5 ring-2 ring-[var(--color-dark)]">
                       <Logo className="h-3.5 w-3.5 object-contain" alt="" />
                     </span>
                   )}
                 </div>
-                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-light)] sm:text-xs">
-                  {t("boardGameMatches.playerSlot", { n: String(i + 1) })}
-                </span>
-                <div className="min-w-[8rem] flex-1 basis-[10rem]">
+                <div className="min-w-0 flex-1">
                   <MatchPlayerNameField
                     value={p.name}
                     appUserId={p.appUserId}
@@ -651,10 +648,10 @@ export const BoardGameMatchesSection = forwardRef<
                   onChange={(e) =>
                     setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, score: e.target.value } : row)))
                   }
-                  className="h-10 w-[5.5rem] shrink-0 border-[var(--color-mid)]/35 bg-[var(--color-dark)]/80"
+                  className="h-10 w-16 shrink-0 border-[var(--color-mid)]/35 bg-[var(--color-dark)]/80 sm:w-[5.5rem]"
                   aria-label={t("boardGameMatches.score")}
                 />
-                <div className="flex shrink-0 items-center gap-2 rounded-xl bg-[var(--color-mid)]/10 px-2.5 py-1.5">
+                <div className="flex shrink-0 items-center gap-1.5 rounded-xl bg-[var(--color-mid)]/10 px-2 py-1.5">
                   <Switch
                     checked={p.winner}
                     onCheckedChange={(v) =>
@@ -663,16 +660,13 @@ export const BoardGameMatchesSection = forwardRef<
                     aria-label={t("boardGameMatches.winner")}
                   />
                   <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-400/90" aria-hidden />
-                  <span className="hidden text-xs font-medium text-[var(--color-light)] sm:inline">
-                    {t("boardGameMatches.winner")}
-                  </span>
                 </div>
                 {players.length > 1 && i > 0 && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="ml-auto shrink-0 text-red-400/90 hover:bg-red-500/15 hover:text-red-300 sm:ml-0"
+                    className="shrink-0 text-red-400/90 hover:bg-red-500/15 hover:text-red-300"
                     onClick={() => setPlayers((prev) => prev.filter((_, j) => j !== i))}
                     aria-label={t("boardGameMatches.removePlayer")}
                   >

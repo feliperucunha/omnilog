@@ -267,8 +267,16 @@ function fireFirstApiErrorFromCaught(err: unknown): void {
   fireFirstApiErrorOnce(LoadingErrorCodeEnum.NETWORK);
 }
 
+let cacheRevision = 0;
+
+/** Prevents an in-flight GET started before a mutation from repopulating the cache with old data. */
+function invalidateCacheRevision(): void {
+  cacheRevision += 1;
+}
+
 /** Invalidate cached GET requests. Call after mutations (create/update/delete logs). */
 export function invalidateApiCache(prefix: string): void {
+  invalidateCacheRevision();
   invalidateByPrefix(prefix);
 }
 
@@ -280,6 +288,7 @@ export const LOGS_CACHE_WARM_EVENT = "geeklogs-logs-cache-warm";
 
 /** Invalidate logs and items caches (use after any log mutation). */
 export function invalidateLogsAndItemsCache(): void {
+  invalidateCacheRevision();
   swrInflight.clear();
   markStaleByPrefix("/logs");
   markStaleByPrefix("/items");
@@ -619,12 +628,17 @@ export async function apiFetchCached<T>(
   if (cached !== undefined) return cached;
   const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
   const { ttlMs: _ttl, ...fetchOpts } = options ?? {};
+  const revision = cacheRevision;
   const data = await fetchInternal<T>(path, fetchOpts);
-  setCached(method, path, data, ttlMs);
+  if (revision === cacheRevision) {
+    setCached(method, path, data, ttlMs);
+  }
   return data;
 }
 
-const swrInflight = new Map<string, Promise<unknown>>();
+type RevalidateResult<T> = { data: T; fresh: boolean };
+
+const swrInflight = new Map<string, Promise<RevalidateResult<unknown>>>();
 
 function cacheDataChanged(a: unknown, b: unknown): boolean {
   try {
@@ -638,15 +652,17 @@ async function revalidateGet<T>(
   path: string,
   fetchOpts: ApiFetchOptions | undefined,
   ttlMs: number
-): Promise<T> {
+): Promise<RevalidateResult<T>> {
   const key = `GET ${path}`;
   const existing = swrInflight.get(key);
-  if (existing) return existing as Promise<T>;
+  if (existing) return existing as Promise<RevalidateResult<T>>;
 
+  const revision = cacheRevision;
   const promise = fetchInternal<T>(path, fetchOpts)
     .then((data) => {
-      setCached("GET", path, data, ttlMs);
-      return data;
+      const fresh = revision === cacheRevision;
+      if (fresh) setCached("GET", path, data, ttlMs);
+      return { data, fresh };
     })
     .finally(() => {
       swrInflight.delete(key);
@@ -686,8 +702,11 @@ export async function apiFetchSWR<T>(
   if (!entry) {
     onRefreshing?.(true);
     try {
-      const data = await revalidateGet<T>(path, fetchOpts, ttlMs);
-      return { data, fromCache: false };
+      let result = await revalidateGet<T>(path, fetchOpts, ttlMs);
+      if (!result.fresh) {
+        result = await revalidateGet<T>(path, fetchOpts, ttlMs);
+      }
+      return { data: result.data, fromCache: false };
     } finally {
       onRefreshing?.(false);
     }
@@ -701,9 +720,9 @@ export async function apiFetchSWR<T>(
     onRefreshing?.(true);
     try {
       const previous = entry.data;
-      const fresh = await revalidateGet<T>(path, fetchOpts, ttlMs);
-      if (onUpdate && cacheDataChanged(previous, fresh)) {
-        onUpdate(fresh);
+      const result = await revalidateGet<T>(path, fetchOpts, ttlMs);
+      if (result.fresh && onUpdate && cacheDataChanged(previous, result.data)) {
+        onUpdate(result.data);
       }
     } catch {
       /* keep stale UI on background failure */

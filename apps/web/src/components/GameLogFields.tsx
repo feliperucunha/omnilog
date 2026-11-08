@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { LogDateFields } from "@/components/LogDateFields";
+import { GamePlatformIcon } from "@/components/GamePlatformIcon";
 import { useLocale } from "@/contexts/LocaleContext";
-import { buildGamePlatformSelectOptions } from "@/lib/gamePlatforms";
+import { buildGamePlatformSelectOptions, rememberGamePlatform } from "@/lib/gamePlatforms";
 
 export function GameLogFields({
   gamePlatform,
@@ -27,8 +28,30 @@ export function GameLogFields({
   const { t } = useLocale();
 
   const platformSelectOptions = useMemo(
-    () => buildGamePlatformSelectOptions(platformOptions, gamePlatform),
+    () =>
+      buildGamePlatformSelectOptions(platformOptions, gamePlatform).map((option) =>
+        option.value
+          ? {
+              ...option,
+              accessibleLabel: option.label,
+              label: (
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  <GamePlatformIcon platform={option.value} />
+                  <span className="truncate">{option.label}</span>
+                </span>
+              ),
+            }
+          : option
+      ),
     [platformOptions, gamePlatform]
+  );
+
+  const handlePlatformChange = useCallback(
+    (value: string) => {
+      rememberGamePlatform(value);
+      onGamePlatformChange(value);
+    },
+    [onGamePlatformChange]
   );
 
   return (
@@ -37,7 +60,7 @@ export function GameLogFields({
         <Label className="text-sm text-[var(--color-lightest)]">{t("gameLog.platform")}</Label>
         <Select
           value={gamePlatform}
-          onValueChange={onGamePlatformChange}
+          onValueChange={handlePlatformChange}
           options={platformSelectOptions}
           placeholder={t("gameLog.platformPlaceholder")}
           disabled={disabled}

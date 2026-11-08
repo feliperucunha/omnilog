@@ -40,6 +40,7 @@ import {
 } from "@/lib/mediaTypeFeatures";
 import { MoneyAmountInput } from "@/components/MoneyAmountInput";
 import { DEFAULT_PURCHASE_CURRENCY, normalizeCurrencyCode } from "@/lib/currencies";
+import { getLastGamePlatform } from "@/lib/gamePlatforms";
 import {
   BoardGameMatchesSection,
   type BoardGameMatchesSectionHandle,
@@ -138,7 +139,9 @@ export function ItemReviewForm({
   const [chapter, setChapter] = useState<number | "">("");
   const [volume, setVolume] = useState<number | "">("");
   const [pagesRead, setPagesRead] = useState<number | "">("");
-  const [gamePlatform, setGamePlatform] = useState("");
+  const [gamePlatform, setGamePlatform] = useState(() =>
+    mediaType === "games" ? getLastGamePlatform() : ""
+  );
   const [startedAtInput, setStartedAtInput] = useState("");
   const [completedAtInput, setCompletedAtInput] = useState("");
   const [hoursToBeat, setHoursToBeat] = useState<number | "">("");
@@ -255,7 +258,7 @@ export function ItemReviewForm({
           setChapter("");
           setVolume("");
           setPagesRead("");
-          setGamePlatform("");
+          setGamePlatform(mediaType === "games" ? getLastGamePlatform() : "");
           setStartedAtInput("");
           setCompletedAtInput("");
           setHoursToBeat("");
@@ -279,6 +282,7 @@ export function ItemReviewForm({
         setMyLog(null);
         setStars(null);
         setReview("");
+        setGamePlatform(mediaType === "games" ? getLastGamePlatform() : "");
       })
       .finally(() => setLoadingLog(false));
   }, [mediaType, externalId]);

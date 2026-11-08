@@ -69,6 +69,7 @@ import {
 } from "@/lib/mediaTypeFeatures";
 import { MarketListingSection } from "@/components/MarketListingSection";
 import { DEFAULT_PURCHASE_CURRENCY, normalizeCurrencyCode } from "@/lib/currencies";
+import { getLastGamePlatform } from "@/lib/gamePlatforms";
 
 const HAS_SEASON_EPISODE: MediaType[] = ["tv", "anime"];
 /** TV only; anime uses episode without season. */
@@ -134,7 +135,9 @@ export function LogForm(props: LogFormProps) {
   const [chapter, setChapter] = useState<number | "">(isEdit ? (log!.chapter ?? "") : "");
   const [volume, setVolume] = useState<number | "">(isEdit ? (log!.volume ?? "") : "");
   const [pagesRead, setPagesRead] = useState<number | "">(isEdit ? (log!.pagesRead ?? "") : "");
-  const [gamePlatform, setGamePlatform] = useState(isEdit ? (log!.gamePlatform ?? "") : "");
+  const [gamePlatform, setGamePlatform] = useState(
+    isEdit ? (log!.gamePlatform ?? "") : mediaType === "games" ? getLastGamePlatform() : ""
+  );
   const [startedAtInput, setStartedAtInput] = useState(isEdit ? isoToDateInput(log!.startedAt) : "");
   const [completedAtInput, setCompletedAtInput] = useState(isEdit ? isoToDateInput(log!.completedAt) : "");
   const [hoursToBeat, setHoursToBeat] = useState<number | "">(isEdit ? (log!.hoursToBeat ?? "") : "");

@@ -73,7 +73,9 @@ export function markStaleByPrefix(prefix: string): void {
   const now = Date.now();
   for (const [key, entry] of cache.entries()) {
     if (key.includes(prefix)) {
-      cache.set(key, { ...entry, expiresAt: now - 1 });
+      const next = { ...entry, expiresAt: now - 1 };
+      cache.set(key, next);
+      schedulePersistGetEntry({ key, ...next });
     }
   }
 }
@@ -93,10 +95,12 @@ export function updateCachedEntriesMatching(
     if (!key.includes(keyIncludes)) continue;
     const next = updater(entry.data, key);
     if (next === undefined) continue;
-    cache.set(key, {
+    const updated = {
       data: next,
       expiresAt: now + ttlMs,
       storedAt: entry.storedAt,
-    });
+    };
+    cache.set(key, updated);
+    schedulePersistGetEntry({ key, ...updated });
   }
 }
