@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-frame="desktop" data-shell="app">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prototype — Direction — Geeklogs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,650&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* Direction prototype. Visual language from Restructure.
+     Real files in apps/web/public are used for the logo, team, screenshots, and Pix QR.
+     Catalog covers stay generated: the live app loads those from the catalogs. */
+  :root {
+    --bg: #f3efe7; --sunken: #e8e2d6; --surface: #fffcf8; --surface-2: #f6f1e8;
+    --ink: #1c1915; --muted: #6b645b; --faint: #8a8176; --line: #e3dace;
+    --accent: #0e6e6b; --accent-ink: #f3fffe; --star: #a8641a; --danger: #9d342c;
+    --shadow: 0 1px 2px rgba(40, 32, 18, 0.05);
+    --display: "Fraunces", "Iowan Old Style", Georgia, serif;
+    --font: "Outfit", system-ui, sans-serif;
+    --rail: 104px; --radius: 14px; color-scheme: light;
+    --asset: "../apps/web/public";
+  }
+  [data-theme="dark"] {
+    --bg: #10120f; --sunken: #0c0e0b; --surface: #1a1d18; --surface-2: #23271f;
+    --ink: #f4f0e8; --muted: #b3aca1; --faint: #8e877c; --line: #31362d;
+    --accent: #7ee8df; --accent-ink: #06211f; --star: #f0b429; --danger: #ff9a92;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35); color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--font); background: var(--sunken); color: var(--ink); font-size: 15px; line-height: 1.45; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  h1, h2, h3, p { margin: 0; }
+  img { max-width: 100%; }
+  .proto { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; background: #1c1915; color: #f4f0e8; font-size: 12px; }
+  .proto strong { font-weight: 650; }
+  .proto .sp { flex: 1; min-width: 8px; }
+  .proto button, .proto select { background: #2a2622; color: #f4f0e8; border: 1px solid #4a433b; border-radius: 8px; padding: 6px 8px; min-height: 32px; }
+  .proto .state { color: #c9c0b4; }
+  .stage { min-height: calc(100vh - 48px); }
+  .app { position: relative; min-height: calc(100vh - 48px); background: var(--bg); }
+  [data-frame="desktop"][data-shell="app"] .app { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); }
+  [data-frame="desktop"][data-shell="app"] .sidebar { grid-column: 1; }
+  [data-frame="desktop"][data-shell="app"] .column { grid-column: 2; min-width: 0; }
+  [data-frame="phone"] .stage { width: 390px; height: min(820px, calc(100vh - 64px)); margin: 12px auto 24px; border: 8px solid #1c1915; border-radius: 32px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.28); background: var(--bg); }
+  [data-frame="phone"] .app { position: relative; height: 100%; display: flex; flex-direction: column; min-height: 0; }
+  [data-frame="phone"] .column { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  [data-frame="phone"] .content { flex: 1; overflow: auto; }
+  [data-frame="desktop"] .phone-head, [data-frame="desktop"] .dock { display: none; }
+  [data-frame="phone"] .sidebar { display: none; }
+  [data-shell="plain"] .sidebar, [data-shell="plain"] .dock, [data-shell="plain"] .phone-head, [data-shell="plain"] .topbar { display: none !important; }
+  [data-shell="plain"][data-frame="desktop"] .app { display: block; }
+  [data-frame="phone"][data-shell="app"] .content { padding-bottom: 84px; }
+  [data-frame="phone"] .topbar, [data-screen="search"] .topbar { display: none; }
+  .sidebar { position: sticky; top: 48px; height: calc(100vh - 48px); background: var(--surface); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 12px 8px; gap: 4px; }
+  .brand { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 4px 12px; text-decoration: none; color: inherit; }
+  .brand img { height: 32px; width: 32px; object-fit: contain; }
+  .brand b { font-family: var(--display); font-size: 13px; font-weight: 650; letter-spacing: -0.03em; }
+  .navbtn, .dock a, .textlink { background: none; border: 0; text-align: left; color: var(--ink); text-decoration: none; }
+  .navbtn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; border-radius: 12px; min-height: 64px; color: var(--muted); font-weight: 600; font-size: 11px; text-align: center; }
+  .navbtn[aria-current="page"], .dock a[aria-current="page"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); }
+  .phone-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px 8px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .phone-head b { font-family: var(--display); font-size: 20px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; }
+  .topbar { padding: 16px 28px 0; }
+  .content { padding: 18px 28px 48px; min-width: 0; }
+  [data-frame="phone"] .content { padding: 14px 14px 24px; }
+  .page-title { font-family: var(--display); font-size: 34px; font-weight: 560; letter-spacing: -0.03em; line-height: 1.1; }
+  [data-frame="phone"] .page-title { font-size: 28px; }
+  .lede { color: var(--muted); max-width: 46rem; }
+  .kicker { font-size: 12px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .spread { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; min-width: 0; overflow: hidden; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid transparent; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .btn.ghost { background: transparent; border-color: var(--line); color: var(--ink); }
+  .btn.small { min-height: 36px; padding: 0 12px; font-size: 13px; }
+  .btn.danger { background: transparent; color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
+  .btn[disabled] { opacity: 0.45; cursor: default; }
+  .chips { display: flex; gap: 6px; overflow: auto; padding-bottom: 2px; }
+  .chip { flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 8px 12px; min-height: 36px; font-weight: 550; font-size: 13px; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .field span, .field legend { font-size: 13px; font-weight: 600; }
+  input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="date"], select, textarea { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; }
+  .row > select, .row > .btn { width: auto; min-width: 0; flex: none; }
+  textarea { min-height: 96px; resize: vertical; }
+  .muted { color: var(--muted); }
+  .faint { color: var(--faint); font-size: 13px; }
+  .search-launch { width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-height: 44px; padding: 0 14px; color: var(--muted); }
+  .cover { border-radius: 10px; display: grid; place-items: end start; padding: 8px; color: white; font-family: var(--display); font-weight: 650; letter-spacing: -0.03em; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+  .logs { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .logs.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .log { display: flex; gap: 12px; text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; color: inherit; min-width: 0; }
+  .logs.list .cover { width: 64px; height: 96px; flex: none; font-size: 14px; }
+  .logs.grid .log { flex-direction: column; }
+  .logs.grid .cover { width: 100%; aspect-ratio: 2/3; font-size: 22px; }
+  .log-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .log-top { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+  .log-top h3 { font-size: 16px; font-weight: 620; flex: 1 1 120px; min-width: 0; }
+  .log-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .pill { flex: none; font-size: 11px; font-weight: 650; border-radius: 999px; padding: 3px 8px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+  .stars { color: var(--star); letter-spacing: 1px; font-size: 13px; background: none; border: 0; padding: 0; }
+  .library { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+  [data-frame="phone"] .library { display: block; }
+  [data-frame="phone"] .side-rail { display: none; }
+  .side-rail { position: sticky; top: 72px; display: flex; flex-direction: column; gap: 12px; }
+  .continue, .shelf-row { display: flex; gap: 10px; overflow: auto; padding-bottom: 4px; }
+  .continue .log { width: 320px; flex: none; }
+  [data-frame="phone"] .continue .log { width: 88%; }
+  .shelf-card { flex: none; width: 132px; display: flex; flex-direction: column; gap: 6px; text-align: left; background: none; border: 0; padding: 0; color: inherit; }
+  .shelf-card .cover { width: 100%; aspect-ratio: 2/3; font-size: 22px; }
+  .shelf-card h3 { font-size: 13px; font-weight: 620; line-height: 1.25; min-height: 2.5em; }
+  .activity { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 18px; align-items: start; }
+  [data-frame="phone"] .activity { display: block; }
+  .pane-toggle { display: none; }
+  [data-frame="phone"] .pane-toggle { display: flex; }
+  [data-frame="phone"] .activity.is-friends .numbers, [data-frame="phone"] .activity.is-numbers .friends { display: none; }
+  .item-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 18px; align-items: start; }
+  [data-frame="phone"] .item-grid { grid-template-columns: 1fr; }
+  .hero { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 18px; align-items: end; }
+  [data-frame="phone"] .hero { grid-template-columns: 104px minmax(0, 1fr); gap: 12px; }
+  .hero .cover { width: 100%; aspect-ratio: 2/3; font-size: 28px; }
+  .tabs { display: flex; gap: 6px; background: var(--surface-2); padding: 4px; border-radius: 12px; }
+  .tabs button { flex: 1; min-height: 40px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-weight: 600; }
+  .tabs button[aria-pressed="true"] { background: var(--surface); color: var(--ink); }
+  .you, .team { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  [data-frame="phone"] .you, [data-frame="phone"] .team { grid-template-columns: 1fr 1fr; }
+  .team article { padding: 0; overflow: hidden; }
+  .team img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+  .team div { padding: 12px; text-align: center; }
+  .about-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  [data-frame="phone"] .about-split, [data-frame="phone"] .plans { grid-template-columns: 1fr; }
+  .shots { display: grid; grid-template-columns: 160px 160px; gap: 12px; }
+  .shots img { border-radius: 16px; border: 1px solid var(--line); }
+  .market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  [data-frame="phone"] .market-grid { grid-template-columns: 1fr; }
+  .dock { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 4; display: flex; gap: 2px; background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line); border-radius: 18px; padding: 6px; }
+  .dock a { flex: 1; min-height: 48px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 10px; font-weight: 600; color: var(--muted); }
+  .overlay { position: absolute; inset: 0; background: rgba(0,0,0,.45); display: none; z-index: 8; }
+  .overlay.on { display: flex; }
+  [data-frame="desktop"] .overlay { position: fixed; top: 48px; }
+  .sheet-back { align-items: flex-end; justify-content: center; }
+  [data-frame="desktop"] .sheet-back { align-items: center; }
+  .sheet { width: min(520px, 100%); background: var(--surface); border-radius: 18px 18px 0 0; padding: 12px 16px 20px; max-height: 86%; overflow: auto; }
+  [data-frame="desktop"] .sheet { border-radius: 18px; max-height: 80%; }
+  .drawer-back { justify-content: flex-end; }
+  [data-frame="phone"] .drawer-back { align-items: flex-end; justify-content: center; }
+  .drawer { width: min(400px, 100%); height: 100%; background: var(--surface); overflow: auto; padding: 16px 16px 28px; }
+  [data-frame="phone"] .drawer { width: 100%; height: auto; max-height: 88%; border-radius: 18px 18px 0 0; }
+  .grab { width: 36px; height: 4px; border-radius: 4px; background: var(--line); margin: 4px auto 10px; }
+  [data-frame="desktop"] .grab { display: none; }
+  .checks { display: flex; flex-direction: column; gap: 4px; }
+  .checks label { display: flex; gap: 10px; align-items: center; min-height: 40px; }
+  .own { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .own button { min-height: 64px; border-radius: 12px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 11px; font-weight: 650; }
+  .own button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .lib-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .lib-head .btn { flex: none; }
+  .lib-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .rate { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .rate-star { position: relative; width: 32px; height: 32px; flex: none; }
+  .rate-star::before, .rate-star i { position: absolute; left: 0; top: 0; height: 32px; font-style: normal; font-size: 28px; line-height: 32px; pointer-events: none; }
+  .rate-star::before { content: "★"; color: color-mix(in srgb, var(--ink) 28%, transparent); }
+  .rate-star i { width: calc(var(--fill) * 100%); overflow: hidden; color: var(--star); }
+  .rate-star i::before { content: "★"; }
+  .rate-star button { position: absolute; top: 0; height: 100%; width: 50%; border: 0; background: transparent; padding: 0; z-index: 1; cursor: pointer; }
+  .rate-star button:first-of-type { left: 0; }
+  .rate-star button:last-of-type { right: 0; }
+  .match-count { display: flex; gap: 8px; align-items: center; }
+  .match-count input { max-width: 8rem; }
+  .match-player { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .match-player .name { flex: 1 1 140px; min-width: 0; width: auto; }
+  .match-player .score { width: 5.5rem; flex: none; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700; flex: none; }
+  .avatar.winner { box-shadow: 0 0 0 2px var(--star); }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; border: 0; background: var(--surface-2); color: var(--muted); border-radius: 12px; min-height: 40px; padding: 6px 8px; }
+  .toggle i { width: 28px; height: 16px; border-radius: 99px; background: var(--line); position: relative; flex: none; }
+  .toggle i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; }
+  .toggle[aria-pressed="true"] { color: var(--ink); }
+  .toggle[aria-pressed="true"] i { background: var(--accent); }
+  .toggle[aria-pressed="true"] i::after { left: 14px; }
+  .match-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .match-actions .btn { flex: 1; }
+  .history-head { display: flex; gap: 8px; align-items: center; width: 100%; background: none; border: 0; color: inherit; padding: 0; text-align: left; }
+  .avatars { display: flex; flex: none; }
+  .avatars .avatar { margin-left: -8px; box-shadow: 0 0 0 2px var(--surface); }
+  .avatars .avatar:first-child { margin-left: 0; }
+  .history-meta { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+  .history-row { display: flex; gap: 8px; align-items: center; }
+  .history-row.winner { background: color-mix(in srgb, var(--star) 16%, transparent); border-radius: 12px; padding: 6px 8px; }
+  .chev { color: var(--muted); flex: none; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  .stat b { display: block; font-family: var(--display); font-size: 28px; font-weight: 560; letter-spacing: -0.03em; }
+  .pace { display: flex; align-items: flex-end; gap: 6px; height: 148px; overflow: hidden; min-width: 0; }
+  .pace span { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+  .pace i { display: block; width: 100%; height: min(calc(var(--h) * 1%), calc(100% - 16px)); border-radius: 6px 6px 2px 2px; background: var(--accent); }
+  .pace em { font-style: normal; font-size: 10px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barline { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+  .barline i { display: block; height: 100%; width: var(--w); max-width: 100%; background: var(--accent); }
+  .barline.sale i { background: #3f7d6a; }
+  .donut { width: 112px; height: 112px; border-radius: 50%; flex: none; background: conic-gradient(var(--accent) 0 46%, #c9846a 46% 70%, var(--star) 70% 88%, var(--line) 88% 100%); }
+  .legend { display: flex; flex-direction: column; gap: 6px; }
+  .hof-row { display: flex; gap: 10px; align-items: center; }
+  .hof-row .cover { width: 42px; height: 62px; font-size: 12px; flex: none; }
+  .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .cal button { aspect-ratio: 1; border-radius: 8px; border: 1px solid transparent; background: var(--surface-2); font-size: 12px; min-width: 0; }
+  .cal button.has { box-shadow: inset 0 -3px 0 var(--accent); }
+  .listing { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 12px; align-items: center; text-align: left; color: inherit; width: 100%; }
+  [data-frame="phone"] .listing { grid-template-columns: 64px minmax(0, 1fr); }
+  [data-frame="phone"] .listing .price { grid-column: 2; }
+  .price { font-family: var(--display); font-size: 22px; }
+  .auth-wrap { max-width: 420px; margin: 8vh auto; display: flex; flex-direction: column; gap: 14px; }
+  .landing { max-width: 1040px; margin: 0 auto; padding: 48px 28px 64px; display: flex; flex-direction: column; gap: 36px; }
+  [data-frame="phone"] .landing { padding: 28px 16px 40px; }
+  .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .switch { width: 44px; height: 26px; border-radius: 99px; border: 0; background: var(--line); position: relative; flex: none; }
+  .switch i { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: white; }
+  .switch[aria-pressed="true"] { background: var(--accent); }
+  .switch[aria-pressed="true"] i { left: 21px; }
+  .set-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 999px; font-size: 13px; z-index: 70; max-width: min(420px, 92vw); }
+  .prose { display: flex; flex-direction: column; gap: 10px; max-width: 42rem; }
+  .prose p, .prose li { color: var(--muted); }
+  details { border-top: 1px solid var(--line); padding: 10px 0; }
+  details summary { cursor: pointer; font-weight: 600; }
+  .discover-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 16px; }
+  [data-frame="phone"] .discover-grid { grid-template-columns: 1fr; }
+  .badge { min-width: 18px; height: 18px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); font-size: 11px; display: inline-grid; place-items: center; padding: 0 5px; }
+</style>
+</head>
+<body>
+<div class="proto">
+  <strong>PROTOTYPE · Direction</strong>
+  <span>Restructure, with the live fields and assets. Nothing is saved.</span>
+  <span class="sp"></span>
+  <label>Screen <select id="jump"></select></label>
+  <button type="button" id="theme-btn">Theme</button>
+  <button type="button" id="frame-btn">Frame</button>
+  <span class="state" id="state-line"></span>
+</div>
+<div class="stage">
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="column">
+      <header class="phone-head">
+        <b>Geeklogs</b>
+        <span class="faint" id="phone-screen"></span>
+        <button type="button" class="icon-btn" id="search-quick" data-go="search" aria-label="Search catalogs"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="m20 20-3.5-3.5"/></svg></button>
+      </header>
+      <div class="topbar"><button type="button" class="search-launch" data-go="search">Search catalogs</button></div>
+      <main class="content" id="main"></main>
+    </div>
+    <nav class="dock" id="dock"></nav>
+    <div class="overlay sheet-back" id="sheet">
+      <div class="sheet" role="dialog" aria-labelledby="sheet-title">
+        <div class="grab"></div>
+        <div class="spread"><h2 id="sheet-title">Log</h2><button class="btn ghost small" type="button" id="sheet-close">Close</button></div>
+        <div id="sheet-body" class="stack" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div class="overlay drawer-back" id="drawer">
+      <div class="drawer" role="dialog" aria-labelledby="drawer-title">
+        <div class="grab"></div>
+        <div id="drawer-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script>
+const ASSET = "../apps/web/public";
+const CATS = [["movies","Movies"],["tv","TV Shows"],["boardgames","Board Games"],["games","Games"],["books","Books"],["anime","Anime"],["manga","Manga"],["comics","Comics"]];
+const SPEND = new Set(["games","boardgames","books","manga","comics"]);
+const MARKET = { boardgames: "Board Games", books: "Books", manga: "Manga", comics: "Comics" };
+const STATUS = {
+  movies: ["Watched","Plan to watch"],
+  tv: ["Completed","Watching","Plan to watch","Dropped"],
+  boardgames: ["Played","Plan to play"],
+  games: ["Completed","Plan to play","Dropped","Playing"],
+  books: ["Read","Plan to read","Reading","Dropped"],
+  anime: ["Completed","Watching","Plan to watch","Dropped"],
+  manga: ["Read","Plan to read","Reading","Dropped"],
+  comics: ["Read","Plan to read","Reading","Dropped"],
+};
+const PLANNED = { movies: "Plan to watch", tv: "Plan to watch", anime: "Plan to watch", boardgames: "Plan to play", games: "Plan to play", books: "Plan to read", manga: "Plan to read", comics: "Plan to read" };
+const PLATFORMS = ["PC","PlayStation 5","PlayStation 4","Xbox Series X|S","Xbox One","Nintendo Switch","Nintendo Switch 2","Steam Deck","Mac","iOS","Android"];
+const CURRENCIES = ["USD","EUR","GBP","BRL","JPY","CAD","AUD"];
+const OWN = [["no","Don't own"],["want","Want to buy"],["own","Own"],["sold","Sold"]];
+function L(title, year, status, rating, blurb, facts, bg, extra) {
+  return { title, year, status, rating, blurb, facts, bg, genre: "Drama", own: "no", playersMin: 1, playersMax: 4, weight: 2, hours: 12, ...extra };
+}
+const DATA = {
+  movies: { score: "IMDb 8.1", count: 24, facts: [["Release","2023"],["Runtime","106 min"],["Genres","Romance, Drama"],["Country","United States, South Korea"],["Language","English, Korean"],["Rating","PG-13"]],
+    logs: [
+      L("Past Lives","2023","Watched",5,"A quiet film about the lives you do not live.",["106 min","Romance"],"linear-gradient(160deg,#c9846a,#3d2a28)",{genre:"Romance"}),
+      L("The Zone of Interest","2023","Plan to watch",0,"",["105 min","History"],"linear-gradient(160deg,#8d8f86,#2c2e28)",{genre:"History"}),
+      L("Anatomy of a Fall","2023","Watched",4,"The argument is the whole movie.",["151 min","Drama"],"linear-gradient(160deg,#d7c4a3,#5c4632)",{genre:"Drama"}),
+      L("Aftersun","2022","Watched",5,"",["102 min","Drama"],"linear-gradient(160deg,#e7c27d,#6a4a28)",{genre:"Drama"}),
+    ]},
+  tv: { score: "IMDb 8.6", count: 8, facts: [["Seasons","1"],["Episodes","10"],["Network","FX"],["Status","Ended"],["Runtime","58 min"],["Genres","Drama, History"]],
+    logs: [
+      L("Shōgun","2024","Completed",5,"Ten episodes, fully landed.",["Season 1","Episode 10"],"linear-gradient(160deg,#8a3b2f,#241816)",{genre:"History"}),
+      L("The Bear","2022","Watching",4.5,"Still in the kitchen.",["Season 3","Episode 6"],"linear-gradient(160deg,#d8dee6,#314052)",{genre:"Drama"}),
+      L("Slow Horses","2022","Plan to watch",0,"",["Season 1","Spy"],"linear-gradient(160deg,#6e7c6a,#222820)",{genre:"Spy"}),
+    ]},
+  boardgames: { score: "Weight 2.4", count: 18, facts: [["Players","1–5"],["Play time","70 min"],["Weight","2.44"],["Age","10+"],["Designer","Elizabeth Hargrave"],["Mechanics","Hand management, Engine building"],["Source","BoardGameGeek"]],
+    logs: [
+      L("Wingspan","2019","Played",4.5,"Twelve plays. Still the one I bring out.",["1–5 players","70 min","Owned"],"linear-gradient(160deg,#3f7d6a,#16342c)",{genre:"Engine building", own:"own", playersMin:1, playersMax:5, weight:2.4}),
+      L("Azul","2017","Played",4,"Four plays.",["2–4 players","45 min","Owned"],"linear-gradient(160deg,#2f6fbf,#14304f)",{genre:"Abstract", own:"own", playersMin:2, playersMax:4, weight:1.8}),
+      L("Brass: Birmingham","2018","Plan to play",0,"",["2–4 players","120 min"],"linear-gradient(160deg,#8a6232,#2b2118)",{genre:"Economic", own:"want", playersMin:2, playersMax:4, weight:3.9}),
+    ]},
+  games: { score: "RAWG 4.6", count: 6, facts: [["Platforms","PC, Switch"],["Developer","Supergiant"],["Publisher","Supergiant"],["Time to beat","22 h"],["ESRB","T"],["Genres","Action, Roguelike"]],
+    logs: [
+      L("Hades","2020","Completed",5,"Finished the main escape.",["PC","22h to beat"],"linear-gradient(160deg,#e24b3b,#3a120f)",{genre:"Roguelike", own:"own", hours:22}),
+      L("Balatro","2024","Playing",4.5,"",["Switch","Owned"],"linear-gradient(160deg,#7b2d6b,#1c1020)",{genre:"Card", own:"own", hours:8}),
+      L("Outer Wilds","2019","Plan to play",0,"",["PC","15h to beat"],"linear-gradient(160deg,#3c6e8a,#101820)",{genre:"Adventure", own:"want", hours:15}),
+    ]},
+  books: { score: "245 pages", count: 15, facts: [["Pages","245"],["Author","Susanna Clarke"],["Publisher","Bloomsbury"],["Subjects","Fiction, Fantasy"],["Year","2020"]],
+    logs: [
+      L("Piranesi","2020","Reading",4,"Page 120.",["Susanna Clarke","p. 120 / 245"],"linear-gradient(160deg,#d7d3c4,#5c584c)",{genre:"Fantasy", own:"own"}),
+      L("Tomorrow, and Tomorrow, and Tomorrow","2022","Plan to read",0,"",["Gabrielle Zevin","416 pages"],"linear-gradient(160deg,#e07a5f,#4a2c28)",{genre:"Fiction", own:"want"}),
+      L("The Left Hand of Darkness","1969","Read",5,"",["Ursula K. Le Guin","304 pages"],"linear-gradient(160deg,#6a8caf,#1b2836)",{genre:"Science fiction", own:"own"}),
+    ]},
+  anime: { score: "MAL 9.0", count: 40, facts: [["Episodes","28"],["Status","Finished"],["Studio","Madhouse"],["Season","Fall 2023"],["Genres","Adventure, Drama"],["Source","Manga"]],
+    logs: [
+      L("Frieren","2023","Watching",5,"Episode 18 of 28.",["Episode 18","28 episodes"],"linear-gradient(160deg,#8eb38a,#243028)",{genre:"Adventure"}),
+      L("Odd Taxi","2021","Completed",4.5,"",["13 episodes","Drama"],"linear-gradient(160deg,#f0c14b,#3a3014)",{genre:"Drama"}),
+      L("Pluto","2023","Plan to watch",0,"",["8 episodes","Sci-fi"],"linear-gradient(160deg,#4d6a8a,#141c28)",{genre:"Sci-fi"}),
+    ]},
+  manga: { score: "41 volumes", count: 4, facts: [["Chapters","374"],["Volumes","41"],["Author","Kentaro Miura"],["Serialization","Young Animal"],["Status","Publishing"]],
+    logs: [
+      L("Berserk","1989","Reading",5,"Chapter 374.",["Chapter 374","Volume 41"],"linear-gradient(160deg,#6b1d2a,#1a0c0e)",{genre:"Dark fantasy", own:"own"}),
+      L("Goodnight Punpun","2007","Read",5,"",["Inio Asano","13 volumes"],"linear-gradient(160deg,#d9d4cf,#3a3836)",{genre:"Drama", own:"own"}),
+      L("Witch Hat Atelier","2016","Plan to read",0,"",["Kamome Shirahama","Volume 1"],"linear-gradient(160deg,#6f8fbf,#243044)",{genre:"Fantasy", own:"want"}),
+    ]},
+  comics: { score: "Issue 67", count: 12, facts: [["Issues","67"],["Publisher","Image"],["Authors","Brian K. Vaughan, Fiona Staples"],["Started","2012"],["Status","Ongoing"]],
+    logs: [
+      L("Saga","2012","Reading",5,"Issue 67.",["Issue 67","Image"],"linear-gradient(160deg,#ef6f4a,#3a1d2a)",{genre:"Science fiction", own:"own"}),
+      L("Monstress","2015","Reading",4,"",["Issue 52","Image"],"linear-gradient(160deg,#5b3a6e,#1a1020)",{genre:"Fantasy", own:"own"}),
+      L("Paper Girls","2015","Read",4.5,"",["30 issues","Image"],"linear-gradient(160deg,#f2a2c0,#4a3040)",{genre:"Adventure", own:"sold"}),
+    ]},
+};
+const TASTE = {
+  movies: { mean: "4.3 / 5", lines: ["Romance and drama are half of what you finish.","You rate quiet films higher than thrillers.","Mean runtime of finished films is 118 min."], planned: ["The Zone of Interest"], beyond: [["Aftersun","You already rate this kind of film at 5."],["Drive My Car","Same pace and score band as Past Lives."]] },
+  boardgames: { mean: "4.2 / 5", lines: ["Owned engine builders, weight around 2.4.","You play 1–4 more often than 5+.","Twelve sessions is your high, on Wingspan."], planned: ["Brass: Birmingham"], beyond: [["Ark Nova","Close weight and the same engine-building pull as Wingspan."],["Cascadia","Shorter, calmer, still in the weights you finish."]] },
+  books: { mean: "4.4 / 5", lines: ["Fantasy and literary fiction, mostly owned.","You are mid-book on a 245-page novel.","Finished books cluster around 300 pages."], planned: ["Tomorrow, and Tomorrow, and Tomorrow"], beyond: [["Piranesi's author, Jonathan Strange","You are already inside Clarke's tone."],["Station Eleven","Same length and the literary-fantasy mix you rate highly."]] },
+  anime: { mean: "4.6 / 5", lines: ["You finish shorter series and stay with character dramas.","Adventure is the genre you are watching now.","Planned titles are single-cour."], planned: ["Pluto"], beyond: [["Mob Psycho 100","Same studio family and the tone of the series you completed."],["Vinland Saga","The historical weight sitting next to your plan list."]] },
+  comics: { mean: "4.5 / 5", lines: ["Image comics, ongoing series, owned.","Science fiction leads fantasy.","You sold one completed run and kept the ongoing ones."], planned: [], beyond: [["Descender","The same writer-and-artist shape as Saga."],["Something Is Killing the Children","Ongoing, owned-shelf length."]] },
+};
+const BEYOND_BG = "linear-gradient(160deg,#355c58,#14211f)";
+const HOF = {
+  all: [["Top rated movies","Past Lives","5/5"],["Most board game matches","Wingspan","12 matches"],["Most hours played","Hades","22 h"]],
+  movies: [["Highest rated","Past Lives","5/5"],["Longest movie","Anatomy of a Fall","151 min"],["Top movie genre","Drama","2 items"]],
+  tv: [["Highest rated","Shōgun","5/5"],["Most TV episodes","Shōgun","10 episodes"],["Longest TV series","The Bear","3 seasons"]],
+  boardgames: [["Most matches","Wingspan","12 matches"],["Most wins","Wingspan","7 wins"],["Heaviest board game","Brass: Birmingham","3.9/5"]],
+  games: [["Most hours played","Hades","22 h"],["Top platform","PC","2 items"],["Highest rated","Hades","5/5"]],
+  books: [["Most book pages","The Left Hand of Darkness","304 pages"],["Top book genre","Fantasy","1 item"],["Highest rated","The Left Hand of Darkness","5/5"]],
+  anime: [["Highest rated","Frieren","5/5"],["Most anime episodes","Frieren","28 episodes"],["Longest anime","Frieren","28 episodes"]],
+  manga: [["Most manga chapters","Berserk","374 chapters"],["Most volumes","Berserk","41 volumes"],["Highest rated","Berserk","5/5"]],
+  comics: [["Most comic chapters","Saga","67 chapters"],["Highest rated","Saga","5/5"],["Most volumes","Monstress","52 issues"]],
+};
+const SCREENS = [["landing","Landing"],["login","Log in"],["register","Register"],["forgot","Forgot password"],["reset","Reset password"],["onboarding","Onboarding"],["dashboard","Library"],["discover","Discover"],["statistics","Activity"],["search","Search"],["item","Item"],["market","Market"],["listing","Listing"],["mine","My listings"],["profile","Public profile"],["store","User store"],["settings","You"],["plans","Plans"],["about","About"],["faq","FAQ"],["privacy","Privacy"],["terms","Terms"]];
+const APP_NAV = [["dashboard","Library"],["discover","Discover"],["statistics","Activity"],["market","Market"],["settings","You"]];
+const GUEST_NAV = [["dashboard","Library"],["search","Search"],["plans","Plans"],["about","About"],["login","Log in"],["register","Register"]];
+const ICONS = {
+  dashboard: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h7v7H4zM13 5h7v4h-7zM13 11h7v8h-7zM4 14h7v5H4z"/></svg>',
+  discover: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.6 5.2L19 10l-5.4 1.8L12 17l-1.6-5.2L5 10l5.4-1.8z"/></svg>',
+  statistics: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-7"/></svg>',
+  search: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="m20 20-3.5-3.5"/></svg>',
+  market: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9h16l-1 11H5L4 9z"/><path d="M8 9V7a4 4 0 0 1 8 0v2"/></svg>',
+  settings: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3"/><path d="M5 19a7 7 0 0 1 14 0"/></svg>',
+  plans: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>',
+  about: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/></svg>',
+  login: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 12H3m0 0 3-3M3 12l3 3"/><path d="M10 7V5h9v14h-9v-2"/></svg>',
+  register: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="8" r="3"/><path d="M4 19a6 6 0 0 1 12 0M19 8v6M16 11h6"/></svg>',
+};
+const state = {
+  screen: "dashboard", theme: "dark", frame: "desktop", cat: "movies", market: "all", layout: "list",
+  lib: "shelves", pane: "numbers", step: 0, sheet: false, drawer: false, authed: true, cookie: true,
+  focus: "", from: "dashboard", itemTitle: "", itemTab: "review",
+  filters: { status: "", sort: "dateDesc", genre: "", collection: "", players: [] },
+  paceMode: "pace", pacePeriod: "month", hofPeriod: "all", spendPeriod: "month",
+  discoverStatus: "saved", discoverLocked: false, discoverAt: "Today, 9:14", discoverCat: "movies",
+};
+function shownCat() { return DATA[state.cat] ? state.cat : "movies"; }
+function catName(id) { return (CATS.find((c) => c[0] === id) || ["",""])[1]; }
+function toast(msg) { const el = document.getElementById("toast"); el.hidden = false; el.textContent = msg; clearTimeout(toast._t); toast._t = setTimeout(() => { el.hidden = true; }, 2200); }
+function go(screen, extra) {
+  state.from = state.screen;
+  if (extra) Object.assign(state, extra);
+  if (["login","landing","register","forgot","reset"].includes(screen)) state.authed = false;
+  if (screen === "dashboard" || screen === "onboarding") state.authed = true;
+  state.screen = screen;
+  if (!["statistics","dashboard","discover"].includes(screen) && state.cat === "all") state.cat = "movies";
+  state.sheet = false; state.drawer = false;
+  draw();
+}
+function currentPlace() {
+  const s = state.screen;
+  if (["dashboard","search","item"].includes(s)) return "dashboard";
+  if (["settings","plans","about","faq","privacy","terms","profile","store"].includes(s)) return "settings";
+  if (["market","listing","mine"].includes(s)) return "market";
+  return s;
+}
+function todayInput() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+const STARTED = new Set(["Watching", "Reading", "Playing"]);
+const FINISHED = new Set(["Watched", "Completed", "Read", "Played", "Dropped"]);
+const COMPLETED = new Set(["Watched", "Completed", "Read", "Played"]);
+const EPISODES = { 1: [1,2,3,4,5,6,7,8,9,10], 2: [1,2,3,4,5,6,7,8], 3: [1,2,3,4,5,6], 4: [1,2,3,4,5,6,7,8,9,10,11,12] };
+const ANIME_EPS = [1, 8, 12, 13, 18, 24, 28];
+const DURATIONS = [["0.5","30 min"],["1","1 h"],["1.5","1 h 30 min"],["2","2 h"],["2.5","2 h 30 min"],["3","3 h"],["3.5","3 h 30 min"],["4","4 h"],["4.5","4 h 30 min"],["5","5 h"],["5.5","5 h 30 min"],["6","6 h"]];
+function durationLabel(v) { return (DURATIONS.find((d) => d[0] === String(v)) || DURATIONS[2])[1]; }
+function formatPlayed(yyyyMmDd) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(yyyyMmDd || "");
+  if (!m) return yyyyMmDd || "";
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric" });
+}
+function factNum(row, re) {
+  const hit = (row?.facts || []).join(" ").match(re);
+  return hit ? hit[1] : "";
+}
+function starGlyphs(n, interactive) {
+  const v = Number(n) || 0;
+  return [0, 1, 2, 3, 4].map((i) => {
+    const fill = Math.max(0, Math.min(1, v - i));
+    const hit = interactive ? `<button type="button" data-rate="${i + 0.5}" aria-label="${i + 0.5} of 5"></button><button type="button" data-rate="${i + 1}" aria-label="${i + 1} of 5"></button>` : "";
+    return `<span class="rate-star" style="--fill:${fill}">${hit}<i></i></span>`;
+  }).join("");
+}
+function stars(n) {
+  if (!n) return '<span class="faint">No rating</span>';
+  const shown = Number.isInteger(Number(n)) ? String(n) : Number(n).toFixed(1);
+  return `<span class="rate">${starGlyphs(n, false)}<span class="faint">${shown}/5</span></span>`;
+}
+function avatar(name, winner) {
+  let h = 0;
+  const s = String(name || "").trim() || "?";
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const initials = s.split(/\s+/).slice(0, 2).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
+  return `<span class="avatar${winner ? " winner" : ""}" style="background:linear-gradient(145deg,hsl(${h % 360} 58% 48%),hsl(${(h + 48) % 360} 52% 36%))">${esc(initials)}</span>`;
+}
+function freshSession() {
+  return { date: todayInput(), duration: "1.5", notes: "", pickDate: false, players: [{ name: "you", score: "", winner: false, app: true }, { name: "", score: "", winner: false, app: false }] };
+}
+function boardBundle(title, row) {
+  if (!state.boards) state.boards = {};
+  if (!state.boards[title]) {
+    const count = title === "Wingspan" ? 12 : title === "Azul" ? 4 : row?.status === "Played" ? 1 : 0;
+    const history = title === "Wingspan" ? [
+      { id: "w1", date: "Mar 12, 2026", duration: "1 h 30 min", notes: "Close all the way to the last round.", open: false, players: [{ name: "you", score: "72", winner: true, app: true }, { name: "Mina", score: "64", winner: false }, { name: "Alex", score: "51", winner: false }] },
+      { id: "w2", date: "Feb 2, 2026", duration: "2 h", notes: "", open: false, players: [{ name: "Mina", score: "80", winner: true }, { name: "you", score: "61", winner: false, app: true }] },
+    ] : title === "Azul" ? [
+      { id: "a1", date: "Jan 18, 2026", duration: "45 min", notes: "", open: false, players: [{ name: "you", score: "78", winner: true, app: true }, { name: "Mina", score: "70", winner: false }] },
+    ] : [];
+    state.boards[title] = { count, confirm: "", session: freshSession(), history };
+  }
+  return state.boards[title];
+}
+function blankLog(cat, row) {
+  const pages = (row?.facts || []).join(" ").match(/p\.\s*(\d+)\s*\/\s*(\d+)/);
+  const totalFact = factNum(row, /(\d+)\s+pages/);
+  const pagesTotal = pages ? pages[2] : totalFact || (cat === "manga" ? "180" : cat === "comics" ? "96" : "245");
+  const log = {
+    status: row?.status || "",
+    season: factNum(row, /Season\s+(\d+)/) || "1",
+    episode: factNum(row, /Episode\s+(\d+)/) || (cat === "anime" ? "12" : "1"),
+    episodeMax: factNum(row, /(\d+)\s+episodes/) || "",
+    chapter: cat === "manga" ? "374" : "12",
+    volume: cat === "manga" ? "41" : "2",
+    pages: pages ? pages[1] : (row?.status === "Read" ? pagesTotal : ""),
+    pagesTotal,
+    started: STARTED.has(row?.status) ? "2024-03-02" : "",
+    finished: FINISHED.has(row?.status) ? "2024-06-18" : "",
+    platform: "PC",
+    hours: row?.hours != null ? String(row.hours) : "",
+    own: row?.own || "no",
+    currency: "BRL",
+    amount: "",
+    saleCurrency: "BRL",
+    sale: "",
+    matches: cat === "boardgames" ? String(boardBundle(row?.title || "Board game", row).count) : "",
+    rating: row?.rating || 0,
+    review: "",
+  };
+  return log;
+}
+function applyStatusEffects(next, prev, log, cat) {
+  if (!next || next === prev) return;
+  if (STARTED.has(next)) log.started = todayInput();
+  if (FINISHED.has(next)) log.finished = todayInput();
+  if (COMPLETED.has(next) && cat === "tv") {
+    const opts = EPISODES[log.season] || EPISODES[1];
+    log.episode = String(opts[opts.length - 1]);
+  }
+  if (COMPLETED.has(next) && cat === "anime") log.episode = String(log.episodeMax || ANIME_EPS[ANIME_EPS.length - 1]);
+  if (cat === "books") log.pages = next === "Read" && log.pagesTotal ? String(log.pagesTotal) : "";
+  if (cat === "boardgames") {
+    if (next === "Played" && (!log.matches || Number(log.matches) === 0)) log.matches = "1";
+    if (next === "Plan to play") log.matches = "0";
+  }
+}
+function clampEpisode(log) {
+  const eps = (EPISODES[log.season] || EPISODES[1]).map(String);
+  if (log.episode && !eps.includes(String(log.episode))) log.episode = "";
+}
+function syncDraft() {
+  if (state.log) {
+    const root = document.getElementById("sheet-body");
+    if (root) root.querySelectorAll("[data-log-field]").forEach((el) => { state.log[el.dataset.logField] = el.value; });
+  }
+  const form = state.sheet === "match"
+    ? document.querySelector("#sheet-body .match-form")
+    : document.querySelector("#main .match-form");
+  const bundle = state.boards && state.boards[state.itemTitle];
+  if (form && bundle) {
+    form.querySelectorAll("[data-session-field]").forEach((el) => { bundle.session[el.dataset.sessionField] = el.value; });
+    form.querySelectorAll("[data-player-name]").forEach((el) => { const row = bundle.session.players[Number(el.dataset.playerName)]; if (row) row.name = el.value; });
+    form.querySelectorAll("[data-player-score]").forEach((el) => { const row = bundle.session.players[Number(el.dataset.playerScore)]; if (row) row.score = el.value; });
+  }
+}
+function optionTags(list, value) {
+  return list.map((item) => {
+    const v = Array.isArray(item) ? item[0] : item;
+    const label = Array.isArray(item) ? item[1] : item;
+    return `<option value="${esc(v)}" ${String(v) === String(value) ? "selected" : ""}>${esc(label)}</option>`;
+  }).join("");
+}
+function dateFields(log) {
+  return `<div class="pair"><label class="field"><span>Started</span><input type="date" data-log-field="started" value="${esc(log.started)}" /></label><label class="field"><span>Finished</span><input type="date" data-log-field="finished" value="${esc(log.finished)}" /></label></div>`;
+}
+function ratingField(log) {
+  const v = Number(log.rating) || 0;
+  const shown = Number.isInteger(v) ? String(v) : v.toFixed(1);
+  const grade = Math.round(v * 2);
+  return `<div class="field"><span>Rating</span><div class="rate">${starGlyphs(v, true)}<span class="faint">${shown} / 5 · ${grade}/10</span><button type="button" class="btn ghost small" data-rate="0">Clear</button></div><p class="faint">Left half of a star sets the half. ${grade}/10 is that same grade.</p></div>`;
+}
+function cover(title, bg) {
+  const initials = title.split(/\s+/).slice(0, 2).map((w) => w[0]).join("");
+  return `<div class="cover" style="background:${bg}">${initials}</div>`;
+}
+function options(list, current) {
+  return list.map(([v, l]) => `<option value="${v}" ${v === current ? "selected" : ""}>${l}</option>`).join("");
+}
+function genresOf(cat) {
+  return [...new Set(DATA[cat].logs.map((r) => r.genre))];
+}
+function sortLogs(rows) {
+  const list = rows.slice();
+  const s = state.filters.sort;
+  const by = {
+    dateAsc: (a, b) => a.year.localeCompare(b.year),
+    dateDesc: (a, b) => b.year.localeCompare(a.year),
+    gradeAsc: (a, b) => a.rating - b.rating,
+    gradeDesc: (a, b) => b.rating - a.rating,
+    matchesPlayedAsc: (a, b) => (a.title === "Azul" ? -1 : 1),
+    matchesPlayedDesc: (a, b) => (a.title === "Wingspan" ? -1 : 1),
+    weightAsc: (a, b) => a.weight - b.weight,
+    weightDesc: (a, b) => b.weight - a.weight,
+    timeToBeatAsc: (a, b) => a.hours - b.hours,
+    timeToBeatDesc: (a, b) => b.hours - a.hours,
+  };
+  list.sort(by[s] || by.dateDesc);
+  return list;
+}
+function filteredLogs(cat) {
+  const f = state.filters;
+  return sortLogs(DATA[cat].logs.filter((row) => {
+    if (f.status && row.status !== f.status) return false;
+    if (f.genre && row.genre !== f.genre) return false;
+    if (f.collection === "owned" && row.own !== "own") return false;
+    if (f.collection === "want" && row.own !== "want") return false;
+    if (cat === "boardgames" && f.players.length) {
+      const ok = f.players.some((p) => {
+        const n = Number(p);
+        return row.playersMin <= n && n <= (p === "6" ? 99 : row.playersMax);
+      });
+      if (!ok) return false;
+    }
+    return true;
+  }));
+}
+function activeFilterCount() {
+  const f = state.filters;
+  return [f.status, f.genre, f.collection, f.players.length ? "p" : ""].filter(Boolean).length + (f.sort !== "dateDesc" ? 1 : 0);
+}
+function logCard(row, cat) {
+  return `<div class="log" data-open-item="${cat}" role="link" tabindex="0">
+    ${cover(row.title, row.bg)}
+    <span class="log-body">
+      <span class="log-top"><h3>${row.title}</h3><span class="log-actions"><button type="button" class="btn ghost small" data-log>Log</button>${cat === "boardgames" ? `<button type="button" class="btn ghost small" data-log-match>Log a match</button>` : ""}</span></span>
+      <span class="faint">${row.year} · ${catName(cat)}</span>
+      <span class="pill">${row.status}</span>
+      ${stars(row.rating)}
+      ${row.blurb ? `<span class="faint">${row.blurb}</span>` : ""}
+      <span class="faint">${row.facts.join(" · ")}</span>
+    </span>
+  </div>`;
+}
+function shelfCard(row, cat) {
+  return `<button type="button" class="shelf-card" data-open-item="${cat}"><span style="display:contents">${cover(row.title, row.bg)}</span><h3>${row.title}</h3><span class="faint">${row.status}</span></button>`;
+}
+function formFields(cat) {
+  if (!state.log) state.log = blankLog(cat);
+  const log = state.log;
+  let extra = "";
+  if (cat === "tv") {
+    const eps = EPISODES[log.season] || EPISODES[1];
+    extra += `<div class="pair"><label class="field"><span>Season</span><select data-log-field="season">${optionTags(["1","2","3","4"], log.season)}</select></label><label class="field"><span>Episode</span><select data-log-field="episode"><option value="">—</option>${optionTags(eps, log.episode)}</select></label></div>${dateFields(log)}`;
+  }
+  if (cat === "anime") {
+    const eps = [...ANIME_EPS];
+    for (const n of [log.episode, log.episodeMax]) if (n && !eps.map(String).includes(String(n))) eps.push(Number(n));
+    eps.sort((a, b) => a - b);
+    extra += `<label class="field"><span>Episode</span><select data-log-field="episode">${optionTags(eps, log.episode)}</select></label>${dateFields(log)}`;
+  }
+  if (cat === "books" || cat === "manga" || cat === "comics") {
+    if (cat !== "books") {
+      const chapters = cat === "manga" ? [1, 12, 48, 120, 374] : [1, 6, 12, 28, 67];
+      const volumes = cat === "manga" ? [1, 2, 8, 20, 41] : [1, 2, 6, 12];
+      extra += `<div class="pair"><label class="field"><span>Chapter</span><select data-log-field="chapter">${optionTags(chapters, log.chapter)}</select></label><label class="field"><span>Volume</span><select data-log-field="volume">${optionTags(volumes, log.volume)}</select></label></div>`;
+    }
+    extra += `<label class="field"><span>Pages read</span><input type="number" min="0" data-log-field="pages" value="${esc(log.pages)}" /></label><p class="faint">of ${esc(log.pagesTotal)}</p>${dateFields(log)}`;
+  }
+  if (cat === "games") {
+    extra += `<label class="field"><span>Platform / console</span><select data-log-field="platform">${optionTags(PLATFORMS, log.platform)}</select></label>${dateFields(log)}<label class="field"><span>Hours to beat</span><input type="number" min="0" step="0.5" data-log-field="hours" value="${esc(log.hours)}" /></label>`;
+  }
+  if (SPEND.has(cat)) {
+    extra += `<fieldset class="field"><legend>Collection</legend><div class="own">${OWN.map(([id, label]) => `<button type="button" data-own="${id}" aria-pressed="${log.own === id ? "true" : "false"}">${label}</button>`).join("")}</div></fieldset>`;
+    if (log.own === "own" || log.own === "sold") {
+      extra += `<div class="pair"><label class="field"><span>Currency</span><select data-log-field="currency">${optionTags(CURRENCIES, log.currency)}</select></label><label class="field"><span>Amount spent (optional)</span><input type="number" min="0" step="0.01" data-log-field="amount" value="${esc(log.amount)}" placeholder="0.00" /></label></div>`;
+    }
+    if (log.own === "sold") {
+      extra += `<div class="pair"><label class="field"><span>Currency</span><select data-log-field="saleCurrency">${optionTags(CURRENCIES, log.saleCurrency)}</select></label><label class="field"><span>Sale proceeds (optional)</span><input type="number" min="0" step="0.01" data-log-field="sale" value="${esc(log.sale)}" placeholder="0.00" /></label></div>`;
+    }
+  }
+  if (cat === "boardgames") extra += `<label class="field"><span>Matches played</span><div class="match-count"><input type="number" min="0" step="1" data-log-field="matches" value="${esc(log.matches)}" /><button type="button" class="btn ghost" data-add-match aria-label="Add one match">+</button></div></label>`;
+  return `<div class="stack"><label class="field"><span>Status</span><select data-log-field="status"><option value="">—</option>${optionTags(STATUS[cat], log.status)}</select></label>${extra}${ratingField(log)}<label class="field"><span>Review</span><textarea data-log-field="review" placeholder="Your thoughts...">${esc(log.review)}</textarea></label><button class="btn" type="button" id="save-log">Save log</button></div>`;
+}
+function matchFields(row) {
+  const bundle = boardBundle(row.title, row);
+  const session = bundle.session;
+  const isToday = session.date === todayInput();
+  const dateField = isToday && !session.pickDate
+    ? `<button type="button" class="btn ghost" data-pick-date>Today</button>`
+    : `<input type="date" data-session-field="date" value="${esc(session.date)}" />`;
+  const players = session.players.map((p, i) => `<div class="match-player">${avatar(p.name, p.winner)}<input class="name" type="text" data-player-name="${i}" value="${esc(p.name)}" placeholder="Name" aria-label="Player ${i + 1} name" /><input class="score" type="text" inputmode="numeric" data-player-score="${i}" value="${esc(p.score)}" placeholder="Score" aria-label="Score" /><button type="button" class="toggle" data-winner="${i}" aria-pressed="${p.winner ? "true" : "false"}" aria-label="Winner"><i></i><span>Winner</span></button>${i > 0 ? `<button type="button" class="btn ghost small" data-remove-player="${i}" aria-label="Remove player">Remove</button>` : ""}</div>`).join("");
+  return `<div class="stack match-form"><p class="faint">Total matches played: ${bundle.count} (updated when you save a match)</p><div class="pair"><label class="field"><span>Date played</span>${dateField}</label><label class="field"><span>Session time</span><select data-session-field="duration">${optionTags(DURATIONS, session.duration)}</select></label></div><div class="spread"><b>Players</b><button type="button" class="btn ghost small" data-add-player>Add player</button></div>${players}<label class="field"><span>Session notes</span><textarea data-session-field="notes" placeholder="How did it go? Optional notes for this session only.">${esc(session.notes)}</textarea></label><div class="match-actions"><button type="button" class="btn" data-save-match>Save match</button><button type="button" class="btn ghost" data-save-banner>Save and show banner</button></div></div>`;
+}
+function matchesTab(row) {
+  const bundle = boardBundle(row.title, row);
+  const history = bundle.history.length ? bundle.history.map((m) => {
+    const winners = m.players.filter((p) => p.winner).map((p) => p.name).join(" · ");
+    return `<article class="card stack"><button type="button" class="history-head" data-open-match="${m.id}" aria-expanded="${m.open ? "true" : "false"}"><span class="avatars">${m.players.slice(0, 5).map((p) => avatar(p.name, false)).join("")}</span><span class="history-meta"><span class="pill">${esc(m.date)}</span><span class="pill">${esc(m.duration)}</span>${winners ? `<span class="pill">${esc(winners)}</span>` : ""}</span><span class="chev">${m.open ? "▴" : "▾"}</span></button>${m.open ? `<div class="stack">${m.players.map((p) => `<div class="history-row${p.winner ? " winner" : ""}">${avatar(p.name, p.winner)}<span><b>${esc(p.name)}</b>${p.app ? " · on Geeklogs" : ""}${p.score !== "" ? `<span class="faint"> · ${esc(p.score)} pts</span>` : ""}</span>${p.winner ? '<span class="stars">★</span>' : ""}</div>`).join("")}${m.notes ? `<p class="muted">${esc(m.notes)}</p>` : ""}${bundle.confirm === m.id ? `<p>Delete this match? The match count will be updated.</p><div class="row"><button type="button" class="btn" data-confirm-delete="${m.id}">Delete</button><button type="button" class="btn ghost" data-cancel-delete>Cancel</button></div>` : `<button type="button" class="btn ghost small" data-delete-match="${m.id}">Remove session</button>`}</div>` : ""}</article>`;
+  }).join("") : `<div class="card stack" style="border-style:dashed;text-align:center"><p class="muted">No matches logged yet.</p></div>`;
+  return `<div class="stack"><div class="card stack"><h2>Log a new session</h2><p class="faint">Add everyone who played. Pick a winner and optional notes.</p>${matchFields(row)}</div><div class="stack"><h2>Play history</h2><p class="faint">Every session you log shows up here with scores and winners.</p>${history}</div></div>`;
+}
+function matchSheet() {
+  const cat = state.cat === "all" ? "movies" : shownCat();
+  const row = (DATA[cat]?.logs || []).find((r) => r.title === state.itemTitle) || { title: state.itemTitle || "Board game", status: "Played" };
+  return `<div class="stack"><h2 class="page-title" style="font-size:28px">${esc(row.title)}</h2>${matchFields(row)}</div>`;
+}
+function saveMatch(banner) {
+  const bundle = state.boards[state.itemTitle];
+  const players = bundle.session.players;
+  if (players.some((p) => !String(p.name).trim())) { toast("Each player needs a name."); return; }
+  if (players.some((p) => String(p.score).trim() && !/^-?\d+$/.test(String(p.score).trim()))) { toast("Scores must be whole numbers."); return; }
+  bundle.history.unshift({ id: "m" + Date.now(), date: formatPlayed(bundle.session.date), duration: durationLabel(bundle.session.duration), notes: bundle.session.notes.trim(), open: true, players: players.map((p) => ({ name: p.name.trim(), score: String(p.score).trim(), winner: !!p.winner, app: !!p.app })) });
+  bundle.count += 1;
+  bundle.session = freshSession();
+  if (state.log && state.focus === state.itemTitle) state.log.matches = String(bundle.count);
+  toast(banner ? "Play logged. The completion banner would open in the app." : "Match saved");
+  draw();
+}
+function drawerBody() {
+  const cat = shownCat();
+  const f = state.filters;
+  const sorts = [["dateDesc","Newest logged"],["dateAsc","Oldest logged"],["gradeDesc","Rating high to low"],["gradeAsc","Rating low to high"]];
+  if (cat === "boardgames") sorts.push(["matchesPlayedDesc","Matches played, most"],["matchesPlayedAsc","Matches played, least"],["weightDesc","Weight high to low"],["weightAsc","Weight low to high"]);
+  if (cat === "games") sorts.push(["timeToBeatDesc","Time to beat, longest"],["timeToBeatAsc","Time to beat, shortest"]);
+  return `<div class="stack">
+    <div class="spread"><h2 id="drawer-title">Filters</h2><button class="btn ghost small" type="button" id="drawer-close">Close</button></div>
+    <p class="faint">${catName(cat)}. These are the filters this category already has on the log list.</p>
+    <label class="field"><span>Category</span><select data-filter-cat="1">${CATS.map(([id, label]) => `<option value="${id}" ${id===cat?"selected":""}>${label}</option>`).join("")}</select></label>
+    <label class="field"><span>Status</span><select data-filter="status"><option value="">All (${DATA[cat].count})</option>${STATUS[cat].map((s) => `<option ${f.status===s?"selected":""}>${s}</option>`).join("")}</select></label>
+    <label class="field"><span>Genre</span><select data-filter="genre"><option value="">All genres</option>${genresOf(cat).map((g) => `<option ${f.genre===g?"selected":""}>${g}</option>`).join("")}</select></label>
+    ${SPEND.has(cat) ? `<label class="field"><span>Collection</span><select data-filter="collection"><option value="">All</option><option value="owned" ${f.collection==="owned"?"selected":""}>Owned</option><option value="want" ${f.collection==="want"?"selected":""}>Want to buy</option></select></label>` : ""}
+    ${cat === "boardgames" ? `<fieldset class="field"><legend>Players</legend><div class="checks">${["1","2","3","4","5","6"].map((n) => `<label><input type="checkbox" data-player="${n}" ${f.players.includes(n)?"checked":""}/> ${n === "6" ? "6+" : n}</label>`).join("")}</div></fieldset>` : ""}
+    <label class="field"><span>Sort</span><select data-filter="sort">${options(sorts, f.sort)}</select></label>
+    <div class="row"><button class="btn" type="button" id="apply-filters">Show ${filteredLogs(cat).length}</button><button class="btn ghost" type="button" id="clear-filters">Clear</button></div>
+  </div>`;
+}
+function paceChart(values, labels) {
+  const max = Math.max(...values, 1);
+  return `<div class="pace">${values.map((n, i) => `<span><i style="--h:${Math.round((n / max) * 100)}"></i><em>${labels[i]}</em></span>`).join("")}</div>`;
+}
+function libHead() {
+  const n = activeFilterCount();
+  return `<div class="stack"><div class="lib-head"><h1 class="page-title">Library</h1><button class="btn ghost" type="button" id="open-filters">Filters${n ? ` <span class="badge">${n}</span>` : ""}</button></div><div class="lib-tools"><button class="chip" type="button" data-lib="shelves" aria-pressed="${state.lib==="shelves"}">Shelves</button><button class="chip" type="button" data-lib="logs" aria-pressed="${state.lib==="logs"}">All logs</button><button class="chip" type="button" data-layout="list" aria-pressed="${state.layout==="list"}">List</button><button class="chip" type="button" data-layout="grid" aria-pressed="${state.layout==="grid"}">Grid</button></div></div>`;
+}
+function viewShelves() {
+  const continueRow = [["tv",1],["books",0],["anime",0],["games",1],["manga",0],["comics",0]].map(([cat, i]) => logCard(DATA[cat].logs[i], cat)).join("");
+  const shelves = CATS.map(([id, label]) => `<section class="stack"><div class="spread"><h2>${label}</h2><button class="btn ghost small" type="button" data-see="${id}">All logs</button></div><div class="shelf-row">${DATA[id].logs.map((row) => shelfCard(row, id)).join("")}${id==="boardgames" ? `<div class="card" style="flex:none;width:200px"><b>Import a collection</b><p class="faint">BoardGameGeek or Ludopedia.</p><button class="btn small" type="button" data-toast="Import stays a prototype control">Import</button></div>` : ""}</div></section>`).join("");
+  return `<div class="library"><div class="stack">${libHead()}<section class="stack"><h2>Continue</h2><div class="continue">${continueRow}</div></section>${shelves}</div>
+    <aside class="side-rail"><div class="card stack"><span class="kicker">This week</span><b class="page-title" style="font-size:32px">16</b>${paceChart([8,11,9,14,12,10,16], ["M","T","W","T","F","S","S"])}<button class="btn ghost small" type="button" data-go="statistics">Open activity</button></div></aside></div>`;
+}
+function viewLogs() {
+  const cat = state.cat === "all" ? "movies" : state.cat;
+  const rows = filteredLogs(cat);
+  const chips = [["status", state.filters.status],["genre", state.filters.genre],["collection", state.filters.collection === "owned" ? "Owned" : state.filters.collection === "want" ? "Want to buy" : ""]].filter(([, v]) => v);
+  return `<div class="stack">${libHead()}
+    ${catChips(cat)}
+    ${chips.length ? `<div class="row">${chips.map(([k, v]) => `<button class="chip" type="button" data-clear="${k}">${v} ×</button>`).join("")}</div>` : ""}
+    ${cat === "boardgames" ? `<div class="card spread"><div><b>Import a collection</b><p class="faint">BoardGameGeek or Ludopedia.</p></div><button class="btn small" type="button" data-toast="Import stays a prototype control">Import</button></div>` : ""}
+    ${rows.length ? `<div class="logs ${state.layout}">${rows.map((row) => logCard(row, cat)).join("")}</div>` : `<div class="card"><p>Nothing matches these filters.</p></div>`}
+  </div>`;
+}
+function catChips(active) {
+  return `<div class="chips">${CATS.map(([id, label]) => `<button type="button" class="chip" data-cat="${id}" aria-pressed="${id===active}">${label}</button>`).join("")}</div>`;
+}
+function viewNumbers() {
+  const cat = state.cat;
+  const all = cat === "all";
+  const showPages = all || ["books","manga","comics"].includes(cat);
+  const showWins = all || cat === "boardgames";
+  const showBoard = all || cat === "boardgames";
+  const showPlat = all || cat === "games";
+  const showSpend = all || SPEND.has(cat);
+  const pace = cat === "books" || cat === "manga" || cat === "comics" ? [40, 0, 80, 120, 60, 20, 90] : [3, 5, 4, 8, 6, 4, 7];
+  const paceLabels = state.pacePeriod === "month" ? ["J","F","M","A","M","J","J"] : ["20","21","22","23","24","25","26"];
+  const records = HOF[all ? "all" : cat] || HOF.all;
+  return `<div class="stack numbers">
+    <div class="spread"><span class="kicker">Numbers</span><button class="btn ghost small" type="button" id="open-recap">Recap</button></div>
+    <div class="chips">${[["all","All"], ...CATS].map(([id, label]) => `<button type="button" class="chip" data-cat="${id}" aria-pressed="${state.cat===id}">${label}</button>`).join("")}</div>
+    <section class="stack"><h2>Overview</h2><div class="stats">
+      ${showPages ? `<div class="card stat"><span class="faint">Pages read</span><b>1,284</b><span class="faint">+12% vs last month</span></div>` : ""}
+      ${showWins ? `<div class="card stat"><span class="faint">Games won</span><b>19</b><span class="faint">+2 vs last month</span></div>` : ""}
+      <div class="card stat"><span class="faint">Total logs</span><b>${all ? 235 : DATA[cat].count}</b></div>
+      <div class="card stat"><span class="faint">Completed</span><b>${all ? 152 : Math.max(1, DATA[cat].count - 3)}</b></div>
+      <div class="card stat"><span class="faint">Hours logged</span><b>86.5</b></div>
+      <div class="card stat"><span class="faint">Rated</span><b>${all ? 148 : DATA[cat].count - 1}</b></div>
+      ${showSpend ? `<div class="card stat"><span class="faint">Collection balance</span><b style="font-size:22px">R$ 186</b><span class="faint">Sales − purchases, all time</span></div>` : ""}
+    </div></section>
+    <section class="card stack"><div class="spread"><h2>Hall of fame</h2><select data-hof aria-label="Hall of Fame period"><option value="all" ${state.hofPeriod==="all"?"selected":""}>All time</option><option value="year" ${state.hofPeriod==="year"?"selected":""}>This year</option></select></div>
+      ${records.map(([k, title, value]) => `<div class="hof-row">${cover(title, "linear-gradient(160deg,#355c58,#14211f)")}<div><b>${k}</b><div class="faint">${title} · ${value}</div></div></div>`).join("")}
+    </section>
+    <section class="card stack"><h2>Library status</h2><div class="row"><div class="donut" role="img" aria-label="Completed 46 percent, in progress 24 percent, planned 18 percent, dropped 12 percent"></div><div class="legend"><span>Completed · 46%</span><span>In progress · 24%</span><span>Planned · 18%</span><span class="faint">Dropped · 12%</span></div></div></section>
+    ${showBoard ? `<section class="card stack"><div class="spread"><h2>Matches played</h2><div class="row"><button class="chip" type="button" aria-pressed="true">This month</button><button class="chip" type="button">This year</button></div></div>
+      <div class="row"><button class="chip" aria-pressed="true" type="button">Recently played</button><button class="chip" type="button">Most played</button><button class="chip" type="button">Least played</button></div>
+      <p><b>Wingspan</b> <span class="muted">12 plays · 7 wins · 58% · 4 days ago</span></p>
+      <p><b>Azul</b> <span class="muted">4 plays · 1 win · 25% · 2 weeks ago</span></p></section>` : ""}
+    ${showPlat ? `<section class="card stack"><h2>Most played platforms</h2><p class="faint">How many games you logged on each platform.</p>
+      ${[["PC",70],["Nintendo Switch",40],["PlayStation 5",22]].map(([name, w]) => `<div><div class="spread"><span>${name}</span><span class="faint">${Math.round(w/10)}</span></div><div class="barline"><i style="--w:${w}%"></i></div></div>`).join("")}</section>` : ""}
+    ${showBoard ? `<section class="card stack"><h2>Board games by weight</h2><div class="chips"><button class="chip" aria-pressed="true" type="button">All</button><button class="chip" type="button">Plan to play</button><button class="chip" type="button">Played</button><button class="chip" type="button">In collection</button><button class="chip" type="button">Want to buy</button></div>${paceChart([2,5,8,4,1], ["1","2","3","4","5"])}<p class="faint">Weight / 5. A column opens the games in that bin.</p></section>` : ""}
+    <section class="card stack">
+      <div class="spread"><h2>${state.paceMode === "pace" ? "Pace" : "Completed"}</h2>
+        <div class="row"><button class="chip" type="button" data-pace="pace" aria-pressed="${state.paceMode==="pace"}">Pace</button><button class="chip" type="button" data-pace="completed" aria-pressed="${state.paceMode==="completed"}">Completed</button>
+        <button class="chip" type="button" data-period="month" aria-pressed="${state.pacePeriod==="month"}">Month</button><button class="chip" type="button" data-period="year" aria-pressed="${state.pacePeriod==="year"}">Year</button></div></div>
+      <p class="page-title" style="font-size:28px">${pace.reduce((a,b)=>a+b,0).toLocaleString()} <span class="faint">${showPages && !all ? "pages" : "items"} total</span></p>
+      ${paceChart(pace, paceLabels)}
+      <p class="faint">${state.pacePeriod === "month" ? "Monthly increments" : "Yearly increments"} · tap a column · best ${Math.max(...pace)}</p>
+      <div class="stats"><div class="card stat"><span class="faint">Top</span><b style="font-size:22px">${paceLabels[pace.indexOf(Math.max(...pace))]}</b></div><div class="card stat"><span class="faint">Average</span><b style="font-size:22px">${Math.round(pace.reduce((a,b)=>a+b,0)/pace.length)}</b></div><div class="card stat"><span class="faint">This ${state.pacePeriod}</span><b style="font-size:22px">${pace.at(-1)}</b></div></div>
+    </section>
+    ${showSpend ? `<section class="card stack"><div class="spread"><h2>Spending by category</h2><div class="row"><button class="chip" type="button" data-spend="month" aria-pressed="${state.spendPeriod==="month"}">This month</button><button class="chip" type="button" data-spend="year" aria-pressed="${state.spendPeriod==="year"}">This year</button><button class="chip" type="button" data-spend="all" aria-pressed="${state.spendPeriod==="all"}">All time</button></div></div>
+      <p class="faint">6 items. Bar width stays inside the card. Green is sales, teal is purchases.</p>
+      ${[["Board Games","R$ 48","70"],["Books","R$ 12","28"],["Manga","R$ 18","40"],["Games","R$ 70","100"],["Comics","R$ 15","34"]].map(([name, amt, w]) => `<div><div class="spread"><b>${name}</b><span>${amt}</span></div><div class="barline"><i style="--w:${w}%"></i></div></div>`).join("")}
+    </section>` : ""}
+    <section class="card stack"><div class="spread"><span class="kicker">Calendar</span><span class="faint">March</span></div><div class="cal">${Array.from({length:28}, (_,i) => `<button type="button" class="${[2,6,11,18].includes(i)?"has":""}" data-day="${i+1}">${i+1}</button>`).join("")}</div><p class="faint">A marked day opens the log sheet.</p></section>
+  </div>`;
+}
+function viewActivity() {
+  return `<div class="stack"><h1 class="page-title">Activity</h1>
+    <div class="row pane-toggle"><button class="chip" type="button" data-pane="friends" aria-pressed="${state.pane==="friends"}">Friends</button><button class="chip" type="button" data-pane="numbers" aria-pressed="${state.pane==="numbers"}">Numbers</button></div>
+    <div class="activity is-${state.pane}">
+      <section class="stack friends"><div class="spread"><h2>Friends</h2><span class="pill">3 new this week</span></div>
+        ${[["@mina","rated","Past Lives","Movies · 2h"],["@leo","finished","Hades","Games · 1d"],["@mina","logged","Wingspan","Board Games · 3d"]].map(([who, verb, title, meta]) => `<button type="button" class="card spread" data-go="profile"><span><b style="color:var(--accent)">${who}</b> ${verb} <b>${title}</b><span class="faint" style="display:block">${meta}</span></span></button>`).join("")}
+      </section>
+      ${viewNumbers()}
+    </div></div>`;
+}
+function discoverCard(title, note, fromList) {
+  return `<button type="button" class="log" ${fromList ? `data-open-item="${state.discoverCat}"` : "data-toast=\"Outside the list. Opening it would search the catalog.\""}><span class="log-body"><span class="log-top"><h3>${title}</h3><span class="pill">${fromList ? "On your list" : "New to you"}</span></span><span class="faint">${note}</span></span></button>`;
+}
+function viewDiscover() {
+  const cat = state.discoverCat;
+  const count = DATA[cat].count;
+  const ready = count >= 10;
+  const short = CATS.filter(([id]) => DATA[id].count < 10).map(([id]) => catName(id));
+  const taste = TASTE[cat];
+  const planned = ready ? DATA[cat].logs.filter((r) => r.status === PLANNED[cat]) : [];
+  const statusLine = state.discoverStatus === "reading"
+    ? "Reading your logs, including every field on every record. This will be ready in a bit."
+    : `Saved on your profile ${state.discoverAt}. A return visit does not call the model again.`;
+  return `<div class="stack">
+    <div class="spread"><div><h1 class="page-title">Discover</h1><p class="lede">What to consume next, from the logs you already have and from titles you have not logged.</p></div>
+      <button class="btn" type="button" id="refresh-discover" ${state.discoverLocked || state.discoverStatus==="reading" ? "disabled" : ""}>${state.discoverLocked ? "Available tomorrow" : state.discoverStatus==="reading" ? "Reading…" : "Refresh"}</button></div>
+    <div class="card stack"><p>${statusLine}</p><p class="faint">Once a day. Gemini Flash, on the Google AI Studio free tier, reads the library in one call and returns JSON. ${short.join(", ")} ${short.length === 1 ? "needs" : "need"} 10 logs before ${short.length === 1 ? "it is" : "they are"} included.</p></div>
+    <div class="chips">${CATS.map(([id, label]) => `<button type="button" class="chip" data-discover="${id}" aria-pressed="${id===cat}">${label} · ${DATA[id].count}</button>`).join("")}</div>
+    ${ready ? `<div class="discover-grid">
+      <section class="card stack"><span class="kicker">Your taste · ${catName(cat)}</span><p class="page-title" style="font-size:28px">${taste.mean}</p>${taste.lines.map((line) => `<p>${line}</p>`).join("")}</section>
+      <div class="stack">
+        <section class="stack"><h2>From your list</h2>${planned.length ? planned.map((row) => discoverCard(row.title, `${row.status}. ${row.facts.join(" · ")}`, true)).join("") : `<p class="faint">Nothing in this category is still planned. The suggestions below step outside the list.</p>`}</section>
+        <section class="stack"><h2>Outside your list</h2>${taste.beyond.map(([title, note]) => discoverCard(title, note, false)).join("")}</section>
+      </div>
+    </div>` : `<div class="card stack"><h2>${catName(cat)} needs more logs</h2><p>Discover reads a category once it has 10 items. This one has ${count}.</p><button class="btn" type="button" data-see="${cat}">Add some in the library</button></div>`}
+  </div>`;
+}
+function findRow(cat) {
+  return DATA[cat].logs.find((r) => r.title === state.itemTitle) || DATA[cat].logs[0];
+}
+function viewItem() {
+  const cat = shownCat();
+  const pack = DATA[cat];
+  const row = findRow(cat);
+  const marketName = MARKET[cat];
+  const tab = state.itemTab;
+  return `<div class="stack">
+    <button class="btn ghost small" type="button" data-go="${state.from === "search" ? "search" : "dashboard"}" style="align-self:flex-start">Back</button>
+    <div class="item-grid"><div class="stack">
+      <div class="hero">${cover(row.title, row.bg)}<div class="stack"><span class="kicker">${catName(cat)}</span><h1 class="page-title">${row.title}</h1><p class="muted">${row.year}</p>${stars(row.rating || 4)}<span class="pill">${pack.score}</span><div class="row"><button class="btn" type="button" data-log data-focus="${esc(row.title)}">Log this</button>${cat === "boardgames" ? `<button class="btn ghost" type="button" data-log-match data-focus="${esc(row.title)}">Log a match</button>` : ""}</div></div></div>
+      <div class="tabs">
+        <button type="button" data-tab="review" aria-pressed="${tab==="review"}">Review</button>
+        ${cat==="boardgames" ? `<button type="button" data-tab="matches" aria-pressed="${tab==="matches"}">Matches</button>` : ""}
+        ${marketName ? `<button type="button" data-tab="market" aria-pressed="${tab==="market"}">For sale</button>` : ""}
+      </div>
+      ${tab==="review" ? `<div class="card stack"><p class="muted">${row.blurb || "Catalog description."}</p><div class="row">${pack.facts.map(([k,v]) => `<span class="pill"><b>${k}</b> ${v}</span>`).join("")}</div></div>` : ""}
+      ${tab==="matches" ? matchesTab(row) : ""}
+      ${tab==="market" ? `<div class="card stack"><div class="spread"><h2>For sale</h2><button class="btn ghost small" type="button" data-market-go="${marketName}">All listings</button></div><p class="faint">Listings for this title. Games are not on the market.</p><button type="button" class="listing" data-go="listing" style="background:none;border:0;padding:0">${cover(row.title, row.bg)}<span><b>${row.title}</b><span class="faint" style="display:block">São Paulo · Like new</span></span><span class="price">R$ 48</span></button></div>` : ""}
+    </div>
+    <div class="stack"><h2>Reviews</h2><label class="field"><span>Sort reviews</span><select><option>Recent</option><option>Oldest</option><option>Most liked</option></select></label><article class="card stack"><div class="spread"><b>@mina</b><span class="pill">${row.status}</span></div>${stars(row.rating || 4)}<p>${row.blurb || "Short review."}</p></article></div>
+  </div></div>`;
+}
+function viewSearch() {
+  const cat = shownCat();
+  const sorts = cat === "games"
+    ? ["Relevance","Title A–Z","Newest release","Highest rating"]
+    : ["Relevance","Title A–Z","Newest first","Highest score"];
+  return `<div class="stack"><button class="btn ghost small" type="button" data-go="dashboard" style="align-self:flex-start">Library</button><h1 class="page-title">Search</h1>${catChips(cat)}
+    <label class="field"><span>Find a title</span><input type="text" value="${DATA[cat].logs[0].title}" /></label>
+    <label class="field"><span>Sort by</span><select>${sorts.map((s) => `<option>${s}</option>`).join("")}</select></label>
+    ${cat==="boardgames" ? `<div class="row"><span class="faint">Catalog</span><button class="chip" type="button" aria-pressed="true">BoardGameGeek</button><button class="chip" type="button">Ludopedia</button></div>` : ""}
+    <div class="logs list">${DATA[cat].logs.map((row) => logCard(row, cat)).join("")}</div></div>`;
+}
+function shellNav(items) {
+  const here = currentPlace();
+  return `<a class="brand" href="#" data-go="dashboard"><img src="${ASSET}/logo.svg" alt="" /><b>Geeklogs</b></a>` +
+    items.map(([id, label]) => `<button type="button" class="navbtn" data-go="${id}" ${here===id?'aria-current="page"':""}>${ICONS[id]||""}${label}</button>`).join("");
+}
+function authCard(title, body, footer) {
+  return `<div class="auth-wrap"><a class="brand" href="#" data-go="landing" style="flex-direction:row"><img src="${ASSET}/logo.svg" alt="" /><b style="font-size:22px">Geeklogs</b></a><div class="card stack"><h1 class="page-title" style="font-size:32px">${title}</h1>${body}</div><p class="muted">${footer}</p></div>`;
+}
+const VIEWS = {
+  landing() {
+    return `<div class="landing">${state.cookie ? `<div class="card spread"><p class="faint" style="margin:0">Cookies and local storage keep you signed in and remember preferences.</p><button class="btn small" type="button" id="cookie-ok">OK</button></div>` : ""}
+      <div class="stack"><div class="row"><img src="${ASSET}/logo.svg" alt="" width="48" height="48" /><h1 class="page-title" style="font-size:56px">Geeklogs</h1></div>
+        <p class="page-title" style="font-size:28px;max-width:16ch">One place for every title you care about.</p>
+        <div class="row"><button class="btn" type="button" data-go="register">Create your account</button><button class="btn ghost" type="button" data-go="login">Log in</button></div></div>
+      <div class="shots"><img src="${ASSET}/app-home.jpeg" alt="The home screen" /><img src="${ASSET}/app-statistics.jpeg" alt="The statistics screen" /></div>
+    </div>`;
+  },
+  login() { return authCard("Log in", `<label class="field"><span>Email</span><input type="email" value="you@example.com" /></label><label class="field"><span>Password</span><input type="password" value="password" /></label><button class="btn" type="button" data-go="dashboard">Log in</button><button class="textlink" type="button" data-go="forgot" style="color:var(--accent)">Forgot password</button>`, `New here? <button class="textlink" type="button" data-go="register" style="color:var(--accent)">Register</button>`); },
+  register() { return authCard("Create your account", `<label class="field"><span>Name</span><input value="Alex" /></label><label class="field"><span>Email</span><input type="email" value="you@example.com" /></label><label class="field"><span>Password</span><input type="password" value="password" /></label><button class="btn" type="button" data-go="onboarding">Create account</button>`, ""); },
+  forgot() { return authCard("Forgot password", `<label class="field"><span>Email</span><input type="email" value="you@example.com" /></label><button class="btn" type="button" data-go="reset">Send link</button>`, ""); },
+  reset() { return authCard("Choose a new password", `<label class="field"><span>New password</span><input type="password" /></label><label class="field"><span>Confirm</span><input type="password" /></label><button class="btn" type="button" data-go="login">Update password</button>`, ""); },
+  onboarding() {
+    const steps = [
+      `<h2 class="page-title" style="font-size:28px">Language</h2><div class="row"><button class="chip" type="button" aria-pressed="true">English</button><button class="chip" type="button">Português</button></div>`,
+      `<h2 class="page-title" style="font-size:28px">Theme</h2><div class="row"><button class="chip" type="button" id="ob-light" aria-pressed="${state.theme==="light"}">Light</button><button class="chip" type="button" id="ob-dark" aria-pressed="${state.theme==="dark"}">Dark</button></div>`,
+      `<h2 class="page-title" style="font-size:28px">Categories</h2><div class="row">${CATS.map(([,l]) => `<button class="chip" type="button" aria-pressed="true">${l}</button>`).join("")}</div>`,
+      `<h2 class="page-title" style="font-size:28px">Board games</h2><div class="row"><button class="chip" type="button" aria-pressed="true">BoardGameGeek</button><button class="chip" type="button">Ludopedia</button></div>`,
+      `<h2 class="page-title" style="font-size:28px">Anime and manga titles</h2><div class="row"><button class="chip" type="button" aria-pressed="true">English</button><button class="chip" type="button">Romaji</button><button class="chip" type="button">Native</button></div>`,
+    ];
+    return `<div class="auth-wrap"><span class="kicker">Step ${state.step+1} of ${steps.length}</span>${steps[state.step]}<div class="row"><button class="btn ghost" type="button" id="ob-back" ${state.step===0?"disabled":""}>Back</button><button class="btn" type="button" id="ob-next">${state.step===steps.length-1?"Finish":"Continue"}</button></div></div>`;
+  },
+  dashboard() { return state.lib === "logs" ? viewLogs() : viewShelves(); },
+  discover: viewDiscover,
+  statistics: viewActivity,
+  search: viewSearch,
+  item: viewItem,
+  market() {
+    const rows = [["Wingspan","Board Games","R$ 48"],["Piranesi","Books","R$ 12"],["Berserk vol. 1","Manga","R$ 18"],["Saga vol. 1","Comics","R$ 15"]];
+    const shown = rows.filter((r) => state.market === "all" || r[1] === state.market);
+    return `<div class="stack"><div class="spread"><h1 class="page-title">Market</h1><button class="btn small" type="button" data-go="mine">My listings</button></div>
+      <div class="row">${[["all","All"],["Board Games","Board Games"],["Books","Books"],["Manga","Manga"],["Comics","Comics"]].map(([id,label]) => `<button class="chip" type="button" data-market="${id}" aria-pressed="${state.market===id}">${label}</button>`).join("")}</div>
+      <label class="field"><span>City</span><input value="São Paulo" /></label>
+      <div class="market-grid">${shown.map((r) => `<button type="button" class="card listing" data-go="listing">${cover(r[0], BEYOND_BG)}<span><b>${r[0]}</b><span class="faint" style="display:block">${r[1]}</span></span><span class="price">${r[2]}</span></button>`).join("")}</div></div>`;
+  },
+  listing() { return `<div class="stack"><button class="btn ghost small" type="button" data-go="market">Back</button><h1 class="page-title">Wingspan</h1><p class="price">R$ 48</p><div class="card stack"><p>Complete copy, sleeved. Pickup in São Paulo.</p><div class="row"><button class="btn" type="button" data-toast="WhatsApp is not opened">WhatsApp</button><button class="btn ghost" type="button" data-toast="Mail is not opened">Email</button></div></div></div>`; },
+  mine() { return `<div class="stack"><h1 class="page-title">My listings</h1><article class="card">Azul · Board Games · R$ 30 · Active</article></div>`; },
+  profile() { return `<div class="stack"><h1 class="page-title">@mina</h1><p class="faint">235 logs · the saved Discover result can live on this profile</p><button class="btn small" type="button" data-go="store">Store</button></div>`; },
+  store() { return `<div class="stack"><button class="btn ghost small" type="button" data-go="profile">@mina</button><h1 class="page-title">Store</h1><button class="card" type="button" data-go="listing">Wingspan · R$ 48</button></div>`; },
+  settings() {
+    const row = (title, desc) => `<div class="set-row"><div><b>${title}</b><div class="faint">${desc}</div></div><button type="button" class="switch" aria-pressed="true" data-switch><i></i></button></div>`;
+    return `<div class="stack" style="max-width:720px"><h1 class="page-title">You</h1>
+      <div class="you">${[["profile","Public profile"],["plans","Plans"],["about","About"],["faq","FAQ"],["privacy","Privacy"],["terms","Terms"]].map(([id,label]) => `<button type="button" class="card" data-go="${id}"><b>${label}</b></button>`).join("")}</div>
+      <section class="card">${row("Show public profile","Anyone with the link can view it")}${row("Show log count","Visible on the profile")}${row("Show reviews","Reviews appear on the profile")}</section>
+      <section class="card stack"><label class="field"><span>Language</span><select><option>English</option><option>Português</option></select></label>
+        <div class="row"><span>Theme</span><button class="chip" type="button" id="set-light" aria-pressed="${state.theme==="light"}">Light</button><button class="chip" type="button" id="set-dark" aria-pressed="${state.theme==="dark"}">Dark</button></div>
+        <label class="field"><span>Board game catalog</span><select><option>BoardGameGeek</option><option>Ludopedia</option></select></label>
+        <label class="field"><span>Anime and manga titles</span><select><option>English</option><option>Romaji</option><option>Native</option></select></label>
+        ${row("Monthly recap email","A recap of what you finished")}
+      </section>
+      <button class="btn danger" type="button" data-toast="Delete account is not performed">Delete account</button></div>`;
+  },
+  plans() { return `<div class="stack"><h1 class="page-title">Plans</h1><p class="lede">Everyone gets the full app. Pro is unlimited logs, because server space is limited.</p><div class="plans"><article class="card stack"><span class="kicker">Free</span><p class="page-title" style="font-size:32px">$0</p><p>Up to 500 logs. Statistics, export, calendar, and recap are included.</p></article><article class="card stack" style="outline:2px solid var(--accent)"><span class="kicker">Pro</span><p class="page-title" style="font-size:32px">$5<span class="faint">/month</span></p><p>Unlimited logs. R$ 20/mês or $50/year.</p><button class="btn" type="button" data-toast="Checkout is not started">Upgrade</button></article></div></div>`; },
+  about() {
+    const team = [["ceo.jpeg","Felipe Cunha","CEO"],["dev.jpeg","Fe Costa","Developer"],["designer.jpeg","Lipe Cunha","Designer"],["qa.jpeg","Lina","Quality Assurance"]];
+    return `<div class="stack">
+      <h1 class="page-title">About</h1>
+      <section class="card"><span class="kicker">Help and legal</span><div class="row" style="margin-top:8px"><button class="btn ghost small" type="button" data-go="faq">FAQ</button><button class="btn ghost small" type="button" data-go="privacy">Privacy policy</button><button class="btn ghost small" type="button" data-go="terms">Terms of service</button></div></section>
+      <section class="stack"><h2>Team</h2><div class="team">${team.map(([file, name, role]) => `<article class="card"><img src="${ASSET}/${file}" alt="${name}" /><div><b>${name}</b><div class="faint">${role}</div></div></article>`).join("")}</div></section>
+      <div class="about-split">
+        <section class="card stack"><h2>About the project</h2><p>Geeklogs is a single place to log movies, TV, board games, video games, books, anime, manga, and comics. Look up titles from well-known catalogs, track status and progress, save reviews and grades, and explore your history through stats, a calendar, spending summaries when you choose to track them, and board-game play sessions. Add custom rows when something is not in the catalog, follow friends' activity, and use optional API keys for faster search. Every plan includes the full app; Pro is for unlimited logs because server space is limited.</p><p class="faint">The service runs on modest hosting; the first request after idle can take a few seconds while things wake up.</p></section>
+        <section class="card stack"><h2>Support the project</h2><p>If Geeklogs is useful to you, you can support its development with a one-time donation or recurring support.</p><div class="row"><a class="btn" href="https://ko-fi.com/felipecunha23777">Ko-fi</a><button class="btn ghost" type="button" data-toast="GitHub Sponsors opens from the live page when the URL is set">GitHub Sponsors</button></div><h3>Pix (Brazil)</h3><p class="faint">Scan the QR code with your banking app.</p><img src="${ASSET}/qrcode.png" alt="Pix donation QR code" style="width:192px;height:192px;object-fit:contain;background:#fff;border-radius:12px" /><p>Pix key (e-mail): <b>felipecunha04@icloud.com</b></p></section>
+      </div>
+      <section class="card stack"><h2>Feedback</h2><p>Rate the website and leave a comment.</p><label class="field"><span>Rate the website (1–10)</span><select>${Array.from({length:10},(_,i)=>`<option ${i===9?"selected":""}>${i+1}</option>`).join("")}</select></label><label class="field"><span>Comments</span><textarea placeholder="Comments (optional)"></textarea></label><button class="btn" type="button" data-toast="Feedback is not sent. The live page waits an hour before another one.">Send feedback</button></section>
+    </div>`;
+  },
+  faq() { return `<div class="prose"><h1 class="page-title">FAQ</h1><details open><summary>What can I log?</summary><p>Movies, TV, board games, video games, books, anime, manga, and comics. Each category keeps its own status and progress fields.</p></details><details open><summary>Who can see my logs?</summary><p>You choose that in You. The public profile can hide the log count and reviews.</p></details></div>`; },
+  privacy() { return `<div class="prose"><h1 class="page-title">Privacy</h1><p>Sample copy in the same place as the live policy. It is not the legal text.</p></div>`; },
+  terms() { return `<div class="prose"><h1 class="page-title">Terms</h1><p>Sample copy in the same place as the live terms. It is not the legal text.</p></div>`; },
+};
+function recapBody() {
+  return `<div class="stack"><p class="faint">Pick a category and a timeframe. The live recap is a full-screen collage of covers.</p>
+    <label class="field"><span>Category</span><select><option>All my media</option>${CATS.map(([,l]) => `<option>${l}</option>`).join("")}</select></label>
+    <label class="field"><span>Status</span><select><option>All statuses</option><option>Completed</option><option>Planned</option></select></label>
+    <label class="field"><span>Timeframe</span><select><option>Last week</option><option>Last month</option><option>Last year</option></select></label>
+    <button class="btn" type="button" data-toast="The collage is the live recap, not drawn here">See my recap</button></div>`;
+}
+function draw() {
+  const plain = ["landing","login","register","forgot","reset","onboarding"].includes(state.screen);
+  document.documentElement.dataset.theme = state.theme;
+  document.documentElement.dataset.frame = state.frame;
+  document.documentElement.dataset.shell = plain ? "plain" : "app";
+  document.documentElement.dataset.screen = state.screen;
+  const nav = state.authed ? APP_NAV : GUEST_NAV;
+  const dock = state.authed ? APP_NAV : [["search","Search"],["dashboard","Library"],["plans","Plans"],["login","Log in"],["register","Register"]];
+  document.getElementById("sidebar").innerHTML = shellNav(nav);
+  document.getElementById("dock").innerHTML = dock.map(([id, label]) => `<a href="#" data-go="${id}" ${currentPlace()===id?'aria-current="page"':""}>${ICONS[id]||""}<span>${label}</span></a>`).join("");
+  document.getElementById("main").innerHTML = VIEWS[state.screen]();
+  document.getElementById("phone-screen").textContent = SCREENS.find((s) => s[0] === state.screen)[1];
+  document.getElementById("search-quick").hidden = plain || state.screen === "search" || !state.authed;
+  document.getElementById("jump").value = state.screen;
+  document.getElementById("theme-btn").textContent = state.theme === "dark" ? "Dark" : "Light";
+  document.getElementById("frame-btn").textContent = state.frame === "desktop" ? "Desktop" : "Phone";
+  document.getElementById("state-line").textContent = `${SCREENS.find((s) => s[0] === state.screen)[1]} · ${catName(state.cat) || "All"} · ${state.theme} · ${state.frame}`;
+  document.getElementById("sheet").classList.toggle("on", !!state.sheet);
+  document.getElementById("sheet-title").textContent = state.sheet === "match" ? "Log a match" : (state.focus ? state.focus : "Log");
+  if (state.sheet) {
+    const cat = state.cat === "all" ? "movies" : shownCat();
+    document.getElementById("sheet-body").innerHTML = state.sheet === "recap" ? recapBody() : state.sheet === "match" ? matchSheet() : formFields(cat);
+  }
+  document.getElementById("drawer").classList.toggle("on", state.drawer);
+  if (state.drawer) document.getElementById("drawer-body").innerHTML = drawerBody();
+}
+document.getElementById("jump").innerHTML = SCREENS.map(([id, label]) => `<option value="${id}">${label}</option>`).join("");
+document.body.addEventListener("click", (e) => {
+  syncDraft();
+  const t = e.target.closest("[data-go],[data-cat],[data-layout],[data-lib],[data-pane],[data-see],[data-market],[data-market-go],[data-log-match],[data-log],[data-open-item],[data-toast],[data-switch],[data-day],[data-rate],[data-own],[data-add-match],[data-add-player],[data-remove-player],[data-winner],[data-pick-date],[data-open-match],[data-delete-match],[data-confirm-delete],[data-cancel-delete],[data-save-match],[data-save-banner],[data-tab],[data-pace],[data-period],[data-spend],[data-discover],[data-player],[data-clear],#theme-btn,#frame-btn,#sheet-close,#save-log,#open-filters,#drawer-close,#apply-filters,#clear-filters,#open-recap,#refresh-discover,#ob-next,#ob-back,#ob-light,#ob-dark,#set-light,#set-dark,#cookie-ok");
+  if (!t) return;
+  if (t.id === "sheet-close") { state.sheet = false; draw(); return; }
+  if (t.id === "drawer-close") { state.drawer = false; draw(); return; }
+  if (t.id === "open-filters") { state.drawer = true; if (state.cat === "all") state.cat = "movies"; draw(); return; }
+  if (t.id === "apply-filters") { state.lib = "logs"; state.drawer = false; draw(); return; }
+  if (t.id === "clear-filters") { state.filters = { status:"", sort:"dateDesc", genre:"", collection:"", players:[] }; draw(); return; }
+  if (t.id === "open-recap") { state.sheet = "recap"; state.focus = "Your recap"; draw(); return; }
+  if (t.id === "refresh-discover") {
+    state.discoverStatus = "reading"; draw();
+    clearTimeout(window._discoverTimer);
+    window._discoverTimer = setTimeout(() => { state.discoverStatus = "saved"; state.discoverLocked = true; state.discoverAt = "just now"; draw(); }, 1400);
+    return;
+  }
+  if (t.dataset.logMatch !== undefined) {
+    const card = t.closest("[data-open-item]");
+    if (card?.dataset.openItem) state.cat = card.dataset.openItem;
+    const title = t.dataset.focus || card?.querySelector("h3")?.textContent || state.itemTitle;
+    state.itemTitle = title;
+    state.focus = title;
+    const cat = state.cat === "all" ? "movies" : shownCat();
+    const row = (DATA[cat]?.logs || []).find((r) => r.title === title);
+    boardBundle(title, row);
+    state.sheet = "match";
+    draw();
+    return;
+  }
+  if (t.dataset.log !== undefined) {
+    const card = t.closest("[data-open-item]");
+    if (card?.dataset.openItem) state.cat = card.dataset.openItem;
+    state.focus = t.dataset.focus || card?.querySelector("h3")?.textContent || "Log";
+    const cat = state.cat === "all" ? "movies" : shownCat();
+    const row = (DATA[cat]?.logs || []).find((r) => r.title === state.focus);
+    state.log = blankLog(cat, row);
+    state.sheet = true; draw(); return;
+  }
+  if (t.dataset.go) { e.preventDefault(); go(t.dataset.go); return; }
+  if (t.dataset.see) { state.cat = t.dataset.see; state.lib = "logs"; state.screen = "dashboard"; state.filters.status = ""; draw(); return; }
+  if (t.dataset.marketGo) { state.market = t.dataset.marketGo; go("market"); return; }
+  if (t.dataset.cat) { state.cat = t.dataset.cat; state.filters = { ...state.filters, status:"", genre:"", collection:"", players:[] }; draw(); return; }
+  if (t.dataset.layout) { state.layout = t.dataset.layout; draw(); return; }
+  if (t.dataset.lib) { state.lib = t.dataset.lib; draw(); return; }
+  if (t.dataset.pane) { state.pane = t.dataset.pane; draw(); return; }
+  if (t.dataset.market) { state.market = t.dataset.market; draw(); return; }
+  if (t.dataset.discover) { state.discoverCat = t.dataset.discover; draw(); return; }
+  if (t.dataset.tab) { state.itemTab = t.dataset.tab; draw(); return; }
+  if (t.dataset.pace) { state.paceMode = t.dataset.pace; draw(); return; }
+  if (t.dataset.period) { state.pacePeriod = t.dataset.period; draw(); return; }
+  if (t.dataset.spend) { state.spendPeriod = t.dataset.spend; draw(); return; }
+  if (t.dataset.clear) { state.filters[t.dataset.clear] = ""; draw(); return; }
+  if (t.dataset.own && state.log) { state.log.own = t.dataset.own; draw(); return; }
+  if (t.dataset.rate !== undefined && state.log) { state.log.rating = Number(t.dataset.rate); draw(); return; }
+  if (t.dataset.addMatch !== undefined && state.log) {
+    const n = parseInt(state.log.matches || "0", 10);
+    state.log.matches = String((Number.isFinite(n) ? n : 0) + 1);
+    draw(); return;
+  }
+  if (t.dataset.addPlayer !== undefined) { state.boards[state.itemTitle].session.players.push({ name: "", score: "", winner: false, app: false }); draw(); return; }
+  if (t.dataset.removePlayer !== undefined) { state.boards[state.itemTitle].session.players.splice(Number(t.dataset.removePlayer), 1); draw(); return; }
+  if (t.dataset.winner !== undefined) { const p = state.boards[state.itemTitle].session.players[Number(t.dataset.winner)]; p.winner = !p.winner; draw(); return; }
+  if (t.dataset.pickDate !== undefined) { state.boards[state.itemTitle].session.pickDate = true; draw(); return; }
+  if (t.dataset.openMatch) { const m = state.boards[state.itemTitle].history.find((x) => x.id === t.dataset.openMatch); if (m) m.open = !m.open; draw(); return; }
+  if (t.dataset.deleteMatch) { state.boards[state.itemTitle].confirm = t.dataset.deleteMatch; draw(); return; }
+  if (t.dataset.cancelDelete !== undefined) { state.boards[state.itemTitle].confirm = ""; draw(); return; }
+  if (t.dataset.confirmDelete) {
+    const bundle = state.boards[state.itemTitle];
+    bundle.history = bundle.history.filter((m) => m.id !== t.dataset.confirmDelete);
+    bundle.count = Math.max(0, bundle.count - 1);
+    bundle.confirm = "";
+    if (state.log && state.focus === state.itemTitle) state.log.matches = String(bundle.count);
+    toast("Match removed"); draw(); return;
+  }
+  if (t.dataset.saveMatch !== undefined) { saveMatch(false); return; }
+  if (t.dataset.saveBanner !== undefined) { saveMatch(true); return; }
+  if (t.dataset.player) { const n = t.dataset.player; state.filters.players = state.filters.players.includes(n) ? state.filters.players.filter((p) => p !== n) : [...state.filters.players, n]; draw(); return; }
+  if (t.dataset.day) {
+    const cat = state.cat === "all" ? "movies" : shownCat();
+    state.focus = `March ${t.dataset.day}`;
+    state.log = blankLog(cat);
+    state.sheet = true; draw(); return;
+  }
+  if (t.dataset.switch !== undefined || t.classList.contains("switch")) { const btn = t.classList.contains("switch") ? t : t.closest(".switch"); btn.setAttribute("aria-pressed", btn.getAttribute("aria-pressed")==="true"?"false":"true"); return; }
+  if (t.dataset.toast) toast(t.dataset.toast);
+  if (t.id === "theme-btn") { state.theme = state.theme === "dark" ? "light" : "dark"; draw(); }
+  if (t.id === "frame-btn") { state.frame = state.frame === "desktop" ? "phone" : "desktop"; draw(); }
+  if (t.id === "save-log") toast("Nothing was saved.");
+  if (t.id === "cookie-ok") { state.cookie = false; draw(); }
+  if (t.id === "ob-light" || t.id === "set-light") { state.theme = "light"; draw(); }
+  if (t.id === "ob-dark" || t.id === "set-dark") { state.theme = "dark"; draw(); }
+  if (t.id === "ob-back") { state.step = Math.max(0, state.step - 1); draw(); }
+  if (t.id === "ob-next") { if (state.step >= 4) go("dashboard"); else { state.step += 1; draw(); } }
+  if (t.closest("[data-open-item]")) {
+    const card = t.closest("[data-open-item]");
+    if (card.dataset.openItem) state.cat = card.dataset.openItem;
+    state.itemTitle = card.querySelector("h3")?.textContent || "";
+    state.itemTab = "review";
+    go("item");
+  }
+});
+document.body.addEventListener("change", (e) => {
+  const prevStatus = state.log?.status;
+  syncDraft();
+  const t = e.target;
+  const cat = state.cat === "all" ? "movies" : shownCat();
+  if (state.log && state.sheet === true && t.dataset.logField === "status") {
+    applyStatusEffects(state.log.status, prevStatus, state.log, cat);
+    draw(); return;
+  }
+  if (state.log && state.sheet === true && (t.dataset.logField === "season" || t.dataset.logField === "episode")) {
+    if (t.dataset.logField === "season") clampEpisode(state.log);
+    if ((cat === "tv" || cat === "anime") && COMPLETED.has(state.log.status)) state.log.status = "Watching";
+    draw(); return;
+  }
+  if (t.hasAttribute("data-filter-cat")) { state.cat = t.value; state.filters = { ...state.filters, status:"", genre:"", collection:"", players:[] }; draw(); }
+  if (t.dataset.filter) { state.filters[t.dataset.filter] = t.value; draw(); }
+  if (t.dataset.hof) { state.hofPeriod = t.value; draw(); }
+});
+document.getElementById("jump").addEventListener("change", (e) => go(e.target.value));
+document.getElementById("drawer").addEventListener("click", (e) => { if (e.target.id === "drawer") { state.drawer = false; draw(); } });
+document.getElementById("sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") { state.sheet = false; draw(); } });
+draw();
+</script>
+</body>
+</html>

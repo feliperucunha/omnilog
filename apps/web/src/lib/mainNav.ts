@@ -1,7 +1,10 @@
 export function navItemIsActive(to: string, pathname: string): boolean {
   const pathOnly = to.split("?")[0] || "/";
   if (pathOnly === "/") return pathname === "/" || pathname === "/search";
-  return pathname === pathOnly;
+  if (pathOnly === "/market") {
+    return pathname === "/market" || pathname.startsWith("/market/") || pathname === "/my-listings";
+  }
+  return pathname === pathOnly || pathname.startsWith(`${pathOnly}/`);
 }
 
 export function isItemDetailPath(pathname: string): boolean {
@@ -11,6 +14,7 @@ export function isItemDetailPath(pathname: string): boolean {
 export function getMainNavTransitionKey(pathname: string): string {
   if (pathname === "/" || pathname === "/search") return "nav-search";
   if (pathname.startsWith("/dashboard")) return "nav-dashboard";
+  if (pathname.startsWith("/discover")) return "nav-discover";
   if (pathname.startsWith("/statistics")) return "nav-statistics";
   if (pathname.startsWith("/market/listing/")) return "nav-market-listing";
   if (pathname.startsWith("/market")) return "nav-market";

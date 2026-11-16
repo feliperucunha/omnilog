@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-frame="desktop" data-shell="app">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prototype — Reskin — Geeklogs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,650&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* PROTOTYPE, throwaway. Visual language v1 — Restructure reuses these tokens.
+     Light: warm paper, ink, teal accent. Dark: olive black, same accent family.
+     Display: Fraunces. UI: Outfit. Solid buttons, 12px cards, 2:3 covers. */
+  :root {
+    --bg: #f3efe7;
+    --sunken: #e8e2d6;
+    --surface: #fffcf8;
+    --surface-2: #f6f1e8;
+    --ink: #1c1915;
+    --muted: #6b645b;
+    --faint: #8a8176;
+    --line: #e3dace;
+    --accent: #0e6e6b;
+    --accent-ink: #f3fffe;
+    --star: #a8641a;
+    --danger: #9d342c;
+    --shadow: 0 1px 2px rgba(40, 32, 18, 0.05);
+    --display: "Fraunces", "Iowan Old Style", Georgia, serif;
+    --font: "Outfit", system-ui, sans-serif;
+    --sidebar: 232px;
+    --radius: 14px;
+    color-scheme: light;
+  }
+  [data-theme="dark"] {
+    --bg: #10120f;
+    --sunken: #0c0e0b;
+    --surface: #1a1d18;
+    --surface-2: #23271f;
+    --ink: #f4f0e8;
+    --muted: #b3acA1;
+    --faint: #8e877c;
+    --line: #31362d;
+    --accent: #7ee8df;
+    --accent-ink: #06211f;
+    --star: #f0b429;
+    --danger: #ff9a92;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--font);
+    background: var(--sunken);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  h1, h2, h3, p { margin: 0; }
+  img { max-width: 100%; }
+
+  .proto {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 8px 12px;
+    background: #1c1915; color: #f4f0e8;
+    font-size: 12px;
+  }
+  .proto strong { font-weight: 650; letter-spacing: 0.02em; }
+  .proto .sp { flex: 1; min-width: 8px; }
+  .proto button, .proto select {
+    background: #2a2622; color: #f4f0e8; border: 1px solid #4a433b;
+    border-radius: 8px; padding: 6px 8px; min-height: 32px;
+  }
+  .proto .state { color: #c9c0b4; }
+
+  .stage { min-height: calc(100vh - 48px); }
+  .app { position: relative; min-height: calc(100vh - 48px); background: var(--bg); }
+  [data-frame="desktop"][data-shell="app"] .app {
+    display: grid;
+    grid-template-columns: var(--sidebar) minmax(0, 1fr);
+  }
+  [data-frame="desktop"][data-shell="app"] .sidebar { grid-column: 1; grid-row: 1; }
+  [data-frame="desktop"][data-shell="app"] .column { grid-column: 2; grid-row: 1; min-width: 0; }
+  [data-frame="phone"] .stage {
+    width: 390px;
+    height: min(820px, calc(100vh - 64px));
+    margin: 12px auto 24px;
+    border: 8px solid #1c1915;
+    border-radius: 32px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0,0,0,.28);
+    background: var(--bg);
+  }
+  [data-frame="phone"] .app { position: relative; height: 100%; display: flex; flex-direction: column; min-height: 0; }
+  [data-frame="phone"] .column { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  [data-frame="phone"] .content { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; }
+  [data-frame="desktop"] .phone-head, [data-frame="desktop"] .dock { display: none; }
+  [data-frame="phone"] .sidebar { display: none; }
+  [data-shell="plain"] .sidebar, [data-shell="plain"] .dock, [data-shell="plain"] .phone-head { display: none !important; }
+  [data-shell="plain"][data-frame="desktop"] .app { display: block; }
+  [data-frame="phone"][data-shell="app"] .content { padding-bottom: 84px; }
+
+  .sidebar {
+    position: sticky; top: 48px; height: calc(100vh - 48px);
+    background: var(--surface); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; padding: 16px 12px; gap: 4px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 8px 14px; text-decoration: none; color: inherit;
+  }
+  .mark {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: var(--accent); color: var(--accent-ink);
+    display: grid; place-items: center; font-family: var(--display); font-weight: 650;
+  }
+  .brand b { font-family: var(--display); font-size: 22px; font-weight: 650; letter-spacing: -0.03em; }
+  .navbtn, .dock a, .textlink {
+    background: none; border: 0; text-align: left; color: var(--ink); text-decoration: none;
+  }
+  .navbtn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 10px; min-height: 44px; color: var(--muted); font-weight: 550;
+  }
+  .navbtn[aria-current="page"], .dock a[aria-current="page"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); }
+  .navbtn svg, .dock svg { flex: none; }
+
+  .phone-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px 8px; background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .phone-head b { font-family: var(--display); font-size: 20px; }
+
+  .content { padding: 22px 28px 48px; }
+  [data-frame="phone"] .content { padding: 14px 14px 24px; }
+  .view { display: none; }
+  .view.on { display: block; }
+
+  .page-title { font-family: var(--display); font-size: 34px; font-weight: 560; letter-spacing: -0.03em; line-height: 1.1; }
+  [data-frame="phone"] .page-title { font-size: 28px; }
+  .lede { color: var(--muted); max-width: 46rem; }
+  .kicker { font-size: 12px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .spread { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 16px;
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid transparent;
+    background: var(--accent); color: var(--accent-ink); font-weight: 600;
+  }
+  .btn.ghost { background: transparent; border-color: var(--line); color: var(--ink); }
+  .btn.small { min-height: 36px; padding: 0 12px; font-size: 13px; }
+  .btn.danger { background: transparent; color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
+  .chips { display: flex; gap: 6px; overflow: auto; padding-bottom: 2px; }
+  .chip {
+    flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+    border-radius: 999px; padding: 8px 12px; min-height: 36px; font-weight: 550; font-size: 13px;
+  }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field span { font-size: 13px; font-weight: 600; }
+  input[type="text"], input[type="email"], input[type="password"], input[type="number"], select, textarea {
+    width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; min-height: 44px;
+  }
+  .row > select { width: auto; min-width: 9rem; flex: none; }
+  .row > .btn { flex: none; }
+  textarea { min-height: 96px; resize: vertical; }
+  .muted { color: var(--muted); }
+  .faint { color: var(--faint); font-size: 13px; }
+
+  .cover {
+    border-radius: 10px; display: grid; place-items: end start; padding: 8px;
+    color: white; font-family: var(--display); font-weight: 650; letter-spacing: -0.03em;
+    text-shadow: 0 1px 2px rgba(0,0,0,.35); background-size: cover;
+  }
+  .logs { display: flex; flex-direction: column; gap: 8px; }
+  .logs.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 12px; }
+  .log {
+    display: flex; gap: 12px; text-align: left; width: 100%;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 10px; box-shadow: var(--shadow); color: inherit;
+  }
+  .logs.list .cover { width: 64px; height: 96px; flex: none; font-size: 14px; }
+  .logs.grid .log { flex-direction: column; }
+  .logs.grid .cover { width: 100%; aspect-ratio: 2/3; height: auto; font-size: 22px; }
+  .log-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .log-top { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; }
+  .log-top h3 { font-size: 16px; font-weight: 620; letter-spacing: -0.02em; }
+  .pill {
+    flex: none; font-size: 11px; font-weight: 650; letter-spacing: 0.02em;
+    border-radius: 999px; padding: 3px 8px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .stars { color: var(--star); letter-spacing: 1px; font-size: 13px; }
+  .stars b { color: var(--ink); letter-spacing: 0; font-weight: 620; margin-left: 4px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .facts span, .meta-grid div {
+    font-size: 12px; color: var(--muted); background: var(--surface-2);
+    border-radius: 999px; padding: 3px 8px;
+  }
+  .snippet { font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  .hero {
+    display: grid; grid-template-columns: 148px 1fr; gap: 18px; align-items: end;
+  }
+  [data-frame="phone"] .hero { grid-template-columns: 104px 1fr; gap: 12px; }
+  .hero .cover { width: 100%; aspect-ratio: 2/3; font-size: 28px; border-radius: 12px; }
+  .meta-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .meta-grid div { border-radius: 8px; }
+
+  .dock {
+    position: absolute; left: 10px; right: 10px; bottom: 10px;
+    display: flex; justify-content: space-between; gap: 2px;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    border: 1px solid var(--line); border-radius: 18px;
+    padding: 6px; backdrop-filter: blur(10px);
+  }
+  [data-frame="desktop"] .dock { position: static; }
+  .dock a {
+    flex: 1; min-height: 48px; border-radius: 12px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    font-size: 10px; font-weight: 600; color: var(--muted);
+  }
+  .sheet-back {
+    position: absolute; inset: 0; background: rgba(0,0,0,.45);
+    display: none; align-items: flex-end; justify-content: center; z-index: 5;
+  }
+  .sheet-back.on { display: flex; }
+  [data-frame="desktop"] .sheet-back { align-items: center; }
+  .sheet {
+    width: min(520px, 100%); background: var(--surface); color: var(--ink);
+    border-radius: 18px 18px 0 0; padding: 12px 16px 20px; max-height: 86%; overflow: auto;
+  }
+  [data-frame="desktop"] .sheet { border-radius: 18px; max-height: 80%; }
+  .grab { width: 36px; height: 4px; border-radius: 4px; background: var(--line); margin: 4px auto 10px; }
+  [data-frame="desktop"] .grab { display: none; }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  }
+  [data-frame="phone"] .stats { grid-template-columns: 1fr 1fr; }
+  .stat b { display: block; font-family: var(--display); font-size: 28px; font-weight: 560; letter-spacing: -0.03em; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 88px; }
+  .bars i { display: block; flex: 1; border-radius: 6px 6px 2px 2px; background: var(--accent); opacity: 0.85; }
+  .split { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 12px; }
+  [data-frame="phone"] .split, [data-frame="phone"] .plans, [data-frame="phone"] .auth-wrap { grid-template-columns: 1fr; }
+  .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .switch {
+    width: 44px; height: 26px; border-radius: 99px; border: 0; background: var(--line); position: relative; flex: none;
+  }
+  .switch i { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: white; }
+  .switch[aria-pressed="true"] { background: var(--accent); }
+  .switch[aria-pressed="true"] i { left: 21px; }
+  .set-row {
+    display: flex; justify-content: space-between; gap: 12px; align-items: center;
+    padding: 12px 0; border-top: 1px solid var(--line);
+  }
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal button {
+    aspect-ratio: 1; border-radius: 8px; border: 1px solid transparent; background: var(--surface-2); color: var(--ink); font-size: 12px;
+  }
+  .cal button.has { box-shadow: inset 0 -3px 0 var(--accent); }
+  .listing {
+    display: grid; grid-template-columns: 72px 1fr auto; gap: 12px; align-items: center;
+  }
+  [data-frame="phone"] .listing { grid-template-columns: 64px 1fr; }
+  [data-frame="phone"] .listing .price { grid-column: 2; }
+  .price { font-family: var(--display); font-size: 22px; }
+  .auth-wrap { max-width: 420px; margin: 8vh auto; display: flex; flex-direction: column; gap: 14px; }
+  .landing { max-width: 1040px; margin: 0 auto; padding: 48px 28px 64px; display: flex; flex-direction: column; gap: 36px; }
+  [data-frame="phone"] .landing { padding: 28px 16px 40px; }
+  .media-row { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+  [data-frame="phone"] .media-row { grid-template-columns: repeat(4, 1fr); }
+  .media-row .cover { aspect-ratio: 2/3; font-size: 13px; }
+  .toast {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 999px;
+    font-size: 13px; z-index: 70;
+  }
+  .cookie {
+    display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px;
+  }
+  details { border-top: 1px solid var(--line); padding: 10px 0; }
+  details summary { cursor: pointer; font-weight: 600; }
+  .prose { display: flex; flex-direction: column; gap: 10px; max-width: 42rem; }
+  .prose p, .prose li { color: var(--muted); }
+  .hof { display: flex; gap: 10px; }
+  .hof .cover { width: 72px; height: 108px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+</style>
+</head>
+<body>
+<div class="proto">
+  <strong>PROTOTYPE · Reskin</strong>
+  <span>Today’s screens, new presentation. Nothing is saved.</span>
+  <span class="sp"></span>
+  <label>Screen <select id="jump"></select></label>
+  <button type="button" id="theme-btn">Theme</button>
+  <button type="button" id="frame-btn">Frame</button>
+  <span class="state" id="state-line"></span>
+</div>
+<div class="stage">
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="column">
+      <header class="phone-head"><b>Geeklogs</b><span class="faint" id="phone-screen"></span></header>
+      <main class="content" id="main"></main>
+    </div>
+    <nav class="dock" id="dock"></nav>
+    <div class="sheet-back" id="sheet">
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+        <div class="grab"></div>
+        <div class="spread"><h2 id="sheet-title">Log</h2><button class="btn ghost small" type="button" id="sheet-close">Close</button></div>
+        <div id="sheet-body" class="stack" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script>
+const CATS = [
+  ["movies", "Movies"],
+  ["tv", "TV Shows"],
+  ["boardgames", "Board Games"],
+  ["games", "Games"],
+  ["books", "Books"],
+  ["anime", "Anime"],
+  ["manga", "Manga"],
+  ["comics", "Comics"],
+];
+const SPEND = new Set(["games", "boardgames", "books", "manga", "comics"]);
+const STATUS = {
+  movies: ["Watched", "Plan to watch"],
+  tv: ["Completed", "Watching", "Plan to watch", "Dropped"],
+  boardgames: ["Played", "Plan to play"],
+  games: ["Completed", "Playing", "Plan to play", "Dropped"],
+  books: ["Read", "Reading", "Plan to read", "Dropped"],
+  anime: ["Completed", "Watching", "Plan to watch", "Dropped"],
+  manga: ["Read", "Reading", "Plan to read", "Dropped"],
+  comics: ["Read", "Reading", "Plan to read", "Dropped"],
+};
+const FIELDS = {
+  movies: ["Watched on"],
+  tv: ["Season", "Episode", "Started", "Finished"],
+  anime: ["Season", "Episode", "Started", "Finished"],
+  boardgames: ["Matches played", "Owned or want to buy", "Amount spent"],
+  games: ["Platform", "Hours to beat", "Owned or want to buy", "Amount spent"],
+  books: ["Page", "Pages", "Owned or want to buy", "Amount spent"],
+  manga: ["Chapter", "Volume", "Owned or want to buy", "Amount spent"],
+  comics: ["Chapter", "Volume", "Owned or want to buy", "Amount spent"],
+};
+const DATA = {
+  movies: {
+    score: "IMDb 8.1",
+    stats: { logged: 86, done: 71, mean: "4.2", pace: [3, 5, 4, 8, 6, 4, 7] },
+    logs: [
+      ["Past Lives", "2023", "Watched", 5, "A quiet film about the lives you do not live.", ["106 min", "Romance"], "linear-gradient(160deg,#c9846a,#3d2a28)"],
+      ["The Zone of Interest", "2023", "Plan to watch", 0, "", ["105 min", "History"], "linear-gradient(160deg,#8d8f86,#2c2e28)"],
+      ["Anatomy of a Fall", "2023", "Watched", 4, "The argument is the whole movie.", ["151 min", "Drama"], "linear-gradient(160deg,#d7c4a3,#5c4632)"],
+    ],
+    facts: [["Release", "2023"], ["Runtime", "106 min"], ["Genres", "Romance, Drama"], ["Country", "United States, South Korea"], ["Language", "English, Korean"], ["Rating", "PG-13"]],
+  },
+  tv: {
+    score: "IMDb 8.6",
+    stats: { logged: 24, done: 11, mean: "4.4", pace: [1, 2, 2, 4, 3, 2, 5] },
+    logs: [
+      ["Shōgun", "2024", "Completed", 5, "Ten episodes, fully landed.", ["Season 1", "Episode 10"], "linear-gradient(160deg,#8a3b2f,#241816)"],
+      ["The Bear", "2022", "Watching", 4.5, "Still in the kitchen.", ["Season 3", "Episode 6"], "linear-gradient(160deg,#d8dee6,#314052)"],
+      ["Slow Horses", "2022", "Plan to watch", 0, "", ["Season 1", "Spy"], "linear-gradient(160deg,#6e7c6a,#222820)"],
+    ],
+    facts: [["Seasons", "1"], ["Episodes", "10"], ["Network", "FX"], ["Status", "Ended"], ["Runtime", "58 min"], ["Genres", "Drama, History"]],
+  },
+  boardgames: {
+    score: "Weight 2.4",
+    stats: { logged: 18, done: 14, mean: "4.1", pace: [2, 1, 3, 2, 4, 2, 3] },
+    logs: [
+      ["Wingspan", "2019", "Played", 4.5, "Twelve plays. Still the one I bring out.", ["1–5 players", "70 min", "Owned"], "linear-gradient(160deg,#3f7d6a,#16342c)"],
+      ["Azul", "2017", "Played", 4, "Four plays.", ["2–4 players", "45 min", "Owned"], "linear-gradient(160deg,#2f6fbf,#14304f)"],
+      ["Brass: Birmingham", "2018", "Plan to play", 0, "", ["2–4 players", "120 min", "Weight 3.9"], "linear-gradient(160deg,#8a6232,#2b2118)"],
+    ],
+    facts: [["Players", "1–5"], ["Play time", "70 min"], ["Weight", "2.44"], ["Age", "10+"], ["Designer", "Elizabeth Hargrave"], ["Mechanics", "Hand management, Engine building"], ["Source", "BoardGameGeek"]],
+  },
+  games: {
+    score: "RAWG 4.6",
+    stats: { logged: 31, done: 12, mean: "4.0", pace: [1, 1, 2, 3, 2, 4, 2] },
+    logs: [
+      ["Hades", "2020", "Completed", 5, "Finished the main escape.", ["PC", "22h to beat"], "linear-gradient(160deg,#e24b3b,#3a120f)"],
+      ["Balatro", "2024", "Playing", 4.5, "", ["Switch", "Owned"], "linear-gradient(160deg,#7b2d6b,#1c1020)"],
+      ["Outer Wilds", "2019", "Plan to play", 0, "", ["PC", "15h to beat"], "linear-gradient(160deg,#3c6e8a,#101820)"],
+    ],
+    facts: [["Platforms", "PC, Switch"], ["Developer", "Supergiant"], ["Publisher", "Supergiant"], ["Time to beat", "22 h"], ["ESRB", "T"], ["Genres", "Action, Roguelike"]],
+  },
+  books: {
+    score: "245 pages",
+    stats: { logged: 15, done: 9, mean: "4.3", pace: [1, 0, 1, 2, 1, 1, 2] },
+    logs: [
+      ["Piranesi", "2020", "Reading", 4, "Page 120.", ["Susanna Clarke", "p. 120 / 245"], "linear-gradient(160deg,#d7d3c4,#5c584c)"],
+      ["Tomorrow, and Tomorrow, and Tomorrow", "2022", "Plan to read", 0, "", ["Gabrielle Zevin", "416 pages"], "linear-gradient(160deg,#e07a5f,#4a2c28)"],
+      ["The Left Hand of Darkness", "1969", "Read", 5, "", ["Ursula K. Le Guin", "304 pages"], "linear-gradient(160deg,#6a8caf,#1b2836)"],
+    ],
+    facts: [["Pages", "245"], ["Author", "Susanna Clarke"], ["Publisher", "Bloomsbury"], ["Subjects", "Fiction, Fantasy"], ["Year", "2020"]],
+  },
+  anime: {
+    score: "MAL 9.0",
+    stats: { logged: 40, done: 28, mean: "4.4", pace: [2, 3, 2, 5, 4, 3, 4] },
+    logs: [
+      ["Frieren", "2023", "Watching", 5, "Episode 18 of 28.", ["Episode 18", "28 episodes"], "linear-gradient(160deg,#8eb38a,#243028)"],
+      ["Odd Taxi", "2021", "Completed", 4.5, "", ["13 episodes", "Drama"], "linear-gradient(160deg,#f0c14b,#3a3014)"],
+      ["Pluto", "2023", "Plan to watch", 0, "", ["8 episodes", "Sci-fi"], "linear-gradient(160deg,#4d6a8a,#141c28)"],
+    ],
+    facts: [["Episodes", "28"], ["Status", "Finished"], ["Studio", "Madhouse"], ["Season", "Fall 2023"], ["Genres", "Adventure, Drama"], ["Source", "Manga"]],
+  },
+  manga: {
+    score: "41 volumes",
+    stats: { logged: 12, done: 4, mean: "4.6", pace: [1, 1, 0, 2, 1, 2, 1] },
+    logs: [
+      ["Berserk", "1989", "Reading", 5, "Chapter 374.", ["Chapter 374", "Volume 41"], "linear-gradient(160deg,#6b1d2a,#1a0c0e)"],
+      ["Goodnight Punpun", "2007", "Read", 5, "", ["Inio Asano", "13 volumes"], "linear-gradient(160deg,#d9d4cf,#3a3836)"],
+      ["Witch Hat Atelier", "2016", "Plan to read", 0, "", ["Kamome Shirahama", "Volume 1"], "linear-gradient(160deg,#6f8fbf,#243044)"],
+    ],
+    facts: [["Chapters", "374"], ["Volumes", "41"], ["Author", "Kentaro Miura"], ["Serialization", "Young Animal"], ["Status", "Publishing"]],
+  },
+  comics: {
+    score: "Issue 67",
+    stats: { logged: 9, done: 3, mean: "4.3", pace: [0, 1, 1, 0, 2, 1, 1] },
+    logs: [
+      ["Saga", "2012", "Reading", 5, "Issue 67.", ["Issue 67", "Image"], "linear-gradient(160deg,#ef6f4a,#3a1d2a)"],
+      ["Monstress", "2015", "Reading", 4, "", ["Issue 52", "Image"], "linear-gradient(160deg,#5b3a6e,#1a1020)"],
+      ["Paper Girls", "2015", "Read", 4.5, "", ["30 issues", "Image"], "linear-gradient(160deg,#f2a2c0,#4a3040)"],
+    ],
+    facts: [["Issues", "67"], ["Publisher", "Image"], ["Authors", "Brian K. Vaughan, Fiona Staples"], ["Started", "2012"], ["Status", "Ongoing"]],
+  },
+};
+
+const SCREENS = [
+  ["landing", "Landing", false],
+  ["login", "Log in", false],
+  ["register", "Register", false],
+  ["forgot", "Forgot password", false],
+  ["reset", "Reset password", false],
+  ["onboarding", "Onboarding", false],
+  ["dashboard", "Home", true],
+  ["statistics", "Statistics", true],
+  ["search", "Search", true],
+  ["item", "Item", true],
+  ["market", "Market", true],
+  ["listing", "Listing", true],
+  ["mine", "My listings", true],
+  ["profile", "Public profile", true],
+  ["store", "User store", true],
+  ["settings", "Settings", true],
+  ["plans", "Plans", true],
+  ["about", "About", true],
+  ["faq", "FAQ", true],
+  ["privacy", "Privacy", true],
+  ["terms", "Terms", true],
+];
+const APP_NAV = [
+  ["dashboard", "Home"],
+  ["statistics", "Statistics"],
+  ["search", "Search"],
+  ["market", "Market"],
+  ["settings", "Settings"],
+  ["plans", "Plans"],
+  ["about", "About"],
+];
+const GUEST_NAV = [
+  ["dashboard", "Home"],
+  ["search", "Search"],
+  ["about", "About"],
+  ["plans", "Plans"],
+  ["login", "Log in"],
+  ["register", "Register"],
+];
+const DOCK = [
+  ["dashboard", "Home"],
+  ["statistics", "Statistics"],
+  ["search", "Search"],
+  ["market", "Market"],
+  ["settings", "Settings"],
+];
+const GUEST_DOCK = [
+  ["search", "Search"],
+  ["dashboard", "Home"],
+  ["plans", "Plans"],
+  ["login", "Log in"],
+  ["register", "Register"],
+];
+
+const state = { screen: "dashboard", theme: "dark", frame: "desktop", cat: "movies", market: "all", layout: "list", step: 0, sheet: false, authed: true, cookie: true };
+function shownCat() { return DATA[state.cat] ? state.cat : "movies"; }
+
+const ICONS = {
+  dashboard: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5z"/></svg>',
+  statistics: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19h16M7 16v-4M12 16V8M17 16v-7"/></svg>',
+  search: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="m20 20-3.5-3.5"/></svg>',
+  market: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9h16l-1 11H5L4 9z"/><path d="M8 9V7a4 4 0 0 1 8 0v2"/></svg>',
+  settings: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg>',
+  plans: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>',
+  about: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/></svg>',
+  login: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2"/><path d="M15 12H3m0 0 3-3M3 12l3 3"/></svg>',
+  register: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="8" r="3"/><path d="M4 19a6 6 0 0 1 12 0M19 8v6M16 11h6"/></svg>',
+};
+
+function stars(n) {
+  if (!n) return '<span class="faint">No rating</span>';
+  const full = Math.round(n);
+  return `<span class="stars" aria-label="${n} of 5">${"★".repeat(full)}${"☆".repeat(5 - full)}<b>${n}</b></span>`;
+}
+function cover(title, bg, cls) {
+  const initials = title.split(/\s+/).slice(0, 2).map((w) => w[0]).join("");
+  return `<div class="cover ${cls || ""}" style="background:${bg}">${initials}</div>`;
+}
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.hidden = false;
+  el.textContent = msg;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.hidden = true; }, 1800);
+}
+function go(screen, extra) {
+  if (extra) Object.assign(state, extra);
+  if (screen === "login" || screen === "landing" || screen === "register" || screen === "forgot" || screen === "reset") state.authed = false;
+  if (screen === "dashboard" || screen === "onboarding") state.authed = true;
+  state.screen = screen;
+  if (screen !== "statistics" && state.cat === "all") state.cat = "movies";
+  state.sheet = false;
+  draw();
+}
+function catChips(active) {
+  return `<div class="chips" role="tablist">${CATS.map(([id, label]) =>
+    `<button type="button" class="chip" role="tab" aria-pressed="${id === active}" data-cat="${id}">${label}</button>`
+  ).join("")}</div>`;
+}
+function logCard(row, cat) {
+  const [title, year, status, rating, blurb, facts, bg] = row;
+  return `<button type="button" class="log" data-open-item="${cat || ""}">
+    ${cover(title, bg)}
+    <span class="log-body">
+      <span class="log-top"><h3>${title}</h3><span class="pill">${status}</span></span>
+      <span class="faint">${year}</span>
+      ${stars(rating)}
+      ${blurb ? `<span class="snippet">${blurb}</span>` : ""}
+      <span class="facts">${facts.map((f) => `<span>${f}</span>`).join("")}</span>
+    </span>
+  </button>`;
+}
+function formFields(cat) {
+  const statuses = STATUS[cat].map((s) => `<button type="button" class="chip" data-status="${s}" aria-pressed="${s === STATUS[cat][0]}">${s}</button>`).join("");
+  const extras = FIELDS[cat].map((label) => `<label class="field"><span>${label}</span><input type="text" placeholder="${label}" /></label>`).join("");
+  return `<div class="stack">
+    <div class="field"><span>Status</span><div class="seg chips">${statuses}</div></div>
+    ${extras}
+    <div class="field"><span>Rating</span><div class="stars" style="font-size:20px">★★★★☆</div></div>
+    <label class="field"><span>Review</span><textarea placeholder="What stayed with you?"></textarea></label>
+    <button class="btn" type="button" id="save-log">Save log</button>
+  </div>`;
+}
+
+function shellNav(items) {
+  return `<a class="brand" href="#" data-go="dashboard"><span class="mark">G</span><b>Geeklogs</b></a>` +
+    items.map(([id, label]) => `<button type="button" class="navbtn" data-go="${id}" ${state.screen === id ? 'aria-current="page"' : ""}>${ICONS[id] || ""}${label}</button>`).join("");
+}
+function dockNav(items) {
+  return items.map(([id, label]) => `<a href="#" data-go="${id}" ${state.screen === id ? 'aria-current="page"' : ""}>${ICONS[id] || ""}<span>${label}</span></a>`).join("");
+}
+
+function viewDashboard() {
+  const cat = shownCat();
+  const pack = DATA[cat];
+  const spend = SPEND.has(cat);
+  return `<div class="stack">
+    <div class="spread"><h1 class="page-title">Home</h1>
+      <div class="row">
+        <button class="chip" type="button" data-layout="list" aria-pressed="${state.layout === "list"}">List</button>
+        <button class="chip" type="button" data-layout="grid" aria-pressed="${state.layout === "grid"}">Grid</button>
+      </div>
+    </div>
+    ${catChips(cat)}
+    <div class="row">
+      <label class="field" style="flex:1;min-width:180px"><span class="sr" style="position:absolute;left:-999px">Search titles</span><input type="text" placeholder="Search your ${CATS.find(c => c[0] === cat)[1].toLowerCase()}" /></label>
+      <select aria-label="Sort"><option>Recent</option><option>Rating</option><option>Title</option></select>
+      ${spend ? `<select aria-label="Collection"><option>All</option><option>Owned</option><option>Want to buy</option></select>` : ""}
+      ${cat === "boardgames" ? `<select aria-label="Players"><option>Any players</option><option>Solo</option><option>2</option><option>3+</option></select>` : ""}
+      <button class="btn ghost small" type="button" data-go="search">Search catalogs</button>
+    </div>
+    ${cat === "boardgames" ? `<div class="card spread"><div><b>Import a collection</b><p class="faint">BoardGameGeek or Ludopedia. Same place this category already offers it.</p></div><button class="btn small" type="button" data-toast="Import stays a prototype control">Import</button></div>` : ""}
+    <div class="logs ${state.layout}">${pack.logs.map(logCard).join("")}</div>
+    <section class="stack">
+      <div class="spread"><h2>Friends</h2><span class="pill">3 new this week</span></div>
+      <div class="chips"><button class="chip" aria-pressed="true" type="button">All</button><button class="chip" type="button">@mina</button><button class="chip" type="button">@leo</button></div>
+      <div class="stack">
+        ${[
+          ["@mina", "rated", "Past Lives", "Movies · 2h"],
+          ["@leo", "finished", "Hades", "Games · 1d"],
+          ["@mina", "logged", "Wingspan", "Board Games · 3d"],
+        ].map(([who, verb, title, meta]) => `<div class="card spread"><div><b style="color:var(--accent)">${who}</b> <span class="muted">${verb}</span> <b>${title}</b><div class="faint">${meta}</div></div><span class="faint">♥ 4</span></div>`).join("")}
+      </div>
+    </section>
+  </div>`;
+}
+
+function viewStats() {
+  const all = state.cat === "all";
+  const pack = all ? { stats: { logged: 235, done: 152, mean: "4.3", pace: [8, 11, 9, 14, 12, 10, 16] } } : DATA[state.cat];
+  const s = pack.stats;
+  const showBoard = all || state.cat === "boardgames";
+  const showPlat = all || state.cat === "games";
+  const showSpend = all || SPEND.has(state.cat);
+  return `<div class="stack">
+    <h1 class="page-title">Statistics</h1>
+    <div class="chips">${[["all","All"], ...CATS].map(([id, label]) => `<button type="button" class="chip" data-cat="${id}" aria-pressed="${state.cat === id}">${label}</button>`).join("")}</div>
+    <div class="row"><span class="kicker">Recap</span><button class="btn ghost small" type="button" data-toast="Recap opens the existing share flow">This month</button></div>
+    <div class="stats">
+      <div class="card stat"><span class="faint">Logged</span><b>${s.logged}</b></div>
+      <div class="card stat"><span class="faint">Finished</span><b>${s.done}</b></div>
+      <div class="card stat"><span class="faint">Mean rating</span><b>${s.mean}</b></div>
+      <div class="card stat"><span class="faint">This week</span><b>${s.pace[6]}</b></div>
+    </div>
+    <div class="split">
+      <div class="card stack"><span class="kicker">Pace</span><div class="bars">${s.pace.map((n) => `<i style="height:${n * 12}px"></i>`).join("")}</div><span class="faint">Last 7 days</span></div>
+      <div class="card stack"><span class="kicker">Hall of fame</span><div class="hof">${(all ? DATA.movies : DATA[state.cat]).logs.slice(0, 3).map((row) => cover(row[0], row[6])).join("")}</div></div>
+    </div>
+    <div class="card stack">
+      <div class="spread"><span class="kicker">Calendar</span><span class="faint">March</span></div>
+      <div class="cal">${Array.from({ length: 28 }, (_, i) => `<button type="button" class="${[2, 6, 11, 18].includes(i) ? "has" : ""}" data-day="${i + 1}">${i + 1}</button>`).join("")}</div>
+      <p class="faint">A marked day opens the log sheet, as it does on Statistics today.</p>
+    </div>
+    ${showBoard ? `<div class="card stack"><span class="kicker">Recent plays</span><p><b>Wingspan</b> <span class="muted">· 12 matches · last played 4 days ago</span></p><p><b>Azul</b> <span class="muted">· 4 matches · last played 2 weeks ago</span></p></div>` : ""}
+    ${showPlat ? `<div class="card stack"><span class="kicker">Platforms</span><p>PC · 18 &nbsp; Switch · 9 &nbsp; PlayStation · 4</p></div>` : ""}
+    ${showSpend ? `<div class="card stack"><span class="kicker">Spending</span><p class="page-title" style="font-size:28px">$186</p><p class="faint">Owned titles in this view. Tracked for games, board games, books, manga, and comics.</p></div>` : ""}
+  </div>`;
+}
+
+function viewSearch() {
+  const pack = DATA[shownCat()];
+  return `<div class="stack">
+    <h1 class="page-title">Search</h1>
+    ${catChips(shownCat())}
+    <label class="field"><span>Find a title</span><input type="text" value="${DATA[shownCat()].logs[0][0]}" /></label>
+    ${shownCat() === "boardgames" ? `<div class="row"><span class="faint">Catalog</span><button class="chip" type="button" aria-pressed="true">BoardGameGeek</button><button class="chip" type="button">Ludopedia</button></div>` : ""}
+    <div class="logs list">${pack.logs.map((row) => logCard(row)).join("")}</div>
+  </div>`;
+}
+
+function viewItem() {
+  const cat = shownCat();
+  const pack = DATA[cat];
+  const row = pack.logs[0];
+  return `<div class="stack">
+    <button class="btn ghost small" type="button" data-go="search" style="align-self:flex-start">Back</button>
+    ${catChips(cat)}
+    <div class="hero">
+      ${cover(row[0], row[6])}
+      <div class="stack">
+        <span class="kicker">${CATS.find((c) => c[0] === cat)[1]}</span>
+        <h1 class="page-title">${row[0]}</h1>
+        <p class="muted">${row[1]}</p>
+        ${stars(row[4] ? row[3] : 4)}
+        <span class="pill">${pack.score}</span>
+      </div>
+    </div>
+    <div class="card stack">
+      <p class="muted">${row[4] || "A catalog description lives here, collapsed until you open it, the way the item page does today."}</p>
+      <div class="meta-grid">${pack.facts.map(([k, v]) => `<div><b style="color:var(--ink)">${k}</b> · ${v}</div>`).join("")}</div>
+    </div>
+    <div class="card stack">
+      <h2>Your log</h2>
+      ${formFields(cat)}
+    </div>
+    <div class="stack">
+      <div class="spread"><h2>Reviews</h2><select aria-label="Sort reviews"><option>Recent</option><option>Oldest</option><option>Most liked</option></select></div>
+      <article class="card stack"><div class="spread"><b>@mina</b><span class="pill">${row[2]}</span></div>${stars(row[3] || 4)}<p>${row[4] || "Short review text from someone who logged this title."}</p><span class="faint">♥ 6 · 2 days ago</span></article>
+    </div>
+  </div>`;
+}
+
+function viewMarket() {
+  const rows = [
+    ["Wingspan", "Board Games", "$48", "São Paulo", "Like new", "linear-gradient(160deg,#3f7d6a,#16342c)"],
+    ["Piranesi", "Books", "$12", "Rio de Janeiro", "Good", "linear-gradient(160deg,#d7d3c4,#5c584c)"],
+    ["Berserk vol. 1", "Manga", "$18", "Curitiba", "Fine", "linear-gradient(160deg,#6b1d2a,#1a0c0e)"],
+    ["Saga vol. 1", "Comics", "$15", "Recife", "Good", "linear-gradient(160deg,#ef6f4a,#3a1d2a)"],
+  ];
+  return `<div class="stack">
+    <div class="spread"><h1 class="page-title">Market</h1><button class="btn small" type="button" data-go="mine">My listings</button></div>
+    <div class="row">
+      ${[["all", "All"], ["Board Games", "Board Games"], ["Books", "Books"], ["Manga", "Manga"], ["Comics", "Comics"]].map(([id, label]) => `<button class="chip" type="button" data-market="${id}" aria-pressed="${state.market === id}">${label}</button>`).join("")}
+    </div>
+    <label class="field"><span>City</span><input type="text" value="São Paulo" /></label>
+    ${rows.filter((r) => state.market === "all" || r[1] === state.market).map((r) => `<button type="button" class="card listing" data-go="listing">
+      ${cover(r[0], r[5])}
+      <span><b>${r[0]}</b><span class="faint" style="display:block">${r[1]} · ${r[3]} · ${r[4]}</span></span>
+      <span class="price">${r[2]}</span>
+    </button>`).join("")}
+  </div>`;
+}
+
+function authCard(title, body, footer) {
+  return `<div class="auth-wrap"><a class="brand" href="#" data-go="landing"><span class="mark">G</span><b>Geeklogs</b></a><div class="card stack"><h1 class="page-title" style="font-size:32px">${title}</h1>${body}</div><p class="muted">${footer}</p></div>`;
+}
+
+const VIEWS = {
+  landing() {
+    return `<div class="landing">
+      ${state.cookie ? `<div class="cookie"><p class="faint" style="margin:0;flex:1">Cookies and local storage keep you signed in and remember preferences.</p><button class="btn small" type="button" id="cookie-ok">OK</button></div>` : ""}
+      <div class="stack" style="padding-top:24px">
+        <div class="row"><span class="mark">G</span><h1 class="page-title" style="font-size:56px">Geeklogs</h1></div>
+        <p class="page-title" style="font-size:28px;max-width:16ch">One place for every title you care about.</p>
+        <p class="lede">Log what you watch, play, and read — with ratings, progress, and stats that stay with you.</p>
+        <div class="row"><button class="btn" type="button" data-go="register">Create your account</button><button class="btn ghost" type="button" data-go="login">Log in</button></div>
+      </div>
+      <section class="stack"><h2 class="page-title" style="font-size:28px">Your whole library, finally together</h2><p class="lede">Search catalogs, track status, save reviews, and keep board-game sessions, spending, and milestones in the same home.</p><div class="media-row">${CATS.map(([id, label]) => cover(label, DATA[id].logs[0][6])).join("")}</div></section>
+      <section class="spread"><div class="stack"><h2 class="page-title" style="font-size:28px">See the story behind your habits</h2><p class="lede">Charts, calendars, and recaps turn your logs into a picture of what you finish.</p></div><button class="btn" type="button" data-go="register">Create your account</button></section>
+    </div>`;
+  },
+  login() {
+    return authCard("Log in", `<label class="field"><span>Email</span><input type="email" value="you@example.com" /></label><label class="field"><span>Password</span><input type="password" value="password" /></label><button class="btn" type="button" data-go="dashboard">Log in</button><button class="textlink" type="button" data-go="forgot" style="color:var(--accent);background:none;border:0;padding:0">Forgot password</button>`, `New here? <button class="textlink" style="color:var(--accent);background:none;border:0" type="button" data-go="register">Register</button>`);
+  },
+  register() {
+    return authCard("Create your account", `<label class="field"><span>Name</span><input type="text" value="Alex" /></label><label class="field"><span>Email</span><input type="email" value="you@example.com" /></label><label class="field"><span>Password</span><input type="password" value="password" /></label><button class="btn" type="button" data-go="onboarding">Create account</button>`, `Already logging? <button class="textlink" style="color:var(--accent);background:none;border:0" type="button" data-go="login">Log in</button>`);
+  },
+  forgot() {
+    return authCard("Forgot password", `<p class="muted">We send a reset link to the email on the account.</p><label class="field"><span>Email</span><input type="email" value="you@example.com" /></label><button class="btn" type="button" data-toast="Reset link is not sent from the prototype" data-go="reset">Send link</button>`, `<button class="textlink" style="color:var(--accent);background:none;border:0" type="button" data-go="login">Back to log in</button>`);
+  },
+  reset() {
+    return authCard("Choose a new password", `<label class="field"><span>New password</span><input type="password" /></label><label class="field"><span>Confirm</span><input type="password" /></label><button class="btn" type="button" data-go="login">Update password</button>`, "");
+  },
+  onboarding() {
+    const steps = [
+      `<h2 class="page-title" style="font-size:28px">Language</h2><div class="row"><button class="chip" type="button" aria-pressed="true">English</button><button class="chip" type="button">Português</button></div>`,
+      `<h2 class="page-title" style="font-size:28px">Theme</h2><div class="row"><button class="chip" type="button" id="ob-light" aria-pressed="${state.theme === "light"}">Light</button><button class="chip" type="button" id="ob-dark" aria-pressed="${state.theme === "dark"}">Dark</button></div>`,
+      `<h2 class="page-title" style="font-size:28px">Categories</h2><p class="faint">Choose what shows up in Home.</p><div class="row">${CATS.map(([, l]) => `<button class="chip" type="button" aria-pressed="true">${l}</button>`).join("")}</div>`,
+      `<h2 class="page-title" style="font-size:28px">Board games</h2><p class="faint">Which catalog to search.</p><div class="row"><button class="chip" type="button" aria-pressed="true">BoardGameGeek</button><button class="chip" type="button">Ludopedia</button></div>`,
+      `<h2 class="page-title" style="font-size:28px">Anime and manga titles</h2><div class="row"><button class="chip" type="button" aria-pressed="true">English</button><button class="chip" type="button">Romaji</button><button class="chip" type="button">Native</button></div>`,
+    ];
+    return `<div class="auth-wrap"><span class="kicker">Step ${state.step + 1} of ${steps.length}</span>${steps[state.step]}<div class="row"><button class="btn ghost" type="button" id="ob-back" ${state.step === 0 ? "disabled" : ""}>Back</button><button class="btn" type="button" id="ob-next">${state.step === steps.length - 1 ? "Finish" : "Continue"}</button></div></div>`;
+  },
+  dashboard: viewDashboard,
+  statistics: viewStats,
+  search: viewSearch,
+  item: viewItem,
+  market: viewMarket,
+  listing() {
+    return `<div class="stack">
+      <button class="btn ghost small" type="button" data-go="market" style="align-self:flex-start">Back</button>
+      <div class="hero">${cover("Wingspan", "linear-gradient(160deg,#3f7d6a,#16342c)")}<div class="stack"><span class="kicker">Board Games · São Paulo</span><h1 class="page-title">Wingspan</h1><p class="price">$48 <span class="pill">Like new</span></p><p class="muted">Listed by @mina · 3 days ago</p></div></div>
+      <div class="card stack"><p>Complete copy, sleeved. Collection from the same city. Pickup or local meetup.</p><div class="row"><button class="btn" type="button" data-toast="WhatsApp link is not opened">WhatsApp</button><button class="btn ghost" type="button" data-toast="Mail is not opened">Email</button></div></div>
+    </div>`;
+  },
+  mine() {
+    return `<div class="stack"><div class="spread"><h1 class="page-title">My listings</h1><button class="btn small" type="button" data-toast="Create listing is the same form, not built out here">New listing</button></div>
+      <article class="card listing">${cover("Azul", "linear-gradient(160deg,#2f6fbf,#14304f)")}<span><b>Azul</b><span class="faint" style="display:block">Board Games · Active</span></span><span class="price">$30</span></article>
+      <article class="card listing">${cover("Saga", "linear-gradient(160deg,#ef6f4a,#3a1d2a)")}<span><b>Saga, vol. 1</b><span class="faint" style="display:block">Comics · Active</span></span><span class="price">$15</span></article>
+    </div>`;
+  },
+  profile() {
+    return `<div class="stack">
+      <div class="spread"><div class="row"><span class="mark">M</span><div><h1 class="page-title" style="font-size:32px">@mina</h1><p class="faint">Public profile · 235 logs</p></div></div><button class="btn small" type="button" data-toast="Follow is not saved">Follow</button></div>
+      <div class="stats"><div class="card stat"><span class="faint">Logs</span><b>235</b></div><div class="card stat"><span class="faint">Reviews</span><b>48</b></div><div class="card stat"><span class="faint">Mean</span><b>4.3</b></div><div class="card stat"><span class="faint">Following</span><b>12</b></div></div>
+      <h2>Recent logs</h2>
+      <div class="logs list">${DATA.movies.logs.slice(0, 2).map((row) => logCard(row, "movies")).join("")}</div>
+      <div class="spread"><h2>Store</h2><button class="btn ghost small" type="button" data-go="store">Open store</button></div>
+    </div>`;
+  },
+  store() {
+    return `<div class="stack">
+      <button class="btn ghost small" type="button" data-go="profile" style="align-self:flex-start">@mina</button>
+      <h1 class="page-title">Store</h1>
+      <p class="muted">Listings this person has on the market.</p>
+      <button type="button" class="card listing" data-go="listing">${cover("Wingspan", "linear-gradient(160deg,#3f7d6a,#16342c)")}<span><b>Wingspan</b><span class="faint" style="display:block">Board Games · São Paulo</span></span><span class="price">$48</span></button>
+      <button type="button" class="card listing" data-go="listing">${cover("Piranesi", "linear-gradient(160deg,#d7d3c4,#5c584c)")}<span><b>Piranesi</b><span class="faint" style="display:block">Books · Rio de Janeiro</span></span><span class="price">$12</span></button>
+    </div>`;
+  },
+  settings() {
+    const row = (title, desc, on) => `<div class="set-row"><div><b>${title}</b><div class="faint">${desc}</div></div><button type="button" class="switch" aria-pressed="${on ? "true" : "false"}" data-switch><i></i></button></div>`;
+    return `<div class="stack"><h1 class="page-title">Settings</h1>
+      <section class="card"><span class="kicker">Profile</span>${row("Show public profile", "Anyone with the link can view @mina", true)}${row("Show log count", "Visible on the public profile", true)}${row("Show reviews", "Reviews appear on the profile", true)}<div class="set-row"><button class="btn ghost small" type="button" data-toast="Profile editor stays on this screen in the app">Edit profile</button></div></section>
+      <section class="card stack"><span class="kicker">Subscription</span><p>Pro · renews in 18 days</p><button class="btn ghost small" type="button" data-go="plans" style="align-self:flex-start">Plans</button></section>
+      <section class="card stack"><span class="kicker">General</span>
+        <label class="field"><span>Language</span><select><option>English</option><option>Português</option></select></label>
+        <div class="row"><span>Theme</span><button class="chip" type="button" id="set-light" aria-pressed="${state.theme === "light"}">Light</button><button class="chip" type="button" id="set-dark" aria-pressed="${state.theme === "dark"}">Dark</button></div>
+        ${row("Monthly recap email", "A recap of what you finished", true)}
+        ${row("Completion celebration", "Show the dialog when you finish a title", true)}
+      </section>
+      <section class="card stack"><span class="kicker">Catalogs</span>
+        <label class="field"><span>Board game catalog</span><select><option>BoardGameGeek</option><option>Ludopedia</option></select></label>
+        <label class="field"><span>Anime and manga titles</span><select><option>English</option><option>Romaji</option><option>Native</option></select></label>
+      </section>
+      <section class="card stack"><span class="kicker">Data</span><button class="btn ghost small" type="button" data-toast="Export downloads a file in the app" style="align-self:flex-start">Export logs</button>
+        <label class="field"><span>API keys</span><input type="text" placeholder="Stored on this account" /></label>
+      </section>
+      <button class="btn danger" type="button" data-toast="Delete account is not performed">Delete account</button>
+    </div>`;
+  },
+  plans() {
+    return `<div class="stack"><h1 class="page-title">Plans</h1><div class="plans">
+      <article class="card stack"><span class="kicker">Free</span><p class="page-title" style="font-size:32px">$0</p><ul class="muted"><li>Log every category</li><li>Ratings, progress, reviews</li><li>Limited catalog searches</li></ul></article>
+      <article class="card stack" style="outline:2px solid var(--accent)"><span class="kicker">Pro</span><p class="page-title" style="font-size:32px">Pro</p><ul class="muted"><li>Unlimited search</li><li>Recaps and export</li><li>Market listings</li></ul><button class="btn" type="button" data-toast="Checkout is not started">Upgrade</button></article>
+    </div></div>`;
+  },
+  about() {
+    return `<div class="prose"><h1 class="page-title">About</h1><p>Geeklogs is one log for movies, TV, board games, games, books, anime, manga, and comics. Ratings, progress, sessions, and spending stay on the same account.</p><p>The phone app is this site inside the Capacitor shell.</p><button class="btn ghost" type="button" data-go="faq" style="align-self:flex-start">FAQ</button></div>`;
+  },
+  faq() {
+    return `<div class="prose"><h1 class="page-title">FAQ</h1>${[
+      ["What can I log?", "Movies, TV, board games, video games, books, anime, manga, and comics. Each category keeps its own status and progress fields."],
+      ["Is the Android app separate?", "It is the same product, installed through the Capacitor shell."],
+      ["Who can see my logs?", "You choose that in Settings. The public profile can hide the log count and reviews."],
+      ["What does the market sell?", "Board games, books, manga, and comics, listed by people on Geeklogs."],
+    ].map(([q, a]) => `<details open><summary>${q}</summary><p>${a}</p></details>`).join("")}</div>`;
+  },
+  privacy() {
+    return `<div class="prose"><h1 class="page-title">Privacy</h1><p>Sample copy for the prototype, in the same place as the live policy. It is not the legal text.</p><p>The account stores your logs, ratings, reviews, preferences, and, if you list something, the contact details you choose to show buyers.</p><p><button class="textlink" type="button" data-go="terms" style="color:var(--accent);background:none;border:0;padding:0">Terms</button></p></div>`;
+  },
+  terms() {
+    return `<div class="prose"><h1 class="page-title">Terms</h1><p>Sample copy for the prototype, in the same place as the live terms. It is not the legal text.</p><p>You keep what you write. Catalog data comes from the sources already wired into search. Market listings are between the people who post them.</p></div>`;
+  },
+};
+
+function draw() {
+  const plain = ["landing", "login", "register", "forgot", "reset", "onboarding"].includes(state.screen);
+  document.documentElement.dataset.theme = state.theme;
+  document.documentElement.dataset.frame = state.frame;
+  document.documentElement.dataset.shell = plain ? "plain" : "app";
+  const nav = state.authed ? APP_NAV : GUEST_NAV;
+  const dock = state.authed ? DOCK : GUEST_DOCK;
+  document.getElementById("sidebar").innerHTML = shellNav(nav);
+  document.getElementById("dock").innerHTML = dockNav(dock);
+  document.getElementById("main").innerHTML = VIEWS[state.screen]();
+  document.getElementById("phone-screen").textContent = SCREENS.find((s) => s[0] === state.screen)[1];
+  document.getElementById("jump").value = state.screen;
+  document.getElementById("theme-btn").textContent = state.theme === "dark" ? "Dark" : "Light";
+  document.getElementById("frame-btn").textContent = state.frame === "desktop" ? "Desktop" : "Phone";
+  const catLabel = state.cat === "all" ? "All" : (CATS.find((c) => c[0] === state.cat) || ["", ""])[1];
+  document.getElementById("state-line").textContent = `${SCREENS.find((s) => s[0] === state.screen)[1]} · ${catLabel} · ${state.theme} · ${state.frame} · ${state.layout}`;
+  const sheet = document.getElementById("sheet");
+  sheet.classList.toggle("on", state.sheet);
+  if (state.sheet) document.getElementById("sheet-body").innerHTML = formFields(state.cat === "all" ? "movies" : state.cat);
+}
+
+document.getElementById("jump").innerHTML = SCREENS.map(([id, label]) => `<option value="${id}">${label}</option>`).join("");
+
+document.body.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-go],[data-cat],[data-layout],[data-market],[data-status],[data-switch],[data-day],[data-open-item],[data-toast],#theme-btn,#frame-btn,#sheet-close,#save-log,#ob-next,#ob-back,#ob-light,#ob-dark,#set-light,#set-dark,#cookie-ok");
+  if (!t) return;
+  if (t.closest(".sheet-back") && e.target.id === "sheet") { state.sheet = false; draw(); return; }
+  if (t.dataset.go) { e.preventDefault(); go(t.dataset.go); return; }
+  if (t.dataset.cat) {
+    state.cat = t.dataset.cat;
+    if (state.screen !== "statistics" && state.screen !== "dashboard" && state.screen !== "search" && state.screen !== "item") state.screen = "dashboard";
+    draw();
+    return;
+  }
+  if (t.dataset.layout) { state.layout = t.dataset.layout; draw(); return; }
+  if (t.dataset.market) { state.market = t.dataset.market; draw(); return; }
+  if (t.dataset.status) {
+    t.parentElement.querySelectorAll("[data-status]").forEach((b) => b.setAttribute("aria-pressed", b === t ? "true" : "false"));
+    toast(`Status · ${t.dataset.status}`);
+    return;
+  }
+  if (t.dataset.switch !== undefined || t.classList.contains("switch")) {
+    const btn = t.classList.contains("switch") ? t : t.closest(".switch");
+    btn.setAttribute("aria-pressed", btn.getAttribute("aria-pressed") === "true" ? "false" : "true");
+    return;
+  }
+  if (t.dataset.day) { state.sheet = true; draw(); return; }
+  if (t.dataset.toast) toast(t.dataset.toast);
+  if (t.id === "theme-btn") { state.theme = state.theme === "dark" ? "light" : "dark"; draw(); }
+  if (t.id === "frame-btn") { state.frame = state.frame === "desktop" ? "phone" : "desktop"; draw(); }
+  if (t.id === "sheet-close") { state.sheet = false; draw(); }
+  if (t.id === "save-log") toast("Log stays on this screen in the app. Nothing was saved.");
+  if (t.id === "cookie-ok") { state.cookie = false; draw(); }
+  if (t.id === "ob-light" || t.id === "set-light") { state.theme = "light"; draw(); }
+  if (t.id === "ob-dark" || t.id === "set-dark") { state.theme = "dark"; draw(); }
+  if (t.id === "ob-back") { state.step = Math.max(0, state.step - 1); draw(); }
+  if (t.id === "ob-next") {
+    if (state.step >= 4) go("dashboard");
+    else { state.step += 1; draw(); }
+  }
+  if (t.hasAttribute("data-open-item")) {
+    if (t.dataset.openItem) state.cat = t.dataset.openItem;
+    go("item");
+  }
+});
+
+document.getElementById("jump").addEventListener("change", (e) => go(e.target.value));
+document.getElementById("sheet").addEventListener("click", (e) => {
+  if (e.target.id === "sheet") { state.sheet = false; draw(); }
+});
+
+draw();
+</script>
+</body>
+</html>

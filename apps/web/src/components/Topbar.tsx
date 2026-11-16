@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Settings, Info, LogOut, Loader2, CreditCard, Store, FlaskConical } from "lucide-react";
+import { Settings, Info, LogOut, Loader2, CreditCard, Store, FlaskConical, Search } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -26,6 +26,7 @@ import { useAndroidOverlayBack } from "@/hooks/useAndroidOverlayBack";
 const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/": "nav.search",
   "/dashboard": "nav.dashboard",
+  "/discover": "nav.discover",
   "/statistics": "nav.statistics",
   "/search": "nav.search",
   "/market": "nav.market",
@@ -110,15 +111,15 @@ export function Topbar() {
         {/* Mobile: logo + title (or app name when no title) */}
         <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
           <Link
-            to={token ? "/search" : "/"}
+            to={token ? "/dashboard" : "/"}
             className="flex shrink-0 items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
-            aria-label={token ? t("nav.search") : t("app.name")}
+            aria-label={t("app.name")}
           >
             <Logo alt={t("app.name")} className="h-9 w-auto flex-shrink-0 sm:h-11" />
           </Link>
           {displayTitle ? (
             <span
-              className="min-w-0 flex-1 truncate text-lg font-semibold text-[var(--color-lightest)]"
+              className="display-title min-w-0 flex-1 truncate text-lg text-[var(--color-lightest)]"
               title={displayTitle}
             >
               {displayTitle}
@@ -130,7 +131,7 @@ export function Topbar() {
         {/* Desktop: page title only */}
         {displayTitle && (
           <span
-            className="hidden min-w-0 flex-1 truncate text-lg font-semibold text-[var(--color-lightest)] md:block md:text-xl"
+            className="display-title hidden min-w-0 flex-1 truncate text-lg text-[var(--color-lightest)] md:block md:text-2xl"
             title={displayTitle}
           >
             {displayTitle}
@@ -145,6 +146,18 @@ export function Topbar() {
       )}
 
         <div className="ml-auto flex flex-shrink-0 items-center gap-2 sm:gap-3">
+        {token && location.pathname !== "/search" && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-10 w-10"
+            onClick={() => navigate("/search")}
+            aria-label={t("nav.search")}
+          >
+            <Search className="size-4" aria-hidden />
+          </Button>
+        )}
         {/* Theme and locale: in header when logged out, inside avatar menu when logged in */}
         {!token && (
           <>

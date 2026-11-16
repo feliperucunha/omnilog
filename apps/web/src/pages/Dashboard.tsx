@@ -732,7 +732,7 @@ export function Dashboard() {
       )}
 
       {token && (
-        <section aria-label={t("social.sectionTitle")} className="flex min-w-0 flex-col gap-4 overflow-hidden">
+        <section aria-label={t("social.sectionTitle")} className="hidden min-w-0 flex-col gap-4 overflow-hidden md:flex">
           <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
             <button
               type="button"

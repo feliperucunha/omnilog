@@ -23,8 +23,9 @@
     "accept": "OK"
   },
   "nav": {
-    "dashboard": "Inicio",
-    "statistics": "Estadísticas",
+    "dashboard": "Biblioteca",
+    "discover": "Descubrir",
+    "statistics": "Actividad",
     "movies": "Películas",
     "tv": "Series",
     "boardgames": "Juegos de mesa",
@@ -36,7 +37,7 @@
     "search": "Buscar",
     "market": "Mercado",
     "myListings": "Mis anuncios",
-    "settings": "Ajustes",
+    "settings": "Tú",
     "plans": "Planes",
     "about": "Acerca de",
     "lab": "Laboratorio UI",
@@ -242,7 +243,7 @@
     "termsContact": "Asuntos legales: {{email}}"
   },
   "settings": {
-    "title": "Ajustes",
+    "title": "Tú",
     "tabApp": "Ajustes de la app",
     "tabUser": "Ajustes de usuario",
     "general": "General",
@@ -454,6 +455,30 @@
     "timeAgoHours": "hace {{count}} h",
     "timeAgoDays": "hace {{count}} d"
   },
+  "discover": {
+    "lede": "Qué consumir ahora, a partir de lo que ya registraste y de títulos que todavía no están en tu lista.",
+    "refresh": "Actualizar",
+    "refreshing": "Leyendo…",
+    "availableTomorrow": "Disponible mañana",
+    "reading": "Leyendo tus registros, incluido cada campo de cada ítem. Estará listo en un momento.",
+    "saved": "Guardado en este dispositivo {{when}}. Una nueva visita no vuelve a consultar los catálogos hasta mañana.",
+    "note": "Una vez al día. Una categoría entra cuando tiene 10 registros. Las sugerencias fuera de la lista vienen de los catálogos que Geeklogs ya usa.",
+    "needsMore": "{{category}} necesita más registros",
+    "needsMoreBody": "Descubrir lee una categoría a partir de 10 ítems. Esta tiene {{count}}.",
+    "addInLibrary": "Agregar en la biblioteca",
+    "yourTaste": "Tu gusto",
+    "fromYourList": "De tu lista",
+    "nothingPlanned": "Nada en esta categoría sigue planeado. Las sugerencias de abajo salen de la lista.",
+    "outsideList": "Fuera de tu lista",
+    "onYourList": "En tu lista",
+    "newToYou": "Nuevo para ti",
+    "meanGrade": "{{grade}} / 10",
+    "logsCount": "{{count}} registros",
+    "topGenres": "Más registrados: {{genres}}",
+    "statusMix": "{{status}}: {{count}}",
+    "friends": "Amigos",
+    "numbers": "Números"
+  },
   "dashboard": {
     "badgesAchievementUnlocked": "¡Logro desbloqueado!",
     "badgesSectionTitle": "Insignias",
@@ -495,7 +520,7 @@
     "searchAndAddFirst": "Busca y añade tu primer log",
     "share": "Compartir perfil",
     "statsTitle": "Tiempo consumido",
-    "title": "Inicio"
+    "title": "Biblioteca"
   },
   "statistics": {
     "categoryFilter": "Filtrar estadísticas por categoría",
@@ -792,6 +817,7 @@
     "couldntLoadLogs": "No se pudieron cargar los logs",
     "updatingList": "Actualizando lista…",
     "filterAll": "Todos",
+    "filters": "Filtros",
     "filterCollection": "Colección / quiero comprar",
     "filterOwned": "En mi colección",
     "filterWantToBuy": "Quiero comprar",

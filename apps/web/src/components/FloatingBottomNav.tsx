@@ -3,10 +3,11 @@ import { Link, useLocation } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { LayoutGroup, motion } from "framer-motion";
 import {
-  Home,
-  BarChart3,
+  Library,
+  Compass,
+  Activity,
   Search,
-  Settings,
+  UserRound,
   LogIn,
   UserPlus,
   CreditCard,
@@ -29,16 +30,16 @@ type NavItem = {
 };
 
 const AUTH_ITEMS: NavItem[] = [
-  { to: "/dashboard", labelKey: "nav.dashboard", icon: Home },
-  { to: "/statistics", labelKey: "nav.statistics", icon: BarChart3 },
-  { to: "/search", labelKey: "nav.search", icon: Search },
+  { to: "/dashboard", labelKey: "nav.dashboard", icon: Library },
+  { to: "/discover", labelKey: "nav.discover", icon: Compass },
+  { to: "/statistics", labelKey: "nav.statistics", icon: Activity },
   { to: "/market", labelKey: "nav.market", icon: Store },
-  { to: "/settings", labelKey: "nav.settings", icon: Settings },
+  { to: "/settings", labelKey: "nav.settings", icon: UserRound },
 ];
 
 const GUEST_ITEMS: NavItem[] = [
   { to: "/search", labelKey: "nav.search", icon: Search },
-  { to: "/dashboard", labelKey: "nav.dashboard", icon: Home },
+  { to: "/dashboard", labelKey: "nav.dashboard", icon: Library },
   { to: "/tiers", labelKey: "nav.plans", icon: CreditCard },
   { to: "/login", labelKey: "nav.logIn", icon: LogIn },
   { to: "/register", labelKey: "nav.register", icon: UserPlus },

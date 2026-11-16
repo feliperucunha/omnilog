@@ -1,4 +1,1 @@
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
-@import "@fontsource/inter/600.css";
-@import "@fontsource/inter/700.css";
+/* Outfit and Fraunces load from index.html, with system fonts if those are blocked. */

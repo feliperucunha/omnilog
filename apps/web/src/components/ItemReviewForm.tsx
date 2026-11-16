@@ -29,6 +29,7 @@ import {
   logDateInputMatchesStored,
 } from "@/lib/logFormEquality";
 import { BoardGameOwnershipSwitch } from "@/components/BoardGameOwnershipSwitch";
+import { MatchLogSheet } from "@/components/MatchLogSheet";
 import { MatchesPlayedField } from "@/components/MatchesPlayedField";
 import { boardGameOwnershipFromBooleans, boardGameOwnershipToBooleans } from "@/lib/boardGameOwnership";
 import {
@@ -155,6 +156,7 @@ export function ItemReviewForm({
   const [saleAmountMinor, setSaleAmountMinor] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [itemMainTab, setItemMainTab] = useState<"review" | "matches" | "market">("review");
+  const [matchSheetOpen, setMatchSheetOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const boardMatchesRef = useRef<BoardGameMatchesSectionHandle>(null);
   const prevSeasonEpisodeRef = useRef<{ season: number | ""; episode: number | "" } | null>(null);
@@ -769,9 +771,16 @@ export function ItemReviewForm({
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
     >
       <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-card)]">
-        <h2 className="mb-4 min-w-0 text-xl font-semibold text-[var(--color-lightest)]">
-          {myLog ? t("itemReviewForm.yourReview") : t("itemReviewForm.addReview")}
-        </h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="min-w-0 text-xl font-semibold text-[var(--color-lightest)]">
+            {myLog ? t("itemReviewForm.yourReview") : t("itemReviewForm.addReview")}
+          </h2>
+          {showBoardGameFields ? (
+            <Button type="button" variant="outline" onClick={() => setMatchSheetOpen(true)}>
+              {t("mediaLogs.addMatch")}
+            </Button>
+          ) : null}
+        </div>
         {showCollectionOwnership &&
           myLog &&
           (myLog.own === true ||
@@ -1180,6 +1189,20 @@ export function ItemReviewForm({
         </motion.div>
         )}
       </Card>
+      {showBoardGameFields && matchSheetOpen ? (
+        <MatchLogSheet
+          log={myLog}
+          title={title}
+          onClose={() => setMatchSheetOpen(false)}
+          onEnsureLog={ensureBoardGameLog}
+          onLogUpdated={(log) => {
+            setMyLog(log);
+            setStatus(log.status ?? log.listType ?? status);
+            if (log.matchesPlayed != null) setMatchesPlayed(log.matchesPlayed);
+          }}
+          onMatchSaved={() => onSaved()}
+        />
+      ) : null}
     </motion.div>
   );
 }

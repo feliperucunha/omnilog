@@ -336,10 +336,15 @@ export const BoardGameMatchesSection = forwardRef<
     onEnsureLog?: () => Promise<string>;
     /** When true, hide the section save button (parent provides one). */
     embedded?: boolean;
+    /** Session form only. Play history stays on the item Matches tab. */
+    sessionOnly?: boolean;
     /** Called after a match is saved (e.g. close drawer/modal). */
     onMatchSaved?: (log: Log) => void;
   }
->(function BoardGameMatchesSection({ logId, onLogUpdated, onEnsureLog, embedded = false, onMatchSaved }, ref) {
+>(function BoardGameMatchesSection(
+  { logId, onLogUpdated, onEnsureLog, embedded = false, sessionOnly = false, onMatchSaved },
+  ref,
+) {
   const { t, locale } = useLocale();
   const { me } = useMe();
   const { showBoardGameMatchComplete } = useBoardGameMatchComplete();
@@ -372,7 +377,7 @@ export const BoardGameMatchesSection = forwardRef<
   }, [meUser?.id, meUser?.username, meUser?.email]);
 
   const loadMatches = useCallback(() => {
-    if (!logId) {
+    if (sessionOnly || !logId) {
       setMatches([]);
       setLoadingList(false);
       return;
@@ -382,7 +387,7 @@ export const BoardGameMatchesSection = forwardRef<
       .then((res) => setMatches(res.data ?? []))
       .catch(() => setMatches([]))
       .finally(() => setLoadingList(false));
-  }, [logId]);
+  }, [logId, sessionOnly]);
 
   useEffect(() => {
     loadMatches();
@@ -713,7 +718,7 @@ export const BoardGameMatchesSection = forwardRef<
           )}
       </div>
 
-      {logId ? (
+      {!sessionOnly && logId ? (
         <div className="flex min-w-0 flex-col gap-4 border-t border-[var(--color-mid)]/25 pt-4">
           <div>
             <h3 className="text-sm font-medium text-[var(--color-lightest)]">{t("boardGameMatches.previousSessions")}</h3>

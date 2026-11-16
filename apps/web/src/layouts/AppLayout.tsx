@@ -88,7 +88,7 @@ export function AppLayout() {
     <div className="flex h-dvh min-h-0 min-w-0">
       <Nav />
       <main
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-0 md:pb-6 md:pl-[255px]"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-0 md:pb-6 md:pl-[6.5rem]"
       >
         <PageTitleProvider>
           <AppLayoutContent />

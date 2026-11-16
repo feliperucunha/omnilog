@@ -23,8 +23,9 @@
     "accept": "OK"
   },
   "nav": {
-    "dashboard": "Home",
-    "statistics": "Statistics",
+    "dashboard": "Library",
+    "discover": "Discover",
+    "statistics": "Activity",
     "movies": "Movies",
     "tv": "TV Shows",
     "boardgames": "Board Games",
@@ -36,7 +37,7 @@
     "search": "Search",
     "market": "Market",
     "myListings": "My listings",
-    "settings": "Settings",
+    "settings": "You",
     "plans": "Plans",
     "about": "About",
     "lab": "UI Lab",
@@ -262,7 +263,7 @@
     "termsContact": "Legal questions: {{email}}"
   },
   "settings": {
-    "title": "Settings",
+    "title": "You",
     "tabApp": "App settings",
     "tabUser": "User settings",
     "general": "General",
@@ -475,6 +476,30 @@
     "timeAgoHours": "{{count}}h ago",
     "timeAgoDays": "{{count}}d ago"
   },
+  "discover": {
+    "lede": "What to consume next, from the logs you already have and from titles you have not logged.",
+    "refresh": "Refresh",
+    "refreshing": "Reading…",
+    "availableTomorrow": "Available tomorrow",
+    "reading": "Reading your logs, including every field on every record. This will be ready in a bit.",
+    "saved": "Saved on this device {{when}}. A return visit does not ask the catalogs again until tomorrow.",
+    "note": "Once a day. A category is included once it has 10 logs. Suggestions outside your list come from the catalogs Geeklogs already uses.",
+    "needsMore": "{{category}} needs more logs",
+    "needsMoreBody": "Discover reads a category once it has 10 items. This one has {{count}}.",
+    "addInLibrary": "Add some in the library",
+    "yourTaste": "Your taste",
+    "fromYourList": "From your list",
+    "nothingPlanned": "Nothing in this category is still planned. The suggestions below step outside the list.",
+    "outsideList": "Outside your list",
+    "onYourList": "On your list",
+    "newToYou": "New to you",
+    "meanGrade": "{{grade}} / 10",
+    "logsCount": "{{count}} logs",
+    "topGenres": "Most logged: {{genres}}",
+    "statusMix": "{{status}}: {{count}}",
+    "friends": "Friends",
+    "numbers": "Numbers"
+  },
   "dashboard": {
     "badgesAchievementUnlocked": "Achievement Unlocked!",
     "badgesSectionTitle": "Badges",
@@ -516,7 +541,7 @@
     "searchAndAddFirst": "Search and add your first log",
     "share": "Share profile",
     "statsTitle": "Time consumed",
-    "title": "Home"
+    "title": "Library"
   },
   "statistics": {
     "categoryFilter": "Filter statistics by category",
@@ -813,6 +838,7 @@
     "couldntLoadLogs": "Couldn't load logs",
     "updatingList": "Updating list…",
     "filterAll": "All",
+    "filters": "Filters",
     "filterCollection": "Own / wishlist",
     "filterOwned": "Owned",
     "filterWantToBuy": "Want to buy",

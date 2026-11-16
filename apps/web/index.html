@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <!-- Initial value; ThemeContext syncs to match light/dark (see themeChromeSync.ts). -->
-    <meta name="theme-color" content="#0b1220" />
+    <meta name="theme-color" content="#10120f" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,650&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Geeklogs — Track everything you watch, play, and read.</title>
     <meta name="description" content="Log movies, TV, games, board games, books, anime, manga, and comics in one place. Ratings, progress, stats, and more." />
     <!-- Favicon -->
@@ -36,7 +39,7 @@
         if (link) link.href = t === 'dark' ? '/logo-dark.png' : '/logo.png';
         /* Keep in sync with src/lib/themeChromeSync.ts */
         var tc = document.querySelector('meta[name="theme-color"]');
-        if (tc) tc.setAttribute('content', t === 'dark' ? '#0b1220' : '#F1F5F9');
+        if (tc) tc.setAttribute('content', t === 'dark' ? '#10120f' : '#f3efe7');
       })();
     </script>
   </head>
