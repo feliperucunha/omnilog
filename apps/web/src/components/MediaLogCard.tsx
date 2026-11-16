@@ -1,5 +1,6 @@
-import { useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
-import { Check, Loader2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { Link } from "react-router-dom";
+import { Check, Loader2, MoreHorizontal, Pencil, Plus, Tag, Trash2 } from "lucide-react";
 import { MotionLink } from "@/components/MotionLink";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -31,20 +32,8 @@ import { gradeToStars } from "@/lib/gradeStars";
 import {
   LOG_CARD_ACTION_COLUMN,
   LOG_CARD_ACTION_COLUMN_GRID,
-  LOG_CARD_BODY_GAP,
-  LOG_CARD_BODY_GAP_GRID,
-  LOG_CARD_BODY_PADDING,
-  LOG_CARD_BODY_PADDING_GRID,
   LOG_CARD_EDIT_BUTTON,
   LOG_CARD_EDIT_BUTTON_GRID,
-  LOG_CARD_HEIGHT_DEFAULT,
-  LOG_CARD_HEIGHT_EMBEDDED_COLLAPSED,
-  LOG_CARD_HEIGHT_EMBEDDED_GRID_COLLAPSED,
-  LOG_CARD_IMAGE_COLUMN,
-  LOG_CARD_IMAGE_COLUMN_GRID,
-  LOG_CARD_REVIEW_MAX_WIDTH,
-  LOG_CARD_TITLE,
-  LOG_CARD_TITLE_GRID,
 } from "@/lib/logCardLayout";
 import { itemDetailPath } from "@/lib/itemRoutes";
 import { getStatusLabel } from "@/lib/statusLabel";
@@ -67,8 +56,6 @@ const SCORE_SOURCE_LABELS: Partial<Record<MediaType, string>> = {
 
 const EPISODE_TYPES: MediaType[] = ["tv", "anime"];
 const CHAPTER_TYPES: MediaType[] = ["manga", "comics"];
-
-const REVIEW_PREVIEW_LENGTH = 120;
 
 function getProgress(log: Log): { field: "episode" | "chapter" | "volume"; value: number; labelKey: string } {
   if (EPISODE_TYPES.includes(log.mediaType))
@@ -222,6 +209,7 @@ function LogMetaRow({
   locale,
   compact,
   grid,
+  hideStars = false,
 }: {
   log: Log;
   display: ReturnType<typeof getLogCardDisplay>;
@@ -232,13 +220,14 @@ function LogMetaRow({
   locale: Locale;
   compact: boolean;
   grid: boolean;
+  hideStars?: boolean;
 }) {
   const badgeSize = compact
     ? "rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-1.5 py-px text-[8px] font-medium text-[var(--color-lightest)] whitespace-nowrap sm:text-[9px]"
     : grid
-      ? "max-w-[5rem] truncate rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-1.5 py-px text-[8px] font-medium text-[var(--color-lightest)] md:max-w-[4.25rem]"
+      ? "max-w-full whitespace-normal break-words rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-1.5 py-px text-[11px] font-medium leading-snug text-[var(--color-lightest)]"
       : "rounded-full border border-[var(--color-mid)]/30 bg-[var(--color-mid)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--color-lightest)] whitespace-nowrap";
-  const textSize = compact ? "text-[8px] sm:text-[9px]" : grid ? "max-w-[5rem] truncate text-[8px] md:max-w-[4.25rem]" : "text-[10px] sm:text-xs";
+  const textSize = compact ? "text-[8px] sm:text-[9px]" : grid ? "max-w-full break-words text-[11px] leading-snug" : "text-[10px] sm:text-xs";
   const tvBadgeSize =
     compact || grid
       ? "max-w-[4.25rem] truncate rounded-full px-1.5 py-px text-[8px] font-medium whitespace-nowrap sm:text-[9px]"
@@ -249,19 +238,19 @@ function LogMetaRow({
     <div
       className={cn(
         "flex min-w-0 flex-wrap items-center",
-        compact ? "gap-1" : grid ? "gap-0.5 overflow-hidden md:max-h-[2.35rem]" : "gap-1 gap-2 text-xs sm:text-sm"
+        compact ? "gap-1" : "gap-1.5"
       )}
     >
-      {display.grade != null ? (
+      {!hideStars && display.grade != null ? (
         <StarRating
           value={gradeToStars(display.grade)}
           readOnly
           size="sm"
           className={grid ? "shrink-0 origin-left scale-[0.88]" : undefined}
         />
-      ) : (
+      ) : !hideStars ? (
         <span className={cn("text-[var(--color-light)]", grid && "text-[8px]")}>—</span>
-      )}
+      ) : null}
       {scopeLabel ? <span className={badgeSize}>{scopeLabel}</span> : null}
       <GenreBadges genres={log.genres} maxCount={1} compact={useCompactBadges} />
       {log.mediaType === "games" && log.gamePlatform?.trim() ? (
@@ -366,7 +355,7 @@ function LogProgressLine({
         ? t("mediaLogs.tvSeasonEpisode", { season: String(seasonValue), episode: String(episodeValue) })
         : t("mediaLogs.tvEpisodeOnly", { episode: String(episodeValue) });
     return (
-      <span className={cn("text-[var(--color-light)] whitespace-nowrap", compact || grid ? "text-[9px] sm:text-[10px]" : "text-xs", className)}>
+      <span className={cn("min-w-0 break-words text-[var(--color-light)]", compact || grid ? "text-[11px]" : "text-xs", className)}>
         {label}
       </span>
     );
@@ -382,7 +371,6 @@ function LogProgressLine({
 function LogReviewBlock({
   log,
   display,
-  embedded,
   compact,
   grid,
   onViewReview,
@@ -390,43 +378,38 @@ function LogReviewBlock({
 }: {
   log: Log;
   display: ReturnType<typeof getLogCardDisplay>;
-  embedded: boolean;
   compact: boolean;
   grid: boolean;
   onViewReview: (logId: string) => void;
   t: TFunction;
 }) {
-  if (!display.review) {
-    if (compact || grid) return null;
-    return <span className="invisible text-xs sm:text-sm line-clamp-2">—</span>;
-  }
+  const review = display.review?.trim() ?? "";
+  const reviewRef = useRef<HTMLParagraphElement>(null);
+  const [clamped, setClamped] = useState(false);
 
-  const review = display.review;
-  const truncated = review.length > REVIEW_PREVIEW_LENGTH;
-  const preview = truncated ? review.slice(0, REVIEW_PREVIEW_LENGTH) : review;
-  const showClamp = (embedded || compact || grid) && truncated;
-  const reviewClass = compact ? "text-[9px] sm:text-[10px]" : grid ? "text-[10px] md:text-[9px]" : "text-xs sm:text-sm";
+  useLayoutEffect(() => {
+    const el = reviewRef.current;
+    if (!el) return;
+    setClamped(el.scrollHeight > el.clientHeight + 1);
+  }, [review, compact, grid]);
+
+  if (!review) return null;
 
   return (
-    <>
-      <div
+    <div className="flex w-full min-w-0 flex-col items-start gap-0.5">
+      <p
+        ref={reviewRef}
         className={cn(
-          "w-full min-w-0",
-          showClamp ? (grid ? "line-clamp-1" : "line-clamp-2") : "",
-          !compact && !grid && LOG_CARD_REVIEW_MAX_WIDTH
+          "line-clamp-2 w-full min-w-0 break-words text-[var(--color-light)]",
+          compact ? "text-[10px]" : "text-[13px]"
         )}
       >
-        <p className={cn(reviewClass, "text-[var(--color-light)] whitespace-pre-wrap break-words")}>
-          {preview}
-          {truncated && " ... "}
-        </p>
-      </div>
-      {truncated && (
-        <Button
+        {review}
+      </p>
+      {clamped && (
+        <button
           type="button"
-          variant="link"
-          size="sm"
-          className="h-auto shrink-0 p-0 text-[10px] text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300 md:text-[9px] sm:text-xs"
+          className="max-w-full break-words text-left text-[13px] font-medium text-[var(--color-lightest)] underline-offset-2 hover:underline"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -434,9 +417,9 @@ function LogReviewBlock({
           }}
         >
           {t("social.viewMore")}
-        </Button>
+        </button>
       )}
-    </>
+    </div>
   );
 }
 
@@ -473,6 +456,7 @@ function LogActions({
   onEdit,
   onDelete,
   t,
+  inline = false,
 }: {
   log: Log;
   readOnly: boolean;
@@ -486,6 +470,7 @@ function LogActions({
   onEdit: (log: Log, tab: "review" | "matches" | "market") => void;
   onDelete?: (logId: string) => void | Promise<void>;
   t: TFunction;
+  inline?: boolean;
 }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [deletingConfirm, setDeletingConfirm] = useState(false);
@@ -570,13 +555,16 @@ function LogActions({
   };
 
   const isGrid = view === "grid";
-  const containerClass = view === "compact"
-    ? "flex shrink-0 items-center justify-end gap-1 border-t border-[var(--color-surface-border)]/80 p-1.5"
-    : isGrid
-      ? LOG_CARD_ACTION_COLUMN_GRID
-      : LOG_CARD_ACTION_COLUMN;
-  const triggerClass =
-    view === "compact"
+  const containerClass = inline
+    ? "flex w-full min-w-0 flex-wrap items-center gap-1.5"
+    : view === "compact"
+      ? "flex shrink-0 items-center justify-end gap-1 border-t border-[var(--color-surface-border)]/80 p-1.5"
+      : isGrid
+        ? LOG_CARD_ACTION_COLUMN_GRID
+        : LOG_CARD_ACTION_COLUMN;
+  const triggerClass = inline
+    ? "h-9 w-9 rounded-[10px] text-[var(--color-light)]"
+    : view === "compact"
       ? "h-11 w-11 min-h-[44px] min-w-[44px] rounded-xl text-[var(--color-light)] hover:bg-[var(--color-mid)]/40 hover:text-[var(--color-lightest)]"
       : cn(
           isGrid ? LOG_CARD_EDIT_BUTTON_GRID : LOG_CARD_EDIT_BUTTON,
@@ -590,6 +578,32 @@ function LogActions({
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
       >
+        {inline && (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-auto min-h-9 max-w-full whitespace-normal px-2.5 py-1.5 text-left text-[13px] leading-snug"
+              disabled={busy}
+              onClick={() => onEdit(log, "review")}
+            >
+              {t("mediaLogs.log")}
+            </Button>
+            {showMatch && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-auto min-h-9 max-w-full whitespace-normal px-2.5 py-1.5 text-left text-[13px] leading-snug"
+                disabled={busy}
+                onClick={() => onEdit(log, "matches")}
+              >
+                {t("mediaLogs.addMatch")}
+              </Button>
+            )}
+          </>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -601,7 +615,9 @@ function LogActions({
               aria-label={t("mediaLogs.quickActionsLabel")}
             >
               {busy ? (
-                <Loader2 className={cn("animate-spin", isGrid ? "h-3.5 w-3.5 md:h-3 md:w-3" : "h-4 w-4")} aria-hidden />
+                <Loader2 className={cn("animate-spin", inline ? "h-4 w-4" : isGrid ? "h-3.5 w-3.5 md:h-3 md:w-3" : "h-4 w-4")} aria-hidden />
+              ) : inline ? (
+                <MoreHorizontal className="h-4 w-4" aria-hidden />
               ) : (
                 <Pencil className={cn(isGrid ? "h-3.5 w-3.5 md:h-3 md:w-3" : "h-4 w-4")} aria-hidden />
               )}
@@ -700,7 +716,6 @@ function LogActions({
 
 export function MediaLogCard({
   log,
-  embedded,
   readOnly,
   view,
   mediaType,
@@ -727,13 +742,13 @@ export function MediaLogCard({
     return (
       <Card
         className={cn(
-          "relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-[var(--color-dark)] p-0",
+          "relative flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] bg-[var(--color-dark)] p-0",
           borderClass
         )}
         style={cardShadow}
       >
         {!readOnly && deletingId === log.id && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0D1B2A]/70">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-darkest)]/70">
             <Loader2 className="h-6 w-6 animate-spin text-[var(--color-light)]" />
           </div>
         )}
@@ -796,11 +811,10 @@ export function MediaLogCard({
               grid={false}
             />
             <LogProgressLine log={log} hasProgressButton={hasProgressButton} t={t} compact grid={false} />
-            <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col gap-0.5">
               <LogReviewBlock
                 log={log}
                 display={display}
-                embedded={embedded}
                 compact
                 grid={false}
                 onViewReview={onViewReview}
@@ -827,126 +841,86 @@ export function MediaLogCard({
     );
   }
 
+  const detailPath = itemDetailPath(log.mediaType, log.externalId);
+  const statusLabel = log.status ? getStatusLabel(t, log.status) : null;
+
   return (
-    <Card
+            <Card
       className={cn(
-        "relative flex min-h-0 flex-row overflow-hidden rounded-lg bg-[var(--color-dark)] p-0",
-        embedded
-          ? isGrid
-            ? LOG_CARD_HEIGHT_EMBEDDED_GRID_COLLAPSED
-            : LOG_CARD_HEIGHT_EMBEDDED_COLLAPSED
-          : LOG_CARD_HEIGHT_DEFAULT,
-        borderClass
+        "relative flex w-full min-w-0 gap-3 rounded-[14px] border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-2.5 shadow-[var(--shadow-sm)]",
+        isGrid ? "flex-col" : "flex-row items-start"
       )}
-      style={cardShadow}
     >
       {!readOnly && deletingId === log.id && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0D1B2A]/70">
-          <Loader2 className={cn("animate-spin text-[var(--color-light)]", isGrid ? "h-6 w-6" : "h-8 w-8")} />
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-[var(--color-darkest)]/70">
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--color-light)]" />
         </div>
       )}
-      <LogCardTapArea
-        log={log}
-        readOnly={readOnly}
-        onEdit={onEdit}
-        className="flex min-w-0 flex-1 flex-row overflow-hidden"
-      >
-        {readOnly ? (
-          <MotionLink
-            to={itemDetailPath(log.mediaType, log.externalId)}
-            whileTap={tapScale}
-            transition={tapTransition}
-            className={isGrid ? LOG_CARD_IMAGE_COLUMN_GRID : LOG_CARD_IMAGE_COLUMN}
-          >
-            <div className="absolute inset-0 min-h-0">
-              <ItemImage
-                src={log.image}
-                className="h-full w-full min-h-0"
-                mediaType={log.mediaType}
-                boardGameSource={log.boardGameSource}
-              />
-            </div>
-            <LogImageOverlays log={log} t={t} compact={false} grid={isGrid} />
-          </MotionLink>
-        ) : (
-          <div className={isGrid ? LOG_CARD_IMAGE_COLUMN_GRID : LOG_CARD_IMAGE_COLUMN}>
-            <div className="absolute inset-0 min-h-0">
-              <ItemImage
-                src={log.image}
-                className="h-full w-full min-h-0"
-                mediaType={log.mediaType}
-                boardGameSource={log.boardGameSource}
-              />
-            </div>
-            <LogImageOverlays log={log} t={t} compact={false} grid={isGrid} />
-          </div>
-        )}
-        <div
+      <Link to={detailPath} className={cn("shrink-0", isGrid && "block w-full")}>
+        <ItemImage
+          src={log.image}
+          alt=""
+          mediaType={log.mediaType}
+          boardGameSource={log.boardGameSource}
           className={cn(
-            "flex min-w-0 flex-1 flex-col overflow-hidden",
-            isGrid ? LOG_CARD_BODY_GAP_GRID : LOG_CARD_BODY_GAP,
-            isGrid ? LOG_CARD_BODY_PADDING_GRID : LOG_CARD_BODY_PADDING,
-            embedded && "min-h-0"
+            "overflow-hidden rounded-[10px] bg-[var(--color-mid)]/30",
+            isGrid ? "aspect-[2/3] w-full" : "h-24 w-16"
           )}
+        />
+      </Link>
+      <div className="flex w-full min-w-0 flex-1 flex-col gap-1.5">
+        <Link
+          to={detailPath}
+          className="line-clamp-2 min-w-0 break-words text-base font-semibold leading-snug text-[var(--color-lightest)] hover:underline"
         >
-          {readOnly ? (
-            <MotionLink
-              to={itemDetailPath(log.mediaType, log.externalId)}
-              whileTap={tapScale}
-              transition={tapTransition}
-              className="block min-w-0 font-semibold text-[var(--color-lightest)] no-underline hover:underline"
-            >
-              <OverflowMarquee className={isGrid ? LOG_CARD_TITLE_GRID : LOG_CARD_TITLE}>{log.title}</OverflowMarquee>
-            </MotionLink>
-          ) : (
-            <div className="block min-w-0 font-semibold text-[var(--color-lightest)]">
-              <OverflowMarquee className={isGrid ? LOG_CARD_TITLE_GRID : LOG_CARD_TITLE}>{log.title}</OverflowMarquee>
-            </div>
-          )}
-          <LogMetaRow
-            log={log}
-            display={display}
-            scopeLabel={scopeLabel}
-            mediaType={mediaType}
-            showCollectionOwnershipFilters={showCollectionOwnershipFilters}
-            t={t}
-            locale={locale}
-            compact={false}
-            grid={isGrid}
-          />
-          <LogProgressLine log={log} hasProgressButton={hasProgressButton} t={t} compact={false} grid={isGrid} />
-          <div
-            className={cn(
-              "flex min-h-0 flex-col items-start gap-1",
-              embedded && "flex-1 overflow-hidden"
-            )}
-          >
-            <LogReviewBlock
-              log={log}
-              display={display}
-              embedded={embedded}
-              compact={false}
-              grid={isGrid}
-              onViewReview={onViewReview}
-              t={t}
-            />
-          </div>
-        </div>
-      </LogCardTapArea>
-      <LogActions
-        log={log}
-        readOnly={readOnly}
-        view={isGrid ? "grid" : "list"}
-        mediaType={mediaType}
-        deletingId={deletingId}
-        incrementingId={incrementingId}
-        statusChangingId={statusChangingId}
-        onIncrement={onIncrement}
-        onStatusChange={onStatusChange}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        t={t}
-      />
+          {log.title}
+        </Link>
+        <LogActions
+          inline
+          log={log}
+          readOnly={readOnly}
+          view={isGrid ? "grid" : "list"}
+          mediaType={mediaType}
+          deletingId={deletingId}
+          incrementingId={incrementingId}
+          statusChangingId={statusChangingId}
+          onIncrement={onIncrement}
+          onStatusChange={onStatusChange}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          t={t}
+        />
+        <p className="min-w-0 break-words text-[13px] text-[var(--color-light)]">{t(`nav.${log.mediaType}`)}</p>
+        {statusLabel ? (
+          <span className="w-fit max-w-full whitespace-normal break-words rounded-full border border-[var(--color-surface-border)] bg-[var(--color-mid)]/25 px-2 py-0.5 text-left text-[11px] font-semibold leading-snug text-[var(--color-light)]">
+            {statusLabel}
+          </span>
+        ) : null}
+        {display.grade != null ? (
+          <StarRating value={gradeToStars(display.grade)} readOnly size="sm" />
+        ) : null}
+        <LogReviewBlock
+          log={log}
+          display={display}
+          compact={false}
+          grid={isGrid}
+          onViewReview={onViewReview}
+          t={t}
+        />
+        <LogMetaRow
+          log={log}
+          display={display}
+          scopeLabel={scopeLabel}
+          mediaType={mediaType}
+          showCollectionOwnershipFilters={showCollectionOwnershipFilters}
+          t={t}
+          locale={locale}
+          compact={false}
+          grid={isGrid}
+          hideStars
+        />
+        <LogProgressLine log={log} hasProgressButton={hasProgressButton} t={t} compact={false} grid={isGrid} />
+      </div>
     </Card>
   );
 }

@@ -32,7 +32,7 @@ export function LogViewSelector({
       <span id={labelId} className="sr-only">
         {t("mediaLogs.viewLabel")}
       </span>
-      <div className="relative flex h-full w-full items-stretch rounded-full border border-[var(--color-mid)]/25 bg-[var(--color-mid)]/12 p-1 shadow-inner">
+      <div className="relative flex h-full w-full items-stretch gap-1 rounded-full border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-1">
         {MODES.map(({ value: mode, Icon, labelKey }) => {
           const selected = value === mode;
           return (
@@ -48,7 +48,7 @@ export function LogViewSelector({
                 "relative z-10 flex h-full min-w-9 flex-1 items-center justify-center rounded-full px-2 transition-colors duration-200 sm:min-w-10",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--color-darkest)]",
                 selected
-                  ? "bg-[var(--color-mid)] text-[var(--color-darkest)] shadow-sm"
+                  ? "bg-[var(--color-lightest)] text-[var(--color-darkest)]"
                   : "text-[var(--color-light)] hover:bg-[var(--color-mid)]/15"
               )}
             >

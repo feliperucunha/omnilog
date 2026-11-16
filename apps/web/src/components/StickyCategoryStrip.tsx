@@ -39,7 +39,7 @@ export function StickyCategoryStrip({
   onSelect,
   showCount = items.some((i) => i.count != null),
   mobileOnly = true,
-  stickyTop = "top-14",
+  stickyTop = "top-0",
   bare = false,
   "aria-label": ariaLabel,
   className,
@@ -67,51 +67,46 @@ export function StickyCategoryStrip({
     <div
       className={cn(
         "flex min-w-0 w-full shrink-0",
-        !bare && "border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]",
-        stickyTop && `sticky z-20 self-start ${stickyTop}`,
+        !bare && "pb-2",
+        stickyTop && `sticky z-20 h-fit w-full self-start ${stickyTop}`,
         mobileOnly && "md:hidden",
         className
       )}
     >
-      {/* Scrollable row – edge-to-edge, no horizontal padding */}
       <div
         ref={scrollerRef}
-        className="scrollbar-hide flex min-w-0 overflow-x-auto overflow-y-hidden scroll-smooth min-h-[3rem] [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]"
+        className="scrollbar-hide flex min-w-0 gap-1.5 overflow-x-auto overflow-y-hidden scroll-smooth py-1 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [touch-action:pan-x]"
         role="tablist"
         aria-label={ariaLabel}
       >
-        <div className="flex min-w-max items-stretch gap-6 pl-2.5 pr-2.5 md:pl-3 md:pr-3">
-          {items.map((item) => {
-            const selected = selectedValue === item.value;
-            return (
-              <button
-                key={item.value}
-                ref={selected ? selectedRef : undefined}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                disabled={item.disabled}
-                title={item.title}
-                onClick={() => !item.disabled && onSelect(item.value)}
-                className={cn(
-                  "flex h-full shrink-0 flex-col items-center justify-start border-b-2 pt-3 text-sm transition-colors max-md:min-h-[44px]",
-                  "border-transparent whitespace-nowrap",
-                  item.disabled && "cursor-not-allowed opacity-50",
-                  selected
-                    ? "border-[var(--btn-gradient-end)] font-semibold text-[var(--color-lightest)] dark:border-[var(--btn-gradient-start)]"
-                    : "text-[var(--color-light)] hover:text-[var(--color-lightest)]"
-                )}
-              >
-                <span className="inline-flex items-baseline gap-1">
-                  {item.label}
-                  {showCount && item.count != null ? (
-                    <span className="tabular-nums">({item.count})</span>
-                  ) : null}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {items.map((item) => {
+          const selected = selectedValue === item.value;
+          return (
+            <button
+              key={item.value}
+              ref={selected ? selectedRef : undefined}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-pressed={selected}
+              disabled={item.disabled}
+              title={item.title}
+              onClick={() => !item.disabled && onSelect(item.value)}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-2 text-[13px] font-medium whitespace-nowrap max-md:min-h-9",
+                item.disabled && "cursor-not-allowed opacity-50",
+                selected
+                  ? "border-[var(--color-lightest)] bg-[var(--color-lightest)] text-[var(--color-darkest)]"
+                  : "border-[var(--color-surface-border)] bg-[var(--color-dark)] text-[var(--color-light)] hover:text-[var(--color-lightest)]"
+              )}
+            >
+              {item.label}
+              {showCount && item.count != null ? (
+                <span className="tabular-nums"> · {item.count}</span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

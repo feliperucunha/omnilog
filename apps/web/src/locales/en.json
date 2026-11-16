@@ -541,7 +541,13 @@
     "searchAndAddFirst": "Search and add your first log",
     "share": "Share profile",
     "statsTitle": "Time consumed",
-    "title": "Library"
+    "title": "Library",
+    "shelves": "Shelves",
+    "allLogs": "All logs",
+    "continue": "Continue",
+    "thisWeek": "This week",
+    "thisWeekHint": "Logs updated in the last 7 days, from the shelves above.",
+    "openActivity": "Open activity"
   },
   "statistics": {
     "categoryFilter": "Filter statistics by category",
@@ -776,6 +782,7 @@
   },
   "search": {
     "search": "Search",
+    "catalogs": "Search catalogs",
     "clearSearch": "Clear",
     "searching": "Searching…",
     "searchPlaceholder": "Search {{type}}...",
@@ -873,6 +880,7 @@
     "badgePopupReviews": "reviews",
     "badgePopupLog": "log",
     "badgePopupLogs": "logs",
+    "log": "Log",
     "addMatch": "Log a match",
     "daysAgoToday": "today",
     "daysAgoDay": "1d",

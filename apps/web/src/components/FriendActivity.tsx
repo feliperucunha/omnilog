@@ -46,7 +46,7 @@ export function FriendActivity() {
     const path = friendId === "all" ? buildFeedPath() : buildFeedPath(friendId);
     const cached = getCachedEntry<{ data: FeedEntry[] }>("GET", path);
     if (cached) {
-      setFeed(cached.data ?? []);
+      setFeed(cached.data.data ?? []);
       setLoading(false);
     }
     void apiFetchSWR<{ data: FeedEntry[] }>(path, { ttlMs: HEAVY_PAGE_TTL_MS })

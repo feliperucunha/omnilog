@@ -541,7 +541,13 @@
     "searchAndAddFirst": "Busque e adicione seu primeiro registro",
     "share": "Compartilhar perfil",
     "statsTitle": "Tempo consumido",
-    "title": "Biblioteca"
+    "title": "Biblioteca",
+    "shelves": "Estantes",
+    "allLogs": "Todos os registros",
+    "continue": "Continuar",
+    "thisWeek": "Esta semana",
+    "thisWeekHint": "Registros atualizados nos últimos 7 dias, das estantes acima.",
+    "openActivity": "Abrir atividade"
   },
   "statistics": {
     "categoryFilter": "Filtrar estatísticas por categoria",
@@ -776,6 +782,7 @@
   },
   "search": {
     "search": "Buscar",
+    "catalogs": "Buscar nos catálogos",
     "clearSearch": "Limpar",
     "searching": "Buscando…",
     "searchPlaceholder": "Buscar {{type}}...",
@@ -873,6 +880,7 @@
     "badgePopupReviews": "resenhas",
     "badgePopupLog": "registro",
     "badgePopupLogs": "registros",
+    "log": "Registrar",
     "addMatch": "Registrar partida",
     "daysAgoToday": "hoje",
     "daysAgoDay": "1d",

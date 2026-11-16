@@ -520,7 +520,13 @@
     "searchAndAddFirst": "Busca y añade tu primer log",
     "share": "Compartir perfil",
     "statsTitle": "Tiempo consumido",
-    "title": "Biblioteca"
+    "title": "Biblioteca",
+    "shelves": "Estantes",
+    "allLogs": "Todos los logs",
+    "continue": "Continuar",
+    "thisWeek": "Esta semana",
+    "thisWeekHint": "Logs actualizados en los últimos 7 días, de los estantes de arriba.",
+    "openActivity": "Abrir actividad"
   },
   "statistics": {
     "categoryFilter": "Filtrar estadísticas por categoría",
@@ -755,6 +761,7 @@
   },
   "search": {
     "search": "Buscar",
+    "catalogs": "Buscar en los catálogos",
     "clearSearch": "Limpiar",
     "searching": "Buscando…",
     "searchPlaceholder": "Buscar {{type}}...",
@@ -852,6 +859,7 @@
     "badgePopupReviews": "reseñas",
     "badgePopupLog": "registro",
     "badgePopupLogs": "registros",
+    "log": "Registrar",
     "addMatch": "Registrar partida",
     "daysAgoToday": "hoy",
     "daysAgoDay": "1d",

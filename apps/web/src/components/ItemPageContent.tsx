@@ -44,22 +44,14 @@ import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
-import { getItemDisplayImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
-import {
-  BGG_BLUR_BACKDROP_IMG_CLASS,
-  BGG_CONTAIN_FOREGROUND_IMG_CLASS,
-  isBggBoardGameImageContext,
-} from "@/lib/boardGameImageFit";
+import { getItemDisplayImageUrl } from "@/lib/getHeroImageUrl";
+import { ItemImage } from "@/components/ItemImage";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps, visibleEnterProps } from "@/lib/motionPolicy";
 import { useLocale } from "@/contexts/LocaleContext";
 import { paperShadow } from "@/lib/paperShadow";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { isCapacitorAndroid } from "@/lib/androidOverlayBack";
 import { cn } from "@/lib/utils";
-
-/** Android WebView: `filter: blur()` on the BGG backdrop can break compositing so body text never paints. */
-const BGG_BACKDROP_ANDROID_CLASS =
-  "pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover object-center opacity-[0.55]";
 
 function ItemDetailsBlock({
   item,
@@ -939,113 +931,67 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
   const showPagination = reviewsTotal > pageSize;
 
   const heroUrl = getItemDisplayImageUrl(item.image, item.thumbnail);
-  const bggHeroFraming = isBggBoardGameImageContext(mediaType, heroUrl, item.itemSource ?? null, undefined);
 
   return (
     <motion.div {...visibleEnterProps} className="min-w-0 overflow-x-hidden">
       <div className="flex min-w-0 flex-col gap-8">
-        {/* Hero header: high-res image background with strong gradient for readable text */}
-        <header className="relative min-h-[min(38vh,280px)] w-full overflow-hidden rounded-xl sm:min-h-[min(42vh,360px)]">
-          {/* Background: BGG = blurred fill + full-bleed contain art; else CSS cover poster */}
-          {heroUrl && bggHeroFraming ? (
-            <div className="absolute inset-0 overflow-hidden bg-[var(--color-darkest)]">
-              <img
-                src={heroUrl}
-                alt=""
-                aria-hidden
-                className={androidWebView ? BGG_BACKDROP_ANDROID_CLASS : BGG_BLUR_BACKDROP_IMG_CLASS}
-                referrerPolicy="no-referrer"
-              />
-              <img
-                src={heroUrl}
-                alt=""
-                className={BGG_CONTAIN_FOREGROUND_IMG_CLASS}
-                referrerPolicy="no-referrer"
-              />
-            </div>
-          ) : (
-            <div
-              className="absolute inset-0 bg-[var(--color-darkest)] bg-cover bg-center bg-no-repeat"
-              style={heroUrl ? { backgroundImage: cssBackgroundImageUrl(heroUrl) } : undefined}
+        <header className="flex min-w-0 flex-col gap-4">
+          <Button variant="outline" size="sm" className="w-fit" onClick={onBack}>
+            <ArrowLeft size={18} />
+            {t("itemPage.back")}
+          </Button>
+          <div className="flex min-w-0 items-end gap-4">
+            <ItemImage
+              src={heroUrl}
+              alt=""
+              mediaType={mediaType}
+              boardGameSource={item.itemSource ?? null}
+              className="aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-[10px] bg-[var(--color-mid)]/30 sm:w-40"
             />
-          )}
-          {/* Strong gradient: dark scrim so text is always readable in both light and dark theme */}
-          <div
-            className="pointer-events-none absolute inset-0 z-[2]"
-            style={{
-              background:
-                "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 25%, rgba(0,0,0,0.5) 50%, rgba(13,27,42,0.97) 75%)",
-            }}
-          />
-          {/* Bottom bar: always dark so hero text has contrast in light theme */}
-          <div
-            className="pointer-events-none absolute bottom-0 left-0 right-0 z-[2] h-1/2 min-h-[140px]"
-            style={{
-              background: "linear-gradient(to bottom, transparent 0%, rgba(13,27,42,0.98) 55%)",
-            }}
-          />
-          {/* Back button: always light text on dark scrim (readable in both themes) */}
-          <div className="absolute left-0 top-0 z-10 p-2 sm:p-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="max-md:min-h-[44px] max-md:min-w-[44px] rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/55 hover:text-white"
-              onClick={onBack}
-            >
-              <ArrowLeft size={20} />
-              {t("itemPage.back")}
-            </Button>
-          </div>
-          {mediaType === "boardgames" && item.averageWeight != null && item.averageWeight > 0 && (
-            <span
-              className="absolute right-2 top-2 z-10 rounded bg-black/75 px-2 py-1 text-sm font-semibold text-yellow-300 backdrop-blur-sm sm:right-3 sm:top-3"
-              title={t("itemPage.weight")}
-            >
-              {formatBoardGameWeight(item.averageWeight)}
-            </span>
-          )}
-          {/* Title and meta: always light text on dark scrim (readable in both themes) */}
-          <div className="absolute bottom-0 left-0 right-0 z-10 flex min-w-0 flex-col gap-1.5 p-4 pb-6 sm:p-6 sm:pb-8 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
-            <div className="min-w-0">
-              <OverflowMarquee className="text-sm font-medium uppercase tracking-wide text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-                {label}
-              </OverflowMarquee>
-            </div>
-            <div role="heading" aria-level={1} className="min-w-0">
-              <OverflowMarquee className="text-xl font-bold text-white sm:text-2xl md:text-3xl [text-shadow:0_2px_8px_rgba(0,0,0,0.95)]">
-                {item.title}
-              </OverflowMarquee>
-            </div>
-            {(item.year || item.subtitle) && (
-              <p className="text-sm text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
-                {[item.year, item.subtitle].filter(Boolean).join(" · ")}
-              </p>
-            )}
-            {mediaType === "games" &&
-              item.timeToBeatHours != null &&
-              item.timeToBeatHours > 0 && (() => {
-                const { hours, minutes } = formatTimeToBeatHours(item.timeToBeatHours);
-                const value =
-                  minutes > 0
-                    ? t("itemPage.timeToBeatHoursMinutes", {
-                        hours: String(hours),
-                        minutes: String(minutes),
-                      })
-                    : t("itemPage.timeToBeatHours", { hours: String(hours) });
-                return (
-                  <p className="text-sm text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
-                    {t("itemPage.timeToBeat")}: {value}
-                  </p>
-                );
-              })()}
-            {meanGrade != null && (
-              <div className="mt-2 flex min-w-0 max-w-full flex-wrap items-center gap-2 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] [--color-light:rgb(255,255,255,0.9)] [--color-lightest:white]">
-                <StarRating value={gradeToStars(meanGrade)} readOnly size="xl" />
-                <span className="min-w-0 text-sm text-white/90">
-                  ({reviewsTotal} review{reviewsTotal === 1 ? "" : "s"})
-                </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5 pb-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-light)]">{label}</p>
+                {mediaType === "boardgames" && item.averageWeight != null && item.averageWeight > 0 && (
+                  <span
+                    className="rounded-full border border-[var(--color-surface-border)] px-2 py-0.5 text-xs font-semibold text-[var(--color-lightest)]"
+                    title={t("itemPage.weight")}
+                  >
+                    {formatBoardGameWeight(item.averageWeight)}
+                  </span>
+                )}
               </div>
-            )}
+              <h1 className="page-title text-[var(--color-lightest)]">{item.title}</h1>
+              {(item.year || item.subtitle) && (
+                <p className="text-sm text-[var(--color-light)]">
+                  {[item.year, item.subtitle].filter(Boolean).join(" · ")}
+                </p>
+              )}
+              {mediaType === "games" &&
+                item.timeToBeatHours != null &&
+                item.timeToBeatHours > 0 && (() => {
+                  const { hours, minutes } = formatTimeToBeatHours(item.timeToBeatHours);
+                  const value =
+                    minutes > 0
+                      ? t("itemPage.timeToBeatHoursMinutes", {
+                          hours: String(hours),
+                          minutes: String(minutes),
+                        })
+                      : t("itemPage.timeToBeatHours", { hours: String(hours) });
+                  return (
+                    <p className="text-sm text-[var(--color-light)]">
+                      {t("itemPage.timeToBeat")}: {value}
+                    </p>
+                  );
+                })()}
+              {meanGrade != null && (
+                <div className="mt-1 flex min-w-0 max-w-full flex-wrap items-center gap-2">
+                  <StarRating value={gradeToStars(meanGrade)} readOnly size="md" />
+                  <span className="min-w-0 text-sm text-[var(--color-light)]">
+                    ({reviewsTotal} review{reviewsTotal === 1 ? "" : "s"})
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

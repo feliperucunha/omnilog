@@ -104,38 +104,36 @@ export function Topbar() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex min-h-14 flex-shrink-0 items-center gap-3 sm:gap-4 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)] px-2.5 sm:px-4 pt-[env(safe-area-inset-top)]"
+        "sticky top-0 z-30 flex min-h-14 flex-shrink-0 items-center gap-3 border-b border-[var(--color-surface-border)] bg-[var(--color-darkest)] px-3.5 pt-[env(safe-area-inset-top)] md:px-7"
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        {/* Mobile: logo + title (or app name when no title) */}
         <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
           <Link
             to={token ? "/dashboard" : "/"}
-            className="flex shrink-0 items-center focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-dark)] rounded"
+            className="flex shrink-0 items-center rounded focus:outline-none focus:ring-2 focus:ring-[var(--color-mid)] focus:ring-offset-2 focus:ring-offset-[var(--color-darkest)]"
             aria-label={t("app.name")}
           >
-            <Logo alt={t("app.name")} className="h-9 w-auto flex-shrink-0 sm:h-11" />
+            <Logo alt={t("app.name")} className="h-9 w-auto flex-shrink-0" />
           </Link>
-          {displayTitle ? (
-            <span
-              className="display-title min-w-0 flex-1 truncate text-lg text-[var(--color-lightest)]"
-              title={displayTitle}
-            >
-              {displayTitle}
-            </span>
-          ) : (
-            <span className="brand-title -ml-1 text-lg font-bold text-(--btn-gradient-end) dark:text-(--btn-gradient-start)">{t("app.name")}</span>
-          )}
+          <div className="min-w-0">
+            <div className="display-title truncate text-base leading-none text-[var(--color-lightest)]">{t("app.name")}</div>
+            {displayTitle ? (
+              <div className="truncate text-xs text-[var(--color-light)]">{displayTitle}</div>
+            ) : null}
+          </div>
         </div>
-        {/* Desktop: page title only */}
-        {displayTitle && (
-          <span
-            className="display-title hidden min-w-0 flex-1 truncate text-lg text-[var(--color-lightest)] md:block md:text-2xl"
-            title={displayTitle}
+        {location.pathname !== "/search" ? (
+          <button
+            type="button"
+            className="hidden min-h-11 flex-1 items-center gap-2 rounded-[10px] border border-[var(--color-surface-border)] bg-[var(--color-dark)] px-3 text-left text-sm text-[var(--color-light)] md:flex"
+            onClick={() => navigate("/search")}
           >
-            {displayTitle}
-          </span>
+            <Search className="size-4 shrink-0" aria-hidden />
+            <span className="truncate">{t("search.catalogs")}</span>
+          </button>
+        ) : (
+          <div className="hidden flex-1 md:block" />
         )}
       </div>
 
@@ -146,12 +144,12 @@ export function Topbar() {
       )}
 
         <div className="ml-auto flex flex-shrink-0 items-center gap-2 sm:gap-3">
-        {token && location.pathname !== "/search" && (
+        {location.pathname !== "/search" && (
           <Button
             type="button"
             variant="outline"
             size="icon"
-            className="h-10 w-10"
+            className="h-10 w-10 md:hidden"
             onClick={() => navigate("/search")}
             aria-label={t("nav.search")}
           >

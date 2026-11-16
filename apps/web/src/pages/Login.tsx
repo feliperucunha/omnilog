@@ -199,7 +199,7 @@ export function Login() {
         <Card className="w-full border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-modal)]">
           <CardHeader className="flex flex-col items-center gap-4 text-center">
             <Logo alt="" className="h-24! w-auto sm:h-16" />
-            <h1 className="-mt-6 flex min-w-0 w-full flex-col gap-0.5 text-2xl font-bold text-[var(--color-lightest)]">
+            <h1 className="page-title -mt-6 flex min-w-0 w-full flex-col gap-0.5 text-[var(--color-lightest)]">
               <OverflowMarquee>{t("app.name")}</OverflowMarquee>
               <OverflowMarquee className="text-lg font-normal text-[var(--color-light)]">
                 {t("app.subtitle")}

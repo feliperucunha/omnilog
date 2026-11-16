@@ -50,8 +50,10 @@ import { useIsMobile } from "@/hooks/useMediaQuery";
 import {
   defaultPublicProfileLogView,
   resolveLogViewForContext,
+  type LogViewMode,
   type LogViewPage,
 } from "@/lib/logViewPreference";
+import { LIBRARY_FILTERS_OPEN_EVENT } from "@/lib/libraryFiltersRequest";
 import {
   LOG_LIST_CARD_GRID,
   LOG_LIST_CARD_GRID_DENSE,
@@ -216,6 +218,16 @@ interface MediaLogsProps {
   initialFiltersSyncKey?: string;
   /** When embedded, called when filters change so parent can include them in share URL. */
   onFiltersChange?: (filters: SharedFilters) => void;
+  /** When set, the parent owns the list/grid preference. */
+  logView?: LogViewMode;
+  onLogViewChange?: (view: LogViewMode) => void;
+  /** Hide the icon view switch when the parent already shows List and Grid. */
+  hideViewSelector?: boolean;
+  /** Hide the in-section Filters buttons when the page heading already has one. */
+  hideFiltersButton?: boolean;
+  /** Open the filters sheet on mount. Used when Filters is pressed before this list is shown. */
+  openFiltersOnMount?: boolean;
+  onFiltersOpened?: () => void;
 }
 
 const DEFAULT_SORT: MediaLogsSort = "dateDesc";
@@ -325,6 +337,12 @@ export function MediaLogs({
   initialFilters,
   initialFiltersSyncKey,
   onFiltersChange,
+  logView: controlledLogView,
+  onLogViewChange,
+  hideViewSelector = false,
+  hideFiltersButton = false,
+  openFiltersOnMount = false,
+  onFiltersOpened,
 }: MediaLogsProps) {
   const onFiltersChangeRef = useRef(onFiltersChange);
   onFiltersChangeRef.current = onFiltersChange;
@@ -418,7 +436,25 @@ export function MediaLogs({
   const logViewEnabled = !!embedded;
   const logViewPage: LogViewPage = publicUserId ? "publicProfile" : "dashboard";
   const logViewFallback = publicUserId ? defaultPublicProfileLogView(isMobile) : "list";
-  const [logView, setLogView] = useLogViewPreference(logViewPage, logViewEnabled, logViewFallback);
+  const viewControlled = onLogViewChange != null;
+  const [storedLogView, setStoredLogView] = useLogViewPreference(
+    logViewPage,
+    logViewEnabled && !viewControlled,
+    logViewFallback
+  );
+  const logView = viewControlled ? (controlledLogView ?? storedLogView) : storedLogView;
+  const setLogView = onLogViewChange ?? setStoredLogView;
+
+  useEffect(() => {
+    if (!embedded || readOnly) return;
+    if (openFiltersOnMount) {
+      setFiltersOpen(true);
+      onFiltersOpened?.();
+    }
+    const open = () => setFiltersOpen(true);
+    window.addEventListener(LIBRARY_FILTERS_OPEN_EVENT, open);
+    return () => window.removeEventListener(LIBRARY_FILTERS_OPEN_EVENT, open);
+  }, [embedded, readOnly, openFiltersOnMount, onFiltersOpened]);
 
   const buildLogsPath = useCallback(
     (cursor?: string | null) => {
@@ -1169,11 +1205,13 @@ export function MediaLogs({
                   </span>
                 </Button>
               </motion.div>
-              <Button type="button" variant="outline" className="shrink-0" onClick={() => setFiltersOpen(true)}>
-                <SlidersHorizontal className="size-4" aria-hidden />
-                {t("mediaLogs.filters")}
-                {activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
-              </Button>
+              {!hideFiltersButton && (
+                <Button type="button" variant="outline" className="shrink-0" onClick={() => setFiltersOpen(true)}>
+                  <SlidersHorizontal className="size-4" aria-hidden />
+                  {t("mediaLogs.filters")}
+                  {activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -1294,11 +1332,13 @@ export function MediaLogs({
                 {t("customEntry.importButton")}
               </Button>
             </motion.div>
-            <Button type="button" variant="outline" className="h-8 shrink-0 px-2 text-xs md:h-9 md:px-3 md:text-sm" onClick={() => setFiltersOpen(true)}>
-              <SlidersHorizontal className="size-4" aria-hidden />
-              <span className="max-md:sr-only">{t("mediaLogs.filters")}</span>
-              {activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
-            </Button>
+            {!hideFiltersButton && (
+              <Button type="button" variant="outline" className="h-8 shrink-0 px-2 text-xs md:h-9 md:px-3 md:text-sm" onClick={() => setFiltersOpen(true)}>
+                <SlidersHorizontal className="size-4" aria-hidden />
+                <span className="max-md:sr-only">{t("mediaLogs.filters")}</span>
+                {activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -1325,7 +1365,7 @@ export function MediaLogs({
       {(embedded || readOnly) && (
         <div className="flex min-w-0 items-center gap-2">
           {categorySearchBar}
-          {logViewEnabled && (
+          {logViewEnabled && !hideViewSelector && (
             <LogViewSelector value={logView} onValueChange={setLogView} />
           )}
         </div>
@@ -1333,7 +1373,11 @@ export function MediaLogs({
 
       {isMobile ? (
         <Drawer open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <DrawerContent onClose={() => setFiltersOpen(false)} mobileHeight="auto" className="px-4 pb-6">
+          <DrawerContent
+            onClose={() => setFiltersOpen(false)}
+            mobileHeight="auto"
+            className="px-4 pb-[max(7rem,calc(5.5rem+env(safe-area-inset-bottom)))]"
+          >
             <div className="flex flex-col gap-3 px-1 pt-4">
               <h2 className="text-lg font-semibold text-[var(--color-lightest)]">{t("mediaLogs.filters")}</h2>
               <LibraryFilterFields
@@ -1364,7 +1408,10 @@ export function MediaLogs({
         </Drawer>
       ) : (
         <Dialog open={filtersOpen} onOpenChange={(open) => !open && setFiltersOpen(false)}>
-          <DialogContent onClose={() => setFiltersOpen(false)} className="sm:max-w-md">
+          <DialogContent
+            onClose={() => setFiltersOpen(false)}
+            className="sm:left-auto sm:right-0 sm:top-0 sm:h-dvh sm:max-h-dvh sm:w-full sm:max-w-sm sm:translate-x-0 sm:translate-y-0 sm:rounded-none sm:rounded-l-[14px]"
+          >
             <DialogHeader>
               <DialogTitle className="text-[var(--color-lightest)]">{t("mediaLogs.filters")}</DialogTitle>
             </DialogHeader>
@@ -1452,13 +1499,9 @@ export function MediaLogs({
               <motion.div
                 key={log.id}
                 variants={listStaggerItemVariants}
-                className={cn(
-                  "min-h-0",
-                  activeLogView === "list" && "sm:h-full",
-                  listStaggerItemClassName
-                )}
+                className={cn("min-h-0 min-w-0", listStaggerItemClassName)}
               >
-                <div className="h-full">
+                <div>
                   <MediaLogCard
                     log={log}
                     embedded={embedded}

@@ -1564,14 +1564,14 @@ export function Statistics() {
     }
     if (!visibleTypesOrderReady) {
       setBelowNavbar?.(
-        <div className="sticky top-14 z-20 w-full shrink-0 self-start border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
+        <div className="sticky top-0 z-20 h-fit w-full shrink-0 self-start border-b border-[var(--color-surface-border)] bg-[var(--color-darkest)]">
           <CategoryOrderSkeletonStrip />
         </div>
       );
       return;
     }
     setBelowNavbar?.(
-      <div className="sticky top-14 z-20 w-full shrink-0 self-start border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
+      <div className="sticky top-0 z-20 h-fit w-full shrink-0 self-start border-b border-[var(--color-surface-border)] bg-[var(--color-darkest)]">
         <StickyCategoryStrip
           items={[
             { value: "all", label: t("statistics.filterAll") },

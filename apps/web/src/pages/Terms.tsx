@@ -21,7 +21,7 @@ export function Terms() {
       animate={{ opacity: 1, y: 0 }}
       className="mx-auto w-full max-w-2xl space-y-4 text-sm leading-relaxed text-[var(--color-light)]"
     >
-      <h1 className="min-w-0 text-2xl font-semibold text-[var(--color-lightest)]">
+      <h1 className="page-title min-w-0 text-[var(--color-lightest)]">
         <OverflowMarquee>{t("legal.termsTitle")}</OverflowMarquee>
       </h1>
       <p className="whitespace-pre-wrap">{t("legal.termsIntro", { email: supportEmail })}</p>

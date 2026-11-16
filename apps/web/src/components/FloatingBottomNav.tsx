@@ -60,10 +60,10 @@ function DockTab({
     <Link
       to={to}
       className={cn(
-        "relative z-[1] flex min-h-[44px] min-w-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1.5",
+        "relative z-[1] flex min-h-[44px] min-w-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-[10px] px-1 py-1.5",
         "text-[var(--color-light)] transition-colors duration-200 [-webkit-tap-highlight-color:transparent]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--btn-gradient-start)]/50",
-        isActive && "text-[var(--btn-gradient-start)]"
+        isActive && "text-[var(--color-lightest)]"
       )}
       aria-current={isActive ? "page" : undefined}
       aria-label={label}
@@ -71,20 +71,19 @@ function DockTab({
       {isActive ? (
         <motion.span
           layoutId="floating-dock-active"
-          className="absolute inset-0 rounded-2xl bg-[var(--btn-gradient-start)]/14 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--btn-gradient-start)_25%,transparent)]"
+          className="absolute inset-0 rounded-[10px] bg-[color-mix(in_srgb,var(--btn-gradient-start)_16%,transparent)]"
           transition={springSoft}
         />
       ) : null}
       <Icon
         size={ICON_SIZE}
         strokeWidth={isActive ? 2.25 : 1.85}
-        className={cn("relative z-[1] shrink-0", isActive && "text-[var(--btn-gradient-start)]")}
+        className="relative z-[1] shrink-0"
         aria-hidden
       />
       <span
         className={cn(
-          "relative z-[1] max-w-full truncate text-center text-[10px] font-medium leading-tight",
-          isActive && "text-[var(--btn-gradient-start)]"
+          "relative z-[1] max-w-full truncate text-center text-[10px] font-medium leading-tight"
         )}
       >
         {label}
@@ -122,7 +121,7 @@ export function FloatingBottomNav() {
       <LayoutGroup id="floating-dock">
         <nav
           ref={dockRef}
-          className="glass-dock pointer-events-auto flex w-full max-w-md items-stretch gap-0.5 rounded-[1.75rem] p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
+          className="glass-dock pointer-events-auto flex w-full max-w-md items-stretch gap-0.5 p-1.5"
           aria-label="Main navigation"
         >
           {items.map((item) => (

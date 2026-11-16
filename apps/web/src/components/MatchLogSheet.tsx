@@ -30,10 +30,12 @@ export function MatchLogSheet({
   const body = (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="min-w-0 pr-8">
-        <h2 className="text-lg font-semibold text-[var(--color-lightest)]">{t("mediaLogs.addMatch")}</h2>
-        <p className="mt-1 truncate text-2xl font-semibold text-[var(--color-lightest)]" title={title}>
-          {title}
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-light)]">
+          {t("mediaLogs.addMatch")}
         </p>
+        <h2 className="page-title mt-1 truncate text-[var(--color-lightest)]" title={title}>
+          {title}
+        </h2>
       </div>
       <BoardGameMatchesSection
         sessionOnly
@@ -52,9 +54,9 @@ export function MatchLogSheet({
           onClose={onClose}
           ignoreOutsideCloseForMs={450}
           mobileHeight="95%"
-          className="flex max-h-[85dvh] w-full max-w-lg flex-col overflow-y-auto p-4 sm:p-6"
+          className="px-4 pb-6"
         >
-          <div className="mt-6">{body}</div>
+          {body}
         </DrawerContent>
       </Drawer>
     );
@@ -62,7 +64,7 @@ export function MatchLogSheet({
 
   return (
     <Dialog open modal={false} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent onClose={onClose} className="flex max-h-[90vh] flex-col overflow-y-auto sm:max-w-lg">
+      <DialogContent onClose={onClose} className="flex max-h-[80vh] flex-col overflow-y-auto rounded-[18px] sm:max-w-lg">
         {body}
       </DialogContent>
     </Dialog>

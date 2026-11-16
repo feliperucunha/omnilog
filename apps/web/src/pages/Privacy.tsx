@@ -35,7 +35,7 @@ export function Privacy() {
       className="mx-auto w-full max-w-2xl space-y-8 text-sm leading-relaxed text-[var(--color-light)]"
     >
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold text-[var(--color-lightest)]">{t("legal.privacyTitle")}</h1>
+        <h1 className="page-title text-[var(--color-lightest)]">{t("legal.privacyTitle")}</h1>
         <p className="text-xs text-[var(--color-light)]">{t("legal.privacyLastUpdated", params)}</p>
       </header>
 
