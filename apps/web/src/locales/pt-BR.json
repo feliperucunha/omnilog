@@ -23,8 +23,9 @@
     "accept": "OK"
   },
   "nav": {
-    "dashboard": "Início",
-    "statistics": "Estatísticas",
+    "dashboard": "Biblioteca",
+    "discover": "Descobrir",
+    "statistics": "Atividade",
     "movies": "Filmes",
     "tv": "Séries",
     "boardgames": "Jogos de tabuleiro",
@@ -36,7 +37,7 @@
     "search": "Buscar",
     "market": "Mercado",
     "myListings": "Meus anúncios",
-    "settings": "Configurações",
+    "settings": "Você",
     "plans": "Planos",
     "about": "Sobre",
     "lab": "Laboratório UI",
@@ -262,7 +263,7 @@
     "termsContact": "Questões legais: {{email}}"
   },
   "settings": {
-    "title": "Configurações",
+    "title": "Você",
     "tabApp": "Configurações do app",
     "tabUser": "Configurações de usuário",
     "general": "Geral",
@@ -475,6 +476,30 @@
     "timeAgoHours": "há {{count}}h",
     "timeAgoDays": "há {{count}}d"
   },
+  "discover": {
+    "lede": "O que consumir agora, a partir dos registros que você já tem e de títulos que ainda não registrou.",
+    "refresh": "Atualizar",
+    "refreshing": "Lendo…",
+    "availableTomorrow": "Disponível amanhã",
+    "reading": "Lendo seus registros, inclusive cada campo de cada item. Fica pronto em instantes.",
+    "saved": "Salvo neste aparelho {{when}}. Uma nova visita não consulta os catálogos de novo até amanhã.",
+    "note": "Uma vez por dia. Uma categoria entra quando tem 10 registros. As sugestões fora da lista vêm dos catálogos que o Geeklogs já usa.",
+    "needsMore": "{{category}} precisa de mais registros",
+    "needsMoreBody": "Descobrir lê uma categoria a partir de 10 itens. Esta tem {{count}}.",
+    "addInLibrary": "Adicionar na biblioteca",
+    "yourTaste": "Seu gosto",
+    "fromYourList": "Da sua lista",
+    "nothingPlanned": "Nada nesta categoria continua planejado. As sugestões abaixo saem da lista.",
+    "outsideList": "Fora da sua lista",
+    "onYourList": "Na sua lista",
+    "newToYou": "Novo para você",
+    "meanGrade": "{{grade}} / 10",
+    "logsCount": "{{count}} registros",
+    "topGenres": "Mais registrados: {{genres}}",
+    "statusMix": "{{status}}: {{count}}",
+    "friends": "Amigos",
+    "numbers": "Números"
+  },
   "dashboard": {
     "badgesAchievementUnlocked": "Conquista desbloqueada!",
     "badgesSectionTitle": "Emblemas",
@@ -516,7 +541,13 @@
     "searchAndAddFirst": "Busque e adicione seu primeiro registro",
     "share": "Compartilhar perfil",
     "statsTitle": "Tempo consumido",
-    "title": "Início"
+    "title": "Biblioteca",
+    "shelves": "Estantes",
+    "allLogs": "Todos os registros",
+    "continue": "Continuar",
+    "thisWeek": "Esta semana",
+    "thisWeekHint": "Registros atualizados nos últimos 7 dias, das estantes acima.",
+    "openActivity": "Abrir atividade"
   },
   "statistics": {
     "categoryFilter": "Filtrar estatísticas por categoria",
@@ -751,6 +782,7 @@
   },
   "search": {
     "search": "Buscar",
+    "catalogs": "Buscar nos catálogos",
     "clearSearch": "Limpar",
     "searching": "Buscando…",
     "searchPlaceholder": "Buscar {{type}}...",
@@ -813,6 +845,7 @@
     "couldntLoadLogs": "Não foi possível carregar os registros",
     "updatingList": "Atualizando lista…",
     "filterAll": "Todos",
+    "filters": "Filtros",
     "filterCollection": "Tenho / quero comprar",
     "filterOwned": "Na minha coleção",
     "filterWantToBuy": "Quero comprar",
@@ -847,6 +880,7 @@
     "badgePopupReviews": "resenhas",
     "badgePopupLog": "registro",
     "badgePopupLogs": "registros",
+    "log": "Registrar",
     "addMatch": "Registrar partida",
     "daysAgoToday": "hoje",
     "daysAgoDay": "1d",

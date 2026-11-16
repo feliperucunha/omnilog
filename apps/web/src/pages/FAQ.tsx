@@ -23,7 +23,7 @@ export function FAQ() {
       animate={{ opacity: 1, y: 0 }}
       className="mx-auto flex w-full max-w-2xl flex-col gap-6"
     >
-      <h1 className="min-w-0 text-2xl font-semibold text-[var(--color-lightest)]">
+      <h1 className="page-title min-w-0 text-[var(--color-lightest)]">
         <OverflowMarquee>{t("faq.title")}</OverflowMarquee>
       </h1>
       <p className="text-sm text-[var(--color-light)]">{t("faq.intro")}</p>

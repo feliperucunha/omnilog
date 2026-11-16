@@ -42,7 +42,6 @@ import {
   Trash2,
   Trophy,
   User,
-  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { boardGameSessionDurationLabel, boardGameSessionDurationOptions } from "@/lib/boardGameSessionDuration";
@@ -111,15 +110,6 @@ function initialsFromName(name: string): string {
   return t.slice(0, 2).toUpperCase() || "?";
 }
 
-function huesFromName(name: string): { h1: number; h2: number } {
-  let h = 0;
-  const s = name.trim() || "?";
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  const h1 = h % 360;
-  const h2 = (h1 + 48) % 360;
-  return { h1, h2 };
-}
-
 function PlayerAvatar({
   name,
   size = "md",
@@ -132,22 +122,17 @@ function PlayerAvatar({
   className?: string;
 }) {
   const initials = initialsFromName(name);
-  const { h1, h2 } = huesFromName(name);
   const sizeClass =
-    size === "sm" ? "h-9 w-9 min-h-9 min-w-9 text-[11px]" : size === "lg" ? "h-14 w-14 min-h-14 min-w-14 text-lg" : "h-10 w-10 min-h-10 min-w-10 text-sm";
+    size === "sm" ? "h-9 w-9 text-[11px]" : size === "lg" ? "h-12 w-12 text-base" : "h-9 w-9 text-[11px]";
 
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full font-bold tracking-tight text-white shadow-md ring-1 ring-white/15",
+        "flex shrink-0 items-center justify-center rounded-full bg-[var(--color-mid)] font-semibold text-[var(--color-lightest)]",
         sizeClass,
-        winner &&
-          "border-2 border-amber-400/95 ring-0 shadow-[0_0_18px_-2px_rgba(251,191,36,0.55)]",
+        winner && "ring-2 ring-[var(--btn-gradient-start)]",
         className
       )}
-      style={{
-        background: `linear-gradient(145deg, hsl(${h1} 58% 48%) 0%, hsl(${h2} 52% 36%) 100%)`,
-      }}
       aria-hidden
     >
       {initials}
@@ -234,7 +219,7 @@ function MatchPlayerNameField({
         autoComplete="off"
         aria-autocomplete="list"
         aria-expanded={showSuggestions}
-        className="border-[var(--color-mid)]/35 bg-[var(--color-dark)]/80"
+        className="rounded-[10px] border-[var(--color-surface-border)] bg-[var(--color-dark)]"
         aria-label={t("boardGameMatches.playerName")}
       />
       {showSuggestions && (
@@ -336,10 +321,15 @@ export const BoardGameMatchesSection = forwardRef<
     onEnsureLog?: () => Promise<string>;
     /** When true, hide the section save button (parent provides one). */
     embedded?: boolean;
+    /** Session form only. Play history stays on the item Matches tab. */
+    sessionOnly?: boolean;
     /** Called after a match is saved (e.g. close drawer/modal). */
     onMatchSaved?: (log: Log) => void;
   }
->(function BoardGameMatchesSection({ logId, onLogUpdated, onEnsureLog, embedded = false, onMatchSaved }, ref) {
+>(function BoardGameMatchesSection(
+  { logId, onLogUpdated, onEnsureLog, embedded = false, sessionOnly = false, onMatchSaved },
+  ref,
+) {
   const { t, locale } = useLocale();
   const { me } = useMe();
   const { showBoardGameMatchComplete } = useBoardGameMatchComplete();
@@ -372,7 +362,7 @@ export const BoardGameMatchesSection = forwardRef<
   }, [meUser?.id, meUser?.username, meUser?.email]);
 
   const loadMatches = useCallback(() => {
-    if (!logId) {
+    if (sessionOnly || !logId) {
       setMatches([]);
       setLoadingList(false);
       return;
@@ -382,7 +372,7 @@ export const BoardGameMatchesSection = forwardRef<
       .then((res) => setMatches(res.data ?? []))
       .catch(() => setMatches([]))
       .finally(() => setLoadingList(false));
-  }, [logId]);
+  }, [logId, sessionOnly]);
 
   useEffect(() => {
     loadMatches();
@@ -544,17 +534,16 @@ export const BoardGameMatchesSection = forwardRef<
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex min-w-0 flex-col gap-4">
-          <div className="grid grid-cols-2 gap-2 sm:max-w-[28rem] sm:gap-4">
-            <div className="flex min-w-0 flex-col gap-2">
-              <Label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-lightest)]">
-                <Calendar className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label className="text-[13px] font-semibold text-[var(--color-lightest)]">
                 {t("boardGameMatches.playedDate")}
               </Label>
               {isPlayedToday ? (
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-10 w-full justify-start border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80 px-3 font-normal text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/15"
+                  className="h-11 w-full justify-start rounded-[10px] px-3 font-normal"
                   onClick={() => playedDateInputRef.current?.showPicker()}
                   aria-label={t("boardGameMatches.playedDate")}
                 >
@@ -565,7 +554,7 @@ export const BoardGameMatchesSection = forwardRef<
                   type="date"
                   value={playedDate}
                   onChange={(e) => setPlayedDate(e.target.value)}
-                  className="h-10 w-full border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80"
+                  className="h-11 w-full rounded-[10px] border-[var(--color-surface-border)] bg-[var(--color-dark)]"
                   aria-label={t("boardGameMatches.playedDate")}
                 />
               )}
@@ -576,15 +565,14 @@ export const BoardGameMatchesSection = forwardRef<
                 value={playedDate}
                 onChange={(e) => setPlayedDate(e.target.value)}
                 className={cn(
-                  "h-10 w-full border-[var(--color-mid)]/40 bg-[var(--color-darkest)]/80",
+                  "h-11 w-full rounded-[10px] border-[var(--color-surface-border)] bg-[var(--color-dark)]",
                   isPlayedToday ? "pointer-events-none absolute h-px w-px overflow-hidden opacity-0" : "hidden",
                 )}
                 aria-hidden={isPlayedToday}
               />
             </div>
-            <div className="flex min-w-0 flex-col gap-2">
-              <Label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-lightest)]">
-                <Clock className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label className="text-[13px] font-semibold text-[var(--color-lightest)]">
                 {t("boardGameMatches.sessionDuration")}
               </Label>
               <Select
@@ -593,25 +581,22 @@ export const BoardGameMatchesSection = forwardRef<
                 options={boardGameSessionDurationOptions(t)}
                 aria-label={t("boardGameMatches.sessionDuration")}
                 className="w-full"
-                triggerClassName="h-10 w-full max-md:min-h-[44px] md:h-10 md:min-h-10 md:max-h-10"
+                triggerClassName="h-11 w-full rounded-[10px] border-[var(--color-surface-border)]"
               />
             </div>
           </div>
 
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Label className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-lightest)]">
-                <Dice5 className="h-3.5 w-3.5 text-[var(--color-light)]" aria-hidden />
+              <Label className="text-[13px] font-semibold text-[var(--color-lightest)]">
                 {t("boardGameMatches.players")}
               </Label>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="gap-1.5 rounded-full border-[var(--color-mid)]/40 bg-[var(--color-dark)]/60 hover:bg-[var(--color-mid)]/20"
                 onClick={() => setPlayers((prev) => [...prev, { name: "", score: "", winner: false, appUserId: null }])}
               >
-                <UserPlus className="h-3.5 w-3.5" aria-hidden />
                 {t("boardGameMatches.addPlayer")}
               </Button>
             </div>
@@ -619,17 +604,17 @@ export const BoardGameMatchesSection = forwardRef<
               <motion.div
                 key={i}
                 layout
-                className="flex min-w-0 items-center gap-2 border-b border-[var(--color-mid)]/20 pb-3 last:border-b-0 last:pb-0 sm:gap-3"
+                className="flex min-w-0 flex-wrap items-center gap-2 border-b border-[var(--color-surface-border)] pb-3 last:border-b-0 last:pb-0"
               >
                 <div className="relative shrink-0">
-                  <PlayerAvatar name={p.name || "?"} size="md" winner={p.winner} />
+                  <PlayerAvatar name={p.name || "?"} size="sm" winner={p.winner} />
                   {p.appUserId && (
-                    <span className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-md bg-[var(--color-darkest)] p-0.5 ring-2 ring-[var(--color-dark)]">
-                      <Logo className="h-3.5 w-3.5 object-contain" alt="" />
+                    <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-dark)]">
+                      <Logo className="h-3 w-3 object-contain" alt="" />
                     </span>
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-[8.5rem] flex-1">
                   <MatchPlayerNameField
                     value={p.name}
                     appUserId={p.appUserId}
@@ -643,15 +628,15 @@ export const BoardGameMatchesSection = forwardRef<
                 <Input
                   type="text"
                   inputMode="decimal"
-                  placeholder={t("boardGameMatches.score")}
+                  placeholder="0"
                   value={p.score}
                   onChange={(e) =>
                     setPlayers((prev) => prev.map((row, j) => (j === i ? { ...row, score: e.target.value } : row)))
                   }
-                  className="h-10 w-16 shrink-0 border-[var(--color-mid)]/35 bg-[var(--color-dark)]/80 sm:w-[5.5rem]"
+                  className="h-11 w-[5.5rem] shrink-0 rounded-[10px] border-[var(--color-surface-border)] bg-[var(--color-dark)]"
                   aria-label={t("boardGameMatches.score")}
                 />
-                <div className="flex shrink-0 items-center gap-1.5 rounded-xl bg-[var(--color-mid)]/10 px-2 py-1.5">
+                <label className="inline-flex h-10 shrink-0 items-center gap-2 rounded-[12px] bg-[var(--color-mid)]/25 px-2 text-[13px] font-medium text-[var(--color-light)] has-[:checked]:text-[var(--color-lightest)]">
                   <Switch
                     checked={p.winner}
                     onCheckedChange={(v) =>
@@ -659,18 +644,17 @@ export const BoardGameMatchesSection = forwardRef<
                     }
                     aria-label={t("boardGameMatches.winner")}
                   />
-                  <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-400/90" aria-hidden />
-                </div>
+                  <span>{t("boardGameMatches.winner")}</span>
+                </label>
                 {players.length > 1 && i > 0 && (
                   <Button
                     type="button"
                     variant="ghost"
-                    size="icon"
-                    className="shrink-0 text-red-400/90 hover:bg-red-500/15 hover:text-red-300"
+                    size="sm"
+                    className="shrink-0"
                     onClick={() => setPlayers((prev) => prev.filter((_, j) => j !== i))}
-                    aria-label={t("boardGameMatches.removePlayer")}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {t("boardGameMatches.removePlayer")}
                   </Button>
                 )}
               </motion.div>
@@ -678,13 +662,13 @@ export const BoardGameMatchesSection = forwardRef<
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-[var(--color-lightest)]">{t("boardGameMatches.matchNotes")}</Label>
+            <Label className="text-[13px] font-semibold text-[var(--color-lightest)]">{t("boardGameMatches.matchNotes")}</Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder={t("boardGameMatches.matchNotesPlaceholder")}
-              className="min-h-[88px] resize-none border-[var(--color-mid)]/35 bg-[var(--color-dark)]/80"
+              className="min-h-24 resize-none rounded-[10px] border-[var(--color-surface-border)] bg-[var(--color-dark)]"
             />
           </div>
 
@@ -696,7 +680,7 @@ export const BoardGameMatchesSection = forwardRef<
                 disabled={saving}
                 onClick={() => void handleSaveNew()}
               >
-                {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden /> : <Dice5 className="mr-2 h-5 w-5 opacity-90" aria-hidden />}
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
                 {saving ? t("common.saving") : t("boardGameMatches.saveMatch")}
               </Button>
               <Button
@@ -706,14 +690,14 @@ export const BoardGameMatchesSection = forwardRef<
                 disabled={saving}
                 onClick={() => void handleSaveNewAndShowBanner()}
               >
-                {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden /> : <Dice5 className="mr-2 h-5 w-5 opacity-90" aria-hidden />}
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
                 {saving ? t("common.saving") : t("boardGameMatches.saveMatchAndShowBanner")}
               </Button>
             </div>
           )}
       </div>
 
-      {logId ? (
+      {!sessionOnly && logId ? (
         <div className="flex min-w-0 flex-col gap-4 border-t border-[var(--color-mid)]/25 pt-4">
           <div>
             <h3 className="text-sm font-medium text-[var(--color-lightest)]">{t("boardGameMatches.previousSessions")}</h3>

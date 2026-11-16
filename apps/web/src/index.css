@@ -129,13 +129,25 @@ body {
   }
 
   .glass-dock {
-    background: color-mix(in srgb, var(--color-dark) 68%, transparent);
-    -webkit-backdrop-filter: blur(22px) saturate(1.35);
-    backdrop-filter: blur(22px) saturate(1.35);
-    border: 1px solid color-mix(in srgb, var(--color-lightest) 14%, transparent);
-    box-shadow:
-      0 12px 40px rgba(0, 0, 0, 0.42),
-      inset 0 1px 0 color-mix(in srgb, var(--color-lightest) 10%, transparent);
+    background: color-mix(in srgb, var(--color-dark) 92%, transparent);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--color-surface-border);
+    border-radius: 18px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .page-title {
+    font-family: var(--font-display);
+    font-weight: 560;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    font-size: 28px;
+  }
+  @media (min-width: 768px) {
+    .page-title {
+      font-size: 34px;
+    }
   }
 
   .motion-route-outlet,
@@ -236,9 +248,16 @@ body {
 
 /* Typography */
 :root {
-  --font-body: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: "Outfit", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-heading: var(--font-body);
-  --font-display: var(--font-body);
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+}
+
+h1,
+.display-title {
+  font-family: var(--font-display);
+  font-weight: 560;
+  letter-spacing: -0.03em;
 }
 
 /** App title / wordmark */
@@ -278,21 +297,21 @@ body {
   animation: admin-username-fire 2s ease-in-out infinite;
 }
 
-/* Light theme and defaults */
+/* Light theme and defaults. Warm paper, teal accent. */
 :root {
-  --color-darkest: #0D1B2A;
-  --color-dark: #1B263B;
-  --color-mid: #415A77;
-  --color-light: #778DA9;
-  --color-lightest: #E0E1DD;
+  --color-darkest: #f3efe7;
+  --color-dark: #fffcf8;
+  --color-mid: #c9bfb0;
+  --color-light: #6b645b;
+  --color-lightest: #1c1915;
 
-  /* Button gradients (primary) */
-  --btn-gradient-start: #415A77;
-  --btn-gradient-end: #5c7a9e;
-  --btn-gradient-hover-start: #4a6b8a;
-  --btn-gradient-hover-end: #6b8ab0;
-  --btn-text: #ffffff;
-  --checkbox-checked-bg: #378C61;
+  /* Solid accent. The gradient utilities flatten because both stops match. */
+  --btn-gradient-start: #0e6e6b;
+  --btn-gradient-end: #0e6e6b;
+  --btn-gradient-hover-start: #0b5856;
+  --btn-gradient-hover-end: #0b5856;
+  --btn-text: #f3fffe;
+  --checkbox-checked-bg: #0e6e6b;
   --btn-destructive-start: #dc2626;
   --btn-destructive-end: #b91c1c;
   --btn-destructive-hover-start: #ef4444;
@@ -305,11 +324,11 @@ body {
   --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.5);
 
   /* Category strip on dashboard – slightly elevated */
-  --color-category-bg: #243447;
-  --color-category-border: rgba(65, 90, 119, 0.25);
-  --shadow-category: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --color-category-bg: #f6f1e8;
+  --color-category-border: #e3dace;
+  --shadow-category: 0 1px 2px rgba(40, 32, 18, 0.05);
   /* Border for cards/panels (overridden in dark for visibility) */
-  --color-surface-border: #1B263B;
+  --color-surface-border: #e3dace;
 
   /* API key / warning banner (dark theme: light amber on dark) */
   --color-warning-bg: rgba(245, 158, 11, 0.1);
@@ -325,21 +344,21 @@ body {
 [data-theme="dark"],
 .dark {
   /* Page background (lowest) – warm charcoal, not pure black, so cards read elevated */
-  --color-darkest: #17181C;
+  --color-darkest: #10120f;
   /* Cards, topbar, modals, panels – clearly elevated above page */
-  --color-dark: #212328;
-  --color-mid: #404040;
-  --color-light: #737373;
-  --color-lightest: #fafafa;
+  --color-dark: #1a1d18;
+  --color-mid: #3d4336;
+  --color-light: #b3aca1;
+  --color-lightest: #f4f0e8;
   /* Visible border for cards/panels so edges read in dark mode */
-  --color-surface-border: #2a2a2a;
+  --color-surface-border: #31362d;
 
-  --btn-gradient-start: #378C61;
-  --btn-gradient-end: #174A31;
-  --btn-gradient-hover-start: #378C61;
-  --btn-gradient-hover-end: #174A31;
-  --btn-text: #ffffff;
-  --checkbox-checked-bg: #378C61;
+  --btn-gradient-start: #7ee8df;
+  --btn-gradient-end: #7ee8df;
+  --btn-gradient-hover-start: #a7f3ec;
+  --btn-gradient-hover-end: #a7f3ec;
+  --btn-text: #06211f;
+  --checkbox-checked-bg: #7ee8df;
   --btn-destructive-start: #dc2626;
   --btn-destructive-end: #b91c1c;
   --btn-destructive-hover-start: #ef4444;
@@ -351,32 +370,39 @@ body {
   --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.4);
   --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.7);
 
-  --color-category-bg: #171717;
-  --color-category-border: #2a2a2a;
+  --color-category-bg: #23271f;
+  --color-category-border: #31362d;
   --shadow-category: 0 4px 16px rgba(0, 0, 0, 0.5);
+
+  /* Checkmark sits on the light teal accent. */
+  input[type="checkbox"]:checked {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2306211f' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8l3 3 7-7'/%3E%3C/svg%3E");
+  }
+  input[type="radio"]:checked {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='4' fill='%2306211f'/%3E%3C/svg%3E");
+  }
 }
 
 /* Light theme: WCAG AA contrast, modern slate palette; distinct surfaces for hierarchy */
 [data-theme="light"] {
   /* Page background (lowest elevation) */
-  --color-darkest: #F1F5F9;
+  --color-darkest: #f3efe7;
   /* Cards, topbar, sidebar, modals (elevated surface) */
-  --color-dark: #FFFFFF;
-  --color-surface-border: #E2E8F0;
-  /* Borders, focus rings, dividers – visible on white */
-  --color-mid: #94A3B8;
-  /* Secondary text, placeholders – ≥4.5:1 on white */
-  --color-light: #64748B;
-  /* Primary text – ≥7:1 on white (AAA) */
-  --color-lightest: #0F172A;
+  --color-dark: #fffcf8;
+  --color-surface-border: #e3dace;
+  /* Borders, focus rings, dividers */
+  --color-mid: #c9bfb0;
+  /* Secondary text */
+  --color-light: #6b645b;
+  /* Primary text */
+  --color-lightest: #1c1915;
 
-  /* Primary buttons: modern blue, white text (AAA) */
-  --btn-gradient-start: #378C61;
-  --btn-gradient-end: #174A31;
-  --btn-gradient-hover-start: #378C62;
-  --btn-gradient-hover-end: #174A30;
-  --btn-text: #ffffff;
-  --checkbox-checked-bg: #378C61;
+  --btn-gradient-start: #0e6e6b;
+  --btn-gradient-end: #0e6e6b;
+  --btn-gradient-hover-start: #0b5856;
+  --btn-gradient-hover-end: #0b5856;
+  --btn-text: #f3fffe;
+  --checkbox-checked-bg: #0e6e6b;
   --btn-destructive-start: #dc2626;
   --btn-destructive-end: #b91c1c;
   --btn-destructive-hover-start: #ef4444;
@@ -389,8 +415,8 @@ body {
   --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06);
   --shadow-modal: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
 
-  --color-category-bg: #E2E8F0;
-  --color-category-border: rgba(148, 163, 184, 0.35);
+  --color-category-bg: #f6f1e8;
+  --color-category-border: #e3dace;
   --shadow-category: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
 
   /* Checkbox/radio: black checkmark on light theme for contrast */

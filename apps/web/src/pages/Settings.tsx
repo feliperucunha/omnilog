@@ -677,10 +677,33 @@ export function Settings() {
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
     >
       <div className="flex flex-col gap-8">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {(
+            [
+              {
+                to: me?.user ? `/${me.user.username || me.user.id}` : "/settings",
+                label: t("publicProfile.title"),
+              },
+              { to: "/tiers", label: t("nav.plans") },
+              { to: "/about", label: t("nav.about") },
+              { to: "/faq", label: t("faq.title") },
+              { to: "/privacy", label: t("legal.privacyTitle") },
+              { to: "/terms", label: t("legal.termsTitle") },
+            ] as const
+          ).map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="rounded-[14px] border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4 text-sm font-semibold text-[var(--color-lightest)] no-underline"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
         {me && (
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3 rounded-2xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/50 p-4">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--btn-gradient-start)] text-lg font-black text-white">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--btn-gradient-start)] text-lg font-black text-[var(--btn-text)]">
                 {(me.user.username?.[0] ?? me.user.email[0] ?? "?").toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">

@@ -20,6 +20,20 @@ function AppLayoutContent() {
   const pageTitle = usePageTitle();
   const belowNavbar = pageTitle?.belowNavbar;
   const location = useLocation();
+  const heading = pageTitle?.pageTitle?.trim() ? pageTitle.pageTitle : null;
+  const showHeading =
+    heading != null &&
+    [
+      "/dashboard",
+      "/discover",
+      "/statistics",
+      "/search",
+      "/market",
+      "/settings",
+      "/about",
+      "/tiers",
+      "/my-listings",
+    ].includes(location.pathname);
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
   const ptrEnabled = isPullToRefreshEnabled(location.pathname);
   const ptr = usePullToRefresh({ enabled: ptrEnabled, scrollEl });
@@ -29,22 +43,30 @@ function AppLayoutContent() {
       <Topbar />
       <div
         ref={setScrollEl}
-        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto max-md:[scroll-padding-bottom:max(5.5rem,calc(4.75rem+env(safe-area-inset-bottom)))]"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto max-md:[scroll-padding-bottom:calc(8.5rem+env(safe-area-inset-bottom))]"
       >
         <PullToRefreshIndicator
           pullRawDy={ptr.pullRawDy}
           thresholdPx={ptr.thresholdPx}
           isRefreshing={ptr.isRefreshing}
         />
-        {belowNavbar != null && belowNavbar !== false && (
-          <div className="sticky top-0 z-20 w-full shrink-0 border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
-            {belowNavbar}
-          </div>
-        )}
-        <div className="flex min-h-full min-w-0 flex-col px-2.5 py-4 max-md:pb-[max(5.5rem,calc(4.75rem+env(safe-area-inset-bottom)))] md:p-6">
+        <div className="flex min-h-full min-w-0 flex-col px-3.5 py-4 md:px-7 md:pb-12 md:pt-[18px]">
+          {showHeading ? (
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h1 className="page-title min-w-0 text-[var(--color-lightest)]">{heading}</h1>
+              {pageTitle?.headingAction}
+            </div>
+          ) : null}
+          {belowNavbar != null && belowNavbar !== false && (
+            <div className="mb-4 w-full min-w-0 shrink-0 self-start">{belowNavbar}</div>
+          )}
           <InvalidApiKeyBanner />
           <Outlet />
           <AdBanner />
+          <div
+            aria-hidden
+            className="shrink-0 max-md:h-[calc(8.5rem+env(safe-area-inset-bottom))] md:hidden"
+          />
         </div>
       </div>
     </>
@@ -88,7 +110,7 @@ export function AppLayout() {
     <div className="flex h-dvh min-h-0 min-w-0">
       <Nav />
       <main
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-0 md:pb-6 md:pl-[255px]"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-0 md:pb-6 md:pl-[6.5rem]"
       >
         <PageTitleProvider>
           <AppLayoutContent />

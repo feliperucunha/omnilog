@@ -4,26 +4,26 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-dark)] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mid)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-dark)] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "btn-gradient border-0",
+        default: "btn-gradient border border-transparent",
         destructive: "btn-gradient-destructive border-0",
         outline:
-          "border-2 border-[var(--btn-gradient-start)] bg-transparent text-[var(--color-lightest)] hover:bg-[var(--btn-gradient-start)]/10 dark:hover:bg-[var(--btn-gradient-start)]/20",
+          "border border-[var(--color-surface-border)] bg-transparent text-[var(--color-lightest)] hover:bg-[var(--color-mid)]/20",
         secondary: "btn-gradient-secondary border-0",
-        ghost: "hover:bg-[var(--color-dark)] text-[var(--color-lightest)]",
+        ghost: "border border-transparent hover:bg-[var(--color-mid)]/20 text-[var(--color-lightest)]",
         link: "text-[var(--color-light)] underline-offset-4 hover:underline hover:text-[var(--color-lightest)]",
       },
       size: {
-        default: "h-10 px-4 py-2 max-md:min-h-[44px]",
-        xs: "h-7 rounded px-2 text-xs",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10 max-md:min-h-[44px] max-md:min-w-[44px]",
-        "icon-sm": "h-8 w-8",
-        "icon-xs": "h-6 w-6",
+        default: "h-11 min-h-11 px-4 py-2",
+        xs: "h-7 rounded-[8px] px-2 text-xs",
+        sm: "h-9 min-h-9 rounded-[10px] px-3",
+        lg: "h-11 rounded-[10px] px-8",
+        icon: "h-10 w-10 rounded-[12px] max-md:min-h-[44px] max-md:min-w-[44px]",
+        "icon-sm": "h-8 w-8 rounded-[10px]",
+        "icon-xs": "h-6 w-6 rounded-[8px]",
       },
     },
     defaultVariants: {

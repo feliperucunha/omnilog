@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo, type ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Share2, User, ChevronDown, ChevronRight } from "lucide-react";
+import { Share2, User, ChevronDown, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
@@ -41,12 +41,16 @@ import type { Log } from "@geeklogs/shared";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/useMediaQuery";
+import { useLogViewPreference } from "@/hooks/useLogViewPreference";
+import type { LogViewMode } from "@/lib/logViewPreference";
+import { openMountedLibraryFilters } from "@/lib/libraryFiltersRequest";
 import {
   MediaLogs,
   type CollectionListFilter,
   type MediaLogsSort,
   type SharedFilters,
 } from "@/pages/MediaLogs";
+import { LibraryShelves } from "@/components/LibraryShelves";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { getLogCardDisplay } from "@/lib/logDisplay";
 import { isCompletedStatus } from "@/lib/logStatusColors";
@@ -63,6 +67,15 @@ import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardin
 interface FeedEntry {
   log: Log;
   user: { id: string; username: string | null };
+}
+
+function libraryChipClass(pressed: boolean) {
+  return cn(
+    "rounded-full border px-3 py-2 text-[13px] font-medium",
+    pressed
+      ? "border-[var(--color-lightest)] bg-[var(--color-lightest)] text-[var(--color-darkest)]"
+      : "border-[var(--color-surface-border)] bg-[var(--color-dark)] text-[var(--color-light)]"
+  );
 }
 
 const BETA_MODAL_STORAGE_KEY = "geeklogs.betaModalSeen";
@@ -173,7 +186,7 @@ export function Dashboard() {
   const { token } = useAuth();
   const { me } = useMe();
   const { visibleTypes, visibleTypesOrderReady } = useVisibleMediaTypes();
-  const { setPageTitle, setRightSlot, setBelowNavbar } = usePageTitle() ?? {};
+  const { setPageTitle, setRightSlot, setHeadingAction, setBelowNavbar } = usePageTitle() ?? {};
   const location = useLocation();
   const isDashboardActive = location.pathname === "/dashboard";
   const [searchParams, setSearchParams] = useSearchParams();
@@ -228,6 +241,9 @@ export function Dashboard() {
   const [followedUsers, setFollowedUsers] = useState<Array<{ id: string; username: string | null }>>([]);
   const [showBetaModal, setShowBetaModal] = useState(false);
   const [socialCollapsed, setSocialCollapsed] = useState(false);
+  const [libraryView, setLibraryView] = useState<"shelves" | "logs">("shelves");
+  const [openFiltersOnMount, setOpenFiltersOnMount] = useState(false);
+  const [logView, setLogView] = useLogViewPreference("dashboard", true, "list");
   const [milestoneProgress, setMilestoneProgress] = useState<MilestoneProgressResponse | null>(null);
   const isMobile = useIsMobile();
   /** Current filters from MediaLogs (for share URL). */
@@ -574,8 +590,9 @@ export function Dashboard() {
     return () => {
       setPageTitle?.(null);
       setRightSlot?.(null);
+      setHeadingAction?.(null);
     };
-  }, [isDashboardActive, t, setPageTitle, setRightSlot]);
+  }, [isDashboardActive, t, setPageTitle, setRightSlot, setHeadingAction]);
 
   useEffect(() => {
     if (!isDashboardActive) return;
@@ -592,41 +609,42 @@ export function Dashboard() {
     return () => setRightSlot?.(null);
   }, [isDashboardActive, me?.user?.id, handleShare, t, setRightSlot]);
 
+  const clearOpenFilters = useCallback(() => setOpenFiltersOnMount(false), []);
+
+  const openLibraryFilters = useCallback(() => {
+    if (libraryView === "logs") {
+      openMountedLibraryFilters();
+      return;
+    }
+    setOpenFiltersOnMount(true);
+    setLibraryView("logs");
+  }, [libraryView]);
+
+  const filterBadgeCount = [
+    logsInitialFilters?.status,
+    logsInitialFilters?.collection,
+    logsInitialFilters?.genre,
+    logsInitialFilters?.players,
+  ].filter(Boolean).length;
+
   useEffect(() => {
-    if (!isDashboardActive) return;
-    if (visibleTypes.length === 0) {
-      setBelowNavbar?.(null);
+    if (!isDashboardActive || visibleTypes.length === 0) {
+      setHeadingAction?.(null);
       return;
     }
-    if (!visibleTypesOrderReady) {
-      setBelowNavbar?.(
-        <div className="sticky top-14 z-20 w-full shrink-0 self-start">
-          <CategoryOrderSkeletonStrip />
-        </div>
-      );
-      return;
-    }
-    const byTypeMap = Object.fromEntries(
-      MEDIA_TYPES.map((type) => [type, counts?.[type] ?? 0])
-    ) as Record<MediaType, number>;
-    setBelowNavbar?.(
-      <StickyCategoryStrip
-        items={visibleTypes.map((type) => ({
-          value: type,
-          label: t(`nav.${type}`),
-          ...(counts != null ? { count: byTypeMap[type] ?? 0 } : {}),
-        }))}
-        selectedValue={selectedCategory}
-        onSelect={(v) => setCategory(v as MediaType)}
-        mobileOnly={false}
-        bare
-        aria-label={t("dashboard.category")}
-      />
+    setHeadingAction?.(
+      <Button type="button" variant="outline" size="sm" onClick={openLibraryFilters}>
+        <SlidersHorizontal className="size-4" aria-hidden />
+        {t("mediaLogs.filters")}
+        {filterBadgeCount > 0 ? ` · ${filterBadgeCount}` : ""}
+      </Button>
     );
-  }, [isDashboardActive, visibleTypes, visibleTypesOrderReady, selectedCategory, counts, t, setBelowNavbar, setCategory]);
+    return () => setHeadingAction?.(null);
+  }, [isDashboardActive, visibleTypes.length, openLibraryFilters, filterBadgeCount, t, setHeadingAction]);
 
   useEffect(() => {
     if (!isDashboardActive) return;
+    setBelowNavbar?.(null);
     return () => setBelowNavbar?.(null);
   }, [isDashboardActive, setBelowNavbar]);
 
@@ -711,14 +729,80 @@ export function Dashboard() {
         </Dialog>
       )}
       {visibleTypes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            aria-pressed={libraryView === "shelves"}
+            onClick={() => setLibraryView("shelves")}
+            className={libraryChipClass(libraryView === "shelves")}
+          >
+            {t("dashboard.shelves")}
+          </button>
+          <button
+            type="button"
+            aria-pressed={libraryView === "logs"}
+            onClick={() => setLibraryView("logs")}
+            className={libraryChipClass(libraryView === "logs")}
+          >
+            {t("dashboard.allLogs")}
+          </button>
+          {(["list", "grid"] as const satisfies readonly LogViewMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={libraryView === "logs" && logView === mode}
+              onClick={() => {
+                setLogView(mode);
+                setLibraryView("logs");
+              }}
+              className={libraryChipClass(libraryView === "logs" && logView === mode)}
+            >
+              {t(mode === "list" ? "mediaLogs.viewList" : "mediaLogs.viewGrid")}
+            </button>
+          ))}
+        </div>
+      )}
+      {visibleTypes.length > 0 && libraryView === "shelves" && (
+        <LibraryShelves
+          types={visibleTypes}
+          onOpenCategory={(type) => {
+            setCategory(type);
+            setLibraryView("logs");
+          }}
+        />
+      )}
+      {visibleTypes.length > 0 && libraryView === "logs" && (
         <section
             aria-label={t("dashboard.category")}
-            className="flex min-w-0 flex-col gap-4 overflow-hidden max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0 max-md:shadow-none md:rounded-xl md:border md:border-[var(--color-category-border)] md:bg-[var(--color-category-bg)] md:p-4 md:shadow-[var(--shadow-category)]"
+            className="flex min-w-0 flex-col gap-4"
           >
+          {!visibleTypesOrderReady ? (
+            <CategoryOrderSkeletonStrip />
+          ) : (
+            <StickyCategoryStrip
+              items={visibleTypes.map((type) => ({
+                value: type,
+                label: t(`nav.${type}`),
+                ...(counts != null ? { count: counts[type] ?? 0 } : {}),
+              }))}
+              selectedValue={selectedCategory}
+              onSelect={(v) => setCategory(v as MediaType)}
+              mobileOnly={false}
+              bare
+              stickyTop=""
+              aria-label={t("dashboard.category")}
+            />
+          )}
           <MediaLogs
             key={selectedCategory}
             mediaType={selectedCategory}
             embedded
+            hideFiltersButton
+            hideViewSelector
+            openFiltersOnMount={openFiltersOnMount}
+            onFiltersOpened={clearOpenFilters}
+            logView={logView}
+            onLogViewChange={setLogView}
             milestoneProgress={
               milestoneProgress?.perMedium.find((p) => p.mediaType === selectedCategory) ?? null
             }
@@ -732,7 +816,7 @@ export function Dashboard() {
       )}
 
       {token && (
-        <section aria-label={t("social.sectionTitle")} className="flex min-w-0 flex-col gap-4 overflow-hidden">
+        <section aria-label={t("social.sectionTitle")} className="hidden min-w-0 flex-col gap-4 overflow-hidden md:flex">
           <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
             <button
               type="button"

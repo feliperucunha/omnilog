@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { AlertTriangle, ChevronDown, Download, Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, Download, Loader2, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { MediaType, Log } from "@geeklogs/shared";
@@ -30,6 +30,7 @@ import {
   removeLogFromClientCaches,
 } from "@/lib/logsPageCache";
 import { LogForm } from "@/components/LogForm";
+import { MatchLogSheet } from "@/components/MatchLogSheet";
 import { CustomBatchEntryModal } from "@/components/CustomBatchEntryModal";
 import { ExportLogsModal, type ExportLogsOptions } from "@/components/ExportLogsModal";
 import type { LogCompleteState } from "@/components/ItemReviewForm";
@@ -49,8 +50,10 @@ import { useIsMobile } from "@/hooks/useMediaQuery";
 import {
   defaultPublicProfileLogView,
   resolveLogViewForContext,
+  type LogViewMode,
   type LogViewPage,
 } from "@/lib/logViewPreference";
+import { LIBRARY_FILTERS_OPEN_EVENT } from "@/lib/libraryFiltersRequest";
 import {
   LOG_LIST_CARD_GRID,
   LOG_LIST_CARD_GRID_DENSE,
@@ -63,7 +66,9 @@ import { useMe } from "@/contexts/MeContext";
 import { getApiKeyProviderForMediaType } from "@/lib/apiKeyForMediaType";
 import { skipApiKeyMissingUi } from "@/lib/featureFlags";
 import { API_KEY_META } from "@/lib/apiKeyMeta";
-import { Select } from "@/components/ui/select";
+import { Select, type SelectOption } from "@/components/ui/select";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -213,9 +218,114 @@ interface MediaLogsProps {
   initialFiltersSyncKey?: string;
   /** When embedded, called when filters change so parent can include them in share URL. */
   onFiltersChange?: (filters: SharedFilters) => void;
+  /** When set, the parent owns the list/grid preference. */
+  logView?: LogViewMode;
+  onLogViewChange?: (view: LogViewMode) => void;
+  /** Hide the icon view switch when the parent already shows List and Grid. */
+  hideViewSelector?: boolean;
+  /** Hide the in-section Filters buttons when the page heading already has one. */
+  hideFiltersButton?: boolean;
+  /** Open the filters sheet on mount. Used when Filters is pressed before this list is shown. */
+  openFiltersOnMount?: boolean;
+  onFiltersOpened?: () => void;
 }
 
 const DEFAULT_SORT: MediaLogsSort = "dateDesc";
+
+function LibraryFilterFields({
+  statusFilter,
+  setStatusFilter,
+  statusOptions,
+  showCollection,
+  collectionFilter,
+  setCollectionFilter,
+  collectionOptions,
+  genreFilter,
+  setGenreFilter,
+  genreOptions,
+  mediaType,
+  playersFilter,
+  setPlayersFilter,
+  playersLabel,
+  sortBy,
+  setSortBy,
+  sortOptions,
+  statusLabel,
+  collectionLabel,
+  genreLabel,
+  sortLabel,
+}: {
+  statusFilter: string;
+  setStatusFilter: (value: string) => void;
+  statusOptions: SelectOption[];
+  showCollection: boolean;
+  collectionFilter: CollectionListFilter;
+  setCollectionFilter: (value: CollectionListFilter) => void;
+  collectionOptions: SelectOption[];
+  genreFilter: string;
+  setGenreFilter: (value: string) => void;
+  genreOptions: SelectOption[];
+  mediaType: MediaType;
+  playersFilter: string;
+  setPlayersFilter: (value: string) => void;
+  playersLabel: string;
+  sortBy: MediaLogsSort;
+  setSortBy: (value: MediaLogsSort) => void;
+  sortOptions: SelectOption[];
+  statusLabel: string;
+  collectionLabel: string;
+  genreLabel: string;
+  sortLabel: string;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Select
+        value={statusFilter}
+        onValueChange={setStatusFilter}
+        options={statusOptions}
+        aria-label={statusLabel}
+        className="w-full min-w-0"
+        triggerClassName="w-full min-w-0 max-w-none"
+      />
+      {showCollection && (
+        <Select
+          value={collectionFilter}
+          onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
+          options={collectionOptions}
+          aria-label={collectionLabel}
+          className="w-full min-w-0"
+          triggerClassName="w-full min-w-0 max-w-none"
+        />
+      )}
+      <Select
+        value={genreFilter}
+        onValueChange={setGenreFilter}
+        options={genreOptions}
+        aria-label={genreLabel}
+        contentScrollable
+        className="w-full min-w-0"
+        triggerClassName="w-full min-w-0 max-w-none"
+      />
+      {mediaType === "boardgames" && (
+        <PlayersFilterDropdown
+          value={playersFilter}
+          onChange={setPlayersFilter}
+          labelAll={playersLabel}
+          ariaLabel={playersLabel}
+          className="w-full"
+        />
+      )}
+      <Select
+        value={sortBy}
+        onValueChange={(v) => setSortBy(v as MediaLogsSort)}
+        options={sortOptions}
+        aria-label={sortLabel}
+        className="w-full min-w-0"
+        triggerClassName="w-full min-w-0 max-w-none"
+      />
+    </div>
+  );
+}
 
 export function MediaLogs({
   mediaType,
@@ -227,6 +337,12 @@ export function MediaLogs({
   initialFilters,
   initialFiltersSyncKey,
   onFiltersChange,
+  logView: controlledLogView,
+  onLogViewChange,
+  hideViewSelector = false,
+  hideFiltersButton = false,
+  openFiltersOnMount = false,
+  onFiltersOpened,
 }: MediaLogsProps) {
   const onFiltersChangeRef = useRef(onFiltersChange);
   onFiltersChangeRef.current = onFiltersChange;
@@ -303,6 +419,7 @@ export function MediaLogs({
   const [sortBy, setSortBy] = useState<MediaLogsSort>(() => (initialFilters?.sort as MediaLogsSort) ?? DEFAULT_SORT);
   const [showCustomEntry, setShowCustomEntry] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   /** Applied filter (API + URL); updated on submit, not on every keystroke. */
   const [categorySearchQuery, setCategorySearchQuery] = useState(() => (initialFilters?.search ?? "").trim());
   /** In-progress text in the search field. */
@@ -319,7 +436,25 @@ export function MediaLogs({
   const logViewEnabled = !!embedded;
   const logViewPage: LogViewPage = publicUserId ? "publicProfile" : "dashboard";
   const logViewFallback = publicUserId ? defaultPublicProfileLogView(isMobile) : "list";
-  const [logView, setLogView] = useLogViewPreference(logViewPage, logViewEnabled, logViewFallback);
+  const viewControlled = onLogViewChange != null;
+  const [storedLogView, setStoredLogView] = useLogViewPreference(
+    logViewPage,
+    logViewEnabled && !viewControlled,
+    logViewFallback
+  );
+  const logView = viewControlled ? (controlledLogView ?? storedLogView) : storedLogView;
+  const setLogView = onLogViewChange ?? setStoredLogView;
+
+  useEffect(() => {
+    if (!embedded || readOnly) return;
+    if (openFiltersOnMount) {
+      setFiltersOpen(true);
+      onFiltersOpened?.();
+    }
+    const open = () => setFiltersOpen(true);
+    window.addEventListener(LIBRARY_FILTERS_OPEN_EVENT, open);
+    return () => window.removeEventListener(LIBRARY_FILTERS_OPEN_EVENT, open);
+  }, [embedded, readOnly, openFiltersOnMount, onFiltersOpened]);
 
   const buildLogsPath = useCallback(
     (cursor?: string | null) => {
@@ -811,6 +946,7 @@ export function MediaLogs({
   };
 
   const label = t(`nav.${mediaType}`);
+  const activeFilterCount = [statusFilter, collectionFilter, genreFilter, playersFilter].filter(Boolean).length;
 
   const collectionOwnershipSelectOptions = useMemo(() => {
     const ownedBase = t("mediaLogs.filterOwned");
@@ -1069,6 +1205,13 @@ export function MediaLogs({
                   </span>
                 </Button>
               </motion.div>
+              {!hideFiltersButton && (
+                <Button type="button" variant="outline" className="shrink-0" onClick={() => setFiltersOpen(true)}>
+                  <SlidersHorizontal className="size-4" aria-hidden />
+                  {t("mediaLogs.filters")}
+                  {activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -1084,54 +1227,6 @@ export function MediaLogs({
             </div>
           </div>
           )}
-          <div className="flex min-w-0 flex-wrap items-center gap-3">
-            <div className="flex min-w-0 flex-wrap items-center gap-3">
-              <Select
-                value={statusFilter}
-                onValueChange={setStatusFilter}
-                options={statusFilterSelectOptions}
-                aria-label={t("itemReviewForm.status")}
-                className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
-                triggerClassName="w-full min-w-0 max-w-none"
-              />
-              {showCollectionOwnershipFilters && (
-                <Select
-                  value={collectionFilter}
-                  onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
-                  options={collectionOwnershipSelectOptions}
-                  aria-label={t("mediaLogs.filterCollection")}
-                  className="min-w-0 w-[12rem] max-w-[min(100%,18rem)] shrink-0"
-                  triggerClassName="w-full min-w-0 max-w-none"
-                />
-              )}
-              <Select
-                value={genreFilter}
-                onValueChange={setGenreFilter}
-                options={genreSelectOptions}
-                aria-label={t("mediaLogs.filterGenre")}
-                contentScrollable
-                className="min-w-0 w-[12rem] max-w-[min(100%,20rem)] shrink-0"
-                triggerClassName="w-full min-w-0 max-w-none"
-              />
-              {mediaType === "boardgames" && (
-                <PlayersFilterDropdown
-                  value={playersFilter}
-                  onChange={setPlayersFilter}
-                  labelAll={t("mediaLogs.filterPlayers")}
-                  ariaLabel={t("mediaLogs.filterPlayers")}
-                  className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
-                />
-              )}
-              <Select
-                value={sortBy}
-                onValueChange={(v) => setSortBy(v as typeof sortBy)}
-                options={sortSelectOptions}
-                aria-label={t("mediaLogs.sortLabel")}
-                className="min-w-0 w-[14rem] max-w-[min(100%,24rem)] shrink-0"
-                triggerClassName="w-full min-w-0 max-w-none"
-              />
-            </div>
-          </div>
         </div>
       )}
 
@@ -1237,6 +1332,13 @@ export function MediaLogs({
                 {t("customEntry.importButton")}
               </Button>
             </motion.div>
+            {!hideFiltersButton && (
+              <Button type="button" variant="outline" className="h-8 shrink-0 px-2 text-xs md:h-9 md:px-3 md:text-sm" onClick={() => setFiltersOpen(true)}>
+                <SlidersHorizontal className="size-4" aria-hidden />
+                <span className="max-md:sr-only">{t("mediaLogs.filters")}</span>
+                {activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -1257,127 +1359,87 @@ export function MediaLogs({
         )}
       </div>
 
-      {/* 2. Filters row */}
-      <div className="flex w-full min-w-0 flex-wrap items-center gap-3 overflow-hidden">
-        {/* Mobile (< md): row1 = status [+ collection]; row2 = genre | sort */}
-        <div className="flex w-full min-w-0 flex-col gap-2 md:hidden">
-          <div
-            className={cn(
-              "grid w-full min-w-0 gap-2",
-              showCollectionOwnershipFilters ? "grid-cols-2" : "grid-cols-1"
-            )}
-          >
-            <Select
-              value={statusFilter}
-              onValueChange={setStatusFilter}
-              options={statusFilterSelectOptions}
-              aria-label={t("itemReviewForm.status")}
-              className="min-w-0 w-full"
-              triggerClassName="w-full max-w-none min-w-0"
-            />
-            {showCollectionOwnershipFilters && (
-              <Select
-                value={collectionFilter}
-                onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
-                options={collectionOwnershipSelectOptions}
-                aria-label={t("mediaLogs.filterCollection")}
-                className="min-w-0 w-full"
-                triggerClassName="w-full max-w-none min-w-0"
-              />
-            )}
-          </div>
-          <div
-            className={cn(
-              "grid w-full min-w-0 gap-2",
-              mediaType === "boardgames" ? "grid-cols-3" : "grid-cols-2"
-            )}
-          >
-            <Select
-              value={genreFilter}
-              onValueChange={setGenreFilter}
-              options={genreSelectOptions}
-              aria-label={t("mediaLogs.filterGenre")}
-              contentScrollable
-              className="min-w-0 w-full"
-              triggerClassName="w-full max-w-none min-w-0"
-            />
-            {mediaType === "boardgames" && (
-              <PlayersFilterDropdown
-                value={playersFilter}
-                onChange={setPlayersFilter}
-                labelAll={t("mediaLogs.filterPlayers")}
-                ariaLabel={t("mediaLogs.filterPlayers")}
-                className="w-full"
-              />
-            )}
-            <Select
-              value={sortBy}
-              onValueChange={(v) => setSortBy(v as typeof sortBy)}
-              options={sortSelectOptions}
-              aria-label={t("mediaLogs.sortLabel")}
-              className="min-w-0 w-full"
-              triggerClassName="w-full max-w-none min-w-0"
-            />
-          </div>
-        </div>
-        {/* Desktop (md+): filters + sort wrap on narrow viewports; no search here (non-embedded uses floating search). */}
-        <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-3 md:flex">
-        <Select
-          value={statusFilter}
-          onValueChange={setStatusFilter}
-          options={statusFilterSelectOptions}
-          aria-label={t("itemReviewForm.status")}
-          className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
-          triggerClassName="w-full min-w-0 max-w-none"
-        />
-        {showCollectionOwnershipFilters && (
-          <Select
-            value={collectionFilter}
-            onValueChange={(v) => setCollectionFilter((v as CollectionListFilter) || "")}
-            options={collectionOwnershipSelectOptions}
-            aria-label={t("mediaLogs.filterCollection")}
-            className="min-w-0 w-[12rem] max-w-[min(100%,18rem)] shrink-0"
-            triggerClassName="w-full min-w-0 max-w-none"
-          />
-        )}
-        <Select
-          value={genreFilter}
-          onValueChange={setGenreFilter}
-          options={genreSelectOptions}
-          aria-label={t("mediaLogs.filterGenre")}
-          contentScrollable
-          className="min-w-0 w-[12rem] max-w-[min(100%,20rem)] shrink-0"
-          triggerClassName="w-full min-w-0 max-w-none"
-        />
-        {mediaType === "boardgames" && (
-          <PlayersFilterDropdown
-            value={playersFilter}
-            onChange={setPlayersFilter}
-            labelAll={t("mediaLogs.filterPlayers")}
-            ariaLabel={t("mediaLogs.filterPlayers")}
-            className="min-w-0 w-[11rem] max-w-[min(100%,18rem)] shrink-0"
-          />
-        )}
-        <Select
-          value={sortBy}
-          onValueChange={(v) => setSortBy(v as typeof sortBy)}
-          options={sortSelectOptions}
-          aria-label={t("mediaLogs.sortLabel")}
-          className="min-w-0 w-[14rem] max-w-[min(100%,24rem)] shrink-0"
-          triggerClassName="w-full min-w-0 max-w-none"
-        />
-      </div>
-      </div>
 
       </div>
 
       {(embedded || readOnly) && (
         <div className="flex min-w-0 items-center gap-2">
           {categorySearchBar}
-          {logViewEnabled && (
+          {logViewEnabled && !hideViewSelector && (
             <LogViewSelector value={logView} onValueChange={setLogView} />
           )}
         </div>
+      )}
+
+      {isMobile ? (
+        <Drawer open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <DrawerContent
+            onClose={() => setFiltersOpen(false)}
+            mobileHeight="auto"
+            className="px-4 pb-[max(7rem,calc(5.5rem+env(safe-area-inset-bottom)))]"
+          >
+            <div className="flex flex-col gap-3 px-1 pt-4">
+              <h2 className="text-lg font-semibold text-[var(--color-lightest)]">{t("mediaLogs.filters")}</h2>
+              <LibraryFilterFields
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                statusOptions={statusFilterSelectOptions}
+                showCollection={showCollectionOwnershipFilters}
+                collectionFilter={collectionFilter}
+                setCollectionFilter={setCollectionFilter}
+                collectionOptions={collectionOwnershipSelectOptions}
+                genreFilter={genreFilter}
+                setGenreFilter={setGenreFilter}
+                genreOptions={genreSelectOptions}
+                mediaType={mediaType}
+                playersFilter={playersFilter}
+                setPlayersFilter={setPlayersFilter}
+                playersLabel={t("mediaLogs.filterPlayers")}
+                sortBy={sortBy}
+                setSortBy={setSortBy}
+                sortOptions={sortSelectOptions}
+                statusLabel={t("itemReviewForm.status")}
+                collectionLabel={t("mediaLogs.filterCollection")}
+                genreLabel={t("mediaLogs.filterGenre")}
+                sortLabel={t("mediaLogs.sortLabel")}
+              />
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={filtersOpen} onOpenChange={(open) => !open && setFiltersOpen(false)}>
+          <DialogContent
+            onClose={() => setFiltersOpen(false)}
+            className="sm:left-auto sm:right-0 sm:top-0 sm:h-dvh sm:max-h-dvh sm:w-full sm:max-w-sm sm:translate-x-0 sm:translate-y-0 sm:rounded-none sm:rounded-l-[14px]"
+          >
+            <DialogHeader>
+              <DialogTitle className="text-[var(--color-lightest)]">{t("mediaLogs.filters")}</DialogTitle>
+            </DialogHeader>
+            <LibraryFilterFields
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              statusOptions={statusFilterSelectOptions}
+              showCollection={showCollectionOwnershipFilters}
+              collectionFilter={collectionFilter}
+              setCollectionFilter={setCollectionFilter}
+              collectionOptions={collectionOwnershipSelectOptions}
+              genreFilter={genreFilter}
+              setGenreFilter={setGenreFilter}
+              genreOptions={genreSelectOptions}
+              mediaType={mediaType}
+              playersFilter={playersFilter}
+              setPlayersFilter={setPlayersFilter}
+              playersLabel={t("mediaLogs.filterPlayers")}
+              sortBy={sortBy}
+              setSortBy={setSortBy}
+              sortOptions={sortSelectOptions}
+              statusLabel={t("itemReviewForm.status")}
+              collectionLabel={t("mediaLogs.filterCollection")}
+              genreLabel={t("mediaLogs.filterGenre")}
+              sortLabel={t("mediaLogs.sortLabel")}
+            />
+          </DialogContent>
+        </Dialog>
       )}
 
       <div
@@ -1437,13 +1499,9 @@ export function MediaLogs({
               <motion.div
                 key={log.id}
                 variants={listStaggerItemVariants}
-                className={cn(
-                  "min-h-0",
-                  activeLogView === "list" && "sm:h-full",
-                  listStaggerItemClassName
-                )}
+                className={cn("min-h-0 min-w-0", listStaggerItemClassName)}
               >
-                <div className="h-full">
+                <div>
                   <MediaLogCard
                     log={log}
                     embedded={embedded}
@@ -1514,7 +1572,23 @@ export function MediaLogs({
         onClose={() => setReviewLogId(null)}
       />
 
-      {!readOnly && editingLog && (
+      {!readOnly && editingLog && logEditTab === "matches" && editingLog.mediaType === "boardgames" && (
+        <MatchLogSheet
+          log={editingLog}
+          title={editingLog.title}
+          onClose={() => {
+            setEditingLog(null);
+            setLogEditTab("review");
+          }}
+          onLogUpdated={(lg) => {
+            const normalized = decodeLogForDisplay(lg);
+            setEditingLog(normalized);
+            setLogs((prev) => prev.map((l) => (l.id === normalized.id ? normalized : l)));
+          }}
+        />
+      )}
+
+      {!readOnly && editingLog && !(logEditTab === "matches" && editingLog.mediaType === "boardgames") && (
         <LogForm
           mode="edit"
           log={editingLog}
@@ -1541,7 +1615,7 @@ export function MediaLogs({
       {!readOnly && !embedded && (
       <form
         onSubmit={handleCategorySearchSubmit}
-        className="fixed left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-4 bottom-[max(5rem,calc(5rem+env(safe-area-inset-bottom)))] md:bottom-6 md:left-[calc(127.5px+50vw)]"
+        className="fixed left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-4 bottom-[max(5rem,calc(5rem+env(safe-area-inset-bottom)))] md:bottom-6 md:left-[calc(3.25rem+50vw)]"
         aria-label={t("search.search")}
       >
         <UnifiedSearchBar

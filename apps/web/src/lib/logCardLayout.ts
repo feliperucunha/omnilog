@@ -53,14 +53,13 @@ export const LOG_CARD_INCREMENT_BUTTON =
 export const LOG_CARD_EDIT_BUTTON =
   "h-11 w-11 min-h-[44px] min-w-[44px] rounded-xl sm:h-10 sm:w-10";
 
-export const LOG_LIST_CARD_GRID =
-  "grid min-w-0 grid-cols-1 gap-3 sm:grid sm:gap-4 sm:grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))]";
+export const LOG_LIST_CARD_GRID = "flex min-w-0 flex-col gap-2";
 
 export const LOG_LIST_CARD_GRID_DENSE =
   "grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
 
 export const LOG_LIST_CARD_GRID_MULTI =
-  "grid min-w-0 grid-cols-1 gap-2 min-[480px]:grid-cols-2 sm:gap-2.5 md:grid-cols-2 md:gap-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4";
+  "grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]";
 
 export const SEARCH_RESULT_CARD_GRID =
   "grid min-w-0 grid-cols-1 gap-3 sm:grid sm:gap-4 sm:grid-cols-[repeat(auto-fill,minmax(min(100%,9.5rem),1fr))]";

@@ -62,40 +62,31 @@ export function MarketListingCard({
 
   return (
     <Card
-      className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-0"
+      className="relative grid grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-3 rounded-[14px] border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-2.5 shadow-[var(--shadow-sm)] max-md:grid-cols-[64px_minmax(0,1fr)]"
       style={cardShadow}
     >
-      <Link
-        to={marketListingPath(listing.id)}
-        className="relative block w-full shrink-0 overflow-hidden aspect-[2/3] text-left"
-      >
+      <Link to={marketListingPath(listing.id)} className="relative block overflow-hidden">
         <ItemImage
           src={listing.image}
-          className="h-full w-full"
+          className="h-24 w-[72px] overflow-hidden rounded-[10px] max-md:w-16"
           mediaType={listing.mediaType}
         />
         {hasDiscount && discountPercent != null && (
-          <span className="absolute left-1.5 top-1.5 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
+          <span className="absolute left-1 top-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
             {t("market.discountBadge", { percent: String(discountPercent) })}
           </span>
         )}
       </Link>
-      <div className="flex min-h-0 flex-1 flex-col gap-1 p-2">
+      <div className="flex min-w-0 flex-col gap-1">
         <Link
           to={marketListingPath(listing.id)}
           className="block min-w-0 text-left font-semibold text-[var(--color-lightest)] hover:underline"
         >
-          <OverflowMarquee className="text-xs leading-snug">{listing.title}</OverflowMarquee>
+          <OverflowMarquee className="text-base leading-snug">{listing.title}</OverflowMarquee>
         </Link>
-        <p className="truncate text-[10px] text-[var(--color-light)]">
+        <p className="truncate text-[13px] text-[var(--color-light)]">
           {t("market.seller")}: {sellerName(listing)}
         </p>
-        <div className="flex min-w-0 flex-wrap items-baseline gap-1.5">
-          <p className="text-xs font-semibold tabular-nums text-[var(--btn-gradient-start)]">{price}</p>
-          {previousPrice && (
-            <p className="text-[10px] tabular-nums text-[var(--color-light)] line-through">{previousPrice}</p>
-          )}
-        </div>
         {listing.acceptTrade && (
           <span className="inline-flex w-fit rounded bg-[var(--color-mid)]/40 px-1.5 py-0.5 text-[9px] font-medium text-[var(--color-lightest)]">
             {t("market.acceptsTrade")}
@@ -122,7 +113,12 @@ export function MarketListingCard({
           {formatListingDate(listing.createdAt, locale)} · {listing.cityLabel}
         </p>
       </div>
-      <div className="flex shrink-0 items-center justify-end gap-1 border-t border-[var(--color-surface-border)]/80 p-1.5">
+      <div className="flex flex-col items-end gap-1 max-md:col-start-2">
+        <p className="font-[family-name:var(--font-display)] text-[22px] leading-none text-[var(--color-lightest)]">{price}</p>
+        {previousPrice ? (
+          <p className="text-[13px] tabular-nums text-[var(--color-light)] line-through">{previousPrice}</p>
+        ) : null}
+        <div className="flex items-center justify-end gap-1">
         {listing.contactEmail && (
           <a
             href={mailHref(listing)}
@@ -151,6 +147,7 @@ export function MarketListingCard({
             <WhatsAppIcon className="h-3.5 w-3.5" />
           </a>
         )}
+        </div>
       </div>
     </Card>
   );

@@ -5,6 +5,9 @@ interface PageTitleContextValue {
   setPageTitle: (title: string | null) => void;
   rightSlot: ReactNode;
   setRightSlot: (node: ReactNode) => void;
+  /** Control rendered on the same row as the in-page heading. */
+  headingAction: ReactNode;
+  setHeadingAction: (node: ReactNode) => void;
   /** Full-width bar below navbar (no padding). Used for category strip on Home/Search. */
   belowNavbar: ReactNode;
   setBelowNavbar: (node: ReactNode) => void;
@@ -15,6 +18,7 @@ const PageTitleContext = createContext<PageTitleContextValue | null>(null);
 export function PageTitleProvider({ children }: { children: ReactNode }) {
   const [pageTitle, setPageTitleState] = useState<string | null>(null);
   const [rightSlot, setRightSlotState] = useState<ReactNode>(null);
+  const [headingAction, setHeadingActionState] = useState<ReactNode>(null);
   const [belowNavbar, setBelowNavbarState] = useState<ReactNode>(null);
 
   const setPageTitle = useCallback((title: string | null) => {
@@ -23,6 +27,10 @@ export function PageTitleProvider({ children }: { children: ReactNode }) {
 
   const setRightSlot = useCallback((node: ReactNode) => {
     setRightSlotState(node);
+  }, []);
+
+  const setHeadingAction = useCallback((node: ReactNode) => {
+    setHeadingActionState(node);
   }, []);
 
   const setBelowNavbar = useCallback((node: ReactNode) => {
@@ -36,6 +44,8 @@ export function PageTitleProvider({ children }: { children: ReactNode }) {
         setPageTitle,
         rightSlot,
         setRightSlot,
+        headingAction,
+        setHeadingAction,
         belowNavbar,
         setBelowNavbar,
       }}

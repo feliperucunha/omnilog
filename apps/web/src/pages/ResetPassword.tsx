@@ -115,7 +115,7 @@ export function ResetPassword() {
       >
         <Card className="w-full border-[var(--color-surface-border)] bg-[var(--color-dark)] shadow-[var(--shadow-modal)]">
           <CardHeader className="text-center">
-            <h1 className="min-w-0 text-2xl font-bold text-[var(--color-lightest)]">
+            <h1 className="page-title min-w-0 text-[var(--color-lightest)]">
               <OverflowMarquee>{t("resetPassword.title")}</OverflowMarquee>
             </h1>
           </CardHeader>

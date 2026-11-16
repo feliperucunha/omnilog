@@ -97,6 +97,7 @@ import * as storage from "@/lib/storage";
 import { currencyMinorDecimals } from "@/lib/moneyInput";
 import { currentStatsPeriodKey, formatStatsTimeAxisLabel, partitionStatsPeriods, sortStatsPeriodsDesc } from "@/lib/formatStatsPeriod";
 import { cn } from "@/lib/utils";
+import { FriendActivity } from "@/components/FriendActivity";
 import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
 import { StickyCategoryStrip } from "@/components/StickyCategoryStrip";
@@ -459,7 +460,7 @@ function SegmentedFilter<T extends string>({
             className={cn(
               "rounded-lg px-2.5 py-1 text-[10px] font-semibold transition-colors max-md:min-h-[36px]",
               active
-                ? "bg-[var(--btn-gradient-start)] text-white"
+                ? "bg-[var(--btn-gradient-start)] text-[var(--btn-text)]"
                 : "border border-[var(--color-mid)]/30 text-[var(--color-light)]",
               option.disabled && "cursor-not-allowed opacity-50"
             )}
@@ -837,6 +838,7 @@ export function Statistics() {
   const { setPageTitle, setRightSlot, setBelowNavbar } = usePageTitle() ?? {};
   const isStatisticsActive = useLocation().pathname === "/statistics";
   const [categoryFilter, setCategoryFilter] = useState<"all" | MediaType>("all");
+  const [activityPane, setActivityPane] = useState<"friends" | "numbers">("numbers");
   const isPro = true;
   const [logs, setLogs] = useState<Log[]>([]);
   const [summary, setSummary] = useState<LogStatsSummary | null>(null);
@@ -1562,14 +1564,14 @@ export function Statistics() {
     }
     if (!visibleTypesOrderReady) {
       setBelowNavbar?.(
-        <div className="sticky top-14 z-20 w-full shrink-0 self-start border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
+        <div className="sticky top-0 z-20 h-fit w-full shrink-0 self-start border-b border-[var(--color-surface-border)] bg-[var(--color-darkest)]">
           <CategoryOrderSkeletonStrip />
         </div>
       );
       return;
     }
     setBelowNavbar?.(
-      <div className="sticky top-14 z-20 w-full shrink-0 self-start border-b border-[var(--color-mid)]/30 bg-[var(--color-dark)]">
+      <div className="sticky top-0 z-20 h-fit w-full shrink-0 self-start border-b border-[var(--color-surface-border)] bg-[var(--color-darkest)]">
         <StickyCategoryStrip
           items={[
             { value: "all", label: t("statistics.filterAll") },
@@ -2031,7 +2033,39 @@ const summaryData = summary ?? EMPTY_SUMMARY;
         <RecapView title={recapView.title} logs={recapView.logs} onClose={() => setRecapView(null)} />
       ) : null}
 
-      <div className="flex shrink-0 flex-col gap-12">
+      <div className="mb-4 flex gap-2 md:hidden">
+        <button
+          type="button"
+          aria-pressed={activityPane === "friends"}
+          onClick={() => setActivityPane("friends")}
+          className={cn(
+            "rounded-full border px-3 py-2 text-sm font-medium",
+            activityPane === "friends"
+              ? "border-[var(--color-lightest)] bg-[var(--color-lightest)] text-[var(--color-darkest)]"
+              : "border-[var(--color-surface-border)] text-[var(--color-light)]"
+          )}
+        >
+          {t("discover.friends")}
+        </button>
+        <button
+          type="button"
+          aria-pressed={activityPane === "numbers"}
+          onClick={() => setActivityPane("numbers")}
+          className={cn(
+            "rounded-full border px-3 py-2 text-sm font-medium",
+            activityPane === "numbers"
+              ? "border-[var(--color-lightest)] bg-[var(--color-lightest)] text-[var(--color-darkest)]"
+              : "border-[var(--color-surface-border)] text-[var(--color-light)]"
+          )}
+        >
+          {t("discover.numbers")}
+        </button>
+      </div>
+      <div className="grid min-w-0 items-start gap-6 md:grid-cols-[280px_minmax(0,1fr)]">
+      <div className={cn("min-w-0", activityPane !== "friends" && "max-md:hidden")}>
+        <FriendActivity />
+      </div>
+      <div className={cn("flex min-w-0 shrink-0 flex-col gap-12", activityPane !== "numbers" && "max-md:hidden")}>
       {loading && <StatisticsSummarySkeleton />}
       {!loading && (
         <div className="flex min-w-0 shrink-0 flex-col gap-2">
@@ -2516,7 +2550,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                         className={cn(
                           "rounded-lg px-2.5 py-1 text-[10px] font-semibold transition-colors max-md:min-h-[36px]",
                           pacePeriod === p
-                            ? "bg-[var(--btn-gradient-start)] text-white"
+                            ? "bg-[var(--btn-gradient-start)] text-[var(--btn-text)]"
                             : "border border-[var(--color-mid)]/30 text-[var(--color-light)]"
                         )}
                         aria-pressed={pacePeriod === p}
@@ -3327,6 +3361,7 @@ const summaryData = summary ?? EMPTY_SUMMARY;
               )}
             </div>
           )}
+      </div>
       </div>
       </div>
       <LogActivitySheet
