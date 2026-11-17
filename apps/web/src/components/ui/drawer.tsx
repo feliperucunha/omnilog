@@ -108,6 +108,29 @@ const DrawerContent = React.forwardRef<
     if (radixOpen) ignoreUntilRef.current = performance.now();
   }, [radixOpen]);
 
+  React.useLayoutEffect(() => {
+    if (!radixOpen) return;
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    closeInFlightRef.current = false;
+    setIsClosing(false);
+    const overlay = overlayRef.current;
+    if (overlay) {
+      overlay.style.animation = "";
+      overlay.style.transition = "";
+      overlay.style.opacity = "";
+    }
+    const surface = dragSurfaceRef.current;
+    if (surface) {
+      surface.style.animation = "";
+      surface.style.transform = "";
+      surface.style.transition = "";
+      surface.style.willChange = "";
+    }
+  }, [radixOpen]);
+
   const resetDragSurfaceStyles = React.useCallback(() => {
     const el = dragSurfaceRef.current;
     if (!el) return;
@@ -183,8 +206,9 @@ const DrawerContent = React.forwardRef<
         }
         setIsClosing(true);
         closeTimeoutRef.current = setTimeout(() => {
-          onClose?.();
           closeTimeoutRef.current = null;
+          setIsClosing(false);
+          onClose?.();
         }, DRAWER_CLOSE_DURATION_MS);
       } finally {
         closeInFlightRef.current = false;
@@ -214,16 +238,23 @@ const DrawerContent = React.forwardRef<
     })();
   }, [onClose, restoreScrimAfterDragCancel, runBeforeDismiss]);
 
-  React.useEffect(() => {
-    onReady?.(handleClose, closeImmediately);
-    return () => {
-      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
-    };
-  }, [handleClose, closeImmediately, onReady]);
-
-  /** Android hardware/gesture back: close like scrim tap so Radix unmounts overlay + content together (no delayed onClose leaving the dim layer). */
   const closeImmediatelyRef = React.useRef(closeImmediately);
   closeImmediatelyRef.current = closeImmediately;
+  const handleCloseRef = React.useRef(handleClose);
+  handleCloseRef.current = handleClose;
+
+  React.useEffect(() => {
+    onReady?.(() => handleCloseRef.current(), () => closeImmediatelyRef.current());
+  }, [onReady]);
+
+  React.useEffect(
+    () => () => {
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    },
+    []
+  );
+
+  /** Android hardware/gesture back: close like scrim tap so Radix unmounts overlay + content together (no delayed onClose leaving the dim layer). */
   useAndroidOverlayBack(radixOpen, () => {
     closeImmediatelyRef.current();
   });

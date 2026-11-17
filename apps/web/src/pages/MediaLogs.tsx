@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, useId } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { AlertTriangle, ChevronDown, Download, Loader2, SlidersHorizontal } from "lucide-react";
@@ -69,11 +69,6 @@ import { API_KEY_META } from "@/lib/apiKeyMeta";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-} from "@/components/ui/dropdown-menu";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { mediaTypeHasCollectionOwnership, mediaTypeHasMarketTab } from "@/lib/mediaTypeFeatures";
 import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
@@ -146,6 +141,7 @@ interface PlayersFilterDropdownProps {
 
 function PlayersFilterDropdown({ value, onChange, labelAll, ariaLabel, className }: PlayersFilterDropdownProps) {
   const [open, setOpen] = useState(false);
+  const listId = useId();
   const selected = value ? value.split(",").filter(Boolean) : [];
   const triggerLabel = selected.length === 0 ? labelAll : `${labelAll} (${selected.length})`;
 
@@ -158,45 +154,43 @@ function PlayersFilterDropdown({ value, onChange, labelAll, ariaLabel, className
 
   return (
     <div className={cn("flex min-h-0 min-w-0 flex-col", "max-md:h-full max-md:self-stretch", "md:h-auto md:self-auto", className)}>
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex w-full items-center justify-between gap-2 rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] transition-colors [touch-action:manipulation]",
-            "max-md:h-full max-md:min-h-[44px]",
-            "md:h-9 md:min-h-9 md:max-h-9 md:py-1",
-            "focus:outline-none"
-          )}
-          aria-label={ariaLabel}
+      <button
+        type="button"
+        className={cn(
+          "flex w-full items-center justify-between gap-2 rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] transition-colors [touch-action:manipulation]",
+          "max-md:h-full max-md:min-h-[44px]",
+          "md:h-9 md:min-h-9 md:max-h-9 md:py-1",
+          "focus:outline-none"
+        )}
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <OverflowMarquee className="text-left">{triggerLabel}</OverflowMarquee>
+        <ChevronDown className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", open && "rotate-180")} aria-hidden />
+      </button>
+      {open && (
+        <div
+          id={listId}
+          className="mt-2 flex flex-col gap-0.5 rounded-md border border-[var(--color-mid)]/30 bg-[var(--color-darkest)] p-1.5"
         >
-          <OverflowMarquee className="text-left">{triggerLabel}</OverflowMarquee>
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[10rem] p-2">
-        {PLAYER_OPTIONS.map((opt) => {
-          const checked = selected.includes(opt.value);
-          return (
+          {PLAYER_OPTIONS.map((opt) => (
             <label
               key={opt.value}
-              className={cn(
-                "flex min-h-[44px] w-full cursor-pointer select-none items-center gap-3 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors [touch-action:manipulation]",
-                "hover:bg-[var(--color-mid)]/40"
-              )}
+              className="flex min-h-[44px] cursor-pointer select-none items-center gap-3 rounded-sm px-2 py-1.5 text-sm text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/40 [touch-action:manipulation]"
             >
               <input
                 type="checkbox"
-                checked={checked}
+                checked={selected.includes(opt.value)}
                 onChange={() => toggle(opt.value)}
                 className="m-0"
               />
               <span className="min-w-0 flex-1">{opt.label}</span>
             </label>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
