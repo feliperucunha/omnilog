@@ -41,7 +41,7 @@ import { Logo } from "@/components/Logo";
 import { showErrorToast } from "@/lib/errorToast";
 import { toast } from "sonner";
 import { tapScale, tapTransition } from "@/lib/animations";
-import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps, visibleEnterProps } from "@/lib/motionPolicy";
+import { visibleEnterProps } from "@/lib/motionPolicy";
 import { LogViewSelector } from "@/components/LogViewSelector";
 import { MediaLogCard } from "@/components/MediaLogCard";
 import { ReviewQuoteModal } from "@/components/ReviewQuoteModal";
@@ -1485,7 +1485,7 @@ export function MediaLogs({
             )}
           </motion.div>
         ) : (
-          <motion.div {...listStaggerParentProps} className="min-w-0 overflow-hidden">
+          <div className="min-w-0">
             <div
               className={
                 activeLogView === "compact"
@@ -1496,10 +1496,14 @@ export function MediaLogs({
               }
             >
             {logs.map((log) => (
-              <motion.div
+              <div
                 key={log.id}
-                variants={listStaggerItemVariants}
-                className={cn("min-h-0 min-w-0", listStaggerItemClassName)}
+                className={cn(
+                  "min-h-0 min-w-0 [content-visibility:auto]",
+                  activeLogView === "grid"
+                    ? "[contain-intrinsic-size:auto_280px]"
+                    : "[contain-intrinsic-size:auto_148px]"
+                )}
               >
                 <div>
                   <MediaLogCard
@@ -1525,7 +1529,7 @@ export function MediaLogs({
                     locale={locale}
                   />
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
           {nextCursor != null && (
@@ -1561,7 +1565,7 @@ export function MediaLogs({
               </div>
             </>
           )}
-          </motion.div>
+          </div>
         )}
       </div>
 

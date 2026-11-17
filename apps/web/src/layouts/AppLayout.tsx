@@ -14,6 +14,7 @@ import { FORCE_ONBOARDING_UI } from "@/lib/onboardingDev";
 import { OnboardingForm } from "@/pages/Onboarding";
 import { useLocale } from "@/contexts/LocaleContext";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 function AppLayoutContent() {
   useEnsureRouteContentVisible();
@@ -58,7 +59,16 @@ function AppLayoutContent() {
             </div>
           ) : null}
           {belowNavbar != null && belowNavbar !== false && (
-            <div className="mb-4 w-full min-w-0 shrink-0 self-start">{belowNavbar}</div>
+            <div
+              className={cn(
+                "w-full min-w-0 self-start",
+                location.pathname === "/statistics"
+                  ? "sticky top-0 z-20 -mx-3.5 mb-4 bg-[var(--color-darkest)] px-3.5 pb-3 md:-mx-7 md:px-7"
+                  : "mb-4 shrink-0"
+              )}
+            >
+              {belowNavbar}
+            </div>
           )}
           <InvalidApiKeyBanner />
           <Outlet />

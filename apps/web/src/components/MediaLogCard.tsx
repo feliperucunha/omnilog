@@ -400,8 +400,8 @@ function LogReviewBlock({
       <p
         ref={reviewRef}
         className={cn(
-          "line-clamp-2 w-full min-w-0 break-words text-[var(--color-light)]",
-          compact ? "text-[10px]" : "text-[13px]"
+          "w-full min-w-0 break-words text-[var(--color-light)]",
+          compact ? "line-clamp-2 text-[10px]" : "line-clamp-1 text-[13px]"
         )}
       >
         {review}
@@ -556,7 +556,7 @@ function LogActions({
 
   const isGrid = view === "grid";
   const containerClass = inline
-    ? "flex w-full min-w-0 flex-wrap items-center gap-1.5"
+    ? "flex min-w-0 max-w-full flex-wrap items-center gap-1.5"
     : view === "compact"
       ? "flex shrink-0 items-center justify-end gap-1 border-t border-[var(--color-surface-border)]/80 p-1.5"
       : isGrid
@@ -875,38 +875,44 @@ export function MediaLogCard({
         >
           {log.title}
         </Link>
-        <LogActions
-          inline
-          log={log}
-          readOnly={readOnly}
-          view={isGrid ? "grid" : "list"}
-          mediaType={mediaType}
-          deletingId={deletingId}
-          incrementingId={incrementingId}
-          statusChangingId={statusChangingId}
-          onIncrement={onIncrement}
-          onStatusChange={onStatusChange}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          t={t}
-        />
-        <p className="min-w-0 break-words text-[13px] text-[var(--color-light)]">{t(`nav.${log.mediaType}`)}</p>
-        {statusLabel ? (
-          <span className="w-fit max-w-full whitespace-normal break-words rounded-full border border-[var(--color-surface-border)] bg-[var(--color-mid)]/25 px-2 py-0.5 text-left text-[11px] font-semibold leading-snug text-[var(--color-light)]">
-            {statusLabel}
-          </span>
-        ) : null}
-        {display.grade != null ? (
-          <StarRating value={gradeToStars(display.grade)} readOnly size="sm" />
-        ) : null}
-        <LogReviewBlock
-          log={log}
-          display={display}
-          compact={false}
-          grid={isGrid}
-          onViewReview={onViewReview}
-          t={t}
-        />
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="min-w-0 break-words text-[13px] text-[var(--color-light)]">{t(`nav.${log.mediaType}`)}</p>
+          {statusLabel ? (
+            <span className="w-fit max-w-full whitespace-normal break-words rounded-full border border-[var(--color-surface-border)] bg-[var(--color-mid)]/25 px-2 py-0.5 text-left text-[11px] font-semibold leading-snug text-[var(--color-light)]">
+              {statusLabel}
+            </span>
+          ) : null}
+          {display.grade != null ? (
+            <StarRating value={gradeToStars(display.grade)} readOnly size="sm" />
+          ) : null}
+        </div>
+        <div className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+          <div className="min-w-[8rem] flex-1">
+            <LogReviewBlock
+              log={log}
+              display={display}
+              compact={false}
+              grid={isGrid}
+              onViewReview={onViewReview}
+              t={t}
+            />
+          </div>
+          <LogActions
+            inline
+            log={log}
+            readOnly={readOnly}
+            view={isGrid ? "grid" : "list"}
+            mediaType={mediaType}
+            deletingId={deletingId}
+            incrementingId={incrementingId}
+            statusChangingId={statusChangingId}
+            onIncrement={onIncrement}
+            onStatusChange={onStatusChange}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            t={t}
+          />
+        </div>
         <LogMetaRow
           log={log}
           display={display}

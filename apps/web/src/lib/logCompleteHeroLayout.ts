@@ -138,22 +138,22 @@ export function logCompleteHeroWrapperClass(opts: {
       return cnJoin(
         base,
         compactForText
-          ? "aspect-square min-h-[140px] max-h-[min(34vh,300px)] md:max-h-[min(32vh,280px)]"
-          : "aspect-square min-h-[160px] max-h-[min(42vh,380px)] md:max-h-[min(40vh,360px)]"
+          ? "aspect-square max-h-[min(28dvh,260px)]"
+          : "aspect-square max-h-[min(34dvh,320px)]"
       );
     case "landscape":
       return cnJoin(
         base,
         compactForText
-          ? "h-[28vh] min-h-[112px] max-h-[min(32vh,280px)] md:aspect-[4/3] md:max-h-[min(30vh,260px)]"
-          : "h-[34vh] min-h-[128px] max-h-[min(38vh,340px)] md:aspect-[4/3] md:max-h-[min(36vh,320px)]"
+          ? "aspect-[4/3] max-h-[min(24dvh,200px)]"
+          : "aspect-[4/3] max-h-[min(30dvh,260px)]"
       );
     default:
       return cnJoin(
         base,
         compactForText
-          ? "h-[48vh] min-h-[168px] max-h-[min(50vh,420px)] md:aspect-[2/3] md:max-h-[min(52vh,440px)]"
-          : "h-[60vh] min-h-[190px] md:aspect-[2/3] md:max-h-none"
+          ? "aspect-[2/3] max-h-[min(32dvh,320px)]"
+          : "aspect-[2/3] max-h-[min(40dvh,420px)]"
       );
   }
 }
