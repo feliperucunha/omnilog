@@ -220,6 +220,7 @@ export async function getGameById(id: string, apiKey?: string | null): Promise<I
     id: String(data.id ?? id),
     title: decodeHtmlEntities(data.name ?? "Unknown"),
     image: data.background_image ?? null,
+    cover: null,
     year: data.released?.slice(0, 4) ?? null,
     subtitle: null,
     timeToBeatHours,

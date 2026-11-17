@@ -42,7 +42,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Drawer, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { useLogViewPreference } from "@/hooks/useLogViewPreference";
-import type { LogViewMode } from "@/lib/logViewPreference";
 import { openMountedLibraryFilters } from "@/lib/libraryFiltersRequest";
 import {
   MediaLogs,
@@ -56,6 +55,7 @@ import { getLogCardDisplay } from "@/lib/logDisplay";
 import { isCompletedStatus } from "@/lib/logStatusColors";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps } from "@/lib/motionPolicy";
 import { itemDetailPath } from "@/lib/itemRoutes";
+import { CardViewChips, segmentChipClass } from "@/components/SegmentChip";
 import { cn } from "@/lib/utils";
 import * as storage from "@/lib/storage";
 import { ReactionButtons } from "@/components/ReactionButtons";
@@ -67,15 +67,6 @@ import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardin
 interface FeedEntry {
   log: Log;
   user: { id: string; username: string | null };
-}
-
-function libraryChipClass(pressed: boolean) {
-  return cn(
-    "rounded-full border px-3 py-2 text-[13px] font-medium",
-    pressed
-      ? "border-[var(--color-lightest)] bg-[var(--color-lightest)] text-[var(--color-darkest)]"
-      : "border-[var(--color-surface-border)] bg-[var(--color-dark)] text-[var(--color-light)]"
-  );
 }
 
 const BETA_MODAL_STORAGE_KEY = "geeklogs.betaModalSeen";
@@ -734,7 +725,7 @@ export function Dashboard() {
             type="button"
             aria-pressed={libraryView === "shelves"}
             onClick={() => setLibraryView("shelves")}
-            className={libraryChipClass(libraryView === "shelves")}
+            className={segmentChipClass(libraryView === "shelves")}
           >
             {t("dashboard.shelves")}
           </button>
@@ -742,22 +733,16 @@ export function Dashboard() {
             type="button"
             aria-pressed={libraryView === "logs"}
             onClick={() => setLibraryView("logs")}
-            className={libraryChipClass(libraryView === "logs")}
+            className={segmentChipClass(libraryView === "logs")}
           >
             {t("dashboard.allLogs")}
           </button>
-          {libraryView === "logs" &&
-            (["list", "grid"] as const satisfies readonly LogViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                aria-pressed={logView === mode}
-                onClick={() => setLogView(mode)}
-                className={libraryChipClass(logView === mode)}
-              >
-                {t(mode === "list" ? "mediaLogs.viewList" : "mediaLogs.viewGrid")}
-              </button>
-            ))}
+          {libraryView === "logs" && (
+            <CardViewChips
+              value={logView === "grid" ? "grid" : "list"}
+              onChange={setLogView}
+            />
+          )}
         </div>
       )}
       {visibleTypes.length > 0 && libraryView === "shelves" && (

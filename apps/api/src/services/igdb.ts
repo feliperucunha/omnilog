@@ -13,7 +13,7 @@ const TOKEN_ENDPOINT = "https://id.twitch.tv/oauth2/token";
 const EXTERNAL_ID_PREFIX = "igdb:";
 const LIST_FIELDS = "name,first_release_date,cover.url,genres.name,rating,total_rating";
 const DETAIL_FIELDS =
-  "name,first_release_date,cover.url,genres.name,platforms.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,total_rating,rating,aggregated_rating,summary,storyline,themes.name,keywords.name";
+  "name,first_release_date,cover.url,artworks.image_id,screenshots.image_id,genres.name,platforms.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,total_rating,rating,aggregated_rating,summary,storyline,themes.name,keywords.name";
 
 type IgdbNamed = { name?: string };
 type IgdbGameRow = {
@@ -21,6 +21,8 @@ type IgdbGameRow = {
   name?: string;
   first_release_date?: number;
   cover?: { url?: string };
+  artworks?: Array<{ image_id?: string }>;
+  screenshots?: Array<{ image_id?: string }>;
   genres?: IgdbNamed[];
   platforms?: IgdbNamed[];
   involved_companies?: Array<{
@@ -105,6 +107,18 @@ function firstPositive(...values: Array<number | undefined>): number | null {
   return null;
 }
 
+/** Landscape key art. Artworks first, then a screenshot. Null when IGDB has neither. */
+export function igdbCoverUrl(row: {
+  artworks?: Array<{ image_id?: string }>;
+  screenshots?: Array<{ image_id?: string }>;
+}): string | null {
+  const imageId = [...(row.artworks ?? []), ...(row.screenshots ?? [])]
+    .map((image) => image.image_id?.trim())
+    .find((id): id is string => !!id);
+  if (!imageId) return null;
+  return `https://images.igdb.com/igdb/image/upload/t_1080p/${imageId}.jpg`;
+}
+
 function imageUrl(url: string | undefined): string | null {
   if (!url) return null;
   let value = url.trim();
@@ -178,6 +192,7 @@ export function mapIgdbGameToItemDetail(
     id: row.id != null ? toIgdbExternalId(row.id) : "",
     title: decodeHtmlEntities(row.name?.trim() || "Unknown"),
     image: imageUrl(row.cover?.url),
+    cover: igdbCoverUrl(row),
     year: date?.slice(0, 4) ?? null,
     subtitle: null,
     timeToBeatHours: timeToBeatHours(timeToBeat),

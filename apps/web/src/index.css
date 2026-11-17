@@ -567,3 +567,22 @@ body {
     transform: translate3d(-50%, 0, 0);
   }
 }
+
+/* Item page: one column until a details panel exists, then log + details side by side. */
+.item-page-layout {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+@media (min-width: 1024px) {
+  .item-page-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 2rem;
+  }
+  .item-page-layout:has(aside:not(:empty)) {
+    grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 22rem);
+  }
+}

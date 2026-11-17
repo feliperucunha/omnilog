@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildIgdbSearchQuery,
+  igdbCoverUrl,
   isIgdbExternalId,
   mapIgdbGameToItemDetail,
   mapIgdbGameToSearchResult,
@@ -87,6 +88,22 @@ describe("mapIgdbGameToItemDetail", () => {
       developers: ["Nintendo EPD"],
       publishers: ["Nintendo"],
       tags: ["Action", "Fantasy"],
+      cover: null,
     });
+  });
+
+  it("uses key art for the header cover and keeps box art as the card", () => {
+    const detail = mapIgdbGameToItemDetail({
+      id: 1,
+      name: "Halo",
+      cover: { url: "//images.igdb.com/igdb/image/upload/t_thumb/box.jpg" },
+      artworks: [{ image_id: "art1" }],
+      screenshots: [{ image_id: "shot1" }],
+    });
+    expect(detail.image).toBe("https://images.igdb.com/igdb/image/upload/t_cover_big/box.jpg");
+    expect(detail.cover).toBe("https://images.igdb.com/igdb/image/upload/t_1080p/art1.jpg");
+    expect(igdbCoverUrl({ screenshots: [{ image_id: "shot1" }] })).toBe(
+      "https://images.igdb.com/igdb/image/upload/t_1080p/shot1.jpg"
+    );
   });
 });

@@ -965,6 +965,9 @@
   },
   "itemPage": {
     "back": "Back",
+    "sectionLog": "Log",
+    "sectionDetails": "Details",
+    "sectionReviews": "Reviews",
     "badgePopupUserEarnedIn": "{{user}} earned {{label}} in {{category}}",
     "logInToReview": "Log in to leave a review or add this to your favorites or pending list.",
     "logInLink": "Log in",

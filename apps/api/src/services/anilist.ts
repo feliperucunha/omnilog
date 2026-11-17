@@ -151,6 +151,7 @@ type AnilistDetailMedia = {
   idMal?: number | null;
   title?: AnilistTitle | null;
   coverImage?: { large?: string | null; medium?: string | null } | null;
+  bannerImage?: string | null;
   description?: string | null;
   averageScore?: number | null;
   episodes?: number | null;
@@ -176,6 +177,7 @@ async function getMediaDetailAnilist(
       idMal
       title { romaji english native }
       coverImage { large medium }
+      bannerImage
       description(asHtml: false)
       averageScore
       episodes
@@ -237,6 +239,7 @@ async function getMediaDetailAnilist(
     title: pickAnilistTitle(d.title ?? {}, preference),
     titleVariants: titleParts,
     image: d.coverImage?.large?.trim() || d.coverImage?.medium?.trim() || null,
+    cover: d.bannerImage?.trim() || null,
     year,
     subtitle: null,
     description: anilistDescription(d.description),

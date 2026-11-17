@@ -770,7 +770,7 @@ export function ItemReviewForm({
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
     >
-      <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6 shadow-[var(--shadow-card)]">
+      <Card className="min-w-0 border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-4 shadow-none sm:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="min-w-0 text-xl font-semibold text-[var(--color-lightest)]">
             {myLog ? t("itemReviewForm.yourReview") : t("itemReviewForm.addReview")}

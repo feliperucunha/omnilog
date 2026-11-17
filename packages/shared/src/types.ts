@@ -186,6 +186,11 @@ export interface ItemDetail {
   id: string;
   title: string;
   image: string | null;
+  /**
+   * Wide scene or key art for the item page header, when the catalog has one
+   * distinct from the search-card `image`. Absent for sources that only have a card.
+   */
+  cover?: string | null;
   /** Smaller/poster URL when the API provides it (e.g. BGG thumbnail). Clients should use `image ?? thumbnail` for display. */
   thumbnail?: string | null;
   year?: string | null;

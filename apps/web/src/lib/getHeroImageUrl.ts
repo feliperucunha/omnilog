@@ -24,6 +24,23 @@ export function getItemDisplayImageUrl(
 }
 
 /**
+ * Header background: the catalog's wide cover when it has one, otherwise the search-card image.
+ * `dropCover` is set after that cover URL fails to load.
+ */
+export function getItemHeaderImageUrl(
+  cover: string | null | undefined,
+  image: string | null | undefined,
+  thumbnail: string | null | undefined,
+  dropCover = false
+): string | null {
+  if (!dropCover) {
+    const coverUrl = getHeroImageUrl(cover);
+    if (coverUrl) return coverUrl;
+  }
+  return getItemDisplayImageUrl(image, thumbnail);
+}
+
+/**
  * Safe `background-image` value for React `style`. Unquoted `url(https://…)` is invalid CSS when
  * the URL contains `)` — e.g. BGG CDN paths like `filters:format(jpeg)/…` — so the rule is dropped.
  */
@@ -40,9 +57,9 @@ export function getHeroImageUrl(imageUrl: string | null | undefined): string | n
   const url = coerceImageUrlString(imageUrl);
   if (!url) return null;
 
-  // TMDB: poster sizes w92, w154, w185, w342, w500, w780, original
+  // TMDB poster sizes. Leave w780, w1280, and original alone so wide covers are not shrunk.
   if (url.includes("image.tmdb.org/t/p/")) {
-    return url.replace(/\/t\/p\/w\d+\//, "/t/p/w780/");
+    return url.replace(/\/t\/p\/w(?:92|154|185|200|342|500)\//, "/t/p/w780/");
   }
 
   // Open Library: -S (small), -M (medium), -L (large). Use L for hero.

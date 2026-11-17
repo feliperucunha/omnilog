@@ -284,7 +284,12 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
     }
   };
 
-  let item = cachedItem && (cachedItem.fresh || cachedItem.stale) ? cachedItem.data : null;
+  const coverCapable = mediaType === "movies" || mediaType === "tv" || mediaType === "games" || mediaType === "anime" || mediaType === "manga";
+  const cacheMissingCover =
+    coverCapable &&
+    !!cachedItem?.data &&
+    !Object.prototype.hasOwnProperty.call(cachedItem.data, "cover");
+  let item = cachedItem && (cachedItem.fresh || cachedItem.stale) && !cacheMissingCover ? cachedItem.data : null;
   if (cachedItem?.stale) {
     timer.setCacheHit(true);
     scheduleItemPayloadCacheRefresh(prisma, mediaType, externalId, fetchUpstreamItem);

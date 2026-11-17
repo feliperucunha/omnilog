@@ -24,7 +24,7 @@ import { fetchLogsIndex, type LogIndexEntry } from "@/lib/logsPageCache";
 import { useAppPtrRefresh } from "@/hooks/useAppPtrRefresh";
 import { SearchSkeleton, BrowseRailSkeleton } from "@/components/skeletons";
 import { SearchResultCard } from "@/components/SearchResultCard";
-import { LogViewSelector } from "@/components/LogViewSelector";
+import { CardViewChips } from "@/components/SegmentChip";
 import { useLogViewPreference } from "@/hooks/useLogViewPreference";
 import { Logo } from "@/components/Logo";
 import {
@@ -70,7 +70,6 @@ import { OnboardingSpotlight } from "@/components/OnboardingSpotlight";
 import { getFirstVisibleByIds, ONBOARDING_SPOTLIGHT_KEYS } from "@/lib/onboardingSpotlightStorage";
 import {
   SEARCH_RESULT_CARD_GRID,
-  SEARCH_RESULT_CARD_GRID_COMPACT,
   SEARCH_RESULT_CARD_GRID_MULTI,
 } from "@/lib/logCardLayout";
 
@@ -887,8 +886,8 @@ export function Search() {
 
   const searchFormContent = (
     <div className="flex flex-col gap-4">
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className="min-w-0 flex-1 basis-full sm:basis-0">
           <UnifiedSearchBar
             ref={searchInputRef}
             value={query}
@@ -916,7 +915,10 @@ export function Search() {
           />
         </div>
         {hasSearched && searchFilter !== SEARCH_USERS_TYPE && (
-          <LogViewSelector value={searchLogView} onValueChange={setSearchLogView} />
+          <CardViewChips
+            value={searchLogView === "grid" ? "grid" : "list"}
+            onChange={setSearchLogView}
+          />
         )}
       </div>
       {hasSearched && searchFilter !== SEARCH_USERS_TYPE && (
@@ -974,7 +976,7 @@ export function Search() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.2 }}
         >
-          <SearchSkeleton view={searchLogView} />
+          <SearchSkeleton view={searchLogView === "grid" ? "grid" : "list"} />
         </motion.div>
       )}
 
@@ -1073,11 +1075,9 @@ export function Search() {
         <motion.div {...listStaggerParentProps} className="min-w-0">
           <div
             className={
-              searchLogView === "compact"
-                ? SEARCH_RESULT_CARD_GRID_COMPACT
-                : searchLogView === "grid"
-                  ? SEARCH_RESULT_CARD_GRID_MULTI
-                  : SEARCH_RESULT_CARD_GRID
+              searchLogView === "grid"
+                ? SEARCH_RESULT_CARD_GRID_MULTI
+                : SEARCH_RESULT_CARD_GRID
             }
           >
             {results.map((item) => {
@@ -1088,14 +1088,14 @@ export function Search() {
                   variants={listStaggerItemVariants}
                   className={cn(
                     "min-h-0 min-w-0",
-                    searchLogView === "list" && "sm:h-full",
+                    searchLogView !== "grid" && "sm:h-full",
                     listStaggerItemClassName
                   )}
                 >
                   <SearchResultCard
                     item={item}
                     mediaType={mediaType}
-                    view={searchLogView}
+                    view={searchLogView === "grid" ? "grid" : "list"}
                     token={token}
                     userLog={userLog}
                     boardGameProvider={boardGameProvider}

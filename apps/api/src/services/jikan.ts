@@ -17,6 +17,16 @@ async function jikanFetch(url: string, init?: RequestInit): Promise<Response> {
   return upstreamFetch(url, { ...init, provider: "jikan", retry: true });
 }
 
+/** 16:9 trailer still from Jikan. MAL has no banner; hqdefault is more reliable than maxres. */
+export function jikanTrailerCoverUrl(
+  images: { large_image_url?: string | null; maximum_image_url?: string | null } | null | undefined
+): string | null {
+  const large = images?.large_image_url?.trim();
+  if (large) return large;
+  const maximum = images?.maximum_image_url?.trim();
+  return maximum || null;
+}
+
 /** Map our sort value to Jikan order_by and sort (asc/desc). */
 function jikanOrderParams(sort: string | undefined): { order_by?: string; sort?: string } {
   if (!sort || sort === "relevance") return {};
@@ -129,6 +139,9 @@ async function getAnimeByIdJikan(
       title_japanese?: string | null;
       year?: number;
       images?: { jpg?: { image_url?: string } };
+      trailer?: {
+        images?: { large_image_url?: string | null; maximum_image_url?: string | null };
+      };
       synopsis?: string;
       score?: number;
       rating?: string;
@@ -172,6 +185,7 @@ async function getAnimeByIdJikan(
     title: jikanDisplayTitle(titleFields, preference),
     titleVariants,
     image: d.images?.jpg?.image_url ?? null,
+    cover: jikanTrailerCoverUrl(d.trailer?.images),
     year: d.year != null ? String(d.year) : null,
     subtitle: null,
     description: description ?? null,
@@ -323,6 +337,7 @@ async function getMangaByIdJikan(
     title: jikanDisplayTitle(titleFields, preference),
     titleVariants,
     image: d.images?.jpg?.image_url ?? null,
+    cover: null,
     year: year ?? null,
     subtitle: null,
     description: description ?? null,

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { ReactionButtons } from "@/components/ReactionButtons";
 import { formatBoardGameWeight } from "@/lib/boardGameWeight";
 import { getStatusLabel } from "@/lib/statusLabel";
 import {
-  logStatusBorderClass,
+  logStatusRailClass,
   logStatusSoftBadgeClass,
   mediaTypeUsesEpisodeStatusColors,
   seriesAirStatusSoftBadgeClass,
@@ -44,11 +44,10 @@ import { MEDIA_BADGE_ICONS } from "@/lib/mediaBadgeIcons";
 import { StarRating } from "@/components/StarRating";
 import { gradeToStars } from "@/lib/gradeStars";
 import { formatTimeToBeatHours } from "@/lib/formatDuration";
-import { getItemDisplayImageUrl } from "@/lib/getHeroImageUrl";
+import { getHeroImageUrl, getItemDisplayImageUrl, getItemHeaderImageUrl } from "@/lib/getHeroImageUrl";
 import { ItemImage } from "@/components/ItemImage";
 import { listStaggerItemClassName, listStaggerItemVariants, listStaggerParentProps, visibleEnterProps } from "@/lib/motionPolicy";
 import { useLocale } from "@/contexts/LocaleContext";
-import { paperShadow } from "@/lib/paperShadow";
 import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { isCapacitorAndroid } from "@/lib/androidOverlayBack";
 import { cn } from "@/lib/utils";
@@ -151,11 +150,10 @@ function ItemDetailsBlock({
   return (
     <Card
       className={cn(
-        "flex min-w-0 flex-col gap-5 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-5 sm:p-6",
+        "@container flex min-w-0 flex-col gap-5 border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-5 shadow-none sm:p-6",
         /* Android: `overflow-hidden` + long description has clipped the whole card’s text layer in WebView; keep horizontal clip only. */
         androidWebView ? "overflow-x-hidden" : "overflow-hidden"
       )}
-      style={paperShadow}
     >
       {hasTagline && (
         <p className="text-[var(--color-light)] italic text-center text-sm sm:text-base border-b border-[var(--color-mid)]/20 pb-4">
@@ -219,11 +217,11 @@ function ItemDetailsBlock({
           </span>
         )}
       </div>
-      <div className="grid min-w-0 grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
+      <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 text-sm @[28rem]:grid-cols-3">
         {hasReleaseDate && (
           <div>
             <span className="text-[var(--color-light)]">{t("itemPage.releaseDate")}: </span>
-            <span className="text-[var(--color-lightest)] font-medium">{item.releaseDate}</span>
+            <span className="whitespace-nowrap font-medium text-[var(--color-lightest)]">{item.releaseDate}</span>
           </div>
         )}
         {hasStatus && (
@@ -294,7 +292,7 @@ function ItemDetailsBlock({
           </div>
         )}
         {hasAuthors && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.authors")}: </span>
             <span className="text-[var(--color-lightest)]">{item.authors!.join(", ")}</span>
           </div>
@@ -320,37 +318,37 @@ function ItemDetailsBlock({
           </div>
         )}
         {hasPlatforms && mediaType !== "games" && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.platforms")}: </span>
             <span className="text-[var(--color-lightest)]">{item.platforms!.join(", ")}</span>
           </div>
         )}
         {hasProductionCountries && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.productionCountries")}: </span>
             <span className="text-[var(--color-lightest)]">{item.productionCountries!.join(", ")}</span>
           </div>
         )}
         {hasSpokenLanguages && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.spokenLanguages")}: </span>
             <span className="text-[var(--color-lightest)]">{item.spokenLanguages!.join(", ")}</span>
           </div>
         )}
         {hasNetworks && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.networks")}: </span>
             <span className="text-[var(--color-lightest)]">{item.networks!.join(", ")}</span>
           </div>
         )}
         {hasDevelopers && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.developers")}: </span>
             <span className="text-[var(--color-lightest)]">{item.developers!.join(", ")}</span>
           </div>
         )}
         {hasPublishers && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.publishers")}: </span>
             <span className="text-[var(--color-lightest)]">{item.publishers!.join(", ")}</span>
           </div>
@@ -362,7 +360,7 @@ function ItemDetailsBlock({
           </div>
         )}
         {hasTags && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.tags")}: </span>
             <span className="text-[var(--color-lightest)]">{item.tags!.join(", ")}</span>
           </div>
@@ -374,25 +372,25 @@ function ItemDetailsBlock({
           </div>
         )}
         {hasCategories && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.categories")}: </span>
             <span className="text-[var(--color-lightest)]">{item.categories!.join(", ")}</span>
           </div>
         )}
         {hasMechanics && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.mechanics")}: </span>
             <span className="text-[var(--color-lightest)]">{item.mechanics!.join(", ")}</span>
           </div>
         )}
         {hasStudios && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.studios")}: </span>
             <span className="text-[var(--color-lightest)]">{item.studios!.join(", ")}</span>
           </div>
         )}
         {hasThemes && (
-          <div className="col-span-2 min-w-0 break-words sm:col-span-3">
+          <div className="col-span-2 min-w-0 break-words @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.themes")}: </span>
             <span className="text-[var(--color-lightest)]">{item.themes!.join(", ")}</span>
           </div>
@@ -410,7 +408,7 @@ function ItemDetailsBlock({
           </div>
         )}
         {hasSubjects && (
-          <div className="col-span-2 sm:col-span-3">
+          <div className="col-span-2 @[28rem]:col-span-3">
             <span className="text-[var(--color-light)]">{t("itemPage.subjects")}: </span>
             <span className="text-[var(--color-lightest)]">{item.subjects!.join(", ")}</span>
           </div>
@@ -427,7 +425,7 @@ function ItemDetailsBlock({
             <span className="text-[var(--color-lightest)] font-medium">{item.volumesCount}</span>
           </div>
         )}
-        <div className="col-span-2 sm:col-span-3 pt-2 mt-2 border-t border-[var(--color-mid)]/20 space-y-1">
+        <div className="col-span-2 @[28rem]:col-span-3 pt-2 mt-2 border-t border-[var(--color-mid)]/20 space-y-1">
           {hasItemSource && (
             <span className="block text-xs text-[var(--color-light)]">
               {t("itemPage.detailsFromSource", {
@@ -497,7 +495,7 @@ function reviewScopeLabel(
 }
 
 function reviewStatusBorderClass(r: ItemReview): string {
-  return logStatusBorderClass(r.status ?? r.listType ?? null);
+  return logStatusRailClass(r.status ?? r.listType ?? null);
 }
 
 function itemReviewProfilePath(review: ItemReview, mediaType: MediaType): string | null {
@@ -681,8 +679,15 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
   const [reviewsPage, setReviewsPage] = useState(1);
   const [reviewsSort, setReviewsSort] = useState<ReviewSortKey>("recent");
   const [expandedReviewUsers, setExpandedReviewUsers] = useState<Set<string>>(() => new Set());
+  const [section, setSection] = useState<"log" | "details" | "reviews">("log");
+  const [dropCover, setDropCover] = useState(false);
+  const sectionNavRef = useRef<HTMLElement>(null);
   const { token } = useAuth();
   const { setPageTitle } = usePageTitle() ?? {};
+
+  useEffect(() => {
+    setDropCover(false);
+  }, [mediaType, id]);
 
   useEffect(() => {
     const title = data?.item?.title ?? null;
@@ -931,38 +936,74 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
   const showPagination = reviewsTotal > pageSize;
 
   const heroUrl = getItemDisplayImageUrl(item.image, item.thumbnail);
+  const headerImageUrl = getItemHeaderImageUrl(item.cover, item.image, item.thumbnail, dropCover);
+  const headerUsesCover = !dropCover && Boolean(getHeroImageUrl(item.cover));
+  const sections = [
+    ["log", t("itemPage.sectionLog")],
+    ["details", t("itemPage.sectionDetails")],
+    ["reviews", t("itemPage.sectionReviews")],
+  ] as const;
+
+  const showSection = (next: (typeof sections)[number][0]) => {
+    setSection(next);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      requestAnimationFrame(() => {
+        sectionNavRef.current?.scrollIntoView({ block: "start", inline: "nearest" });
+      });
+    }
+  };
 
   return (
     <motion.div {...visibleEnterProps} className="min-w-0 overflow-x-hidden">
-      <div className="flex min-w-0 flex-col gap-8">
-        <header className="flex min-w-0 flex-col gap-4">
-          <Button variant="outline" size="sm" className="w-fit" onClick={onBack}>
-            <ArrowLeft size={18} />
-            {t("itemPage.back")}
-          </Button>
-          <div className="flex min-w-0 items-end gap-4">
+      <div className="item-page-layout">
+        <header className="relative isolate min-w-0 overflow-hidden rounded-2xl border border-[var(--color-mid)]/20 bg-[var(--color-dark)] lg:col-span-full lg:grid lg:min-h-[18rem] lg:grid-cols-[11rem_minmax(0,1fr)] lg:items-end lg:gap-6 lg:p-5">
+          {headerImageUrl ? (
+            <img
+              src={headerImageUrl}
+              alt=""
+              className="pointer-events-none absolute inset-0 z-0 h-full w-full object-cover object-center"
+              onError={() => {
+                if (headerUsesCover) setDropCover(true);
+              }}
+            />
+          ) : null}
+          <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/85 via-black/55 to-black/30 lg:bg-gradient-to-r lg:from-black/80 lg:via-black/55 lg:to-black/45" />
+          {heroUrl ? (
             <ItemImage
               src={heroUrl}
               alt=""
               mediaType={mediaType}
               boardGameSource={item.itemSource ?? null}
-              className="aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-[10px] bg-[var(--color-mid)]/30 sm:w-40"
+              loading="eager"
+              className="relative z-10 hidden aspect-[2/3] w-full rounded-xl shadow-lg ring-1 ring-white/20 lg:block"
             />
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5 pb-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-light)]">{label}</p>
+          ) : null}
+          <div className={cn("relative z-10 flex min-h-[15.5rem] min-w-0 flex-col justify-between gap-4 p-3.5 text-white lg:min-h-0 lg:justify-center lg:gap-5 lg:p-0", !heroUrl && "lg:col-span-2")}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="inline-flex w-fit max-w-full flex-row flex-nowrap items-center gap-2 self-start border-white/40 bg-black/50 text-white hover:bg-black/65 hover:text-white max-md:min-h-11"
+              onClick={onBack}
+            >
+              <ArrowLeft className="size-4 shrink-0" aria-hidden />
+              <span className="truncate">{t("itemPage.back")}</span>
+            </Button>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white/80">{label}</p>
                 {mediaType === "boardgames" && item.averageWeight != null && item.averageWeight > 0 && (
                   <span
-                    className="rounded-full border border-[var(--color-surface-border)] px-2 py-0.5 text-xs font-semibold text-[var(--color-lightest)]"
+                    className="rounded-full border border-white/30 px-2 py-0.5 text-xs font-semibold text-white"
                     title={t("itemPage.weight")}
                   >
                     {formatBoardGameWeight(item.averageWeight)}
                   </span>
                 )}
               </div>
-              <h1 className="page-title text-[var(--color-lightest)]">{item.title}</h1>
+              <h1 className="page-title break-words text-white">{item.title}</h1>
               {(item.year || item.subtitle) && (
-                <p className="text-sm text-[var(--color-light)]">
+                <p className="break-words text-sm text-white/80">
                   {[item.year, item.subtitle].filter(Boolean).join(" · ")}
                 </p>
               )}
@@ -978,7 +1019,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                         })
                       : t("itemPage.timeToBeatHours", { hours: String(hours) });
                   return (
-                    <p className="text-sm text-[var(--color-light)]">
+                    <p className="break-words text-sm text-white/80">
                       {t("itemPage.timeToBeat")}: {value}
                     </p>
                   );
@@ -986,7 +1027,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
               {meanGrade != null && (
                 <div className="mt-1 flex min-w-0 max-w-full flex-wrap items-center gap-2">
                   <StarRating value={gradeToStars(meanGrade)} readOnly size="md" />
-                  <span className="min-w-0 text-sm text-[var(--color-light)]">
+                  <span className="min-w-0 text-sm text-white/80">
                     ({reviewsTotal} review{reviewsTotal === 1 ? "" : "s"})
                   </span>
                 </div>
@@ -995,48 +1036,81 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
           </div>
         </header>
 
-        <ItemDetailsBlock item={item} mediaType={mediaType} t={t} androidWebView={androidWebView} />
+        <nav
+          ref={sectionNavRef}
+          className="sticky top-0 z-20 -mx-3.5 bg-[var(--color-darkest)] px-3.5 py-2 md:-mx-7 md:px-7 lg:hidden"
+          aria-label={t("itemPage.sectionLog")}
+        >
+          <div className="grid grid-cols-3 gap-1.5" role="tablist">
+            {sections.map(([id, sectionLabel]) => {
+              const selected = section === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  className={cn(
+                    "inline-flex min-h-11 min-w-0 items-center justify-center rounded-full border px-2 text-sm font-semibold",
+                    selected
+                      ? "border-transparent bg-[var(--color-lightest)] text-[var(--color-darkest)]"
+                      : "border-[var(--color-mid)]/40 bg-transparent text-[var(--color-light)]"
+                  )}
+                  onClick={() => showSection(id)}
+                >
+                  <span className="truncate">{sectionLabel}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
 
-        {token && (
-          <ItemReviewForm
-            mediaType={mediaType}
-            externalId={id}
-            title={item.title}
-            image={getItemDisplayImageUrl(item.image, item.thumbnail)}
-            runtimeMinutes={item.runtimeMinutes ?? null}
-            episodesCount={item.episodesCount ?? null}
-            pagesCount={item.pagesCount ?? null}
-            platforms={item.platforms ?? null}
-            genres={
-              mediaType === "boardgames"
-                ? (item.categories ?? item.genres ?? undefined)
-                : (item.genres ?? undefined)
-            }
-            mechanics={mediaType === "boardgames" ? (item.mechanics ?? undefined) : undefined}
-            affinityContextDraft={affinityContextDraft}
-            onSaved={refreshReviewsAfterSave}
-            onSavedComplete={(state) => showLogComplete(state, onBack)}
-          />
-        )}
+        <div className={cn("min-w-0", section !== "log" && "max-lg:hidden")}>
+          {token ? (
+            <ItemReviewForm
+              mediaType={mediaType}
+              externalId={id}
+              title={item.title}
+              image={heroUrl}
+              runtimeMinutes={item.runtimeMinutes ?? null}
+              episodesCount={item.episodesCount ?? null}
+              pagesCount={item.pagesCount ?? null}
+              platforms={item.platforms ?? null}
+              genres={
+                mediaType === "boardgames"
+                  ? (item.categories ?? item.genres ?? undefined)
+                  : (item.genres ?? undefined)
+              }
+              mechanics={mediaType === "boardgames" ? (item.mechanics ?? undefined) : undefined}
+              affinityContextDraft={affinityContextDraft}
+              onSaved={refreshReviewsAfterSave}
+              onSavedComplete={(state) => showLogComplete(state, onBack)}
+            />
+          ) : (
+            <Card className="border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-4 shadow-none">
+              <p className="text-center text-sm text-[var(--color-light)] [overflow-wrap:anywhere]">
+                <Link
+                  to="/login"
+                  className="text-[var(--color-lightest)] underline hover:no-underline"
+                >
+                  {t("itemPage.logInLink")}
+                </Link>{" "}
+                {t("itemPage.logInToReview")}
+              </p>
+            </Card>
+          )}
+        </div>
 
-        {!token && (
-          <Card
-            className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4"
-            style={paperShadow}
-          >
-            <p className="text-center text-sm text-[var(--color-light)]">
-              <Link
-                to="/login"
-                className="text-[var(--color-lightest)] underline hover:no-underline"
-              >
-                {t("itemPage.logInLink")}
-              </Link>{" "}
-              {t("itemPage.logInToReview")}
-            </p>
-          </Card>
-        )}
+        <aside
+          className={cn(
+            "min-w-0 empty:hidden lg:sticky lg:top-3 lg:col-start-2 lg:row-start-2 lg:row-span-2 lg:max-h-[calc(100dvh-6.5rem)] lg:min-h-0 lg:self-start lg:overflow-y-auto lg:overscroll-contain",
+            section !== "details" && "max-lg:hidden"
+          )}
+        >
+          <ItemDetailsBlock item={item} mediaType={mediaType} t={t} androidWebView={androidWebView} />
+        </aside>
 
-        <div className="flex flex-col gap-4">
+        <div className={cn("flex min-w-0 flex-col gap-4 lg:col-start-1", section !== "reviews" && "max-lg:hidden")}>
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
             <h2 className="min-w-0 shrink-0 text-xl font-semibold text-[var(--color-lightest)]">
               <OverflowMarquee>{t("common.reviews")}</OverflowMarquee>
@@ -1063,19 +1137,13 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
             )}
           </div>
           {reviewsLoading ? (
-            <Card
-              className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6"
-              style={paperShadow}
-            >
+            <Card className="border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-6 shadow-none">
               <p className="text-center text-[var(--color-light)]">
                 {t("search.searching")}
               </p>
             </Card>
           ) : reviews.length === 0 ? (
-            <Card
-              className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-6"
-              style={paperShadow}
-            >
+            <Card className="border-[var(--color-mid)]/20 bg-[var(--color-dark)] p-6 shadow-none">
               <p className="text-center text-[var(--color-light)]">
                 {t("common.noReviews")}
               </p>
@@ -1083,7 +1151,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
           ) : (
             <>
               <motion.div {...listStaggerParentProps}>
-                <div className="flex flex-col gap-4">
+                <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
                   {reviewDisplayGroups.map((group) => {
                     const showRev = pickShowItemReview(group.reviews);
                     const partials = sortUserScopedReviews(partialItemReviews(group.reviews));
@@ -1101,8 +1169,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                         className={listStaggerItemClassName}
                       >
                         <Card
-                          className={cn("overflow-hidden bg-[var(--color-dark)] p-0", listBorderClass)}
-                          style={paperShadow}
+                          className={cn("min-w-0 overflow-hidden bg-[var(--color-dark)] p-0 shadow-none", listBorderClass)}
                         >
                           <div className="flex flex-col gap-4 p-4 sm:p-5">
                             <ItemReviewProfileLink
@@ -1122,7 +1189,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                                   showScopeBadge={!showRev}
                                 />
                                 {mainReview.review && (
-                                  <p className="max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)]">
+                                  <p className="max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)] [overflow-wrap:anywhere]">
                                     {mainReview.review}
                                   </p>
                                 )}
@@ -1178,7 +1245,7 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                                           scopedReviewsDisplay={scopedReviewsDisplay}
                                         />
                                         {partial.review && (
-                                          <p className="max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)]">
+                                          <p className="max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-lightest)] [overflow-wrap:anywhere]">
                                             {partial.review}
                                           </p>
                                         )}

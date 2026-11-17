@@ -14,6 +14,14 @@ async function tmdbFetch(url: string, init?: RequestInit): Promise<Response> {
 
 const BASE = "https://api.themoviedb.org/3";
 const IMAGE_BASE = "https://image.tmdb.org/t/p/w200";
+const BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280";
+
+/** Wide TMDB backdrop for the item header. Null when the title has no backdrop. */
+export function tmdbBackdropUrl(backdropPath: string | null | undefined): string | null {
+  const path = backdropPath?.trim();
+  if (!path) return null;
+  return `${BACKDROP_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
 const WATCH_PROVIDER_REGION = (process.env.TMDB_WATCH_REGION ?? "US").toUpperCase();
 
 type WatchProviderRegion = {
@@ -68,6 +76,7 @@ export async function getMovieById(id: string, apiKey?: string | null): Promise<
     title?: string;
     release_date?: string;
     poster_path?: string;
+    backdrop_path?: string | null;
     runtime?: number;
     overview?: string;
     tagline?: string;
@@ -96,6 +105,7 @@ export async function getMovieById(id: string, apiKey?: string | null): Promise<
     id: String(data.id ?? id),
     title: decodeHtmlEntities(data.title ?? "Unknown"),
     image: data.poster_path ? `${IMAGE_BASE}${data.poster_path}` : null,
+    cover: tmdbBackdropUrl(data.backdrop_path),
     year: data.release_date?.slice(0, 4) ?? null,
     subtitle: null,
     runtimeMinutes,
@@ -122,6 +132,7 @@ export async function getTvById(id: string, apiKey?: string | null): Promise<Ite
     name?: string;
     first_air_date?: string;
     poster_path?: string;
+    backdrop_path?: string | null;
     number_of_episodes?: number;
     number_of_seasons?: number;
     episode_run_time?: number[];
@@ -150,6 +161,7 @@ export async function getTvById(id: string, apiKey?: string | null): Promise<Ite
     id: String(data.id ?? id),
     title: decodeHtmlEntities(data.name ?? "Unknown"),
     image: data.poster_path ? `${IMAGE_BASE}${data.poster_path}` : null,
+    cover: tmdbBackdropUrl(data.backdrop_path),
     year: data.first_air_date?.slice(0, 4) ?? null,
     subtitle: null,
     runtimeMinutes,

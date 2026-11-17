@@ -944,6 +944,9 @@
   },
   "itemPage": {
     "back": "Volver",
+    "sectionLog": "Registro",
+    "sectionDetails": "Detalles",
+    "sectionReviews": "Reseñas",
     "badgePopupUserEarnedIn": "{{user}} consiguió {{label}} en {{category}}",
     "logInToReview": "Inicia sesión para dejar una reseña o añadir a favoritos o pendientes.",
     "logInLink": "Iniciar sesión",
