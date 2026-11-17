@@ -16,7 +16,10 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    "paths": {
+      "@/*": ["src/*"],
+      "@geeklogs/shared": ["../../packages/shared/src/index.ts"]
+    }
   },
   "include": ["src"]
 }
