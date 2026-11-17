@@ -104,7 +104,7 @@ export function Topbar() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex min-h-14 flex-shrink-0 items-center gap-3 border-b border-[var(--color-surface-border)] bg-[var(--color-darkest)] px-3.5 pt-[env(safe-area-inset-top)] md:px-7"
+        "sticky top-0 z-30 flex min-h-16 flex-shrink-0 items-center gap-3 border-b border-[var(--color-surface-border)] bg-[var(--color-darkest)] px-3.5 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] md:px-7"
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -117,7 +117,7 @@ export function Topbar() {
             <Logo alt={t("app.name")} className="h-9 w-auto flex-shrink-0" />
           </Link>
           <div className="min-w-0">
-            <div className="display-title truncate text-base leading-none text-[var(--color-lightest)]">{t("app.name")}</div>
+            <div className="display-title text-base leading-snug text-[var(--color-lightest)]">{t("app.name")}</div>
             {displayTitle ? (
               <div className="truncate text-xs text-[var(--color-light)]">{displayTitle}</div>
             ) : null}
@@ -145,16 +145,14 @@ export function Topbar() {
 
         <div className="ml-auto flex flex-shrink-0 items-center gap-2 sm:gap-3">
         {location.pathname !== "/search" && (
-          <Button
+          <button
             type="button"
-            variant="outline"
-            size="icon"
-            className="h-10 w-10 md:hidden"
+            className="flex size-11 items-center justify-center rounded-full bg-[var(--color-lightest)] text-[var(--color-darkest)] shadow-[var(--shadow-sm)] md:hidden"
             onClick={() => navigate("/search")}
             aria-label={t("nav.search")}
           >
-            <Search className="size-4" aria-hidden />
-          </Button>
+            <Search className="size-5" aria-hidden />
+          </button>
         )}
         {/* Theme and locale: in header when logged out, inside avatar menu when logged in */}
         {!token && (

@@ -746,20 +746,18 @@ export function Dashboard() {
           >
             {t("dashboard.allLogs")}
           </button>
-          {(["list", "grid"] as const satisfies readonly LogViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              aria-pressed={libraryView === "logs" && logView === mode}
-              onClick={() => {
-                setLogView(mode);
-                setLibraryView("logs");
-              }}
-              className={libraryChipClass(libraryView === "logs" && logView === mode)}
-            >
-              {t(mode === "list" ? "mediaLogs.viewList" : "mediaLogs.viewGrid")}
-            </button>
-          ))}
+          {libraryView === "logs" &&
+            (["list", "grid"] as const satisfies readonly LogViewMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={logView === mode}
+                onClick={() => setLogView(mode)}
+                className={libraryChipClass(logView === mode)}
+              >
+                {t(mode === "list" ? "mediaLogs.viewList" : "mediaLogs.viewGrid")}
+              </button>
+            ))}
         </div>
       )}
       {visibleTypes.length > 0 && libraryView === "shelves" && (

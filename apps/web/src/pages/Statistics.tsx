@@ -855,8 +855,6 @@ export function Statistics() {
   const [hallOfFameRecords, setHallOfFameRecords] = useState<StatsRecord[]>([]);
   const [hallOfFameLoading, setHallOfFameLoading] = useState(true);
   const [hallOfFamePeriod, setHallOfFamePeriod] = useState<HallOfFamePeriod>("all");
-  const [hallOfFameCategoryFilter, setHallOfFameCategoryFilter] =
-    useState<PaceCategory>("all");
   const [genreStatsLoading, setGenreStatsLoading] = useState(true);
   const [genreGraphMode, setGenreGraphMode] = useState<GenreGraphMode>("byCategory");
   const [statusOverTimeGroup, setStatusOverTimeGroup] = useState<StatusOverTimeGroup>("month");
@@ -1055,8 +1053,7 @@ export function Statistics() {
   const fetchHallOfFame = useCallback(async () => {
     const period =
       hallOfFamePeriod === "all" ? "all" : String(new Date().getFullYear());
-    const scope =
-      categoryFilter === "all" ? hallOfFameCategoryFilter : categoryFilter;
+    const scope = categoryFilter;
     const path = `/logs/stats/records?scope=${encodeURIComponent(scope)}&period=${period}&limit=10&timezoneOffsetMinutes=${tzOffsetMinutes}`;
     await loadWithSWR<{ data: StatsRecord[] }>(
       path,
@@ -1065,7 +1062,6 @@ export function Statistics() {
     );
   }, [
     categoryFilter,
-    hallOfFameCategoryFilter,
     hallOfFamePeriod,
     tzOffsetMinutes,
   ]);
@@ -1216,10 +1212,6 @@ export function Statistics() {
   useEffect(() => {
     void fetchHallOfFame();
   }, [fetchHallOfFame]);
-
-  useEffect(() => {
-    if (categoryFilter !== "all") setHallOfFameCategoryFilter("all");
-  }, [categoryFilter]);
 
   useEffect(() => {
     void fetchPace();
@@ -1564,14 +1556,14 @@ export function Statistics() {
     }
     if (!visibleTypesOrderReady) {
       setBelowNavbar?.(
-        <div className="sticky top-0 z-20 h-fit w-full shrink-0 self-start border-b border-[var(--color-surface-border)] bg-[var(--color-darkest)]">
+        <div className="h-fit w-full shrink-0 self-start bg-[var(--color-darkest)]">
           <CategoryOrderSkeletonStrip />
         </div>
       );
       return;
     }
     setBelowNavbar?.(
-      <div className="sticky top-0 z-20 h-fit w-full shrink-0 self-start border-b border-[var(--color-surface-border)] bg-[var(--color-darkest)]">
+      <div className="h-fit w-full shrink-0 self-start bg-[var(--color-darkest)]">
         <StickyCategoryStrip
           items={[
             { value: "all", label: t("statistics.filterAll") },
@@ -2208,36 +2200,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
           </div>
           {!hallOfFameCollapsed && (
             <>
-              {categoryFilter === "all" && (
-                <div
-                  className="flex min-w-0 flex-wrap gap-1.5"
-                  role="group"
-                  aria-label={t("statistics.categoryFilter")}
-                >
-                  {(["all", ...visibleTypes] as PaceCategory[]).map((c) => {
-                    const meta = PACE_CATEGORY_META[c];
-                    const Icon = meta.icon;
-                    const active = hallOfFameCategoryFilter === c;
-                    return (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setHallOfFameCategoryFilter(c)}
-                        className={cn(
-                          "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors max-md:min-h-[36px]",
-                          active
-                            ? "border-[var(--btn-gradient-start)] bg-[var(--btn-gradient-start)]/15 text-white"
-                            : "border-[var(--color-mid)]/50 bg-[var(--color-dark)] text-[var(--color-light)]"
-                        )}
-                        aria-pressed={active}
-                      >
-                        <Icon className="size-3.5" aria-hidden />
-                        {c === "all" ? t("statistics.filterAll") : t(`nav.${c}`)}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
               <section aria-label={t("statistics.hallOfFameTitle")} className="min-w-0">
                 <StatisticsHallOfFameWidget
                   records={hallOfFameRecords}
@@ -2560,31 +2522,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                     ))}
                   </div>
                 </div>
-                <div className="flex min-w-0 flex-wrap gap-1.5" role="group" aria-label={t("statistics.categoryFilter")}>
-                  {(["all" as PaceCategory, ...(visibleTypes as PaceCategory[])]).map((c) => {
-                    const m = PACE_CATEGORY_META[c];
-                    const Icon = m.icon;
-                    const active = categoryFilter === c;
-                    return (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setCategoryFilter(c === "all" ? "all" : c)}
-                        className={cn(
-                          "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors max-md:min-h-[36px]",
-                          active
-                            ? "border-[var(--btn-gradient-start)] bg-[var(--btn-gradient-start)]/15 text-white"
-                            : "border-[var(--color-mid)]/50 bg-[var(--color-dark)] text-[var(--color-light)]"
-                        )}
-                        aria-pressed={active}
-                      >
-                        <Icon className="size-3.5" aria-hidden />
-                        {c === "all" ? t("statistics.filterAll") : t(`nav.${c}`)}
-                      </button>
-                    );
-                  })}
-                </div>
-
                 <div className="flex min-w-0 flex-col gap-2.5 rounded-xl border border-[var(--color-mid)]/20 bg-[var(--color-darkest)]/40 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">

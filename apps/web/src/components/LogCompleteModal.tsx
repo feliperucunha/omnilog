@@ -13,8 +13,6 @@ import { Logo, getLogoSrc } from "@/components/Logo";
 import { getHeroImageUrl, cssBackgroundImageUrl } from "@/lib/getHeroImageUrl";
 import { isBggBoardGameImageContext } from "@/lib/boardGameImageFit";
 import {
-  logCompleteAndroidHeroImgClass,
-  logCompleteHeroFrameStyle,
   logCompleteHeroWrapperClass,
   logCompletePrioritizeTextSpace,
   buildLogCompleteShareLayout,
@@ -213,10 +211,10 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
   const isLight = theme.colorScheme === "light";
   const overlayClass =
     isLight
-      ? "fixed inset-0 z-50 flex min-h-[100dvh] min-h-dvh-fallback items-center justify-center bg-white/90 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] md:bg-transparent md:p-6"
-      : "fixed inset-0 z-50 flex min-h-[100dvh] min-h-dvh-fallback items-center justify-center bg-black/90 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] md:bg-transparent md:p-6";
+      ? "fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] min-h-0 items-center justify-center overflow-hidden bg-white/90 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] md:bg-transparent md:p-6"
+      : "fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] min-h-0 items-center justify-center overflow-hidden bg-black/90 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] md:bg-transparent md:p-6";
   const cardClass =
-    "relative flex max-h-full w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-dark)] shadow-[0_24px_80px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.08)] md:rounded-3xl";
+    "relative flex min-h-0 max-h-full w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-dark)] shadow-[0_24px_80px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.08)] md:rounded-3xl";
   /**
    * Native: fill the viewport without document-level scroll; the card body scrolls internally.
    * (Older overflow-y-auto on the overlay caused double-scroll and clipped flex layout on phones.)
@@ -227,7 +225,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       : "fixed inset-0 z-50 flex min-h-0 flex-col overflow-hidden overscroll-y-contain bg-black/90 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] h-[100dvh] max-h-[100dvh]";
   /** `shrink` + `min-w-0` so the card fits the viewport and `contentBlock` scrolls; `flex-shrink-0` caused clipping (hero-only / zero scroll). */
   const cardClassNative =
-    "relative mx-4 flex min-h-0 max-h-full w-full min-w-0 max-w-[400px] shrink flex-col overflow-hidden rounded-2xl border md:rounded-3xl";
+    "relative flex min-h-0 max-h-full w-full min-w-0 max-w-[400px] shrink flex-col overflow-hidden rounded-2xl border md:rounded-3xl";
 
   const closeButton = (
     <div className="absolute right-2 top-2 z-10 md:right-4 md:top-4">
@@ -344,16 +342,9 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
 
   const heroWrapperClass = logCompleteHeroWrapperClass({
     layout: heroLayout,
-    androidWebView: androidHeroLayout,
+    androidWebView: false,
     compactForText: prioritizeText,
   });
-  const heroFrameStyle = logCompleteHeroFrameStyle({
-    natural: heroNaturalSize,
-    layout: heroLayout,
-    androidWebView: androidHeroLayout,
-    compactForText: prioritizeText,
-  });
-  const heroWrapperStyle = heroFrameStyle ?? undefined;
 
   const heroImage = (
     <ItemImage
@@ -362,7 +353,6 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       mediaType={mediaType}
       activeBoardGameProvider={me?.boardGameProvider ?? null}
       containBackdrop={useContainBackdrop}
-      imgClassName={androidHeroLayout ? logCompleteAndroidHeroImgClass(heroLayout) : undefined}
       fitContent={false}
       loading="eager"
       referrerPolicy="no-referrer"
@@ -372,7 +362,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
 
   const imageSection = (
     <div className="relative flex-shrink-0 overflow-hidden rounded-t-2xl md:rounded-t-3xl">
-      <div className={heroWrapperClass} style={heroWrapperStyle}>
+      <div className={heroWrapperClass}>
         {heroImage}
         <div
           className="absolute inset-0 z-[2]"
@@ -392,7 +382,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
     >
       <div
         className={heroWrapperClass}
-        style={{ transform: "none", willChange: "auto", ...heroWrapperStyle }}
+        style={{ transform: "none", willChange: "auto" }}
       >
         {heroImage}
         <div
@@ -414,7 +404,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       style={nativeUi ? { transform: "none", willChange: "auto" } : undefined}
     >
       <span
-        className={`mb-2 inline-flex w-fit rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider md:mb-3 md:px-3 md:py-1 md:text-xs ${statusColor(status)}`}
+        className={`mb-2 inline-flex w-fit max-w-full whitespace-normal break-words rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider md:mb-3 md:px-3 md:py-1 md:text-xs ${statusColor(status)}`}
         id="log-complete-status"
       >
         {statusLabel}
@@ -423,11 +413,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
         id="log-complete-title"
         role="heading"
         aria-level={1}
-        className={
-          nativeUi
-            ? "mb-2 min-w-0 break-words text-lg font-bold leading-snug text-[var(--color-lightest)] [overflow-wrap:anywhere] line-clamp-4"
-            : "mb-2 min-w-0 break-words text-lg font-bold leading-tight text-[var(--color-lightest)] md:mb-4 md:text-[1.75rem]"
-        }
+        className="mb-2 min-w-0 break-words text-lg font-bold leading-snug text-[var(--color-lightest)] [overflow-wrap:anywhere] md:mb-3 md:text-2xl"
       >
         {title}
       </div>
@@ -448,15 +434,15 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
       )}
       {reviewTrimmed !== "" && (
         <p
-          className="mb-3 line-clamp-[15] text-[11px] leading-snug text-[var(--color-light)] whitespace-pre-wrap md:mb-4 md:text-[0.8125rem] md:leading-relaxed"
+          className="mb-3 whitespace-pre-wrap break-words text-[13px] leading-snug text-[var(--color-light)] [overflow-wrap:anywhere] md:mb-4 md:text-sm md:leading-relaxed"
         >
           {reviewTrimmed}
         </p>
       )}
 
-      <div className="mt-auto flex w-full shrink-0 flex-nowrap items-center gap-1.5 border-t border-[var(--color-mid)]/30 pt-3 md:gap-2 md:pt-4">
+      <div className="mt-auto flex w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-t border-[var(--color-mid)]/30 pt-3 md:pt-4">
         <Logo alt="" className="h-7 w-auto shrink-0 opacity-90 md:h-8" aria-hidden />
-        <span className="shrink-0 whitespace-nowrap text-xs font-medium text-[var(--color-light)] [overflow-wrap:normal] [word-break:normal] md:text-sm">
+        <span className="min-w-0 flex-1 break-words text-xs font-medium leading-snug text-[var(--color-light)] md:text-sm">
           {t("logComplete.loggedWith", { app: t("app.name") })}
         </span>
       </div>
@@ -828,7 +814,7 @@ export function LogCompleteModal({ state, onClose }: LogCompleteModalProps) {
           aria-hidden
         />
         {/* flex-1 min-h-0 bounds card height so inner contentBlock can scroll; no overlay scroll. */}
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-4">
+        <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col items-center justify-center">
           <article
             className={cardClassNative}
             onClick={(e) => e.stopPropagation()}
