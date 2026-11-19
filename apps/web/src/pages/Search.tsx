@@ -99,6 +99,21 @@ function loadFreeSearchUsageFromStorage(
   }
 }
 
+function getScrollableAncestor(element: HTMLElement | null): HTMLElement | null {
+  let current = element?.parentElement ?? null;
+  while (current) {
+    const { overflowY } = window.getComputedStyle(current);
+    if (
+      (overflowY === "auto" || overflowY === "scroll") &&
+      current.scrollHeight > current.clientHeight
+    ) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return null;
+}
+
 
 interface SearchResponse {
   results: SearchResult[];
@@ -190,6 +205,27 @@ export function Search() {
   const [loadingFollowId, setLoadingFollowId] = useState<string | null>(null);
   const [query, setQuery] = useState(() => pageCache?.query ?? stateQuery);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const preservedScrollTopRef = useRef<number | null>(null);
+  const restoreScrollFrameRef = useRef(0);
+
+  const rememberScrollTop = useCallback(() => {
+    const scroller = getScrollableAncestor(searchInputRef.current);
+    preservedScrollTopRef.current = scroller?.scrollTop ?? null;
+  }, []);
+
+  const restoreScrollTop = useCallback(() => {
+    const top = preservedScrollTopRef.current;
+    if (top == null) return;
+    preservedScrollTopRef.current = null;
+    cancelAnimationFrame(restoreScrollFrameRef.current);
+    restoreScrollFrameRef.current = requestAnimationFrame(() => {
+      const scroller = getScrollableAncestor(searchInputRef.current);
+      if (scroller && scroller.scrollTop !== top) scroller.scrollTop = top;
+    });
+  }, []);
+
+  useEffect(() => () => cancelAnimationFrame(restoreScrollFrameRef.current), []);
+
   const [searchLogView, setSearchLogView] = useLogViewPreference("search");
   const [results, setResults] = useState<SearchResult[]>(() => pageCache?.results ?? []);
   const [userResults, setUserResults] = useState<UserSearchResult[]>(() => pageCache?.userResults ?? []);
@@ -891,7 +927,14 @@ export function Search() {
           <UnifiedSearchBar
             ref={searchInputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              restoreScrollTop();
+            }}
+            onBeforeInput={rememberScrollTop}
+            onKeyDown={rememberScrollTop}
+            onPointerDown={rememberScrollTop}
+            onFocus={restoreScrollTop}
             placeholder={
               searchFilter === SEARCH_USERS_TYPE
                 ? t("search.usersPlaceholder")
@@ -903,12 +946,14 @@ export function Search() {
             submitAriaLabel={t("search.search")}
             showClear={query.trim() !== ""}
             onClear={() => {
+              rememberScrollTop();
               setQuery("");
               setHasSearched(false);
               setSearchError(null);
               setResults([]);
               setUserResults([]);
-              searchInputRef.current?.focus();
+              searchInputRef.current?.focus({ preventScroll: true });
+              restoreScrollTop();
             }}
             disableSubmitWhenEmpty
             loading={loading}
