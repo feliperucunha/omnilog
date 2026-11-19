@@ -223,6 +223,8 @@ model Log {
   volume       Int?     // anime, manga, comics
   pagesRead    Int?     // books, manga, comics: current page progress
   boardGameSource String?  // "bgg" | "ludopedia" when mediaType = boardgames; which API this externalId came from
+  expansionOfExternalId String?
+  expansionOfTitle      String?
   own            Boolean? // games, board games, books, manga, comics: user owns a copy
   wantToBuy      Boolean? // same categories: user wants to buy a copy
   /// User sold / no longer has the item; optional sale proceeds in saleAmountMinor + saleCurrency
@@ -293,6 +295,7 @@ model BoardGameMatch {
   playedAt  DateTime
   /// JSON: [{ "name": string, "score": number | null, "winner": boolean }]
   players   String
+  expansions String?
   notes     String?
   /// Session length in hours (30 min steps from 0.5 to 6; default 1).
   durationHours Float    @default(1)

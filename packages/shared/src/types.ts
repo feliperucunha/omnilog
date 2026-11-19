@@ -199,6 +199,9 @@ export interface ItemDetail {
   titleVariants?: AnimeMangaTitleParts | null;
   /** When mediaType is boardgames: which API provided this data ("bgg" | "ludopedia"). Enables UI to show "Source: …". */
   itemSource?: "bgg" | "ludopedia" | null;
+  expansionOfExternalId?: string | null;
+  expansionOfTitle?: string | null;
+  expansionBases?: Array<{ id: string; title: string }> | null;
   /** Runtime in minutes (movies, TV, etc.) for content-hours stats */
   runtimeMinutes?: number | null;
   /** Average time to beat in hours (games only, from RAWG playtime). */
@@ -393,6 +396,8 @@ export interface Log {
   updatedAt: string;
   /** Board games: which API this log’s externalId came from (affects image aspect handling for BGG). */
   boardGameSource?: BoardGameProvider | null;
+  expansionOfExternalId?: string | null;
+  expansionOfTitle?: string | null;
   /** Optional amount paid, in minor units (e.g. cents), with purchaseCurrency. */
   purchaseAmountMinor?: number | null;
   /** ISO 4217 currency code when purchaseAmountMinor is set. */
@@ -434,6 +439,8 @@ export interface CreateLogInput {
   affinityContext?: LogAffinityContext | null;
   /** When mediaType is boardgames: which API this id came from (bgg | ludopedia). Stored so details are fetched from the correct API. */
   boardGameSource?: BoardGameProvider | null;
+  expansionOfExternalId?: string | null;
+  expansionOfTitle?: string | null;
   /** Board games and video games: user owns a copy. */
   own?: boolean | null;
   /** Board games and video games: user wants to buy a copy. */
@@ -458,6 +465,12 @@ export interface BoardGameMatchPlayer {
   appUserId?: string | null;
 }
 
+export interface BoardGameMatchExpansion {
+  id: string;
+  title: string;
+  source?: BoardGameProvider | null;
+}
+
 /** Board games only: a logged play session (separate from the main log review). */
 export interface BoardGameMatch {
   id: string;
@@ -467,6 +480,7 @@ export interface BoardGameMatch {
   durationHours: number;
   players: BoardGameMatchPlayer[];
   notes: string | null;
+  expansions?: BoardGameMatchExpansion[];
   createdAt: string;
 }
 
@@ -475,6 +489,7 @@ export interface CreateBoardGameMatchInput {
   durationHours?: number;
   players: BoardGameMatchPlayer[];
   notes?: string | null;
+  expansions?: BoardGameMatchExpansion[];
 }
 
 export interface UpdateLogInput {

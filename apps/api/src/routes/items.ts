@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { decodeHtmlEntities, MEDIA_TYPES, resolveAnimeMangaTitleLanguage } from "@geeklogs/shared";
-import type { MediaType } from "@geeklogs/shared";
+import type { ItemDetail, MediaType } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
 import { getReactionsForLogs } from "../lib/reactions.js";
 import { sanitizeText, EXTERNAL_ID_MAX_LENGTH } from "../lib/sanitize.js";
@@ -342,6 +342,33 @@ itemsRouter.get("/:mediaType/:externalId", async (req: AuthenticatedRequest, res
   if (!item) {
     res.status(404).json({ error: "Item not found" });
     return;
+  }
+
+  if (
+    mediaType === "boardgames" &&
+    req.user &&
+    item.expansionBases &&
+    item.expansionBases.length > 1
+  ) {
+    const source = boardProviderUsed ?? item.itemSource ?? "bgg";
+    const ownedBase = await prisma.log.findFirst({
+      where: {
+        userId: req.user.userId,
+        mediaType: "boardgames",
+        externalId: { in: item.expansionBases.map((base) => base.id) },
+        ...(source === "bgg"
+          ? { OR: [{ boardGameSource: "bgg" }, { boardGameSource: null }] }
+          : { boardGameSource: source }),
+      },
+      select: { externalId: true, title: true },
+    });
+    if (ownedBase) {
+      item = {
+        ...(item as ItemDetail),
+        expansionOfExternalId: ownedBase.externalId,
+        expansionOfTitle: ownedBase.title,
+      };
+    }
   }
 
   const reviewsSkip = (reviewsPage - 1) * reviewsLimit;

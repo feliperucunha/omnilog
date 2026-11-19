@@ -1082,6 +1082,10 @@ export function ItemPageContent({ mediaType, id, onBack }: ItemPageContentProps)
                   : (item.genres ?? undefined)
               }
               mechanics={mediaType === "boardgames" ? (item.mechanics ?? undefined) : undefined}
+              expansionOfExternalId={
+                mediaType === "boardgames" ? (item.expansionOfExternalId ?? null) : null
+              }
+              expansionOfTitle={mediaType === "boardgames" ? (item.expansionOfTitle ?? null) : null}
               affinityContextDraft={affinityContextDraft}
               onSaved={refreshReviewsAfterSave}
               onSavedComplete={(state) => showLogComplete(state, onBack)}

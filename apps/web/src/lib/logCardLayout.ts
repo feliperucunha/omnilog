@@ -61,6 +61,14 @@ export const LOG_LIST_CARD_GRID_DENSE =
 export const LOG_LIST_CARD_GRID_MULTI =
   "grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]";
 
+export const LOG_CARD_GRID_MIN_HEIGHT = "min-h-[380px] sm:min-h-[364px]";
+export const LOG_CARD_GRID_FIXED_HEIGHT = "h-[380px] sm:h-[364px]";
+export const LOG_CARD_GRID_IMAGE_HEIGHT = "h-48 w-full sm:h-44";
+
+export const LOG_CARD_COMPACT_MIN_HEIGHT = "min-h-[220px] sm:min-h-[208px]";
+export const LOG_CARD_COMPACT_FIXED_HEIGHT = "h-[220px] sm:h-[208px]";
+export const LOG_CARD_COMPACT_IMAGE_HEIGHT = "h-[120px] w-full sm:h-[112px]";
+
 export const SEARCH_RESULT_CARD_GRID =
   "grid min-w-0 grid-cols-1 gap-3 sm:grid sm:gap-4 sm:grid-cols-[repeat(auto-fill,minmax(min(100%,9.5rem),1fr))]";
 

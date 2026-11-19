@@ -369,6 +369,9 @@ function mapJogoToItemDetail(raw: {
   vl_tempo_jogo?: number | null;
   tempo_jogo?: number | null;
   idade_minima?: number | null;
+  id_jogo_base?: number | string | null;
+  nm_jogo_base?: string | null;
+  jogo_base?: { id_jogo?: number | string; nm_jogo?: string } | null;
   categorias?: string[] | { nm_categoria?: string }[];
   mecanicas?: string[] | { nm_mecanica?: string }[];
 }): ItemDetail {
@@ -399,6 +402,9 @@ function mapJogoToItemDetail(raw: {
   const playersMax = raw.qt_jogadores_max ?? raw.qt_max_jogadores;
   const playingTime = raw.vl_tempo_jogo ?? raw.tempo_jogo;
   const genres = categories.length > 0 ? categories : null;
+  const rawBaseId = raw.id_jogo_base ?? raw.jogo_base?.id_jogo ?? null;
+  const baseId = rawBaseId != null && String(rawBaseId).trim() !== "" ? String(rawBaseId).trim() : null;
+  const baseTitle = raw.nm_jogo_base ?? raw.jogo_base?.nm_jogo ?? null;
   return {
     id,
     title: decodeHtmlEntities(raw.nm_jogo ?? "Unknown"),
@@ -406,6 +412,11 @@ function mapJogoToItemDetail(raw: {
     thumbnail: thumb,
     year,
     subtitle: null,
+    expansionOfExternalId: baseId,
+    expansionOfTitle: baseId ? decodeHtmlEntities(baseTitle?.trim() || "Unknown") : null,
+    expansionBases: baseId
+      ? [{ id: baseId, title: decodeHtmlEntities(baseTitle?.trim() || "Unknown") }]
+      : null,
     description: description ?? null,
     playersMin: typeof playersMin === "number" && playersMin > 0 ? playersMin : null,
     playersMax: typeof playersMax === "number" && playersMax > 0 ? playersMax : null,
@@ -463,6 +474,33 @@ function parseJogosResponse(data: JogosResponse): SearchResult[] {
       subtitle: null,
     };
   });
+}
+
+export async function getBoardGameExpansionsLudopedia(
+  baseId: string,
+  apiToken?: string | null
+): Promise<SearchResult[]> {
+  const token = apiToken ?? process.env.LUDOPEDIA_API_TOKEN;
+  if (!token || !baseId.trim()) return [];
+  const params = new URLSearchParams();
+  params.set("id_jogo_base", baseId.trim());
+  params.set("tp_jogo", "e");
+  params.set("rows", "200");
+  params.set("page", "1");
+  const res = await fetch(`${BASE}/jogos?${params.toString()}`, {
+    headers: ludopediaHeaders(token),
+  });
+  if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError("ludopedia");
+  if (!res.ok) return [];
+  const data = (await res.json()) as JogosResponse;
+  const list = data.jogos ?? data.itens ?? data.resultados ?? [];
+  return list.slice(0, 200).map((item) => ({
+    id: String(item.id_jogo ?? ""),
+    title: decodeHtmlEntities(item.nm_jogo ?? "Unknown"),
+    image: (item.thumb ?? item.url_imagem)?.trim() || null,
+    year: item.ano_publicacao != null ? String(item.ano_publicacao).slice(0, 4) : null,
+    subtitle: null,
+  }));
 }
 
 /**

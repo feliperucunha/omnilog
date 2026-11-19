@@ -23,6 +23,9 @@ import {
   SEARCH_QUERY_MAX_LENGTH,
 } from "../lib/sanitize.js";
 import { authMiddleware, type AuthenticatedRequest } from "../middleware/auth.js";
+import { preferEnvApiToken } from "../lib/preferEnvApiToken.js";
+import { getBoardGamesByIdsForImport } from "../services/bgg.js";
+import { getBoardGameExpansionsLudopedia } from "../services/ludopedia.js";
 import type { NewBadge } from "../services/gamification.service.js";
 
 export const logsRouter = Router();
@@ -71,6 +74,8 @@ const createLogSchema = z.object({
   mechanics: mechanicsSchema,
   affinityContext: affinityContextSchema,
   boardGameSource: z.enum(["bgg", "ludopedia"]).nullable().optional(),
+  expansionOfExternalId: z.string().max(EXTERNAL_ID_MAX_LENGTH).nullable().optional(),
+  expansionOfTitle: z.string().max(TITLE_MAX_LENGTH).nullable().optional(),
   own: z.boolean().nullable().optional(),
   wantToBuy: z.boolean().nullable().optional(),
   sold: z.boolean().nullable().optional(),
@@ -103,12 +108,44 @@ const boardGameMatchPlayerSchema = z.object({
   appUserId: z.string().min(1).max(40).optional().nullable(),
 });
 
+const boardGameMatchExpansionSchema = z.object({
+  id: z.string().min(1).max(EXTERNAL_ID_MAX_LENGTH),
+  title: z.string().min(1).max(TITLE_MAX_LENGTH),
+  source: z.enum(["bgg", "ludopedia"]).nullable().optional(),
+});
+
 const createBoardGameMatchBodySchema = z.object({
   playedAt: z.string().min(1).max(40),
   durationHours: z.number().optional(),
   players: z.array(boardGameMatchPlayerSchema).min(1).max(16),
   notes: z.string().max(50000).optional().nullable(),
+  expansions: z.array(boardGameMatchExpansionSchema).max(20).optional(),
 });
+
+function parseBoardGameMatchExpansions(json: string | null): Array<{
+  id: string;
+  title: string;
+  source: "bgg" | "ludopedia" | null;
+}> {
+  if (!json?.trim()) return [];
+  try {
+    const raw = JSON.parse(json) as unknown;
+    if (!Array.isArray(raw)) return [];
+    const out: Array<{ id: string; title: string; source: "bgg" | "ludopedia" | null }> = [];
+    for (const row of raw) {
+      if (row == null || typeof row !== "object") continue;
+      const o = row as Record<string, unknown>;
+      const id = typeof o.id === "string" ? o.id.trim() : "";
+      const title = typeof o.title === "string" ? o.title.trim() : "";
+      if (!id || !title) continue;
+      const source = o.source === "bgg" || o.source === "ludopedia" ? o.source : null;
+      out.push({ id, title: decodeHtmlEntities(title), source });
+    }
+    return out.slice(0, 20);
+  } catch {
+    return [];
+  }
+}
 
 function parseBoardGamePlayersJson(json: string): BoardGameMatchPlayer[] {
   try {
@@ -144,6 +181,7 @@ function serializeBoardGameMatchRow(row: {
   playedAt: Date;
   durationHours: number;
   players: string;
+  expansions?: string | null;
   notes: string | null;
   createdAt: Date;
 }) {
@@ -153,6 +191,7 @@ function serializeBoardGameMatchRow(row: {
     playedAt: row.playedAt.toISOString(),
     durationHours: row.durationHours,
     players: parseBoardGamePlayersJson(row.players),
+    expansions: parseBoardGameMatchExpansions(row.expansions ?? null),
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
   };
@@ -1949,6 +1988,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
     mechanics: mechanicsInput,
     affinityContext: affinityInput,
     boardGameSource: bodyBoardGameSource,
+    expansionOfExternalId: bodyExpansionOfExternalId,
+    expansionOfTitle: bodyExpansionOfTitle,
     own: bodyOwn,
     wantToBuy: bodyWantToBuy,
     sold: bodySold,
@@ -1991,6 +2032,14 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
   }
   const sanitizedTitle = sanitizeText(decodeHtmlEntities(title), TITLE_MAX_LENGTH);
   const sanitizedExternalId = sanitizeText(externalId, EXTERNAL_ID_MAX_LENGTH);
+  const sanitizedExpansionOfExternalId =
+    mediaType === "boardgames" && bodyExpansionOfExternalId
+      ? sanitizeText(bodyExpansionOfExternalId, EXTERNAL_ID_MAX_LENGTH) || null
+      : null;
+  const sanitizedExpansionOfTitle =
+    mediaType === "boardgames" && bodyExpansionOfTitle
+      ? sanitizeText(decodeHtmlEntities(bodyExpansionOfTitle), TITLE_MAX_LENGTH) || null
+      : null;
   if (!sanitizedTitle || !sanitizedExternalId) {
     res.status(400).json({ error: "Invalid title or externalId" });
     return;
@@ -2282,6 +2331,8 @@ logsRouter.post("/", async (req: AuthenticatedRequest, res) => {
           mechanics: mechanicsJson,
           affinityContext: affinityStored !== undefined ? affinityStored : null,
           boardGameSource,
+          expansionOfExternalId: sanitizedExpansionOfExternalId,
+          expansionOfTitle: sanitizedExpansionOfTitle,
           own: ownershipNext != null && isSpendTrackedMediaType(mediaType) ? ownershipNext.own : null,
           wantToBuy:
             ownershipNext != null && isSpendTrackedMediaType(mediaType) ? ownershipNext.wantToBuy : null,
@@ -2350,6 +2401,135 @@ const scopedReviewBodySchema = z.object({
 function isTvOrAnime(mediaType: string): boolean {
   return mediaType === "tv" || mediaType === "anime";
 }
+
+logsRouter.get("/:id/board-game-expansions", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const base = await prisma.log.findFirst({
+    where: { id: req.params.id, userId, mediaType: "boardgames" },
+    select: { id: true, externalId: true, boardGameSource: true },
+  });
+  if (!base) {
+    res.status(404).json({ error: "Log not found" });
+    return;
+  }
+  const children = await prisma.log.findMany({
+    where: {
+      userId,
+      mediaType: "boardgames",
+      expansionOfExternalId: base.externalId,
+      boardGameSource: base.boardGameSource,
+      NOT: { id: base.id },
+    },
+    select: { id: true, externalId: true, title: true, boardGameSource: true },
+    orderBy: { title: "asc" },
+    take: 50,
+  });
+  res.json({
+    data: children.map((row) => ({
+      id: row.externalId,
+      title: decodeHtmlEntities(row.title),
+      source: row.boardGameSource,
+    })),
+  });
+});
+
+logsRouter.post("/board-game-expansions/refresh", async (req: AuthenticatedRequest, res) => {
+  const userId = req.user!.userId;
+  const logs = await prisma.log.findMany({
+    where: { userId, mediaType: "boardgames" },
+    select: {
+      id: true,
+      externalId: true,
+      title: true,
+      boardGameSource: true,
+      expansionOfExternalId: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 500,
+  });
+  if (logs.length === 0) {
+    res.json({ updated: 0 });
+    return;
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { bggApiToken: true, ludopediaApiToken: true },
+  });
+  const bggToken = preferEnvApiToken(process.env.BGG_API_TOKEN, user?.bggApiToken);
+  const ludopediaToken = preferEnvApiToken(process.env.LUDOPEDIA_API_TOKEN, user?.ludopediaApiToken);
+  const key = (source: string | null | undefined, externalId: string) =>
+    `${source ?? "bgg"}:${externalId}`;
+  const byKey = new Map(logs.map((l) => [key(l.boardGameSource, l.externalId), l]));
+  const pending = new Map(
+    logs
+      .filter(
+        (l) =>
+          !l.expansionOfExternalId ||
+          !byKey.has(key(l.boardGameSource, l.expansionOfExternalId))
+      )
+      .map((l) => [key(l.boardGameSource, l.externalId), l])
+  );
+  const updates = new Map<string, { externalId: string; title: string }>();
+
+  const bggIds = [...pending.values()]
+    .filter((l) => l.boardGameSource !== "ludopedia")
+    .map((l) => l.externalId)
+    .slice(0, 200);
+  if (bggIds.length > 0 && bggToken) {
+    try {
+      const details = await getBoardGamesByIdsForImport(bggIds, bggToken);
+      for (const detail of details.values()) {
+        const target = pending.get(key("bgg", detail.id));
+        if (!target) continue;
+        const bases =
+          detail.expansionBases && detail.expansionBases.length > 0
+            ? detail.expansionBases
+            : detail.expansionOfExternalId
+              ? [{ id: detail.expansionOfExternalId, title: detail.expansionOfTitle ?? "Unknown" }]
+              : [];
+        const base = bases.find((candidate) => byKey.has(key("bgg", candidate.id)));
+        if (base) {
+          updates.set(target.id, {
+            externalId: base.id,
+            title: base.title || byKey.get(key("bgg", base.id))?.title || "Unknown",
+          });
+        }
+      }
+    } catch {}
+  }
+
+  if (ludopediaToken) {
+    const candidates = [...pending.values()]
+      .filter((l) => l.boardGameSource === "ludopedia" && !updates.has(l.id))
+      .slice(0, 50);
+    for (const candidate of candidates) {
+      try {
+        const expansions = await getBoardGameExpansionsLudopedia(candidate.externalId, ludopediaToken);
+        for (const exp of expansions) {
+          const target = pending.get(key("ludopedia", exp.id));
+          if (target && !updates.has(target.id)) {
+            updates.set(target.id, {
+              externalId: candidate.externalId,
+              title: candidate.title,
+            });
+          }
+        }
+      } catch {}
+    }
+  }
+
+  for (const [logId, base] of updates) {
+    await prisma.log.update({
+      where: { id: logId },
+      data: {
+        expansionOfExternalId: sanitizeText(base.externalId, EXTERNAL_ID_MAX_LENGTH) || null,
+        expansionOfTitle: sanitizeText(decodeHtmlEntities(base.title), TITLE_MAX_LENGTH) || null,
+      },
+    });
+  }
+
+  res.json({ updated: updates.size });
+});
 
 /** GET /logs/:id/scoped-reviews — TV/anime granular reviews for this log. */
 logsRouter.get("/:id/scoped-reviews", async (req: AuthenticatedRequest, res) => {
@@ -2534,6 +2714,15 @@ logsRouter.post("/:id/board-game-matches", async (req: AuthenticatedRequest, res
     }
   }
   const notes = sanitizeReview(parsed.data.notes ?? null);
+  const sanitizedExpansions = (parsed.data.expansions ?? [])
+    .slice(0, 20)
+    .map((exp) => ({
+      id: sanitizeText(exp.id, EXTERNAL_ID_MAX_LENGTH),
+      title: sanitizeText(decodeHtmlEntities(exp.title), TITLE_MAX_LENGTH),
+      source: exp.source ?? null,
+    }))
+    .filter((exp) => exp.id && exp.title);
+  const expansionsJson = sanitizedExpansions.length > 0 ? JSON.stringify(sanitizedExpansions) : null;
 
   try {
     const now = new Date();
@@ -2565,6 +2754,7 @@ logsRouter.post("/:id/board-game-matches", async (req: AuthenticatedRequest, res
           playedAt,
           durationHours,
           players: playersJson,
+          expansions: expansionsJson,
           notes,
         },
       });

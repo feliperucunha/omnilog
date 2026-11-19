@@ -35,6 +35,7 @@ export type {
   AuthResponse,
   SpendTrackedMediaType,
   BoardGameMatchPlayer,
+  BoardGameMatchExpansion,
   BoardGameMatch,
   CreateBoardGameMatchInput,
 } from "./types.js";

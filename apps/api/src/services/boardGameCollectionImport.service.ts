@@ -229,6 +229,7 @@ async function runImportJob(
   const userId = job.userId;
   const source = job.source;
   const duplicateMode = job.duplicateMode;
+  const collectionExternalIds = new Set(objectIds);
 
   const detailToken = source === "bgg" ? bggToken : ludopediaToken;
   if (!detailToken) {
@@ -266,6 +267,20 @@ async function runImportJob(
         ? JSON.stringify(item.mechanics.slice(0, 20).map((m) => decodeHtmlEntities(m)))
         : null;
     const boardGameSource: "bgg" | "ludopedia" = source;
+    const fallbackBase =
+      item.expansionOfExternalId && item.expansionOfExternalId.trim() !== ""
+        ? { id: item.expansionOfExternalId, title: item.expansionOfTitle ?? "Unknown" }
+        : null;
+    const expansionBase =
+      item.expansionBases?.find((base) => collectionExternalIds.has(base.id)) ??
+      item.expansionBases?.[0] ??
+      fallbackBase;
+    const expansionOfExternalId = expansionBase
+      ? sanitizeText(expansionBase.id, EXTERNAL_ID_MAX_LENGTH) || null
+      : null;
+    const expansionOfTitle = expansionBase
+      ? sanitizeText(decodeHtmlEntities(expansionBase.title), TITLE_MAX_LENGTH) || null
+      : null;
 
     const existing = await prisma.log.findUnique({
       where: { userId_mediaType_externalId: { userId, mediaType: "boardgames", externalId: ext } },
@@ -280,6 +295,8 @@ async function runImportJob(
             genres: genres,
             mechanics: mechanics,
             boardGameSource,
+            expansionOfExternalId,
+            expansionOfTitle,
             own: true,
             wantToBuy: false,
             sold: false,
@@ -324,6 +341,8 @@ async function runImportJob(
         mechanics: mechanics,
         affinityContext: null,
         boardGameSource,
+        expansionOfExternalId,
+        expansionOfTitle,
         own: true,
         wantToBuy: false,
         sold: false,

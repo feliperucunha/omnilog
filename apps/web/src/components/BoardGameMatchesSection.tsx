@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { BoardGameMatch, Log } from "@geeklogs/shared";
+import type { BoardGameMatch, BoardGameMatchExpansion, Log } from "@geeklogs/shared";
 import {
   DEFAULT_BOARD_GAME_SESSION_DURATION_HOURS,
   boardGameScoreTrend,
@@ -38,6 +38,7 @@ import {
   ChevronDown,
   Clock,
   Dice5,
+  Layers,
   Loader2,
   Trash2,
   Trophy,
@@ -342,6 +343,9 @@ export const BoardGameMatchesSection = forwardRef<
   );
   const [players, setPlayers] = useState<PlayerRow[]>(() => buildDefaultPlayers(undefined));
   const [notes, setNotes] = useState("");
+  const [availableExpansions, setAvailableExpansions] = useState<BoardGameMatchExpansion[]>([]);
+  const [loadingExpansions, setLoadingExpansions] = useState(Boolean(logId));
+  const [selectedExpansionIds, setSelectedExpansionIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmMatchId, setDeleteConfirmMatchId] = useState<string | null>(null);
@@ -378,11 +382,41 @@ export const BoardGameMatchesSection = forwardRef<
     loadMatches();
   }, [loadMatches]);
 
+  useEffect(() => {
+    if (!logId) {
+      setAvailableExpansions([]);
+      setLoadingExpansions(false);
+      setSelectedExpansionIds([]);
+      return;
+    }
+    let active = true;
+    setLoadingExpansions(true);
+    apiFetch<{ data: BoardGameMatchExpansion[] }>(`/logs/${logId}/board-game-expansions`)
+      .then((res) => {
+        if (!active) return;
+        const list = res.data ?? [];
+        setAvailableExpansions(list);
+        setSelectedExpansionIds((prev) => prev.filter((id) => list.some((exp) => exp.id === id)));
+      })
+      .catch(() => {
+        if (!active) return;
+        setAvailableExpansions([]);
+        setSelectedExpansionIds([]);
+      })
+      .finally(() => {
+        if (active) setLoadingExpansions(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [logId]);
+
   const resetForm = useCallback(() => {
     setPlayedDate(todayDateInput());
     setSessionDurationHours(DEFAULT_BOARD_GAME_SESSION_DURATION_HOURS);
     setPlayers(buildDefaultPlayers(meUser));
     setNotes("");
+    setSelectedExpansionIds([]);
   }, [meUser]);
 
   const submitNewMatch = useCallback(
@@ -391,6 +425,7 @@ export const BoardGameMatchesSection = forwardRef<
       durationHours: BoardGameSessionDurationHours,
       playersPayload: Array<{ name: string; score: number | null; winner: boolean; appUserId?: string }>,
       matchNotes: string | null,
+      expansions: BoardGameMatchExpansion[],
       options?: { resetAfter?: boolean; showBanner?: boolean },
     ): Promise<boolean> => {
       setSaving(true);
@@ -415,6 +450,7 @@ export const BoardGameMatchesSection = forwardRef<
               ...(p.appUserId ? { appUserId: p.appUserId } : {}),
             })),
             notes: matchNotes,
+            expansions,
           }),
         });
         invalidateLogsAndItemsCache();
@@ -463,6 +499,11 @@ export const BoardGameMatchesSection = forwardRef<
     return { iso, withNames };
   }, [playedDate, players, t]);
 
+  const selectedExpansions = useMemo(
+    () => availableExpansions.filter((exp) => selectedExpansionIds.includes(exp.id)),
+    [availableExpansions, selectedExpansionIds]
+  );
+
   const handleSaveNew = useCallback(async (): Promise<boolean> => {
     const validated = validateAndBuildPlayers();
     if (!validated) return false;
@@ -476,9 +517,10 @@ export const BoardGameMatchesSection = forwardRef<
         appUserId: p.appUserId,
       })),
       notes.trim() || null,
+      selectedExpansions,
       { resetAfter: true },
     );
-  }, [notes, sessionDurationHours, submitNewMatch, validateAndBuildPlayers]);
+  }, [notes, selectedExpansions, sessionDurationHours, submitNewMatch, validateAndBuildPlayers]);
 
   const handleSaveNewAndShowBanner = useCallback(async (): Promise<boolean> => {
     const validated = validateAndBuildPlayers();
@@ -493,9 +535,10 @@ export const BoardGameMatchesSection = forwardRef<
         appUserId: p.appUserId,
       })),
       notes.trim() || null,
+      selectedExpansions,
       { resetAfter: true, showBanner: true },
     );
-  }, [notes, sessionDurationHours, submitNewMatch, validateAndBuildPlayers]);
+  }, [notes, selectedExpansions, sessionDurationHours, submitNewMatch, validateAndBuildPlayers]);
 
   useImperativeHandle(
     ref,
@@ -660,6 +703,53 @@ export const BoardGameMatchesSection = forwardRef<
               </motion.div>
             ))}
           </div>
+
+          {loadingExpansions ? (
+            <div className="space-y-2" aria-busy="true">
+              <Label className="flex items-center gap-2 text-[13px] font-semibold text-[var(--color-lightest)]">
+                <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {t("boardGameMatches.expansionsLabel")}
+              </Label>
+              <span className="sr-only">{t("common.loading")}</span>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[0, 1].map((index) => (
+                  <div
+                    key={index}
+                    className="h-[38px] animate-pulse rounded-[10px] bg-[var(--color-mid)]/25"
+                  />
+                ))}
+              </div>
+            </div>
+          ) : availableExpansions.length > 0 ? (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-[13px] font-semibold text-[var(--color-lightest)]">
+                <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {t("boardGameMatches.expansionsLabel")}
+              </Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {availableExpansions.map((exp) => (
+                  <label
+                    key={exp.id}
+                    className="flex min-w-0 items-center gap-2 rounded-[10px] border border-[var(--color-surface-border)] bg-[var(--color-dark)] px-3 py-2 text-[13px] text-[var(--color-light)] has-[:checked]:border-[var(--btn-gradient-start)] has-[:checked]:text-[var(--color-lightest)]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedExpansionIds.includes(exp.id)}
+                      onChange={() =>
+                        setSelectedExpansionIds((prev) =>
+                          prev.includes(exp.id) ? prev.filter((id) => id !== exp.id) : [...prev, exp.id]
+                        )
+                      }
+                      className="h-4 w-4 shrink-0 accent-[var(--btn-gradient-start)]"
+                    />
+                    <span className="min-w-0 flex-1 truncate" title={exp.title}>
+                      {exp.title}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label className="text-[13px] font-semibold text-[var(--color-lightest)]">{t("boardGameMatches.matchNotes")}</Label>
@@ -842,6 +932,17 @@ function MatchHistoryCard({
                 t
               )}
             </span>
+            {match.expansions && match.expansions.length > 0 ? (
+              <span
+                className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-full bg-[var(--color-mid)]/20 px-2.5 py-1 text-xs font-medium text-[var(--color-light)] ring-1 ring-[var(--color-mid)]/25"
+                title={match.expansions.map((exp) => exp.title).join(", ")}
+              >
+                <Layers className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                <span className="truncate">
+                  {t("boardGameMatches.expansionsUsed", { count: String(match.expansions.length) })}
+                </span>
+              </span>
+            ) : null}
             {winners.length > 0 && (
               <span className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-200/95 ring-1 ring-amber-400/25">
                 <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden />
@@ -894,6 +995,24 @@ function MatchHistoryCard({
               );
             })}
           </ul>
+          {match.expansions && match.expansions.length > 0 ? (
+            <div className="rounded-xl border border-[var(--color-mid)]/15 bg-[var(--color-darkest)]/60 px-4 py-3">
+              <p className="m-0 mb-2 flex items-center gap-2 text-xs font-semibold text-[var(--color-light)]">
+                <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {t("boardGameMatches.expansionsLabel")}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {match.expansions.map((exp) => (
+                  <span
+                    key={exp.id}
+                    className="rounded-full bg-[var(--color-mid)]/20 px-2.5 py-1 text-xs text-[var(--color-lightest)]"
+                  >
+                    {exp.title}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {match.notes && match.notes.trim() !== "" && (
             <div className="rounded-xl border border-[var(--color-mid)]/15 bg-[var(--color-darkest)]/60 px-4 py-3">
               <p className="m-0 whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-light)]">{match.notes}</p>

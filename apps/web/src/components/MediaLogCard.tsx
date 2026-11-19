@@ -32,8 +32,14 @@ import { gradeToStars } from "@/lib/gradeStars";
 import {
   LOG_CARD_ACTION_COLUMN,
   LOG_CARD_ACTION_COLUMN_GRID,
+  LOG_CARD_COMPACT_FIXED_HEIGHT,
+  LOG_CARD_COMPACT_IMAGE_HEIGHT,
+  LOG_CARD_COMPACT_MIN_HEIGHT,
   LOG_CARD_EDIT_BUTTON,
   LOG_CARD_EDIT_BUTTON_GRID,
+  LOG_CARD_GRID_FIXED_HEIGHT,
+  LOG_CARD_GRID_IMAGE_HEIGHT,
+  LOG_CARD_GRID_MIN_HEIGHT,
 } from "@/lib/logCardLayout";
 import { itemDetailPath } from "@/lib/itemRoutes";
 import { getStatusLabel } from "@/lib/statusLabel";
@@ -124,6 +130,10 @@ export type MediaLogCardProps = {
   deletingId: string | null;
   incrementingId: string | null;
   statusChangingId: string | null;
+  expansionToggle?: ReactNode;
+  expansionContent?: ReactNode;
+  expansionExpanded?: boolean;
+  minimal?: boolean;
   onViewReview: (logId: string) => void;
   onIncrement: (log: Log, field: "episode" | "chapter" | "volume") => void;
   onStatusChange: (log: Log, status: string) => void | Promise<void>;
@@ -298,6 +308,11 @@ function LogMetaRow({
               </span>
             ) : null}
             <DaysSinceBadge updatedAt={log.updatedAt} />
+            {log.expansionOfTitle?.trim() ? (
+              <span className={badgeSize} title={log.expansionOfTitle}>
+                {t("mediaLogs.expansionBadge", { title: log.expansionOfTitle })}
+              </span>
+            ) : null}
           </>
         );
       })()}
@@ -457,6 +472,7 @@ function LogActions({
   onDelete,
   t,
   inline = false,
+  hideInlinePrimary = false,
 }: {
   log: Log;
   readOnly: boolean;
@@ -471,6 +487,7 @@ function LogActions({
   onDelete?: (logId: string) => void | Promise<void>;
   t: TFunction;
   inline?: boolean;
+  hideInlinePrimary?: boolean;
 }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [deletingConfirm, setDeletingConfirm] = useState(false);
@@ -578,7 +595,7 @@ function LogActions({
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        {inline && (
+        {inline && !hideInlinePrimary && (
           <>
             <Button
               type="button"
@@ -724,6 +741,10 @@ export function MediaLogCard({
   deletingId,
   incrementingId,
   statusChangingId,
+  expansionToggle,
+  expansionContent,
+  expansionExpanded = false,
+  minimal = false,
   onViewReview,
   onIncrement,
   onStatusChange,
@@ -737,12 +758,42 @@ export function MediaLogCard({
   const isCompact = view === "compact";
   const isGrid = view === "grid";
   const borderClass = listBorderClass(log, isCompact);
+  const detailPath = itemDetailPath(log.mediaType, log.externalId);
+  const statusLabel = log.status ? getStatusLabel(t, log.status) : null;
+
+  if (minimal) {
+    return (
+      <Card className="flex w-full min-w-0 items-center gap-2 rounded-xl border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-2">
+        <Link to={detailPath} className="shrink-0">
+          <ItemImage
+            src={log.image}
+            alt=""
+            mediaType={log.mediaType}
+            boardGameSource={log.boardGameSource}
+            className="h-14 w-10 overflow-hidden rounded-md bg-[var(--color-mid)]/30"
+          />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <Link
+            to={detailPath}
+            className="block truncate text-[13px] font-semibold leading-snug text-[var(--color-lightest)] hover:underline"
+          >
+            {log.title}
+          </Link>
+          {statusLabel ? <p className="truncate text-xs text-[var(--color-light)]">{statusLabel}</p> : null}
+        </div>
+        {display.grade != null ? <StarRating value={gradeToStars(display.grade)} readOnly size="sm" /> : null}
+      </Card>
+    );
+  }
 
   if (isCompact) {
     return (
       <Card
         className={cn(
-          "relative flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] bg-[var(--color-dark)] p-0",
+          "relative flex flex-col overflow-hidden rounded-[14px] bg-[var(--color-dark)] p-0",
+          LOG_CARD_COMPACT_MIN_HEIGHT,
+          !expansionExpanded && LOG_CARD_COMPACT_FIXED_HEIGHT,
           borderClass
         )}
         style={cardShadow}
@@ -763,7 +814,7 @@ export function MediaLogCard({
               to={itemDetailPath(log.mediaType, log.externalId)}
               whileTap={tapScale}
               transition={tapTransition}
-              className="relative block w-full shrink-0 overflow-hidden aspect-[2/3]"
+              className={cn("relative block w-full shrink-0 overflow-hidden", LOG_CARD_COMPACT_IMAGE_HEIGHT)}
             >
               <ItemImage
                 src={log.image}
@@ -774,7 +825,7 @@ export function MediaLogCard({
               <LogImageOverlays log={log} t={t} compact grid={false} />
             </MotionLink>
           ) : (
-            <div className="relative block w-full shrink-0 overflow-hidden aspect-[2/3]">
+            <div className={cn("relative block w-full shrink-0 overflow-hidden", LOG_CARD_COMPACT_IMAGE_HEIGHT)}>
               <ItemImage
                 src={log.image}
                 className="h-full w-full"
@@ -823,6 +874,12 @@ export function MediaLogCard({
             </div>
           </div>
         </LogCardTapArea>
+        {expansionToggle != null || expansionContent != null ? (
+          <div className="border-t border-[var(--color-surface-border)]/80 px-2 py-1.5">
+            {expansionToggle}
+            {expansionContent != null ? <div className="mt-2">{expansionContent}</div> : null}
+          </div>
+        ) : null}
         <LogActions
           log={log}
           readOnly={readOnly}
@@ -841,14 +898,12 @@ export function MediaLogCard({
     );
   }
 
-  const detailPath = itemDetailPath(log.mediaType, log.externalId);
-  const statusLabel = log.status ? getStatusLabel(t, log.status) : null;
-
   return (
-            <Card
+    <Card
       className={cn(
-        "relative flex w-full min-w-0 gap-3 rounded-[14px] border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-2.5 shadow-[var(--shadow-sm)]",
-        isGrid ? "flex-col" : "flex-row items-start"
+        "relative flex w-full min-w-0 flex-col rounded-[14px] border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-2.5 shadow-[var(--shadow-sm)]",
+        isGrid && LOG_CARD_GRID_MIN_HEIGHT,
+        isGrid && !expansionExpanded && LOG_CARD_GRID_FIXED_HEIGHT
       )}
     >
       {!readOnly && deletingId === log.id && (
@@ -856,77 +911,126 @@ export function MediaLogCard({
           <Loader2 className="h-6 w-6 animate-spin text-[var(--color-light)]" />
         </div>
       )}
-      <Link to={detailPath} className={cn("shrink-0", isGrid && "block w-full")}>
-        <ItemImage
-          src={log.image}
-          alt=""
-          mediaType={log.mediaType}
-          boardGameSource={log.boardGameSource}
-          className={cn(
-            "overflow-hidden rounded-[10px] bg-[var(--color-mid)]/30",
-            isGrid ? "aspect-[2/3] w-full" : "h-24 w-16"
-          )}
-        />
-      </Link>
-      <div className="flex w-full min-w-0 flex-1 flex-col gap-1.5">
-        <Link
-          to={detailPath}
-          className="line-clamp-2 min-w-0 break-words text-base font-semibold leading-snug text-[var(--color-lightest)] hover:underline"
-        >
-          {log.title}
-        </Link>
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <p className="min-w-0 break-words text-[13px] text-[var(--color-light)]">{t(`nav.${log.mediaType}`)}</p>
-          {statusLabel ? (
-            <span className="w-fit max-w-full whitespace-normal break-words rounded-full border border-[var(--color-surface-border)] bg-[var(--color-mid)]/25 px-2 py-0.5 text-left text-[11px] font-semibold leading-snug text-[var(--color-light)]">
-              {statusLabel}
-            </span>
-          ) : null}
-          {display.grade != null ? (
-            <StarRating value={gradeToStars(display.grade)} readOnly size="sm" />
-          ) : null}
-        </div>
-        <div className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
-          <div className="min-w-[8rem] flex-1">
-            <LogReviewBlock
-              log={log}
-              display={display}
-              compact={false}
-              grid={isGrid}
-              onViewReview={onViewReview}
-              t={t}
+      <div className={cn("flex min-w-0 flex-1", isGrid ? "flex-col gap-2" : "flex-row items-start gap-3")}>
+        <div className={cn("shrink-0", isGrid && "w-full")}>
+          <Link to={detailPath} className="block">
+            <ItemImage
+              src={log.image}
+              alt=""
+              mediaType={log.mediaType}
+              boardGameSource={log.boardGameSource}
+              className={cn(
+                "overflow-hidden rounded-[10px] bg-[var(--color-mid)]/30",
+                isGrid ? LOG_CARD_GRID_IMAGE_HEIGHT : "h-24 w-16"
+              )}
             />
-          </div>
-          <LogActions
-            inline
-            log={log}
-            readOnly={readOnly}
-            view={isGrid ? "grid" : "list"}
-            mediaType={mediaType}
-            deletingId={deletingId}
-            incrementingId={incrementingId}
-            statusChangingId={statusChangingId}
-            onIncrement={onIncrement}
-            onStatusChange={onStatusChange}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            t={t}
-          />
+          </Link>
+          {!isGrid && expansionToggle != null ? (
+            <div className="mt-1 flex w-16 justify-center">{expansionToggle}</div>
+          ) : null}
         </div>
-        <LogMetaRow
-          log={log}
-          display={display}
-          scopeLabel={scopeLabel}
-          mediaType={mediaType}
-          showCollectionOwnershipFilters={showCollectionOwnershipFilters}
-          t={t}
-          locale={locale}
-          compact={false}
-          grid={isGrid}
-          hideStars
-        />
-        <LogProgressLine log={log} hasProgressButton={hasProgressButton} t={t} compact={false} grid={isGrid} />
+        <div className={cn("flex w-full min-w-0 flex-1 flex-col gap-1.5", isGrid && "min-h-0 overflow-hidden")}>
+          <Link
+            to={detailPath}
+            className="line-clamp-2 min-w-0 break-words text-base font-semibold leading-snug text-[var(--color-lightest)] hover:underline"
+          >
+            {log.title}
+          </Link>
+          {statusLabel || display.grade != null ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              {statusLabel ? (
+                <span className="w-fit max-w-full whitespace-normal break-words rounded-full border border-[var(--color-surface-border)] bg-[var(--color-mid)]/25 px-2 py-0.5 text-left text-[11px] font-semibold leading-snug text-[var(--color-light)]">
+                  {statusLabel}
+                </span>
+              ) : null}
+              {display.grade != null ? (
+                <StarRating value={gradeToStars(display.grade)} readOnly size="sm" />
+              ) : null}
+            </div>
+          ) : null}
+          {isGrid ? (
+            <div className="flex min-w-0 flex-col gap-2 pt-0.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-auto min-h-8 w-full justify-center px-2 py-1 text-xs"
+                onClick={() => onViewReview(log.id)}
+              >
+                {t("social.viewMore")}
+              </Button>
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+                <LogActions
+                  inline
+                  hideInlinePrimary
+                  log={log}
+                  readOnly={readOnly}
+                  view="grid"
+                  mediaType={mediaType}
+                  deletingId={deletingId}
+                  incrementingId={incrementingId}
+                  statusChangingId={statusChangingId}
+                  onIncrement={onIncrement}
+                  onStatusChange={onStatusChange}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  t={t}
+                />
+                {expansionToggle}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+                <div className="min-w-[8rem] flex-1">
+                  <LogReviewBlock
+                    log={log}
+                    display={display}
+                    compact={false}
+                    grid={false}
+                    onViewReview={onViewReview}
+                    t={t}
+                  />
+                </div>
+                <LogActions
+                  inline
+                  log={log}
+                  readOnly={readOnly}
+                  view="list"
+                  mediaType={mediaType}
+                  deletingId={deletingId}
+                  incrementingId={incrementingId}
+                  statusChangingId={statusChangingId}
+                  onIncrement={onIncrement}
+                  onStatusChange={onStatusChange}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  t={t}
+                />
+              </div>
+              <LogMetaRow
+                log={log}
+                display={display}
+                scopeLabel={scopeLabel}
+                mediaType={mediaType}
+                showCollectionOwnershipFilters={showCollectionOwnershipFilters}
+                t={t}
+                locale={locale}
+                compact={false}
+                grid={false}
+                hideStars
+              />
+              <LogProgressLine log={log} hasProgressButton={hasProgressButton} t={t} compact={false} grid={false} />
+            </>
+          )}
+        </div>
       </div>
+      {isGrid && expansionContent != null ? (
+        <div className="border-t border-[var(--color-surface-border)] pt-1.5">{expansionContent}</div>
+      ) : null}
+      {!isGrid && expansionContent != null ? (
+        <div className="mt-2 border-t border-[var(--color-surface-border)] pt-2">{expansionContent}</div>
+      ) : null}
     </Card>
   );
 }

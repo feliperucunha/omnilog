@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback, useRef, useMemo, useId } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, useId, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { AlertTriangle, ChevronDown, Download, Loader2, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, ChevronDown, Download, Layers, Loader2, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { MediaType, Log } from "@geeklogs/shared";
@@ -17,6 +17,7 @@ import {
   apiFetchPublic,
   getCachedEntry,
   HEAVY_PAGE_TTL_MS,
+  invalidateApiCache,
   invalidateLogsAndItemsCache,
   apiFetchFile,
   downloadFile,
@@ -73,9 +74,12 @@ import { OverflowMarquee } from "@/components/OverflowMarquee";
 import { mediaTypeHasCollectionOwnership, mediaTypeHasMarketTab } from "@/lib/mediaTypeFeatures";
 import { buildLogsExportFilename, userSlugFromMe } from "@/lib/exportFilename";
 import { decodeLogForDisplay } from "@/lib/decodeDisplayFields";
+import { groupBoardGameLogs, isExpansionParentPlaceholder } from "@/lib/groupBoardGameLogs";
 import { UnifiedSearchBar } from "@/components/UnifiedSearchBar";
 
 const LOGS_PAGE_SIZE = 24;
+let expansionRefreshPromise: Promise<{ updated: number }> | null = null;
+let boardGameLogsCacheSynced = false;
 
 type LogsResponse = Log[] | { data: Log[]; nextCursor: string | null };
 
@@ -423,6 +427,11 @@ export function MediaLogs({
   const [exportingCategory, setExportingCategory] = useState(false);
   /** Log id whose full review is open in the quote modal. */
   const [reviewLogId, setReviewLogId] = useState<string | null>(null);
+  const [expandedExpansionGroups, setExpandedExpansionGroups] = useState<Set<string>>(() => new Set());
+  const [expansionParentLogs, setExpansionParentLogs] = useState<Log[]>([]);
+  const [loadingExpansionParents, setLoadingExpansionParents] = useState<Set<string>>(() => new Set());
+  const expansionParentFetchRef = useRef<Set<string>>(new Set());
+  const expansionCategoryTokenRef = useRef(0);
   const [milestoneProgressFetched, setMilestoneProgressFetched] = useState<CategoryMilestoneProgress | null>(null);
   /** When embedded (home): start with Load more button; after first click, switch to infinite scroll. When not embedded, use infinite scroll from the start. */
   const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(() => !embedded);
@@ -660,6 +669,82 @@ export function MediaLogs({
     ]
   );
 
+  useEffect(() => {
+    if (mediaType !== "boardgames" || readOnly || !token) return;
+    if (!expansionRefreshPromise) {
+      expansionRefreshPromise = apiFetch<{ updated: number }>(
+        "/logs/board-game-expansions/refresh",
+        { method: "POST" }
+      ).finally(() => {
+        expansionRefreshPromise = null;
+      });
+    }
+    void expansionRefreshPromise
+      .then((res) => {
+        if (res.updated > 0) {
+          invalidateLogsAndItemsCache();
+          fetchLogs(true);
+        }
+      })
+      .catch(() => {});
+  }, [mediaType, readOnly, token, fetchLogs]);
+
+  useEffect(() => {
+    expansionCategoryTokenRef.current += 1;
+    expansionParentFetchRef.current.clear();
+    setExpansionParentLogs([]);
+    setLoadingExpansionParents(new Set());
+  }, [mediaType, readOnly, publicUserId]);
+
+  useEffect(() => {
+    if (mediaType !== "boardgames" || readOnly || publicUserId) return;
+    const token = expansionCategoryTokenRef.current;
+    const key = (source: string | null | undefined, externalId: string) =>
+      `${source ?? "bgg"}:${externalId}`;
+    const knownKeys = new Set(
+      [...logs, ...expansionParentLogs].map((log) => key(log.boardGameSource, log.externalId))
+    );
+    const missing = new Map<string, string>();
+    for (const log of logs) {
+      if (!log.expansionOfExternalId) continue;
+      const parentKey = key(log.boardGameSource, log.expansionOfExternalId);
+      if (knownKeys.has(parentKey) || expansionParentFetchRef.current.has(parentKey)) continue;
+      missing.set(parentKey, log.expansionOfExternalId);
+    }
+    if (missing.size === 0) return;
+    setLoadingExpansionParents((prev) => {
+      const next = new Set(prev);
+      for (const parentKey of missing.keys()) next.add(parentKey);
+      return next;
+    });
+    for (const [parentKey, externalId] of missing) {
+      expansionParentFetchRef.current.add(parentKey);
+      void apiFetch<LogsResponse>(
+        `/logs?mediaType=boardgames&externalId=${encodeURIComponent(externalId)}&limit=1`
+      )
+        .then((response) => {
+          if (token !== expansionCategoryTokenRef.current) return;
+          const list = Array.isArray(response) ? response : response.data;
+          const parent = list[0] ? decodeLogForDisplay(list[0]) : null;
+          if (!parent) return;
+          setExpansionParentLogs((prev) => [
+            ...prev.filter((log) => key(log.boardGameSource, log.externalId) !== parentKey),
+            parent,
+          ]);
+        })
+        .catch(() => {})
+        .finally(() => {
+          expansionParentFetchRef.current.delete(parentKey);
+          if (token !== expansionCategoryTokenRef.current) return;
+          setLoadingExpansionParents((prev) => {
+            const next = new Set(prev);
+            next.delete(parentKey);
+            return next;
+          });
+        });
+    }
+  }, [logs, mediaType, readOnly, publicUserId, expansionParentLogs]);
+
   type StatusCountsPayload = {
     data: {
       total: number;
@@ -732,6 +817,11 @@ export function MediaLogs({
       setLoading(true);
       fetchLogsRef.current(true);
       return;
+    }
+
+    if (mediaType === "boardgames" && !boardGameLogsCacheSynced) {
+      boardGameLogsCacheSynced = true;
+      invalidateApiCache("/logs");
     }
 
     const path = buildLogsPath();
@@ -1030,6 +1120,162 @@ export function MediaLogs({
     categorySearchDraft.trim() !== "" || categorySearchQuery !== "";
 
   const activeLogView = resolveLogViewForContext(logViewEnabled, logView);
+  const logsWithExpansionParents = logs;
+  const groupedLogs = useMemo(
+    () => (mediaType === "boardgames" ? groupBoardGameLogs(logsWithExpansionParents) : []),
+    [logsWithExpansionParents, mediaType]
+  );
+
+  const toggleExpansionGroup = (groupKey: string) => {
+    setExpandedExpansionGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  };
+
+  const expansionGroupKey = (log: Log) => `${log.boardGameSource ?? "bgg"}:${log.externalId}`;
+  const expansionInfoByRootId = useMemo(() => {
+    const key = (source: string | null | undefined, externalId: string) =>
+      `${source ?? "bgg"}:${externalId}`;
+    const parentByKey = new Map(
+      expansionParentLogs.map((log) => [key(log.boardGameSource, log.externalId), log] as const)
+    );
+    const info = new Map<string, { logs: Log[]; loading: boolean }>();
+    for (const group of groupedLogs) {
+      if (!group.log.expansionOfExternalId) continue;
+      const parentKey = key(group.log.boardGameSource, group.log.expansionOfExternalId);
+      const parent = parentByKey.get(parentKey) ?? null;
+      const siblings = logs.filter((log) => {
+        if (log.id === group.log.id || !log.expansionOfExternalId) return false;
+        return key(log.boardGameSource, log.expansionOfExternalId) === parentKey;
+      });
+      const related = [...(parent ? [parent] : []), ...siblings, ...group.children];
+      const unique = related.filter(
+        (log, index) => related.findIndex((entry) => entry.id === log.id) === index
+      );
+      info.set(group.log.id, { logs: unique, loading: loadingExpansionParents.has(parentKey) });
+    }
+    return info;
+  }, [groupedLogs, logs, expansionParentLogs, loadingExpansionParents]);
+
+  const resolveLogForReview = (logId: string): Log | null => {
+    const direct = logsWithExpansionParents.find((log) => log.id === logId);
+    if (direct) return direct;
+    if (logId.startsWith("expansion-parent:")) {
+      const key = logId.slice("expansion-parent:".length);
+      return (
+        logsWithExpansionParents.find(
+          (log) => !isExpansionParentPlaceholder(log) && expansionGroupKey(log) === key
+        ) ?? null
+      );
+    }
+    return null;
+  };
+
+  const baseLogCardProps = (log: Log, view: LogViewMode) => ({
+    log,
+    embedded,
+    readOnly,
+    view,
+    mediaType,
+    showCollectionOwnershipFilters,
+    hasProgressButton,
+    deletingId,
+    incrementingId,
+    statusChangingId,
+    onViewReview: (logId: string) => {
+      const resolved = resolveLogForReview(logId);
+      if (!resolved || isExpansionParentPlaceholder(resolved)) return;
+      if (getLogCardDisplay(resolved).review?.trim()) {
+        setReviewLogId(logId);
+      } else {
+        setLogEditTab("review");
+        setEditingLog(resolved);
+      }
+    },
+    onIncrement: handleIncrement,
+    onStatusChange: handleStatusChange,
+    onEdit: (editedLog: Log, tab: "review" | "matches" | "market") => {
+      setLogEditTab(tab);
+      setEditingLog(editedLog);
+    },
+    onDelete: handleDelete,
+    t,
+    locale,
+  });
+
+  const renderLogCard = (
+    log: Log,
+    view: LogViewMode = activeLogView,
+    expansionToggle?: ReactNode,
+    expansionContent?: ReactNode,
+    expansionExpanded = false
+  ) => (
+    <MediaLogCard
+      {...baseLogCardProps(log, view)}
+      expansionToggle={expansionToggle}
+      expansionContent={expansionContent}
+      expansionExpanded={expansionExpanded}
+    />
+  );
+
+  const renderMinimalLogCard = (log: Log) => <MediaLogCard {...baseLogCardProps(log, activeLogView)} minimal />;
+
+  const renderExpansionParts = (
+    groupKey: string,
+    entries: Log[],
+    view: LogViewMode,
+    expanded: boolean,
+    loading = false
+  ): { toggle: ReactNode; content?: ReactNode } => {
+    const count = entries.length;
+    const compactToggle = view === "list" || view === "grid";
+    const fullLabel =
+      loading && count === 0 ? t("common.loading") : t("mediaLogs.expansionsToggle", { count: String(count) });
+    const toggle = (
+      <button
+        type="button"
+        onClick={() => toggleExpansionGroup(groupKey)}
+        aria-expanded={expanded}
+        aria-label={fullLabel}
+        title={fullLabel}
+        className={cn(
+          "flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] text-[var(--color-light)] transition-colors hover:bg-[var(--color-mid)]/20 hover:text-[var(--color-lightest)]",
+          compactToggle ? "w-auto shrink-0 justify-center" : "w-full justify-start"
+        )}
+      >
+        {loading ? (
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+        ) : (
+          <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        )}
+        {compactToggle ? (
+          <span className="font-semibold">{count}</span>
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-left">{fullLabel}</span>
+        )}
+        <ChevronDown
+          className={cn("h-3.5 w-3.5 shrink-0 transition-transform", expanded && "rotate-180")}
+          aria-hidden
+        />
+      </button>
+    );
+    const content = expanded ? (
+      <div className="grid gap-2 sm:grid-cols-2">
+        {loading && count === 0 ? (
+          <p className="col-span-full text-[11px] text-[var(--color-light)]">{t("common.loading")}</p>
+        ) : null}
+        {entries.map((child) => (
+          <div key={child.id} className="min-w-0">
+            {renderMinimalLogCard(child)}
+          </div>
+        ))}
+      </div>
+    ) : undefined;
+    return { toggle, content };
+  };
 
   const categorySearchBar = (
     <form onSubmit={handleListSearchSubmit} className="relative min-h-11 max-md:min-h-[44px] min-w-0 flex-1">
@@ -1082,7 +1328,7 @@ export function MediaLogs({
     }
   };
 
-  const reviewLog = reviewLogId ? logs.find((log) => log.id === reviewLogId) ?? null : null;
+  const reviewLog = reviewLogId ? resolveLogForReview(reviewLogId) : null;
   const reviewText = reviewLog ? getLogCardDisplay(reviewLog).review ?? null : null;
 
   if (loading && logs.length === 0 && !listRefreshing) {
@@ -1481,50 +1727,48 @@ export function MediaLogs({
         ) : (
           <div className="min-w-0">
             <div
-              className={
+              className={cn(
                 activeLogView === "compact"
                   ? LOG_LIST_CARD_GRID_DENSE
                   : activeLogView === "grid"
                     ? LOG_LIST_CARD_GRID_MULTI
-                    : LOG_LIST_CARD_GRID
-              }
+                    : LOG_LIST_CARD_GRID,
+                activeLogView !== "list" && "items-start"
+              )}
             >
-            {logs.map((log) => (
-              <div
-                key={log.id}
-                className={cn(
-                  "min-h-0 min-w-0 [content-visibility:auto]",
-                  activeLogView === "grid"
-                    ? "[contain-intrinsic-size:auto_280px]"
-                    : "[contain-intrinsic-size:auto_148px]"
-                )}
-              >
-                <div>
-                  <MediaLogCard
-                    log={log}
-                    embedded={embedded}
-                    readOnly={readOnly}
-                    view={activeLogView}
-                    mediaType={mediaType}
-                    showCollectionOwnershipFilters={showCollectionOwnershipFilters}
-                    hasProgressButton={hasProgressButton}
-                    deletingId={deletingId}
-                    incrementingId={incrementingId}
-                    statusChangingId={statusChangingId}
-                    onViewReview={setReviewLogId}
-                    onIncrement={handleIncrement}
-                    onStatusChange={handleStatusChange}
-                    onEdit={(lg, tab) => {
-                      setLogEditTab(tab);
-                      setEditingLog(lg);
-                    }}
-                    onDelete={handleDelete}
-                    t={t}
-                    locale={locale}
-                  />
-                </div>
-              </div>
-            ))}
+            {(mediaType === "boardgames" ? groupedLogs : logs.map((log) => ({ log, children: [] }))).map(
+              ({ log, children }) => {
+                const groupKey = expansionGroupKey(log);
+                const expanded = expandedExpansionGroups.has(groupKey);
+                const info = mediaType === "boardgames" ? expansionInfoByRootId.get(log.id) : undefined;
+                const entries = children.length > 0 ? children : info?.logs ?? [];
+                const loading = info?.loading ?? false;
+                const hasExpansion =
+                  Boolean(log.expansionOfExternalId) || children.length > 0 || entries.length > 0 || loading;
+                const expansion = hasExpansion
+                  ? renderExpansionParts(groupKey, entries, activeLogView, expanded, loading)
+                  : null;
+                return (
+                  <div
+                    key={log.id}
+                    className={cn(
+                      "min-h-0 min-w-0 [content-visibility:auto]",
+                      activeLogView === "grid"
+                        ? "[contain-intrinsic-size:auto_380px]"
+                        : "[contain-intrinsic-size:auto_148px]"
+                    )}
+                  >
+                    {renderLogCard(
+                      log,
+                      activeLogView,
+                      expansion?.toggle,
+                      expansion?.content,
+                      expanded
+                    )}
+                  </div>
+                );
+              }
+            )}
           </div>
           {nextCursor != null && (
             <>

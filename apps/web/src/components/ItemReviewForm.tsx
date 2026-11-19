@@ -105,6 +105,8 @@ interface ItemReviewFormProps {
   genres?: string[] | null;
   /** Board games: mechanic names from item detail. */
   mechanics?: string[] | null;
+  expansionOfExternalId?: string | null;
+  expansionOfTitle?: string | null;
   /** Snapshot from item detail for affinity-based recommendations (board games, books, manga). */
   affinityContextDraft?: LogAffinityContext | null;
   onSaved: () => void;
@@ -122,6 +124,8 @@ export function ItemReviewForm({
   platforms,
   genres,
   mechanics,
+  expansionOfExternalId,
+  expansionOfTitle,
   affinityContextDraft,
   onSaved,
   onSavedComplete,
@@ -446,6 +450,10 @@ export function ItemReviewForm({
     };
     if (genreList.length > 0) createBody.genres = genreList;
     if (mechanicList.length > 0) createBody.mechanics = mechanicList;
+    if (expansionOfExternalId) {
+      createBody.expansionOfExternalId = expansionOfExternalId;
+      createBody.expansionOfTitle = expansionOfTitle ?? null;
+    }
     if (affinityContextDraft != null && Object.keys(affinityContextDraft).length > 0) {
       createBody.affinityContext = affinityContextDraft;
     }
@@ -467,6 +475,8 @@ export function ItemReviewForm({
     myLog?.id,
     genres,
     mechanics,
+    expansionOfExternalId,
+    expansionOfTitle,
     affinityContextDraft,
     mediaType,
     externalId,
@@ -658,6 +668,10 @@ export function ItemReviewForm({
         };
         if (mediaType === "boardgames" && (me?.boardGameProvider === "bgg" || me?.boardGameProvider === "ludopedia"))
           createBody.boardGameSource = me.boardGameProvider;
+        if (mediaType === "boardgames" && expansionOfExternalId) {
+          createBody.expansionOfExternalId = expansionOfExternalId;
+          createBody.expansionOfTitle = expansionOfTitle ?? null;
+        }
         const created = await apiFetch<Log>(
           "/logs",
           { method: "POST", body: JSON.stringify(createBody) }

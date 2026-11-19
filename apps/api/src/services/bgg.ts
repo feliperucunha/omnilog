@@ -130,8 +130,29 @@ type BggThingXmlItem = {
   maxplayers?: { "@_value"?: string };
   playingtime?: { "@_value"?: string };
   minage?: { "@_value"?: string };
-  link?: { "@_type": string; "@_value": string } | Array<{ "@_type": string; "@_value": string }>;
+  link?:
+    | { "@_type": string; "@_value": string; "@_id"?: string; "@_inbound"?: string }
+    | Array<{ "@_type": string; "@_value": string; "@_id"?: string; "@_inbound"?: string }>;
 };
+
+export function bggExtractExpansionBases(
+  links: Array<{ "@_type": string; "@_value": string; "@_id"?: string; "@_inbound"?: string }>
+): Array<{ id: string; title: string }> {
+  const bases = new Map<string, { id: string; title: string }>();
+  for (const link of links) {
+    if (link["@_type"] !== "boardgameexpansion" || link["@_inbound"] !== "true" || !link["@_id"]) continue;
+    const id = link["@_id"].trim();
+    if (!id) continue;
+    const title = decodeHtmlEntities(link["@_value"]?.trim() || "Unknown");
+    const existing = bases.get(id);
+    if (!existing) {
+      bases.set(id, { id, title });
+    } else if (existing.title === "Unknown" && title !== "Unknown") {
+      existing.title = title;
+    }
+  }
+  return [...bases.values()];
+}
 
 function mapBggThingXmlItemToItemDetail(item: BggThingXmlItem): ItemDetail | null {
   if (item == null || typeof item !== "object" || !item["@_id"]) return null;
@@ -171,6 +192,8 @@ function mapBggThingXmlItemToItemDetail(item: BggThingXmlItem): ItemDetail | nul
     .map((l) => l["@_value"])
     .filter(Boolean)
     .map((v) => decodeHtmlEntities(v as string)) as string[];
+  const expansionBases = bggExtractExpansionBases(linkList);
+  const expansionBase = expansionBases[0] ?? null;
   const genres = categories.length > 0 ? categories : null;
   const fullImage = bggExtractImageUrl(item.image);
   const thumbImage = bggExtractImageUrl(item.thumbnail);
@@ -182,6 +205,9 @@ function mapBggThingXmlItemToItemDetail(item: BggThingXmlItem): ItemDetail | nul
     thumbnail: thumbImage,
     year,
     subtitle: null,
+    expansionOfExternalId: expansionBase?.id ?? null,
+    expansionOfTitle: expansionBase?.title ?? null,
+    expansionBases: expansionBases.length > 0 ? expansionBases : null,
     description: description ?? null,
     playersMin: minVal != null && !Number.isNaN(minVal) ? minVal : null,
     playersMax: maxVal != null && !Number.isNaN(maxVal) ? maxVal : null,
