@@ -40,7 +40,7 @@ Monorepo: **React + Vite** (web), **Express + Prisma** (API), **Capacitor** (And
    - **Schema** — Prefer Prisma migrations from the API package, e.g.  
      `pnpm --filter @geeklogs/api exec prisma migrate deploy`  
      For Supabase-only bootstrapping, the repo may include SQL helpers under `apps/api/prisma/` (init, milestones, RLS); see comments in those files and `docs/supabase-security.md` for RLS.
-   - **Optional API keys** (server-wide fallbacks): `TMDB_API_KEY`, `RAWG_API_KEY`, `BGG_API_TOKEN`, `COMIC_VINE_API_KEY`, etc. Users can also add their own keys in **Settings**. Books / anime / manga use public APIs without keys.
+    - **Optional API keys** (server-wide fallbacks): `TMDB_API_KEY`, `RAWG_API_KEY`, `BGG_API_TOKEN`, `COMIC_VINE_API_KEY`, `GEMINI_API_KEY` / `GROQ_API_KEY` (Discover AI, Groq as fallback), etc. Users can also add their own catalog keys in **Settings**. Books / anime / manga use public APIs without keys.
 
 ## Run (development)
 

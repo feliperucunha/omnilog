@@ -371,6 +371,16 @@ async function buildRecommendationsPayload(ctx: RecommendationCtx): Promise<Reco
   }
 }
 
+export async function getRecommendationsForUser(
+  userId: string,
+  type: MediaType,
+  boardGameProvider?: BoardGameProvider
+): Promise<RecommendationsPayload> {
+  const keys = await getUserKeys(userId);
+  const skipApiKeyUX = await isDisableApiKeyRequirementsEnabled();
+  return buildRecommendationsPayload({ type, user: { userId }, keys, skipApiKeyUX, boardGameProvider });
+}
+
 /** Rails available from each provider for the empty-search browse carousels. */
 async function buildBrowseRails(ctx: RecommendationCtx): Promise<{ rails: BrowseRail[]; requiresApiKey?: string; link?: string; tutorial?: string }> {
   const { type, user, keys, skipApiKeyUX, boardGameProvider } = ctx;
@@ -1050,7 +1060,7 @@ searchRouter.get("/users", async (req: AuthenticatedRequest, res) => {
   });
 });
 
-const GUEST_BROWSE_PREWARM_TYPES: MediaType[] = ["movies", "tv", "games", "anime"];
+const GUEST_BROWSE_PREWARM_TYPES: MediaType[] = ["movies", "tv", "games"];
 
 /** Fill SearchResponseCache for anonymous browse rails so the first visitor is not the cache filler. */
 export async function prewarmGuestSearchRails(): Promise<void> {

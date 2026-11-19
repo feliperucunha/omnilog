@@ -103,6 +103,7 @@ model User {
   /// Saved custom opponent names for board-game match logging (autocomplete).
   boardGameCustomOpponents UserBoardGameCustomOpponent[]
   marketListings           MarketListing[]
+  discoverTasteSnapshot    DiscoverTasteSnapshot?
 }
 
 /// Per-user saved display names for board-game match players (non–app-user opponents).
@@ -118,6 +119,15 @@ model UserBoardGameCustomOpponent {
 
   @@unique([userId, labelKey])
   @@index([userId, lastUsedAt])
+}
+
+model DiscoverTasteSnapshot {
+  userId      String   @id
+  categories  Json
+  refreshedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Badge {

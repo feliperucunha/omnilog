@@ -1,4 +1,16 @@
 export type { LogAffinityContext } from "./affinityContext.js";
+export {
+  DISCOVER_MIN_LOGS,
+  DISCOVER_TASTE_REFRESH_MS,
+  DISCOVER_TASTE_MAX_LOGS_PER_CATEGORY,
+  DISCOVER_TASTE_PROMPT_LOGS_PER_CATEGORY,
+  DISCOVER_PLANNED_STATUS,
+  type DiscoverPlannedTasteItem,
+  type DiscoverBeyondTasteItem,
+  type DiscoverTasteChartItem,
+  type DiscoverCategoryTaste,
+  type DiscoverTasteSnapshot,
+} from "./discoverTaste.js";
 export type { ScopedReview } from "./scopedReview.js";
 export {
   reviewScopeFromParts,

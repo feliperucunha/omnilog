@@ -1,105 +1,51 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { MEDIA_TYPES, type Log, type MediaType, type SearchResult } from "@geeklogs/shared";
+import {
+  DISCOVER_MIN_LOGS,
+  DISCOVER_TASTE_REFRESH_MS,
+  MEDIA_TYPES,
+  type DiscoverTasteSnapshot,
+  type MediaType,
+} from "@geeklogs/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
-import { useMe } from "@/contexts/MeContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { toast } from "sonner";
-import { apiFetch } from "@/lib/api";
-import { decodeLogForDisplay, decodeSearchResultForDisplay } from "@/lib/decodeDisplayFields";
+import { ApiError, apiFetch } from "@/lib/api";
 import { itemDetailPath } from "@/lib/itemRoutes";
 import { getStatusLabel } from "@/lib/statusLabel";
 import { cn } from "@/lib/utils";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const MIN_LOGS = 10;
-const PAGE_SIZE = 100;
-const MAX_PAGES = 4;
+function isFresh(snapshot: DiscoverTasteSnapshot | null): boolean {
+  if (!snapshot?.refreshedAt) return false;
+  const at = Date.parse(snapshot.refreshedAt);
+  return Number.isFinite(at) && Date.now() - at < DISCOVER_TASTE_REFRESH_MS;
+}
 
-const PLANNED: Record<MediaType, string> = {
-  movies: "plan to watch",
-  tv: "plan to watch",
-  anime: "plan to watch",
-  boardgames: "plan to play",
-  games: "plan to play",
-  books: "plan to read",
-  manga: "plan to read",
-  comics: "plan to read",
+const NEXT_TITLE_KEYS: Record<MediaType, string> = {
+  movies: "discover.nextWatch",
+  tv: "discover.nextWatch",
+  anime: "discover.nextWatch",
+  manga: "discover.nextRead",
+  books: "discover.nextRead",
+  comics: "discover.nextRead",
+  games: "discover.nextPlay",
+  boardgames: "discover.nextPlay",
 };
-
-type PlannedItem = { id: string; externalId: string; title: string; status: string };
-type BeyondItem = { id: string; title: string; note: string };
-type CategorySnapshot = {
-  mean: string;
-  lines: string[];
-  planned: PlannedItem[];
-  beyond: BeyondItem[];
-};
-type DiscoverSnapshot = {
-  refreshedAt: string;
-  categories: Partial<Record<MediaType, CategorySnapshot>>;
-};
-
-function storageKey(userId: string) {
-  return `geeklogs.discover.v1:${userId}`;
-}
-
-function readSnapshot(userId: string): DiscoverSnapshot | null {
-  try {
-    const raw = localStorage.getItem(storageKey(userId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as DiscoverSnapshot;
-    if (!parsed?.refreshedAt || !parsed.categories) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeSnapshot(userId: string, snapshot: DiscoverSnapshot) {
-  localStorage.setItem(storageKey(userId), JSON.stringify(snapshot));
-}
-
-function isFresh(snapshot: DiscoverSnapshot | null): boolean {
-  if (!snapshot) return false;
-  const at = new Date(snapshot.refreshedAt).getTime();
-  return Number.isFinite(at) && Date.now() - at < DAY_MS;
-}
-
-async function fetchCategoryLogs(mediaType: MediaType): Promise<Log[]> {
-  const logs: Log[] = [];
-  let cursor: string | null = null;
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const params = new URLSearchParams({
-      mediaType,
-      sort: "dateDesc",
-      limit: String(PAGE_SIZE),
-    });
-    if (cursor) params.set("cursor", cursor);
-    const res = await apiFetch<{ data: Log[]; nextCursor: string | null }>(`/logs?${params.toString()}`);
-    logs.push(...(res.data ?? []).map(decodeLogForDisplay));
-    cursor = res.nextCursor;
-    if (!cursor) break;
-  }
-  return logs;
-}
 
 export function Discover() {
   const { t, locale } = useLocale();
   const { token } = useAuth();
-  const { me } = useMe();
   const { visibleTypes } = useVisibleMediaTypes();
   const { setPageTitle } = usePageTitle() ?? {};
-  const userId = me?.user?.id ?? null;
   const categories = visibleTypes.length > 0 ? visibleTypes : [...MEDIA_TYPES];
 
   const [counts, setCounts] = useState<Partial<Record<MediaType, number>>>({});
   const [selected, setSelected] = useState<MediaType>(categories[0] ?? "movies");
-  const [snapshot, setSnapshot] = useState<DiscoverSnapshot | null>(null);
+  const [snapshot, setSnapshot] = useState<DiscoverTasteSnapshot | null>(null);
   const [reading, setReading] = useState(false);
   const [attempted, setAttempted] = useState(false);
 
@@ -113,87 +59,20 @@ export function Discover() {
   }, [categories, selected]);
 
   useEffect(() => {
-    if (!userId) return;
-    setSnapshot(readSnapshot(userId));
-  }, [userId]);
-
-  const refresh = useCallback(async () => {
-    if (!token || !userId || reading) return;
-    setReading(true);
-    try {
-      const countRes = await apiFetch<{ data: Record<MediaType, number> }>("/logs/counts");
-      const nextCounts = countRes.data ?? {};
-      setCounts(nextCounts);
-      const categoriesOut: DiscoverSnapshot["categories"] = {};
-      const provider = me?.boardGameProvider ?? "bgg";
-      for (const mediaType of categories) {
-        if ((nextCounts[mediaType] ?? 0) < MIN_LOGS) continue;
-        const logs = await fetchCategoryLogs(mediaType);
-        const grades = logs.map((log) => log.grade).filter((grade): grade is number => grade != null);
-        const mean =
-          grades.length > 0
-            ? (grades.reduce((sum, grade) => sum + grade, 0) / grades.length).toFixed(1)
-            : "—";
-        const genreCounts = new Map<string, number>();
-        const statusCounts = new Map<string, number>();
-        for (const log of logs) {
-          for (const genre of log.genres ?? []) {
-            genreCounts.set(genre, (genreCounts.get(genre) ?? 0) + 1);
-          }
-          const status = log.status ?? "";
-          if (status) statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
-        }
-        const topGenres = [...genreCounts.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3)
-          .map(([name]) => name);
-        const lines = [
-          t("discover.logsCount", { count: String(logs.length) }),
-          ...[...statusCounts.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 4)
-            .map(([status, count]) =>
-              t("discover.statusMix", {
-                status: getStatusLabel(t, status, mediaType),
-                count: String(count),
-              })
-            ),
-        ];
-        if (topGenres.length > 0) lines.push(t("discover.topGenres", { genres: topGenres.join(", ") }));
-        const planned = logs
-          .filter((log) => log.status === PLANNED[mediaType])
-          .slice(0, 8)
-          .map((log) => ({
-            id: log.id,
-            externalId: log.externalId,
-            title: log.title,
-            status: getStatusLabel(t, log.status ?? PLANNED[mediaType], mediaType),
-          }));
-        const params = new URLSearchParams({ type: mediaType, viewer: "auth" });
-        if (mediaType === "boardgames") params.set("boardGameProvider", provider);
-        const rec = await apiFetch<{ results?: SearchResult[] }>(`/search/recommendations?${params.toString()}`);
-        const known = new Set(logs.map((log) => log.title.trim().toLowerCase()));
-        const beyond = (rec.results ?? [])
-          .map(decodeSearchResultForDisplay)
-          .filter((item) => !known.has(item.title.trim().toLowerCase()))
-          .slice(0, 8)
-          .map((item) => ({
-            id: item.id,
-            title: item.title,
-            note: item.subtitle || (item.genres ?? []).slice(0, 2).join(" · ") || item.year || "",
-          }));
-        categoriesOut[mediaType] = { mean, lines, planned, beyond };
-      }
-      const next: DiscoverSnapshot = { refreshedAt: new Date().toISOString(), categories: categoriesOut };
-      writeSnapshot(userId, next);
-      setSnapshot(next);
-    } catch {
-      toast.error(t("common.tryAgain"));
-    } finally {
-      setReading(false);
-      setAttempted(true);
-    }
-  }, [categories, me?.boardGameProvider, reading, t, token, userId]);
+    if (!token) return;
+    let cancelled = false;
+    void apiFetch<DiscoverTasteSnapshot>("/discover/taste")
+      .then((res) => {
+        if (!cancelled) setSnapshot(res);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setAttempted(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   useEffect(() => {
     if (!token) return;
@@ -202,17 +81,40 @@ export function Discover() {
       .catch(() => setCounts({}));
   }, [token]);
 
+  const refresh = useCallback(async () => {
+    if (!token || reading) return;
+    setReading(true);
+    try {
+      const countRes = await apiFetch<{ data: Record<MediaType, number> }>("/logs/counts");
+      const nextCounts = countRes.data ?? {};
+      setCounts(nextCounts);
+      const next = await apiFetch<DiscoverTasteSnapshot>("/discover/taste", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ locale, mediaTypes: categories }),
+        timeout: 120_000,
+        maxAttempts: 1,
+      });
+      setSnapshot(next);
+    } catch (error) {
+      toast.error(error instanceof ApiError && error.statusCode === 503 ? t("discover.aiUnavailable") : t("common.tryAgain"));
+    } finally {
+      setReading(false);
+      setAttempted(true);
+    }
+  }, [categories, locale, reading, t, token]);
+
   useEffect(() => {
-    if (!userId || reading || attempted) return;
-    if (isFresh(snapshot) || isFresh(readSnapshot(userId))) return;
+    if (!token || !attempted || reading || isFresh(snapshot)) return;
+    if (!categories.some((type) => (counts[type] ?? 0) >= DISCOVER_MIN_LOGS)) return;
     void refresh();
-  }, [attempted, reading, refresh, snapshot, userId]);
+  }, [attempted, categories, counts, reading, refresh, snapshot, token]);
 
   const locked = isFresh(snapshot);
   const count = counts[selected] ?? 0;
-  const ready = count >= MIN_LOGS;
+  const ready = count >= DISCOVER_MIN_LOGS;
   const saved = snapshot?.categories[selected];
-  const when = snapshot
+  const when = snapshot?.refreshedAt
     ? new Date(snapshot.refreshedAt).toLocaleString(locale, {
         month: "short",
         day: "numeric",
@@ -224,10 +126,34 @@ export function Discover() {
   const shortNames = useMemo(
     () =>
       categories
-        .filter((type) => (counts[type] ?? 0) < MIN_LOGS)
+        .filter((type) => (counts[type] ?? 0) < DISCOVER_MIN_LOGS)
         .map((type) => t(`nav.${type}`)),
     [categories, counts, t]
   );
+
+  const nextItems = useMemo(() => {
+    if (!saved) return [];
+    return [
+      ...saved.planned.map((item) => ({
+        key: `planned-${item.id}`,
+        externalId: item.externalId,
+        title: item.title,
+        note: getStatusLabel(t, item.status, selected),
+        badge: t("discover.onYourList"),
+        onList: true,
+      })),
+      ...saved.beyond.map((item) => ({
+        key: `beyond-${item.id}`,
+        externalId: item.id,
+        title: item.title,
+        note: item.note,
+        badge: t("discover.newToYou"),
+        onList: false,
+      })),
+    ];
+  }, [saved, selected, t]);
+
+  const maxChartCount = Math.max(1, ...(saved?.charts ?? []).map((chart) => chart.count));
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -239,7 +165,7 @@ export function Discover() {
       </div>
       <Card className="flex flex-col gap-2 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4">
         <p className="text-[var(--color-lightest)]">
-          {reading ? t("discover.reading") : snapshot ? t("discover.saved", { when }) : t("discover.reading")}
+          {reading ? t("discover.reading") : snapshot?.refreshedAt ? t("discover.saved", { when }) : t("discover.reading")}
         </p>
         <p className="text-sm text-[var(--color-light)]">
           {t("discover.note")}
@@ -265,62 +191,71 @@ export function Discover() {
         ))}
       </div>
       {ready && saved ? (
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-          <Card className="flex flex-col gap-2 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <Card className="flex min-w-0 flex-col gap-2 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4">
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-light)]">
               {t("discover.yourTaste")} · {t(`nav.${selected}`)}
             </span>
-            <p className="display-title text-3xl text-[var(--color-lightest)]">
-              {t("discover.meanGrade", { grade: saved.mean })}
-            </p>
             {saved.lines.map((line) => (
               <p key={line} className="text-[var(--color-lightest)]">
                 {line}
               </p>
             ))}
-          </Card>
-          <div className="flex min-w-0 flex-col gap-4">
-            <section className="flex flex-col gap-2">
-              <h2 className="text-lg font-semibold text-[var(--color-lightest)]">{t("discover.fromYourList")}</h2>
-              {saved.planned.length === 0 ? (
-                <p className="text-sm text-[var(--color-light)]">{t("discover.nothingPlanned")}</p>
+            <div className="mt-2 flex min-w-0 flex-col gap-3 border-t border-[var(--color-surface-border)] pt-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-light)]">
+                {t("discover.withinCategory", { category: t(`nav.${selected}`) })}
+              </span>
+              {saved.charts.length === 0 ? (
+                <p className="text-sm text-[var(--color-light)]">{t("discover.noCharts")}</p>
               ) : (
-                saved.planned.map((item) => (
+                saved.charts.map((chart) => (
+                  <div key={chart.label} className="flex min-w-0 flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate text-[var(--color-lightest)]">{chart.label}</span>
+                      <span className="shrink-0 text-xs text-[var(--color-light)]">{chart.count}</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-[var(--color-surface-border)]">
+                      <div
+                        className="h-full rounded-full bg-[var(--color-lightest)]"
+                        style={{ width: `${(chart.count / maxChartCount) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+          <Card className="flex min-w-0 flex-col gap-3 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4">
+            <h2 className="text-lg font-semibold text-[var(--color-lightest)]">{t(NEXT_TITLE_KEYS[selected])}</h2>
+            {nextItems.length === 0 ? (
+              <p className="text-sm text-[var(--color-light)]">{t("discover.emptyNext")}</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {nextItems.map((item) => (
                   <Link
-                    key={item.id}
+                    key={item.key}
                     to={itemDetailPath(selected, item.externalId)}
                     className="rounded-[14px] border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-3 text-[var(--color-lightest)] no-underline"
                   >
                     <span className="flex items-start justify-between gap-2">
                       <span className="font-semibold">{item.title}</span>
-                      <span className="shrink-0 rounded-full border border-[var(--color-surface-border)] px-2 py-0.5 text-[11px] text-[var(--color-light)]">
-                        {t("discover.onYourList")}
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full border px-2 py-0.5 text-[11px]",
+                          item.onList
+                            ? "border-[var(--color-lightest)] text-[var(--color-lightest)]"
+                            : "border-[var(--color-surface-border)] text-[var(--color-light)]"
+                        )}
+                      >
+                        {item.badge}
                       </span>
                     </span>
-                    <span className="mt-1 block text-sm text-[var(--color-light)]">{item.status}</span>
+                    {item.note ? <span className="mt-1 block text-sm text-[var(--color-light)]">{item.note}</span> : null}
                   </Link>
-                ))
-              )}
-            </section>
-            <section className="flex flex-col gap-2">
-              <h2 className="text-lg font-semibold text-[var(--color-lightest)]">{t("discover.outsideList")}</h2>
-              {saved.beyond.map((item) => (
-                <Link
-                  key={item.id}
-                  to={itemDetailPath(selected, item.id)}
-                  className="rounded-[14px] border border-[var(--color-surface-border)] bg-[var(--color-dark)] p-3 text-[var(--color-lightest)] no-underline"
-                >
-                  <span className="flex items-start justify-between gap-2">
-                    <span className="font-semibold">{item.title}</span>
-                    <span className="shrink-0 rounded-full border border-[var(--color-surface-border)] px-2 py-0.5 text-[11px] text-[var(--color-light)]">
-                      {t("discover.newToYou")}
-                    </span>
-                  </span>
-                  {item.note ? <span className="mt-1 block text-sm text-[var(--color-light)]">{item.note}</span> : null}
-                </Link>
-              ))}
-            </section>
-          </div>
+                ))}
+              </div>
+            )}
+          </Card>
         </div>
       ) : ready && reading ? (
         <Card className="border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4">
