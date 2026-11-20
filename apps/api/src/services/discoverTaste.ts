@@ -1,8 +1,7 @@
 import {
   DISCOVER_MIN_LOGS,
   DISCOVER_PLANNED_STATUS,
-  DISCOVER_TASTE_MAX_LOGS_PER_CATEGORY,
-  DISCOVER_TASTE_PROMPT_LOGS_PER_CATEGORY,
+  DISCOVER_TASTE_VERSION,
   MEDIA_TYPES,
   decodeHtmlEntities,
   type BoardGameProvider,
@@ -13,6 +12,7 @@ import {
   type SearchResult,
 } from "@geeklogs/shared";
 import { prisma } from "../lib/prisma.js";
+import { weightedBoardGameProfile } from "../lib/boardGameAffinity.js";
 import { parseLogAffinityContextJson } from "../lib/logAffinityContext.js";
 import { parseGenresJson, parseMechanicsJson } from "../lib/serializeLog.js";
 import { getRecommendationsForUser } from "../routes/search.js";
@@ -65,7 +65,6 @@ async function loadLogs(userId: string, mediaType: MediaType) {
   return prisma.log.findMany({
     where: { userId, mediaType },
     orderBy: [{ updatedAt: "desc" }],
-    take: DISCOVER_TASTE_MAX_LOGS_PER_CATEGORY,
     select: {
       id: true,
       externalId: true,
@@ -96,27 +95,67 @@ async function loadLogs(userId: string, mediaType: MediaType) {
 
 type TasteLog = Awaited<ReturnType<typeof loadLogs>>[number];
 
-function summarizeLogs(logs: TasteLog[]): Record<string, unknown> {
+function summarizeLogs(logs: TasteLog[], mediaType: MediaType): Record<string, unknown> {
   const grades = logs.map((log) => log.grade).filter((grade): grade is number => grade != null);
   const statusCounts = new Map<string, number>();
   const genreCounts = new Map<string, number>();
   const mechanicCounts = new Map<string, number>();
+  const tagStats = new Map<string, { name: string; count: number; score: number; rated: number }>();
+
+  const addTag = (raw: string, grade: number | null) => {
+    const name = decodeHtmlEntities(raw).trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    const stat = tagStats.get(key) ?? { name, count: 0, score: 0, rated: 0 };
+    stat.count += 1;
+    stat.rated += grade != null ? 1 : 0;
+    stat.score += grade != null ? (grade - 5) / 5 : 0.08;
+    tagStats.set(key, stat);
+  };
 
   for (const log of logs) {
     if (log.status) statusCounts.set(log.status, (statusCounts.get(log.status) ?? 0) + 1);
-    for (const genre of parseGenresJson(log.genres ?? null) ?? parseStringArray(log.genres ?? null)) {
+    const genres = parseGenresJson(log.genres ?? null) ?? parseStringArray(log.genres ?? null);
+    const mechanics = parseMechanicsJson(log.mechanics ?? null) ?? parseStringArray(log.mechanics ?? null);
+    const affinity = parseLogAffinityContextJson(log.affinityContext ?? null);
+
+    for (const genre of genres) {
       genreCounts.set(genre, (genreCounts.get(genre) ?? 0) + 1);
+      addTag(genre, log.grade);
     }
-    for (const mechanic of parseMechanicsJson(log.mechanics ?? null) ?? parseStringArray(log.mechanics ?? null)) {
+    for (const mechanic of mechanics) {
       mechanicCounts.set(mechanic, (mechanicCounts.get(mechanic) ?? 0) + 1);
+      addTag(mechanic, log.grade);
+    }
+    if (mediaType === "books") {
+      for (const subject of affinity?.books?.subjects ?? []) addTag(subject, log.grade);
+    }
+    if (mediaType === "manga") {
+      for (const value of [
+        ...(affinity?.manga?.genres ?? []),
+        ...(affinity?.manga?.themes ?? []),
+        ...(affinity?.manga?.demographics ?? []),
+      ]) {
+        addTag(value, log.grade);
+      }
     }
   }
 
   const top = (counts: Map<string, number>) =>
     [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
+      .slice(0, 10)
       .map(([name, count]) => ({ name, count }));
+
+  const rankedTags = [...tagStats.values()].sort(
+    (a, b) => b.score - a.score || b.rated - a.rated || b.count - a.count
+  );
+  const tagSummary = (items: typeof rankedTags) =>
+    items.map((item) => ({
+      name: item.name,
+      count: item.count,
+      score: Math.round(item.score * 100) / 100,
+    }));
 
   return {
     count: logs.length,
@@ -125,22 +164,58 @@ function summarizeLogs(logs: TasteLog[]): Record<string, unknown> {
     statusCounts: Object.fromEntries(statusCounts),
     topGenres: top(genreCounts),
     topMechanics: top(mechanicCounts),
+    strongestTags: tagSummary(rankedTags.filter((item) => item.score > 0).slice(0, 10)),
+    weakestTags: tagSummary(
+      [...rankedTags].reverse().filter((item) => item.score < 0).slice(0, 8)
+    ),
+    boardGameProfile: mediaType === "boardgames" ? weightedBoardGameProfile(logs) : undefined,
   };
+}
+
+function playerBucket(min: number | null | undefined, max: number | null | undefined): string | null {
+  const players = max ?? min;
+  if (players == null || players <= 0) return null;
+  if (players <= 2) return "1-2 players";
+  if (players <= 4) return "3-4 players";
+  return "5+ players";
+}
+
+function timeBucket(minutes: number | null | undefined): string | null {
+  if (minutes == null || minutes <= 0) return null;
+  if (minutes <= 30) return "Under 30 min";
+  if (minutes <= 60) return "30-60 min";
+  if (minutes <= 120) return "1-2 hours";
+  return "2+ hours";
+}
+
+function weightBucket(weight: number | null | undefined): string | null {
+  if (weight == null || weight <= 0) return null;
+  if (weight < 2) return "Light";
+  if (weight < 3) return "Medium-light";
+  if (weight < 4) return "Medium-heavy";
+  return "Heavy";
 }
 
 function buildCharts(logs: TasteLog[], mediaType: MediaType): DiscoverTasteChartItem[] {
   const counts = new Map<string, number>();
+  const add = (label: string | null) => {
+    if (!label) return;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  };
 
   for (const log of logs) {
     const affinity = parseLogAffinityContextJson(log.affinityContext ?? null);
-    let values: string[] = [];
 
     if (mediaType === "boardgames") {
-      values = [
-        ...(parseMechanicsJson(log.mechanics ?? null) ?? parseStringArray(log.mechanics ?? null)),
-        ...(parseGenresJson(log.genres ?? null) ?? parseStringArray(log.genres ?? null)),
-      ];
-    } else if (mediaType === "books") {
+      const boardgames = affinity?.boardgames;
+      add(playerBucket(boardgames?.playersMin, boardgames?.playersMax));
+      add(timeBucket(boardgames?.playingTimeMinutes));
+      add(weightBucket(boardgames?.averageWeight ?? log.averageWeight));
+      continue;
+    }
+
+    let values: string[] = [];
+    if (mediaType === "books") {
       values = [
         ...(parseGenresJson(log.genres ?? null) ?? parseStringArray(log.genres ?? null)),
         ...(affinity?.books?.subjects ?? []),
@@ -156,29 +231,25 @@ function buildCharts(logs: TasteLog[], mediaType: MediaType): DiscoverTasteChart
       values = parseGenresJson(log.genres ?? null) ?? parseStringArray(log.genres ?? null);
     }
 
-    for (const value of values) {
-      const label = decodeHtmlEntities(value).trim();
-      if (!label) continue;
-      counts.set(label, (counts.get(label) ?? 0) + 1);
-    }
+    for (const value of values) add(decodeHtmlEntities(value).trim());
   }
 
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 6)
+    .slice(0, 8)
     .map(([label, count]) => ({ label, count }));
 }
 
 function toPromptLog(log: TasteLog): Record<string, unknown> {
   const affinityContext = parseLogAffinityContextJson(log.affinityContext ?? null);
   return {
-    title: truncate(log.title, 200),
+    title: truncate(log.title, 120),
     grade: log.grade,
     status: log.status,
-    review: truncate(log.review, 180) || undefined,
-    genres: (parseGenresJson(log.genres ?? null) ?? parseStringArray(log.genres ?? null)).slice(0, 5),
-    mechanics: (parseMechanicsJson(log.mechanics ?? null) ?? parseStringArray(log.mechanics ?? null)).slice(0, 5),
-    affinityContext: affinityContext ? truncate(JSON.stringify(affinityContext), 300) : undefined,
+    review: truncate(log.review, 120) || undefined,
+    genres: (parseGenresJson(log.genres ?? null) ?? parseStringArray(log.genres ?? null)).slice(0, 4),
+    mechanics: (parseMechanicsJson(log.mechanics ?? null) ?? parseStringArray(log.mechanics ?? null)).slice(0, 4),
+    affinityContext: affinityContext ? truncate(JSON.stringify(affinityContext), 160) : undefined,
     own: log.own,
     wantToBuy: log.wantToBuy,
     sold: log.sold,
@@ -209,7 +280,7 @@ async function loadCandidates(
 
   return results
     .filter((item) => !knownIds.has(item.id) && !knownTitles.has(normalizeTitle(item.title)))
-    .slice(0, 12)
+    .slice(0, 16)
     .map((item) => ({
       id: item.id,
       title: truncate(item.title, 300),
@@ -240,9 +311,9 @@ async function buildCategoryInput(
     mediaType,
     promptCategory: {
       mediaType,
-      summary: summarizeLogs(logs),
+      summary: summarizeLogs(logs, mediaType),
       candidates,
-      logs: logs.slice(0, DISCOVER_TASTE_PROMPT_LOGS_PER_CATEGORY).map(toPromptLog),
+      logs: logs.map(toPromptLog),
     },
     charts: buildCharts(logs, mediaType),
     planned: logs
@@ -275,7 +346,7 @@ export async function generateDiscoverTasteSnapshot(
   );
 
   if (eligibleMediaTypes.length === 0) {
-    return { refreshedAt: new Date().toISOString(), categories: {} };
+    return { version: DISCOVER_TASTE_VERSION, refreshedAt: new Date().toISOString(), categories: {} };
   }
 
   const inputs = await Promise.all(
@@ -308,5 +379,5 @@ export async function generateDiscoverTasteSnapshot(
     };
   }
 
-  return { refreshedAt: new Date().toISOString(), categories };
+  return { version: DISCOVER_TASTE_VERSION, refreshedAt: new Date().toISOString(), categories };
 }

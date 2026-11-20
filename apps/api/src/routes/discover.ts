@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import {
   DISCOVER_TASTE_REFRESH_MS,
+  DISCOVER_TASTE_VERSION,
   MEDIA_TYPES,
   type BoardGameProvider,
   type DiscoverTasteSnapshot,
@@ -14,7 +15,11 @@ import { authMiddleware, type AuthenticatedRequest } from "../middleware/auth.js
 import { generateDiscoverTasteSnapshot } from "../services/discoverTaste.js";
 import { AiGenerationError, AiUnavailableError, isAiConfigured } from "../services/ai.js";
 
-const EMPTY_SNAPSHOT: DiscoverTasteSnapshot = { refreshedAt: null, categories: {} };
+const EMPTY_SNAPSHOT: DiscoverTasteSnapshot = {
+  version: DISCOVER_TASTE_VERSION,
+  refreshedAt: null,
+  categories: {},
+};
 
 const tasteBodySchema = z
   .object({
@@ -32,10 +37,15 @@ function isFresh(snapshot: DiscoverTasteSnapshot): boolean {
 async function readSnapshot(userId: string): Promise<DiscoverTasteSnapshot> {
   const row = await prisma.discoverTasteSnapshot.findUnique({ where: { userId } });
   if (!row) return EMPTY_SNAPSHOT;
+  const stored: unknown = row.categories;
+  if (!stored || typeof stored !== "object") return EMPTY_SNAPSHOT;
+  const wrapped = stored as { version?: unknown; categories?: unknown };
+  if (typeof wrapped.version !== "number" || !wrapped.categories) return EMPTY_SNAPSHOT;
   return (
     parseStoredDiscoverTasteSnapshot({
+      version: wrapped.version,
       refreshedAt: row.refreshedAt.toISOString(),
-      categories: row.categories,
+      categories: wrapped.categories,
     }) ?? EMPTY_SNAPSHOT
   );
 }
@@ -83,11 +93,11 @@ discoverRouter.post("/taste", async (req: AuthenticatedRequest, res: Response): 
       where: { userId: req.user.userId },
       create: {
         userId: req.user.userId,
-        categories: snapshot.categories as Prisma.InputJsonValue,
+        categories: { version: snapshot.version, categories: snapshot.categories } as unknown as Prisma.InputJsonValue,
         refreshedAt,
       },
       update: {
-        categories: snapshot.categories as Prisma.InputJsonValue,
+        categories: { version: snapshot.version, categories: snapshot.categories } as unknown as Prisma.InputJsonValue,
         refreshedAt,
       },
     });

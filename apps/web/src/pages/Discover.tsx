@@ -36,6 +36,17 @@ const NEXT_TITLE_KEYS: Record<MediaType, string> = {
   boardgames: "discover.nextPlay",
 };
 
+const CHART_COLORS = [
+  "#f97316",
+  "#38bdf8",
+  "#a78bfa",
+  "#34d399",
+  "#f472b6",
+  "#facc15",
+  "#60a5fa",
+  "#fb7185",
+];
+
 export function Discover() {
   const { t, locale } = useLocale();
   const { token } = useAuth();
@@ -123,14 +134,6 @@ export function Discover() {
       })
     : "";
 
-  const shortNames = useMemo(
-    () =>
-      categories
-        .filter((type) => (counts[type] ?? 0) < DISCOVER_MIN_LOGS)
-        .map((type) => t(`nav.${type}`)),
-    [categories, counts, t]
-  );
-
   const nextItems = useMemo(() => {
     if (!saved) return [];
     return [
@@ -157,21 +160,17 @@ export function Discover() {
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="max-w-2xl text-[var(--color-light)]">{t("discover.lede")}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col">
+          <h1 className="text-xl font-semibold text-[var(--color-lightest)]">{t("nav.discover")}</h1>
+          {!reading && snapshot?.refreshedAt ? (
+            <span className="text-xs text-[var(--color-light)]">{t("discover.savedShort", { when })}</span>
+          ) : null}
+        </div>
         <Button type="button" disabled={locked || reading} onClick={() => void refresh()}>
           {reading ? t("discover.refreshing") : locked ? t("discover.availableTomorrow") : t("discover.refresh")}
         </Button>
       </div>
-      <Card className="flex flex-col gap-2 border-[var(--color-surface-border)] bg-[var(--color-dark)] p-4">
-        <p className="text-[var(--color-lightest)]">
-          {reading ? t("discover.reading") : snapshot?.refreshedAt ? t("discover.saved", { when }) : t("discover.reading")}
-        </p>
-        <p className="text-sm text-[var(--color-light)]">
-          {t("discover.note")}
-          {shortNames.length > 0 ? ` ${shortNames.join(", ")}.` : ""}
-        </p>
-      </Card>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {categories.map((type) => (
           <button
@@ -208,16 +207,25 @@ export function Discover() {
               {saved.charts.length === 0 ? (
                 <p className="text-sm text-[var(--color-light)]">{t("discover.noCharts")}</p>
               ) : (
-                saved.charts.map((chart) => (
+                saved.charts.map((chart, index) => (
                   <div key={chart.label} className="flex min-w-0 flex-col gap-1">
                     <div className="flex items-center justify-between gap-2 text-sm">
-                      <span className="truncate text-[var(--color-lightest)]">{chart.label}</span>
+                      <span className="flex min-w-0 items-center gap-2 text-[var(--color-lightest)]">
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                        />
+                        <span className="truncate">{chart.label}</span>
+                      </span>
                       <span className="shrink-0 text-xs text-[var(--color-light)]">{chart.count}</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-[var(--color-surface-border)]">
                       <div
-                        className="h-full rounded-full bg-[var(--color-lightest)]"
-                        style={{ width: `${(chart.count / maxChartCount) * 100}%` }}
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${(chart.count / maxChartCount) * 100}%`,
+                          backgroundColor: CHART_COLORS[index % CHART_COLORS.length],
+                        }}
                       />
                     </div>
                   </div>

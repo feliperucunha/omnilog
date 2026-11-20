@@ -1,8 +1,9 @@
 import { z } from "zod";
-import type {
-  DiscoverCategoryTaste,
-  DiscoverTasteSnapshot,
-  MediaType,
+import {
+  DISCOVER_TASTE_VERSION,
+  type DiscoverCategoryTaste,
+  type DiscoverTasteSnapshot,
+  type MediaType,
 } from "@geeklogs/shared";
 
 const aiTasteCategorySchema = z.object({
@@ -46,18 +47,19 @@ const categoryTasteSchema = z.object({
 });
 
 const storedSnapshotSchema = z.object({
+  version: z.number().int(),
   refreshedAt: z.union([z.string(), z.null()]),
   categories: z.record(z.string(), categoryTasteSchema),
 });
 
 export function parseStoredDiscoverTasteSnapshot(value: unknown): DiscoverTasteSnapshot | null {
   const parsed = storedSnapshotSchema.safeParse(value);
-  if (!parsed.success) return null;
+  if (!parsed.success || parsed.data.version !== DISCOVER_TASTE_VERSION) return null;
   const categories: DiscoverTasteSnapshot["categories"] = {};
   for (const [key, category] of Object.entries(parsed.data.categories)) {
     categories[key as MediaType] = category as DiscoverCategoryTaste;
   }
-  return { refreshedAt: parsed.data.refreshedAt, categories };
+  return { version: parsed.data.version, refreshedAt: parsed.data.refreshedAt, categories };
 }
 
 export interface DiscoverTasteCandidate {
@@ -102,12 +104,14 @@ export function buildDiscoverTastePrompt(input: {
     "Return only a JSON object. No markdown, no prose outside JSON.",
     "Use one key per media type supplied, exactly as given.",
     "Each value must be an object with: lines (2-4 short specific insights in the user's language, no markdown), beyond (up to 8 items).",
-    "For beyond, choose only titles from that media type's candidates. Copy id and title exactly from the candidate. Write a one-sentence note explaining why it fits the user's logged taste.",
+    "For beyond, choose only titles from that media type's candidates. Copy id and title exactly from the candidate. Write a one-sentence note naming the concrete pattern in the logs that makes it a strong match.",
     "Never invent a title, id, genre, or fact. If candidates are empty, return an empty beyond array.",
-    "Base insights on each category's summary and recent log sample: grades, statuses, genres, mechanics, reviews, and other fields. The summary covers the full library; the sample is recent examples. Be specific and varied; do not repeat raw database labels when a natural sentence works.",
+    "The logs array contains every log in that category, not a sample. Use the whole array plus summary, strongestTags, weakestTags, boardGameProfile, grades, statuses, reviews, genres, mechanics, and affinity fields.",
+    "Rank beyond items by closest match to highly rated logs and strongestTags. Avoid merely popular titles, avoid patterns found in weakestTags, and make the notes specific instead of generic praise.",
+    "Be specific and varied; do not repeat raw database labels when a natural sentence works.",
   ].join("\n");
 
-  return `${instructions}\n\nInput:\n${JSON.stringify(input.categories, null, 2)}`;
+  return `${instructions}\n\nInput:\n${JSON.stringify(input.categories)}`;
 }
 
 export function parseDiscoverTasteResponse(

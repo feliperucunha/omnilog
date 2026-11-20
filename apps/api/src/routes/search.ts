@@ -132,18 +132,22 @@ async function getLoggedExternalIds(userId: string, mediaType: string): Promise<
 }
 
 async function getRecentSeedIds(userId: string, mediaType: string, maxSeeds: number): Promise<string[]> {
-  const recent = await prisma.log.findMany({
+  const logs = await prisma.log.findMany({
     where: { userId, mediaType },
     orderBy: { updatedAt: "desc" },
-    take: 40,
-    select: { externalId: true },
+    select: { externalId: true, grade: true, updatedAt: true },
+  });
+  const ranked = [...logs].sort((a, b) => {
+    const gradeDiff = (b.grade ?? -1) - (a.grade ?? -1);
+    if (gradeDiff !== 0) return gradeDiff;
+    return b.updatedAt.getTime() - a.updatedAt.getTime();
   });
   const seen = new Set<string>();
   const seeds: string[] = [];
-  for (const r of recent) {
-    if (seen.has(r.externalId)) continue;
-    seen.add(r.externalId);
-    seeds.push(r.externalId);
+  for (const log of ranked) {
+    if (seen.has(log.externalId)) continue;
+    seen.add(log.externalId);
+    seeds.push(log.externalId);
     if (seeds.length >= maxSeeds) break;
   }
   return seeds;
@@ -183,7 +187,6 @@ async function buildRecommendationsPayload(ctx: RecommendationCtx): Promise<Reco
       where: { userId: user!.userId, mediaType: type },
       select: { genres: true, mechanics: true, grade: true, status: true, affinityContext: true },
       orderBy: { updatedAt: "desc" },
-      take: 120,
     });
 
   switch (type) {
@@ -291,7 +294,6 @@ async function buildRecommendationsPayload(ctx: RecommendationCtx): Promise<Reco
             where: { userId: user.userId, mediaType: "manga" },
             select: { genres: true, affinityContext: true, grade: true, status: true },
             orderBy: { updatedAt: "desc" },
-            take: 120,
           })
         : [];
       const sortParam = ctx.sort;
@@ -334,7 +336,6 @@ async function buildRecommendationsPayload(ctx: RecommendationCtx): Promise<Reco
         where: { userId: user.userId, mediaType: "boardgames" },
         select: { genres: true, mechanics: true, grade: true, status: true, affinityContext: true },
         orderBy: { updatedAt: "desc" },
-        take: 120,
       }) : [];
       const token =
         provider === "bgg"

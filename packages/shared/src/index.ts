@@ -2,8 +2,7 @@ export type { LogAffinityContext } from "./affinityContext.js";
 export {
   DISCOVER_MIN_LOGS,
   DISCOVER_TASTE_REFRESH_MS,
-  DISCOVER_TASTE_MAX_LOGS_PER_CATEGORY,
-  DISCOVER_TASTE_PROMPT_LOGS_PER_CATEGORY,
+  DISCOVER_TASTE_VERSION,
   DISCOVER_PLANNED_STATUS,
   type DiscoverPlannedTasteItem,
   type DiscoverBeyondTasteItem,

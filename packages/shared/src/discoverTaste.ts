@@ -2,8 +2,7 @@ import type { MediaType } from "./types.js";
 
 export const DISCOVER_MIN_LOGS = 10;
 export const DISCOVER_TASTE_REFRESH_MS = 24 * 60 * 60 * 1000;
-export const DISCOVER_TASTE_MAX_LOGS_PER_CATEGORY = 120;
-export const DISCOVER_TASTE_PROMPT_LOGS_PER_CATEGORY = 25;
+export const DISCOVER_TASTE_VERSION = 2;
 
 export const DISCOVER_PLANNED_STATUS: Record<MediaType, string> = {
   movies: "plan to watch",
@@ -42,6 +41,7 @@ export interface DiscoverCategoryTaste {
 }
 
 export interface DiscoverTasteSnapshot {
+  version: number;
   refreshedAt: string | null;
   categories: Partial<Record<MediaType, DiscoverCategoryTaste>>;
 }

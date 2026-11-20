@@ -1,5 +1,10 @@
+import { DISCOVER_TASTE_VERSION } from "@geeklogs/shared";
 import { describe, expect, it } from "vitest";
-import { buildDiscoverTastePrompt, parseDiscoverTasteResponse } from "./discoverTaste.js";
+import {
+  buildDiscoverTastePrompt,
+  parseDiscoverTasteResponse,
+  parseStoredDiscoverTasteSnapshot,
+} from "./discoverTaste.js";
 
 describe("discoverTaste", () => {
   it("builds a prompt with the supplied categories", () => {
@@ -43,5 +48,26 @@ describe("discoverTaste", () => {
 
   it("rejects invalid AI JSON", () => {
     expect(() => parseDiscoverTasteResponse("not json", ["movies"], {})).toThrow();
+  });
+
+  it("invalidates stored snapshots from older versions", () => {
+    const categories = {
+      movies: { lines: ["You like thoughtful science fiction."], charts: [], planned: [], beyond: [] },
+    };
+
+    expect(
+      parseStoredDiscoverTasteSnapshot({
+        version: DISCOVER_TASTE_VERSION - 1,
+        refreshedAt: null,
+        categories,
+      })
+    ).toBeNull();
+    expect(
+      parseStoredDiscoverTasteSnapshot({
+        version: DISCOVER_TASTE_VERSION,
+        refreshedAt: null,
+        categories,
+      })?.categories.movies?.lines
+    ).toEqual(["You like thoughtful science fiction."]);
   });
 });
