@@ -42,7 +42,10 @@ export function MatchLogSheet({
         logId={log?.id ?? null}
         onLogUpdated={onLogUpdated}
         onEnsureLog={onEnsureLog}
-        onMatchSaved={onMatchSaved}
+        onMatchSaved={(log) => {
+          onMatchSaved?.(log);
+          onClose();
+        }}
       />
     </div>
   );

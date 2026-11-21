@@ -37,6 +37,7 @@ import {
   Calendar,
   ChevronDown,
   Clock,
+  Crown,
   Dice5,
   Layers,
   Loader2,
@@ -111,13 +112,53 @@ function initialsFromName(name: string): string {
   return t.slice(0, 2).toUpperCase() || "?";
 }
 
+type AvatarColor = { backgroundColor: string; color: string };
+
+const AVATAR_COLORS: AvatarColor[] = [
+  { backgroundColor: "#3b82f6", color: "#ffffff" },
+  { backgroundColor: "#ef4444", color: "#ffffff" },
+  { backgroundColor: "#16a34a", color: "#ffffff" },
+  { backgroundColor: "#facc15", color: "#422006" },
+  { backgroundColor: "#f97316", color: "#ffffff" },
+  { backgroundColor: "#8b5cf6", color: "#ffffff" },
+  { backgroundColor: "#0891b2", color: "#ffffff" },
+  { backgroundColor: "#ec4899", color: "#ffffff" },
+  { backgroundColor: "#65a30d", color: "#ffffff" },
+  { backgroundColor: "#d946ef", color: "#ffffff" },
+  { backgroundColor: "#0d9488", color: "#ffffff" },
+  { backgroundColor: "#e11d48", color: "#ffffff" },
+];
+
+function avatarColorForIndex(index: number): AvatarColor {
+  if (index < AVATAR_COLORS.length) return AVATAR_COLORS[index]!;
+  const hue = (index * 137.508) % 360;
+  return { backgroundColor: `hsl(${hue} 70% 45%)`, color: "#ffffff" };
+}
+
+function avatarColorsForPlayers(players: ReadonlyArray<{ name: string; appUserId?: string | null }>): AvatarColor[] {
+  const used = new Set<number>();
+  return players.map((player) => {
+    const seed = (player.appUserId || player.name).trim().toLowerCase() || player.name || "?";
+    let hash = 0;
+    for (let i = 0; i < seed.length; i += 1) {
+      hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+    }
+    let index = hash % AVATAR_COLORS.length;
+    while (used.has(index)) index += 1;
+    used.add(index);
+    return avatarColorForIndex(index);
+  });
+}
+
 function PlayerAvatar({
   name,
+  color,
   size = "md",
   winner,
   className,
 }: {
   name: string;
+  color: AvatarColor;
   size?: "sm" | "md" | "lg";
   winner?: boolean;
   className?: string;
@@ -127,16 +168,24 @@ function PlayerAvatar({
     size === "sm" ? "h-9 w-9 text-[11px]" : size === "lg" ? "h-12 w-12 text-base" : "h-9 w-9 text-[11px]";
 
   return (
-    <div
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-[var(--color-mid)] font-semibold text-[var(--color-lightest)]",
-        sizeClass,
-        winner && "ring-2 ring-[var(--btn-gradient-start)]",
-        className
+    <div className={cn("relative inline-flex shrink-0", className)}>
+      <div
+        className={cn(
+          "flex items-center justify-center rounded-full font-semibold",
+          sizeClass,
+          winner && "ring-2 ring-[var(--btn-gradient-start)]",
+        )}
+        style={color}
+        aria-hidden
+      >
+        {initials}
+      </div>
+      {winner && (
+        <Crown
+          className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 text-amber-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+          aria-hidden
+        />
       )}
-      aria-hidden
-    >
-      {initials}
     </div>
   );
 }
@@ -346,13 +395,14 @@ export const BoardGameMatchesSection = forwardRef<
   const [availableExpansions, setAvailableExpansions] = useState<BoardGameMatchExpansion[]>([]);
   const [loadingExpansions, setLoadingExpansions] = useState(Boolean(logId));
   const [selectedExpansionIds, setSelectedExpansionIds] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
+  const [savingAction, setSavingAction] = useState<"match" | "banner" | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmMatchId, setDeleteConfirmMatchId] = useState<string | null>(null);
   const playedDateInputRef = useRef<HTMLInputElement>(null);
   const isPlayedToday = isTodayDateInput(playedDate);
 
   const matchesChronologicalAsc = useMemo(() => sortBoardGameMatchesChronologicalAsc(matches), [matches]);
+  const playerAvatarColors = useMemo(() => avatarColorsForPlayers(players), [players]);
 
   useEffect(() => {
     if (!meUser?.id) return;
@@ -426,9 +476,9 @@ export const BoardGameMatchesSection = forwardRef<
       playersPayload: Array<{ name: string; score: number | null; winner: boolean; appUserId?: string }>,
       matchNotes: string | null,
       expansions: BoardGameMatchExpansion[],
-      options?: { resetAfter?: boolean; showBanner?: boolean },
+      options?: { resetAfter?: boolean; showBanner?: boolean; action?: "match" | "banner" },
     ): Promise<boolean> => {
-      setSaving(true);
+      setSavingAction(options?.action ?? "match");
       try {
         let targetLogId = logId;
         if (!targetLogId) {
@@ -467,7 +517,7 @@ export const BoardGameMatchesSection = forwardRef<
         showErrorToast(t, "E013", { originalError: err });
         return false;
       } finally {
-        setSaving(false);
+        setSavingAction(null);
       }
     },
     [logId, onEnsureLog, onLogUpdated, onMatchSaved, resetForm, showBoardGameMatchComplete, t],
@@ -518,7 +568,7 @@ export const BoardGameMatchesSection = forwardRef<
       })),
       notes.trim() || null,
       selectedExpansions,
-      { resetAfter: true },
+      { resetAfter: true, action: "match" },
     );
   }, [notes, selectedExpansions, sessionDurationHours, submitNewMatch, validateAndBuildPlayers]);
 
@@ -536,7 +586,7 @@ export const BoardGameMatchesSection = forwardRef<
       })),
       notes.trim() || null,
       selectedExpansions,
-      { resetAfter: true, showBanner: true },
+      { resetAfter: true, showBanner: true, action: "banner" },
     );
   }, [notes, selectedExpansions, sessionDurationHours, submitNewMatch, validateAndBuildPlayers]);
 
@@ -649,8 +699,8 @@ export const BoardGameMatchesSection = forwardRef<
                 layout
                 className="flex min-w-0 flex-wrap items-center gap-2 border-b border-[var(--color-surface-border)] pb-3 last:border-b-0 last:pb-0"
               >
-                <div className="relative shrink-0">
-                  <PlayerAvatar name={p.name || "?"} size="sm" winner={p.winner} />
+                <div className="relative ml-1.5 shrink-0">
+                  <PlayerAvatar name={p.name || "?"} color={playerAvatarColors[i]!} size="sm" winner={p.winner} />
                   {p.appUserId && (
                     <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-dark)]">
                       <Logo className="h-3 w-3 object-contain" alt="" />
@@ -767,21 +817,21 @@ export const BoardGameMatchesSection = forwardRef<
               <Button
                 type="button"
                 className="w-full sm:flex-1"
-                disabled={saving}
+                disabled={savingAction !== null}
                 onClick={() => void handleSaveNew()}
               >
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
-                {saving ? t("common.saving") : t("boardGameMatches.saveMatch")}
+                {savingAction === "match" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
+                {savingAction === "match" ? t("common.saving") : t("boardGameMatches.saveMatch")}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 className="w-full sm:flex-1"
-                disabled={saving}
+                disabled={savingAction !== null}
                 onClick={() => void handleSaveNewAndShowBanner()}
               >
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
-                {saving ? t("common.saving") : t("boardGameMatches.saveMatchAndShowBanner")}
+                {savingAction === "banner" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
+                {savingAction === "banner" ? t("common.saving") : t("boardGameMatches.saveMatchAndShowBanner")}
               </Button>
             </div>
           )}
@@ -901,6 +951,7 @@ function MatchHistoryCard({
   t: TFunction;
 }) {
   const [open, setOpen] = useState(false);
+  const playerAvatarColors = useMemo(() => avatarColorsForPlayers(match.players), [match.players]);
   const winners = match.players.filter((p) => p.winner).map((p) => p.name);
   const sessionIndex = matchesChronologicalAsc.findIndex((m) => m.id === match.id);
 
@@ -915,7 +966,7 @@ function MatchHistoryCard({
         <div className="flex shrink-0 -space-x-2.5">
           {match.players.slice(0, 5).map((p, i) => (
             <div key={i} className="relative ring-2 ring-[var(--color-dark)] rounded-full" style={{ zIndex: 10 - i }}>
-              <PlayerAvatar name={p.name || "?"} size="sm" winner={false} />
+              <PlayerAvatar name={p.name || "?"} color={playerAvatarColors[i]!} size="sm" winner={false} />
             </div>
           ))}
         </div>
@@ -976,7 +1027,13 @@ function MatchHistoryCard({
                       : "border-[var(--color-mid)]/15 bg-[var(--color-mid)]/5"
                   )}
                 >
-                  <PlayerAvatar name={p.name} size="md" winner={p.winner} />
+                  <PlayerAvatar
+                    name={p.name}
+                    color={playerAvatarColors[i]!}
+                    size="md"
+                    winner={p.winner}
+                    className="ml-1.5"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-2">
                       {p.appUserId && (

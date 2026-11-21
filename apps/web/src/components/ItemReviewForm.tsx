@@ -161,6 +161,7 @@ export function ItemReviewForm({
   const [saving, setSaving] = useState(false);
   const [itemMainTab, setItemMainTab] = useState<"review" | "matches" | "market">("review");
   const [matchSheetOpen, setMatchSheetOpen] = useState(false);
+  const [savingMatchAction, setSavingMatchAction] = useState<"match" | "banner" | null>(null);
   const [searchParams] = useSearchParams();
   const boardMatchesRef = useRef<BoardGameMatchesSectionHandle>(null);
   const prevSeasonEpisodeRef = useRef<{ season: number | ""; episode: number | "" } | null>(null);
@@ -736,11 +737,11 @@ export function ItemReviewForm({
   const handlePrimarySave = async (e?: FormEvent) => {
     e?.preventDefault();
     if (showBoardGameFields && itemMainTab === "matches") {
-      setSaving(true);
+      setSavingMatchAction("match");
       try {
         await boardMatchesRef.current?.saveNewMatch();
       } finally {
-        setSaving(false);
+        setSavingMatchAction(null);
       }
       return;
     }
@@ -750,21 +751,24 @@ export function ItemReviewForm({
 
   const handleSaveMatchAndShowBanner = async () => {
     if (!showBoardGameFields || itemMainTab !== "matches") return;
-    setSaving(true);
+    setSavingMatchAction("banner");
     try {
       await boardMatchesRef.current?.saveNewMatchAndShowBanner();
     } finally {
-      setSaving(false);
+      setSavingMatchAction(null);
     }
   };
 
-  const saveButtonLabel = saving
-    ? t("common.saving")
-    : showBoardGameFields && itemMainTab === "matches"
-      ? t("boardGameMatches.saveMatch")
-      : myLog
-        ? t("common.update")
-        : t("common.save");
+  const saveButtonLabel =
+    showBoardGameFields && itemMainTab === "matches"
+      ? savingMatchAction === "match"
+        ? t("common.saving")
+        : t("boardGameMatches.saveMatch")
+      : saving
+        ? t("common.saving")
+        : myLog
+          ? t("common.update")
+          : t("common.save");
 
   if (loadingLog) {
     return (
@@ -1166,7 +1170,7 @@ export function ItemReviewForm({
               <Button
                 type="button"
                 className="w-full sm:flex-1"
-                disabled={saving}
+                disabled={savingMatchAction !== null}
                 onClick={(e) => void handlePrimarySave(e)}
               >
                 {saveButtonLabel}
@@ -1175,10 +1179,10 @@ export function ItemReviewForm({
                 type="button"
                 variant="outline"
                 className="w-full sm:flex-1"
-                disabled={saving}
+                disabled={savingMatchAction !== null}
                 onClick={() => void handleSaveMatchAndShowBanner()}
               >
-                {saving ? t("common.saving") : t("boardGameMatches.saveMatchAndShowBanner")}
+                {savingMatchAction === "banner" ? t("common.saving") : t("boardGameMatches.saveMatchAndShowBanner")}
               </Button>
             </div>
           ) : hasPartialReviews && itemMainTab === "review" ? (
