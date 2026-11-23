@@ -25,6 +25,7 @@ export function OverflowMarquee({ children, className, title }: OverflowMarqueeP
   const outerRef = useRef<HTMLSpanElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const [overflow, setOverflow] = useState(false);
+  const [visible, setVisible] = useState(false);
   const [durationSec, setDurationSec] = useState(18);
   const [reduceMotion, setReduceMotion] = useState(() =>
     typeof window !== "undefined"
@@ -41,7 +42,8 @@ export function OverflowMarquee({ children, className, title }: OverflowMarqueeP
     const inner = measureRef.current;
     if (!outer || !inner) return;
     const delta = inner.scrollWidth - outer.clientWidth;
-    setOverflow(delta > 1);
+    const next = delta > 1;
+    setOverflow((prev) => (prev === next ? prev : next));
   }, []);
 
   useEffect(() => {
@@ -51,13 +53,29 @@ export function OverflowMarquee({ children, className, title }: OverflowMarqueeP
     return () => mq.removeEventListener("change", fn);
   }, []);
 
+  useEffect(() => {
+    const outer = outerRef.current;
+    if (!outer || typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => setVisible(entries.some((e) => e.isIntersecting)),
+      { rootMargin: "96px" }
+    );
+    io.observe(outer);
+    return () => io.disconnect();
+  }, []);
+
   useLayoutEffect(() => {
+    if (!visible) return;
     check();
     const id = requestAnimationFrame(() => check());
     return () => cancelAnimationFrame(id);
-  }, [check, children]);
+  }, [check, children, visible]);
 
   useEffect(() => {
+    if (!visible) return;
     const outer = outerRef.current;
     if (!outer) return;
     const ro = new ResizeObserver(check);
@@ -65,18 +83,18 @@ export function OverflowMarquee({ children, className, title }: OverflowMarqueeP
     const inner = measureRef.current;
     if (inner) ro.observe(inner);
     return () => ro.disconnect();
-  }, [check, children]);
+  }, [check, children, visible]);
 
   useEffect(() => {
-    if (typeof document === "undefined" || !document.fonts?.ready) return;
+    if (!visible || typeof document === "undefined" || !document.fonts?.ready) return;
     void document.fonts.ready.then(() => check());
-  }, [check, children]);
+  }, [check, children, visible]);
 
   useLayoutEffect(() => {
-    if (!overflow || reduceMotion) return;
+    if (!visible || !overflow || reduceMotion) return;
     const w = measureRef.current?.scrollWidth ?? 0;
     setDurationSec(Math.min(50, Math.max(10, w / 28)));
-  }, [overflow, reduceMotion, children]);
+  }, [overflow, reduceMotion, children, visible]);
 
   const outerClass = cn("block min-w-0 w-full", className);
 

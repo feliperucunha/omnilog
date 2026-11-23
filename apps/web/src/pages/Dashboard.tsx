@@ -678,7 +678,7 @@ export function Dashboard() {
   );
 
   return (
-    <div className="flex min-w-0 flex-col gap-8 overflow-x-hidden">
+    <div className="flex min-w-0 flex-col gap-8 overflow-clip">
       {countsError != null && counts === null && (
         <motion.div
           initial={{ opacity: 0, y: 6 }}

@@ -26,9 +26,9 @@ export function isBggBoardGameImageContext(
   return false;
 }
 
-/** Back layer: scaled cover + blur so letterboxing isn’t empty flat color. */
+/** Back layer: scaled cover fill so letterboxing isn’t empty flat color. */
 export const BGG_BLUR_BACKDROP_IMG_CLASS =
-  "pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover object-center blur-md opacity-[0.75]";
+  "pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover object-center opacity-[0.45]";
 
 /** Front layer: full artwork at native aspect ratio inside the frame. */
 export const BGG_CONTAIN_FOREGROUND_IMG_CLASS =

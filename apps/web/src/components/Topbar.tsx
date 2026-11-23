@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Settings, Info, LogOut, Loader2, CreditCard, Store, FlaskConical, Search } from "lucide-react";
+import { Settings, Info, LogOut, Loader2, CreditCard, Store, FlaskConical } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMe } from "@/contexts/MeContext";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -123,14 +123,14 @@ export function Topbar() {
             ) : null}
           </div>
         </div>
-        {location.pathname !== "/search" ? (
+        {location.pathname !== "/market" ? (
           <button
             type="button"
             className="hidden min-h-11 flex-1 items-center gap-2 rounded-[10px] border border-[var(--color-surface-border)] bg-[var(--color-dark)] px-3 text-left text-sm text-[var(--color-light)] md:flex"
-            onClick={() => navigate("/search")}
+            onClick={() => navigate("/market")}
           >
-            <Search className="size-4 shrink-0" aria-hidden />
-            <span className="truncate">{t("search.catalogs")}</span>
+            <Store className="size-4 shrink-0" aria-hidden />
+            <span className="truncate">{t("nav.market")}</span>
           </button>
         ) : (
           <div className="hidden flex-1 md:block" />
@@ -144,14 +144,14 @@ export function Topbar() {
       )}
 
         <div className="ml-auto flex flex-shrink-0 items-center gap-2 sm:gap-3">
-        {location.pathname !== "/search" && (
+        {location.pathname !== "/market" && (
           <button
             type="button"
             className="flex size-11 items-center justify-center rounded-full bg-[var(--color-lightest)] text-[var(--color-darkest)] shadow-[var(--shadow-sm)] md:hidden"
-            onClick={() => navigate("/search")}
-            aria-label={t("nav.search")}
+            onClick={() => navigate("/market")}
+            aria-label={t("nav.market")}
           >
-            <Search className="size-5" aria-hidden />
+            <Store className="size-5" aria-hidden />
           </button>
         )}
         {/* Theme and locale: in header when logged out, inside avatar menu when logged in */}

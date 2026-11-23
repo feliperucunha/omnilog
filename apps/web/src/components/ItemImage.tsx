@@ -89,7 +89,8 @@ export function ItemImage({
   const imgSizeClass = fitContent ? "block w-auto h-auto max-w-full max-h-full" : "h-full w-full block";
 
   const imgProps = {
-    loading,
+    loading: loading ?? "lazy",
+    decoding: "async" as const,
     referrerPolicy,
   } as const;
 

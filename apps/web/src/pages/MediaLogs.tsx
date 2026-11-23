@@ -1362,13 +1362,13 @@ export function MediaLogs({
   }
 
   return (
-    <div className={`relative min-h-full min-w-0 overflow-hidden pb-24 md:pb-20 ${embedded ? "" : ""}`}>
+    <div className={`relative min-h-full min-w-0 overflow-clip pb-24 md:pb-20 ${embedded ? "" : ""}`}>
       {!embedded && (
         <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
           <Logo alt="" className="h-40 w-auto opacity-20 sm:h-52 md:h-64" />
         </div>
       )}
-      <div className="relative z-10 flex min-w-0 flex-col gap-6 overflow-hidden">
+      <div className="relative z-10 flex min-w-0 flex-col gap-6 overflow-clip">
       {needsKeyBanner && !embedded && (
         <Link
           to="/settings?open=api-keys"
@@ -1689,7 +1689,7 @@ export function MediaLogs({
       >
         {listRefreshing && logs.length > 0 && (
           <div
-            className="sticky top-0 z-20 flex items-center justify-center border-b border-[var(--color-surface-border)] bg-[var(--color-dark)]/95 py-3 backdrop-blur-md"
+            className="sticky top-0 z-20 flex items-center justify-center border-b border-[var(--color-surface-border)] bg-[var(--color-dark)] py-3"
             role="status"
           >
             <Loader2 className="h-5 w-5 animate-spin text-[var(--color-lightest)]" aria-hidden />
@@ -1755,7 +1755,9 @@ export function MediaLogs({
                       "min-h-0 min-w-0 [content-visibility:auto]",
                       activeLogView === "grid"
                         ? "[contain-intrinsic-size:auto_380px]"
-                        : "[contain-intrinsic-size:auto_148px]"
+                        : activeLogView === "compact"
+                          ? "[contain-intrinsic-size:auto_220px]"
+                          : "[contain-intrinsic-size:auto_160px]"
                     )}
                   >
                     {renderLogCard(

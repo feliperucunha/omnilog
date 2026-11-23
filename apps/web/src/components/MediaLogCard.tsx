@@ -173,7 +173,7 @@ function LogImageOverlays({
       {showScore && (
         <span
           className={cn(
-            "absolute z-10 rounded bg-black/75 px-1 py-0.5 font-semibold text-yellow-300 backdrop-blur-sm whitespace-nowrap",
+            "absolute z-10 rounded bg-black/85 px-1 py-0.5 font-semibold text-yellow-300 whitespace-nowrap",
             pos
           )}
           title={`${sourceLabel} ${log.apiScore!.toFixed(1)} / 10`}
@@ -184,7 +184,7 @@ function LogImageOverlays({
       {!showScore && showWeight && (
         <span
           className={cn(
-            "absolute z-10 rounded bg-black/75 px-1 py-0.5 font-semibold text-yellow-300 backdrop-blur-sm whitespace-nowrap",
+            "absolute z-10 rounded bg-black/85 px-1 py-0.5 font-semibold text-yellow-300 whitespace-nowrap",
             pos
           )}
           title={weightLabel!}

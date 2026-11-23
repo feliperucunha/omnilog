@@ -44,7 +44,7 @@ function AppLayoutContent() {
       <Topbar />
       <div
         ref={setScrollEl}
-        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto max-md:[scroll-padding-bottom:calc(8.5rem+env(safe-area-inset-bottom))]"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain max-md:[scroll-padding-bottom:calc(8.5rem+env(safe-area-inset-bottom))]"
       >
         <PullToRefreshIndicator
           pullRawDy={ptr.pullRawDy}
@@ -116,8 +116,24 @@ export function AppLayout() {
     setDevOnboardingOpen(true);
   }, [user?.onboarded, user?.id]);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyOverscroll = body.style.overscrollBehaviorY;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehaviorY = "none";
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.overscrollBehaviorY = prevBodyOverscroll;
+    };
+  }, []);
+
   return (
-    <div className="flex h-dvh min-h-0 min-w-0">
+    <div className="flex h-dvh min-h-0 min-w-0 overflow-hidden">
       <Nav />
       <main
         className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-0 md:pb-6 md:pl-[6.5rem]"

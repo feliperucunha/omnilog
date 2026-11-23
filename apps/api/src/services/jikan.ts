@@ -204,8 +204,12 @@ export async function getAnimeById(
   id: string,
   preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
 ): Promise<ItemDetail | null> {
-  const fromJikan = await getAnimeByIdJikan(id, preference);
-  if (fromJikan) return fromJikan;
+  try {
+    const fromJikan = await getAnimeByIdJikan(id, preference);
+    if (fromJikan) return fromJikan;
+  } catch {
+    // Fall back to AniList on Jikan timeout/network errors.
+  }
   return getAnimeByIdAnilist(id, preference);
 }
 
@@ -355,8 +359,12 @@ export async function getMangaById(
   id: string,
   preference: AnimeMangaTitleLanguage = DEFAULT_ANIME_MANGA_TITLE_LANGUAGE
 ): Promise<ItemDetail | null> {
-  const fromJikan = await getMangaByIdJikan(id, preference);
-  if (fromJikan) return fromJikan;
+  try {
+    const fromJikan = await getMangaByIdJikan(id, preference);
+    if (fromJikan) return fromJikan;
+  } catch {
+    // Fall back to AniList on Jikan timeout/network errors.
+  }
   return getMangaByIdAnilist(id, preference);
 }
 
