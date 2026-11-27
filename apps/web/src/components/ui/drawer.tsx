@@ -14,6 +14,7 @@ const DISMISS_FRACTION_OF_VH = 0.14;
 /** Quick downward flick: avg velocity (px/ms) from drag start to release. */
 const DISMISS_VELOCITY_PX_PER_MS = 0.55;
 const DISMISS_VELOCITY_MIN_OFFSET_PX = 40;
+const DROPDOWN_TAP_GRACE_MS = 300;
 
 const Dialog = DialogPrimitive.Root;
 const DialogPortal = DialogPrimitive.Portal;
@@ -78,6 +79,11 @@ function isDrawerFooter(child: React.ReactNode): boolean {
   return React.isValidElement(child) && child.type === DrawerFooter;
 }
 
+function hasOpenDropdownPortal(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.querySelector('[data-dropdown-portal][data-state="open"]') !== null;
+}
+
 const DrawerContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   DrawerContentProps
@@ -98,11 +104,20 @@ const DrawerContent = React.forwardRef<
   const swipeStartTimeRef = React.useRef(0);
   const closeInFlightRef = React.useRef(false);
   const ignoreUntilRef = React.useRef(0);
+  const dropdownTapUntilRef = React.useRef(0);
 
   const outsideDismissLocked = React.useCallback(() => {
     if (!closeOnInteractOutside || (ignoreOutsideCloseForMs ?? 0) <= 0) return false;
     return performance.now() - ignoreUntilRef.current < (ignoreOutsideCloseForMs ?? 0);
   }, [closeOnInteractOutside, ignoreOutsideCloseForMs]);
+
+  const dropdownTapLocked = React.useCallback(() => {
+    if (hasOpenDropdownPortal()) {
+      dropdownTapUntilRef.current = performance.now() + DROPDOWN_TAP_GRACE_MS;
+      return true;
+    }
+    return performance.now() < dropdownTapUntilRef.current;
+  }, []);
 
   React.useEffect(() => {
     if (radixOpen) ignoreUntilRef.current = performance.now();
@@ -347,11 +362,11 @@ const DrawerContent = React.forwardRef<
         ref={overlayRef}
         className={overlayClassName}
         onClick={() => {
-          if (outsideDismissLocked()) return;
+          if (outsideDismissLocked() || dropdownTapLocked()) return;
           if (closeOnInteractOutside) closeImmediately();
         }}
         onPointerDown={() => {
-          if (outsideDismissLocked()) return;
+          if (outsideDismissLocked() || dropdownTapLocked()) return;
           if (closeOnInteractOutside) closeImmediately();
         }}
       />
@@ -377,7 +392,7 @@ const DrawerContent = React.forwardRef<
             e.preventDefault();
             return;
           }
-          if (outsideDismissLocked()) {
+          if (outsideDismissLocked() || dropdownTapLocked()) {
             e.preventDefault();
             return;
           }
@@ -394,7 +409,7 @@ const DrawerContent = React.forwardRef<
             e.preventDefault();
             return;
           }
-          if (outsideDismissLocked()) {
+          if (outsideDismissLocked() || dropdownTapLocked()) {
             e.preventDefault();
             return;
           }
