@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Settings, Info, LogOut, Loader2, CreditCard, Store, FlaskConical } from "lucide-react";
+import { Settings, Info, LogOut, Loader2, CreditCard, Store } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useMe } from "@/contexts/MeContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
@@ -44,7 +43,6 @@ const LOCALE_SHORT_LABELS: Record<Locale, string> = {
 export function Topbar() {
   const { t, locale, setLocale } = useLocale();
   const { token, user, logout, signingOut, setSigningOut } = useAuth();
-  const { me } = useMe();
   const navigate = useNavigate();
   const location = useLocation();
   const pageTitleContext = usePageTitle();
