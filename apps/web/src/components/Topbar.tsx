@@ -182,7 +182,7 @@ export function Topbar() {
             </div>
           </>
         )}
-        {token && me?.tier === "admin" && (
+        {/* {token && me?.tier === "admin" && (
           <button
             type="button"
             onClick={() => navigate(location.pathname === "/sandbox" ? "/dashboard" : "/sandbox")}
@@ -197,7 +197,7 @@ export function Topbar() {
             <FlaskConical className="size-4" aria-hidden />
             <span className="max-md:hidden">UI Lab</span>
           </button>
-        )}
+        )} */}
         {token && user && (
           <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
             <DropdownMenuTrigger asChild>

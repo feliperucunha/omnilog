@@ -161,9 +161,10 @@ function PlayersFilterDropdown({ value, onChange, labelAll, ariaLabel, className
       <button
         type="button"
         className={cn(
-          "flex w-full items-center justify-between gap-2 rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] transition-colors [touch-action:manipulation]",
+          "group flex w-full items-center justify-between gap-2 rounded-md border border-[var(--color-mid)] bg-[var(--color-darkest)] px-3 py-2 text-sm text-[var(--color-lightest)] transition-colors [touch-action:manipulation]",
           "max-md:h-full max-md:min-h-[44px]",
           "md:h-9 md:min-h-9 md:max-h-9 md:py-1",
+          "max-md:min-h-[48px] max-md:rounded-xl max-md:border-[var(--color-surface-border)] max-md:bg-[var(--color-dark)] max-md:px-4 max-md:text-base max-md:shadow-[var(--shadow-sm)]",
           "focus:outline-none"
         )}
         aria-label={ariaLabel}
@@ -172,17 +173,17 @@ function PlayersFilterDropdown({ value, onChange, labelAll, ariaLabel, className
         onClick={() => setOpen((v) => !v)}
       >
         <OverflowMarquee className="text-left">{triggerLabel}</OverflowMarquee>
-        <ChevronDown className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", open && "rotate-180")} aria-hidden />
+        <ChevronDown className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", open && "rotate-180", "max-md:h-7 max-md:w-7 max-md:rounded-full max-md:bg-[var(--color-mid)]/15 max-md:p-1.5")} aria-hidden />
       </button>
       {open && (
         <div
           id={listId}
-          className="mt-2 flex flex-col gap-0.5 rounded-md border border-[var(--color-mid)]/30 bg-[var(--color-darkest)] p-1.5"
+          className="mt-2 flex flex-col gap-0.5 rounded-md border border-[var(--color-mid)]/30 bg-[var(--color-darkest)] p-1.5 max-md:rounded-xl max-md:border-[var(--color-surface-border)] max-md:bg-[var(--color-dark)] max-md:p-2"
         >
           {PLAYER_OPTIONS.map((opt) => (
             <label
               key={opt.value}
-              className="flex min-h-[44px] cursor-pointer select-none items-center gap-3 rounded-sm px-2 py-1.5 text-sm text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/40 [touch-action:manipulation]"
+              className="flex min-h-[44px] cursor-pointer select-none items-center gap-3 rounded-sm px-2 py-1.5 text-sm text-[var(--color-lightest)] transition-colors hover:bg-[var(--color-mid)]/40 [touch-action:manipulation] max-md:min-h-[48px] max-md:rounded-lg max-md:px-3 max-md:text-base"
             >
               <input
                 type="checkbox"
@@ -1616,7 +1617,7 @@ export function MediaLogs({
           <DrawerContent
             onClose={() => setFiltersOpen(false)}
             mobileHeight="auto"
-            className="px-4 pb-[max(7rem,calc(5.5rem+env(safe-area-inset-bottom)))]"
+            className="px-4 max-md:pb-[max(7rem,calc(5.5rem+env(safe-area-inset-bottom)))]"
           >
             <div className="flex flex-col gap-3 px-1 pt-4">
               <h2 className="text-lg font-semibold text-[var(--color-lightest)]">{t("mediaLogs.filters")}</h2>

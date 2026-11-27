@@ -67,8 +67,9 @@ import { usePageTitle } from "@/contexts/PageTitleContext";
 import { useVisibleMediaTypes } from "@/contexts/VisibleMediaTypesContext";
 import { logStatusBadgeClass, logStatusBorderClass } from "@/lib/logStatusColors";
 import {
+  FINISHED_STATUSES,
   IN_PROGRESS_STATUSES,
-  LOG_STATUS_OPTIONS,
+  MEDIA_TYPES,
   SPEND_TRACKED_MEDIA_TYPES,
   type Log,
   type MediaType,
@@ -91,7 +92,8 @@ import {
 } from "@/components/ui/dialog";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { showErrorToast } from "@/lib/errorToast";
-import { buildRecapTitle, recapBoundsForPeriod, type RecapPeriod } from "@/lib/recapPeriodBounds";
+import { buildRecapTitle, recapBoundsForDays } from "@/lib/recapPeriodBounds";
+import { RecapTimeSelector } from "@/components/RecapTimeSelector";
 import { RecapView } from "@/components/RecapView";
 import * as storage from "@/lib/storage";
 import { currencyMinorDecimals } from "@/lib/moneyInput";
@@ -121,6 +123,17 @@ function formatSignedMinorAsMoney(minor: number, currency: string): string {
   if (minor > 0) return `+${formatted}`;
   if (minor < 0) return `−${formatMinorAsMoney(abs, currency)}`;
   return formatMinorAsMoney(0, currency);
+}
+
+const DASHBOARD_CATEGORY_STORAGE_KEY = "geeklogs.dashboard.category.v1";
+
+function readStoredDashboardCategory(): MediaType | null {
+  try {
+    const value = localStorage.getItem(DASHBOARD_CATEGORY_STORAGE_KEY);
+    return value && MEDIA_TYPES.includes(value as MediaType) ? (value as MediaType) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** One track: emerald (sales) left, rose (purchases) right — width vs global max. */
@@ -891,9 +904,8 @@ export function Statistics() {
   const [recapPickerOpen, setRecapPickerOpen] = useState(false);
   const [recapView, setRecapView] = useState<{ title: string; logs: Log[] } | null>(null);
   const [recapCategory, setRecapCategory] = useState<"all" | MediaType>("all");
-  /** Only used when `recapCategory` is a single media type; `"all"` = no status filter. */
-  const [recapStatusFilter, setRecapStatusFilter] = useState<"all" | string>("all");
-  const [recapPeriod, setRecapPeriod] = useState<RecapPeriod>("week");
+  const [recapDaysAgo, setRecapDaysAgo] = useState(365);
+  const [recapAllTime, setRecapAllTime] = useState(false);
   const [recapSubmitting, setRecapSubmitting] = useState(false);
   const [purchasePeriod, setPurchasePeriod] = useState<PurchasePeriod>("month");
   const [purchaseSpending, setPurchaseSpending] = useState<Record<string, Record<string, number>> | null>(
@@ -1453,15 +1465,6 @@ export function Statistics() {
     [visibleTypes, t]
   );
 
-  const recapPeriodOptions = useMemo(
-    () => [
-      { value: "week" as const, label: t("recap.periodLastWeek"), disabled: false },
-      { value: "month" as const, label: t("recap.periodLastMonth"), disabled: !isPro },
-      { value: "year" as const, label: t("recap.periodLastYear"), disabled: !isPro },
-    ],
-    [isPro, t]
-  );
-
   const hallOfFamePeriodOptions = useMemo(
     () => [
       { value: "all" as const, label: t("statistics.hallOfFamePeriodAll") },
@@ -1470,62 +1473,55 @@ export function Statistics() {
     [t]
   );
 
-  const recapStatusOptions = useMemo(() => {
-    const allOpt = { value: "all", label: t("recap.statusAll") };
-    if (recapCategory === "all") {
-      return [allOpt];
-    }
-    const statuses = LOG_STATUS_OPTIONS[recapCategory];
-    return [
-      allOpt,
-      ...statuses.map((s) => ({
-        value: s,
-        label: getStatusLabel(t, s, recapCategory),
-      })),
-    ];
-  }, [recapCategory, t]);
-
   const handleOpenRecapPicker = useCallback(() => {
+    const candidate = categoryFilter !== "all" ? categoryFilter : readStoredDashboardCategory();
+    setRecapCategory(candidate && visibleTypes.includes(candidate) ? candidate : "all");
     setRecapPickerOpen(true);
-  }, []);
+  }, [categoryFilter, visibleTypes]);
 
   const handleSeeRecap = useCallback(async () => {
-    const bounds = recapBoundsForPeriod(recapPeriod, tzOffsetMinutes);
     setRecapSubmitting(true);
     try {
       const params = new URLSearchParams({
         recap: "1",
-        recapPeriod,
-        updatedFrom: bounds.from.toISOString(),
-        updatedTo: bounds.to.toISOString(),
+        recapPeriod: recapAllTime ? "all" : "year",
         limit: "400",
         sort: "dateDesc",
         timezoneOffsetMinutes: String(tzOffsetMinutes),
       });
+      if (!recapAllTime) {
+        const bounds = recapBoundsForDays(recapDaysAgo, tzOffsetMinutes);
+        params.set("updatedFrom", bounds.from.toISOString());
+        params.set("updatedTo", bounds.to.toISOString());
+      }
       if (recapCategory !== "all") {
         params.set("mediaType", recapCategory);
-        if (recapStatusFilter !== "all") {
-          params.set("status", recapStatusFilter);
-        }
       }
       const res = await apiFetch<{ data: Log[]; nextCursor: string | null }>(`/logs?${params.toString()}`);
       const categoryLabel =
         recapCategory === "all" ? t("recap.allMyMedia") : t(`nav.${recapCategory}`);
       const title = buildRecapTitle({
-        period: recapPeriod,
         categoryLabel,
         locale,
         tzOffsetMinutes,
-        weekLabel: t("recap.periodLastWeek"),
+        daysAgo: recapDaysAgo,
+        allTime: recapAllTime,
+        allTimeLabel: t("recap.allTime"),
+        sinceLabel: t("recap.since"),
       });
-      setRecapView({ title, logs: (res.data ?? []).map(decodeLogForDisplay) });
+      const logs = (res.data ?? [])
+        .filter(
+          (log) => log.status != null && (FINISHED_STATUSES as readonly string[]).includes(log.status)
+        )
+        .map(decodeLogForDisplay);
+      setRecapView({ title, logs });
       setRecapPickerOpen(false);
     } catch (e) {
       showErrorToast(t, "E010", { originalError: e });
     } finally {
       setRecapSubmitting(false);
     }
-  }, [recapPeriod, tzOffsetMinutes, recapCategory, recapStatusFilter, t, locale]);
+  }, [recapAllTime, recapDaysAgo, tzOffsetMinutes, recapCategory, t, locale]);
 
   useEffect(() => {
     if (!isStatisticsActive) return;
@@ -1895,9 +1891,8 @@ const summaryData = summary ?? EMPTY_SUMMARY;
               className="flex max-h-[min(92dvh,640px)] flex-col gap-4 p-4 sm:p-6"
               onClose={() => setRecapPickerOpen(false)}
             >
-              <div className="mt-4 space-y-1">
+              <div className="mt-4">
                 <h2 className="text-lg font-semibold text-[var(--color-lightest)]">{t("recap.pickerTitle")}</h2>
-                <p className="text-sm text-[var(--color-light)]">{t("recap.pickerSubtitle")}</p>
               </div>
               <div className="flex flex-col gap-3">
                 <div className="space-y-1.5">
@@ -1907,7 +1902,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                   <Select
                     value={recapCategory}
                     onValueChange={(v) => {
-                      setRecapStatusFilter("all");
                       setRecapCategory(v === "all" ? "all" : (v as MediaType));
                     }}
                     options={recapCategoryOptions}
@@ -1916,34 +1910,13 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                     triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
-                    {t("recap.statusLabel")}
-                  </p>
-                  <Select
-                    value={recapStatusFilter}
-                    onValueChange={(v) => setRecapStatusFilter(v)}
-                    options={recapStatusOptions}
-                    disabled={recapCategory === "all"}
-                    aria-label={t("recap.statusLabel")}
-                    className="w-full min-w-0"
-                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
-                    contentScrollable
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
-                    {t("recap.periodLabel")}
-                  </p>
-                  <Select
-                    value={recapPeriod}
-                    onValueChange={(v) => setRecapPeriod(v as RecapPeriod)}
-                    options={recapPeriodOptions}
-                    aria-label={t("recap.periodLabel")}
-                    className="w-full min-w-0"
-                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
-                  />
-                </div>
+                <RecapTimeSelector
+                  daysAgo={recapDaysAgo}
+                  onDaysAgoChange={setRecapDaysAgo}
+                  allTime={recapAllTime}
+                  onAllTimeChange={setRecapAllTime}
+                  timezoneOffsetMinutes={tzOffsetMinutes}
+                />
                 <Button
                   type="button"
                   className="btn-gradient mt-2 w-full mb-4"
@@ -1961,7 +1934,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
               <DialogHeader>
                 <DialogTitle className="min-w-0 text-[var(--color-lightest)]">{t("recap.pickerTitle")}</DialogTitle>
               </DialogHeader>
-              <p className="text-sm text-[var(--color-light)]">{t("recap.pickerSubtitle")}</p>
               <div className="flex flex-col gap-3 pt-1">
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
@@ -1970,7 +1942,6 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                   <Select
                     value={recapCategory}
                     onValueChange={(v) => {
-                      setRecapStatusFilter("all");
                       setRecapCategory(v === "all" ? "all" : (v as MediaType));
                     }}
                     options={recapCategoryOptions}
@@ -1979,34 +1950,13 @@ const summaryData = summary ?? EMPTY_SUMMARY;
                     triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
-                    {t("recap.statusLabel")}
-                  </p>
-                  <Select
-                    value={recapStatusFilter}
-                    onValueChange={(v) => setRecapStatusFilter(v)}
-                    options={recapStatusOptions}
-                    disabled={recapCategory === "all"}
-                    aria-label={t("recap.statusLabel")}
-                    className="w-full min-w-0"
-                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
-                    contentScrollable
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-light)]">
-                    {t("recap.periodLabel")}
-                  </p>
-                  <Select
-                    value={recapPeriod}
-                    onValueChange={(v) => setRecapPeriod(v as RecapPeriod)}
-                    options={recapPeriodOptions}
-                    aria-label={t("recap.periodLabel")}
-                    className="w-full min-w-0"
-                    triggerClassName="w-full min-w-0 justify-between gap-2 py-2 h-auto max-md:min-h-[44px] [&>:first-child]:text-left [&>:first-child]:leading-snug"
-                  />
-                </div>
+                <RecapTimeSelector
+                  daysAgo={recapDaysAgo}
+                  onDaysAgoChange={setRecapDaysAgo}
+                  allTime={recapAllTime}
+                  onAllTimeChange={setRecapAllTime}
+                  timezoneOffsetMinutes={tzOffsetMinutes}
+                />
                 <Button
                   type="button"
                   className="btn-gradient mt-2 w-full"

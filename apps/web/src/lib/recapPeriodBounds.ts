@@ -1,78 +1,60 @@
-export type RecapPeriod = "week" | "month" | "year";
+export type RecapPeriod = "week" | "month" | "year" | "all";
 
 function offsetMs(tzOffsetMinutes: number): number {
   return Number.isFinite(tzOffsetMinutes) ? tzOffsetMinutes * 60 * 1000 : 0;
 }
 
-/**
- * Calendar windows in the user's offset (same convention as Statistics: `-getTimezoneOffset()`).
- * Week = previous ISO Monday–Sunday. Month = previous calendar month. Year = previous calendar year.
- */
-export function recapBoundsForPeriod(period: RecapPeriod, tzOffsetMinutes: number): { from: Date; to: Date } {
+export function recapBoundsForDays(daysAgo: number, tzOffsetMinutes: number): { from: Date; to: Date } {
+  const days = Math.max(0, Math.min(365, Math.round(daysAgo)));
   const om = offsetMs(tzOffsetMinutes);
   const now = new Date();
   const shifted = new Date(now.getTime() + om);
-  const y = shifted.getUTCFullYear();
-  const m = shifted.getUTCMonth() + 1;
-  const d = shifted.getUTCDate();
+  const localMidnight = Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate()) - om;
+  return { from: new Date(localMidnight - days * 86400000), to: now };
+}
 
-  if (period === "week") {
-    const todayMidnight = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - om);
-    const shiftedNoon = new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0) - om);
-    const wd = shiftedNoon.getUTCDay();
-    const daysFromMonday = wd === 0 ? 6 : wd - 1;
-    const thisMonday = new Date(todayMidnight.getTime() - daysFromMonday * 86400000);
-    const from = new Date(thisMonday.getTime() - 7 * 86400000);
-    const to = new Date(thisMonday.getTime() - 1);
-    return { from, to };
-  }
-
-  if (period === "month") {
-    const from = new Date(Date.UTC(y, m - 2, 1, 0, 0, 0, 0) - om);
-    const to = new Date(Date.UTC(y, m - 1, 0, 23, 59, 59, 999) - om);
-    return { from, to };
-  }
-
-  const from = new Date(Date.UTC(y - 1, 0, 1, 0, 0, 0, 0) - om);
-  const to = new Date(Date.UTC(y - 1, 11, 31, 23, 59, 59, 999) - om);
-  return { from, to };
+export function recapCheckpointDays(
+  tzOffsetMinutes: number
+): Array<{ days: number; kind: "jan1" | "lastMonth" | "lastWeek" }> {
+  const om = offsetMs(tzOffsetMinutes);
+  const shifted = new Date(Date.now() + om);
+  const jan1Days = Math.floor(
+    (shifted.getTime() - Date.UTC(shifted.getUTCFullYear(), 0, 1)) / 86400000
+  );
+  const candidates = [
+    { days: jan1Days, kind: "jan1" as const },
+    { days: 30, kind: "lastMonth" as const },
+    { days: 7, kind: "lastWeek" as const },
+  ];
+  return candidates
+    .filter((candidate) => candidate.days > 0 && candidate.days < 365)
+    .filter((candidate, index, all) => all.findIndex((item) => item.days === candidate.days) === index)
+    .sort((a, b) => b.days - a.days);
 }
 
 function intlLocale(locale: string): string {
-  if (locale === "pt-BR") return "pt-BR";
-  return locale;
-}
-
-/** Title-style month: first grapheme uppercased, rest unchanged from `Intl`. */
-function capitalizeMonthLabel(raw: string, loc: string): string {
-  const t = raw.trim();
-  if (t.length === 0) return raw;
-  return t.charAt(0).toLocaleUpperCase(loc) + t.slice(1);
+  return locale === "pt-BR" ? "pt-BR" : locale;
 }
 
 export function buildRecapTitle(params: {
-  period: RecapPeriod;
   categoryLabel: string;
   locale: string;
   tzOffsetMinutes: number;
-  /** Localized “last week” (or equivalent); used instead of a date range for the week recap title. */
-  weekLabel: string;
+  daysAgo: number;
+  allTime: boolean;
+  allTimeLabel: string;
+  sinceLabel: string;
 }): string {
-  const { from } = recapBoundsForPeriod(params.period, params.tzOffsetMinutes);
-  const loc = intlLocale(params.locale);
-  const { categoryLabel } = params;
-
-  if (params.period === "week") {
-    return `${categoryLabel} — ${params.weekLabel}`;
+  if (params.allTime) {
+    return `${params.categoryLabel} — ${params.allTimeLabel}`;
   }
-
-  if (params.period === "month") {
-    const mf = new Intl.DateTimeFormat(loc, { month: "long" });
-    const monthLabel = capitalizeMonthLabel(mf.format(from), loc);
-    return `${categoryLabel} — ${monthLabel}`;
-  }
-
+  const { from } = recapBoundsForDays(params.daysAgo, params.tzOffsetMinutes);
   const shiftedFrom = new Date(from.getTime() + offsetMs(params.tzOffsetMinutes));
-  const yearLabel = String(shiftedFrom.getUTCFullYear());
-  return `${categoryLabel} — ${yearLabel}`;
+  const dateLabel = new Intl.DateTimeFormat(intlLocale(params.locale), {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(shiftedFrom);
+  return `${params.categoryLabel} — ${params.sinceLabel} ${dateLabel}`;
 }

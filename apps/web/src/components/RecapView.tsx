@@ -30,6 +30,13 @@ const DEFAULT_ASPECT = 2 / 3;
 const GRID_GAP_PX = 6;
 const DECODE_TIMEOUT_MS = 22_000;
 
+function recapTitleFontSize(height: number, share: boolean): string {
+  const px = share
+    ? Math.max(15, Math.min(26, height * 0.12))
+    : Math.max(8, Math.min(13, height * 0.11));
+  return `${px}px`;
+}
+
 function useIsNative(): boolean {
   const [isNative, setIsNative] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -459,19 +466,34 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
           activeBoardGameProvider={me?.boardGameProvider ?? null}
           loading="eager"
         />
-        {log.grade != null ? (
+        {log.status === "dropped" ? (
           <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/70 to-transparent px-0.5 pb-0.5 pt-2"
-            style={{ transform: `scale(${starScale})`, transformOrigin: "bottom center" }}
-          >
-            <StarRating
-              value={gradeToStars(log.grade)}
-              readOnly
-              size="sm"
-              className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
-            />
-          </div>
+            className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-red-400/25"
+            style={{ backgroundColor: "rgba(239, 68, 68, 0.13)" }}
+            aria-hidden
+          />
         ) : null}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-0.5 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-1 pb-1"
+          style={{ paddingTop: `${Math.max(8, Math.min(20, H * 0.14))}px` }}
+        >
+          <p
+            className="line-clamp-2 w-full break-words text-center font-semibold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] [overflow-wrap:anywhere]"
+            style={{ fontSize: recapTitleFontSize(H, false) }}
+          >
+            {log.title}
+          </p>
+          {log.grade != null ? (
+            <div style={{ transform: `scale(${starScale})`, transformOrigin: "bottom center" }}>
+              <StarRating
+                value={gradeToStars(log.grade)}
+                readOnly
+                size="sm"
+                className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+              />
+            </div>
+          ) : null}
+        </div>
       </div>
     );
   };
@@ -559,14 +581,32 @@ export function RecapView({ title, logs, onClose }: RecapViewProps) {
                     activeBoardGameProvider={me?.boardGameProvider ?? null}
                     loading="eager"
                   />
-                  {log.grade != null ? (
+                  {log.status === "dropped" ? (
                     <div
-                      className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/75 to-transparent px-1 pb-1 pt-3"
-                      style={{ transform: "scale(0.82)", transformOrigin: "bottom center" }}
-                    >
-                      <StarRating value={gradeToStars(log.grade)} readOnly size="md" />
-                    </div>
+                      className="pointer-events-none absolute inset-0"
+                      style={{
+                        backgroundColor: "rgba(239, 68, 68, 0.13)",
+                        boxShadow: "inset 0 0 0 2px rgba(248, 113, 113, 0.28)",
+                      }}
+                      aria-hidden
+                    />
                   ) : null}
+                  <div
+                    className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-2 pb-2"
+                    style={{ paddingTop: `${Math.max(18, Math.min(44, sharePack.H * 0.16))}px` }}
+                  >
+                    <p
+                      className="line-clamp-2 w-full break-words text-center font-semibold leading-tight text-white [overflow-wrap:anywhere]"
+                      style={{ fontSize: recapTitleFontSize(sharePack.H, true) }}
+                    >
+                      {log.title}
+                    </p>
+                    {log.grade != null ? (
+                      <div style={{ transform: "scale(0.82)", transformOrigin: "bottom center" }}>
+                        <StarRating value={gradeToStars(log.grade)} readOnly size="md" />
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               );
             })}

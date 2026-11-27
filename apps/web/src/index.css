@@ -215,6 +215,19 @@ body {
       transition-duration: 0.15s;
     }
   }
+  @media (max-width: 767px) {
+    [data-radix-popper-content-wrapper]:has(> [data-select-sheet]) {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100% !important;
+      max-width: none !important;
+      transform: none !important;
+      pointer-events: none !important;
+    }
+    [data-radix-popper-content-wrapper]:has(> [data-select-sheet]) > [data-select-sheet] {
+      pointer-events: auto !important;
+    }
+  }
 
   @keyframes recap-glow-pulse {
     0%,

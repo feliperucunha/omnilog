@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   COMPLETED_STATUSES,
+  FINISHED_STATUSES,
   IN_PROGRESS_STATUSES,
   LIST_TYPES,
   LOG_STATUS_OPTIONS,
@@ -631,31 +632,34 @@ logsRouter.get("/", async (req: AuthenticatedRequest, res) => {
   if (recapFlag) {
     const recapPeriodRaw =
       typeof req.query.recapPeriod === "string" ? req.query.recapPeriod.trim().toLowerCase() : "";
-    const recapPeriods = ["week", "month", "year"] as const;
+    const recapPeriods = ["week", "month", "year", "all"] as const;
     if (!recapPeriods.includes(recapPeriodRaw as (typeof recapPeriods)[number])) {
-      res.status(400).json({ error: "Invalid recapPeriod (use week, month, or year)." });
+      res.status(400).json({ error: "Invalid recapPeriod (use week, month, year, or all)." });
       return;
     }
     const recapPeriod = recapPeriodRaw as (typeof recapPeriods)[number];
-    const fromRaw = typeof req.query.updatedFrom === "string" ? req.query.updatedFrom.trim() : "";
-    const toRaw = typeof req.query.updatedTo === "string" ? req.query.updatedTo.trim() : "";
-    if (!fromRaw || !toRaw) {
-      res.status(400).json({ error: "Recap requires updatedFrom and updatedTo (ISO 8601)." });
-      return;
+    where.status = { in: [...FINISHED_STATUSES] };
+    if (recapPeriod !== "all") {
+      const fromRaw = typeof req.query.updatedFrom === "string" ? req.query.updatedFrom.trim() : "";
+      const toRaw = typeof req.query.updatedTo === "string" ? req.query.updatedTo.trim() : "";
+      if (!fromRaw || !toRaw) {
+        res.status(400).json({ error: "Recap requires updatedFrom and updatedTo (ISO 8601)." });
+        return;
+      }
+      const fromD = new Date(fromRaw);
+      const toD = new Date(toRaw);
+      if (Number.isNaN(fromD.getTime()) || Number.isNaN(toD.getTime()) || fromD > toD) {
+        res.status(400).json({ error: "Invalid recap date range." });
+        return;
+      }
+      const spanMs = toD.getTime() - fromD.getTime();
+      const maxSpanMs = 370 * 24 * 60 * 60 * 1000;
+      if (spanMs > maxSpanMs) {
+        res.status(400).json({ error: "Recap date range too wide." });
+        return;
+      }
+      where = mergeLogWhere(where, { updatedAt: { gte: fromD, lte: toD } });
     }
-    const fromD = new Date(fromRaw);
-    const toD = new Date(toRaw);
-    if (Number.isNaN(fromD.getTime()) || Number.isNaN(toD.getTime()) || fromD > toD) {
-      res.status(400).json({ error: "Invalid recap date range." });
-      return;
-    }
-    const spanMs = toD.getTime() - fromD.getTime();
-    const maxSpanMs = 370 * 24 * 60 * 60 * 1000;
-    if (spanMs > maxSpanMs) {
-      res.status(400).json({ error: "Recap date range too wide." });
-      return;
-    }
-    where = mergeLogWhere(where, { updatedAt: { gte: fromD, lte: toD } });
   }
 
   const orderBy: Prisma.LogOrderByWithRelationInput[] | Prisma.LogOrderByWithRelationInput =
